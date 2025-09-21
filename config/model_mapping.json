@@ -1,0 +1,22 @@
+{
+    "gbpjpy": {
+        "model_id": "1abc123def456ghi789jkl012mno345pqr",
+        "scaler_id": "6stu789vwx012yza345bcd678efg901hij",
+        "last_updated": "2023-10-15"
+    },
+    "chfjpy": {
+        "model_id": "2klm345nop678qrs901tuv234wxy567zab",
+        "scaler_id": "7cde890fgh123ijk456lmn789opq012rst",
+        "last_updated": "2023-10-15"
+    },
+    "usdjpy": {
+        "model_id": "3uvw456xyz789abc012def345ghi678jkl",
+        "scaler_id": "8mno901pqr234stu567vwx890yza123bcd",
+        "last_updated": "2023-10-15"
+    },
+    "eurjpy": {
+        "model_id": "4efg567hij890klm123nop456qrs789tuv",
+        "scaler_id": "9wxa234yzb567cde890fgh123ijk456lmn",
+        "last_updated": "2023-10-15"
+    }
+}
