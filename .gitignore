@@ -1,0 +1,143 @@
+# .gitignore for Forex Analysis System
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+forex-env/
+venv*/
+env.py
+.env/
+.virtualenv/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Google Auth credentials
+config/google-auth.json
+config/*-auth.json
+config/*-credentials.json
+config/credentials*.json
+
+# API keys and secrets
+config/secrets.py
+config/keys.py
+*.key
+*.pem
+*.crt
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+logs/
+log/
+
+# Data files - ignore all data except structure
+data/*
+!data/.gitkeep
+!data/pairs_list.txt
+
+# Model files - ignore trained models but keep directory structure
+models/saved_models/*
+!models/saved_models/.gitkeep
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Colab specific
+.colab/
+
+# Streamlit specific
+.streamlit/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# PyTest
+.pytest_cache/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backups
+*.bak
+*.backup
+
+# Large files
+*.h5
+*.joblib
+*.pkl
+*.pickle
+*.model
+*.weights
+
+# Compression files
+*.zip
+*.tar
+*.gz
+*.7z
+
+# MacOS
+*.DS_Store
+
+# Windows
+[Tt]humbs.db
+
+# Exceptions - keep these files
+!.gitkeep
+!README.md
