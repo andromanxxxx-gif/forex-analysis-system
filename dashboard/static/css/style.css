@@ -1,0 +1,100 @@
+/* Custom CSS for Forex Dashboard */
+
+/* Main container */
+.main {
+    padding: 2rem;
+}
+
+/* Headers */
+h1, h2, h3 {
+    color: #1f77b4;
+}
+
+/* Metrics */
+.stMetric {
+    background-color: #f0f2f6;
+    padding: 10px;
+    border-radius: 5px;
+    border-left: 4px solid #1f77b4;
+}
+
+/* Buy signal */
+.buy-signal {
+    background-color: #d4edda;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 4px solid #28a745;
+}
+
+/* Sell signal */
+.sell-signal {
+    background-color: #f8d7da;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 4px solid #dc3545;
+}
+
+/* Neutral signal */
+.neutral-signal {
+    background-color: #fff3cd;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 4px solid #ffc107;
+}
+
+/* News items */
+.news-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+
+.news-positive {
+    border-left: 4px solid #28a745;
+    background-color: #d4edda;
+}
+
+.news-negative {
+    border-left: 4px solid #dc3545;
+    background-color: #f8d7da;
+}
+
+.news-neutral {
+    border-left: 4px solid #ffc107;
+    background-color: #fff3cd;
+}
+
+/* Chart container */
+.chart-container {
+    border: 1px solid #e6e6e6;
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 20px;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Custom button */
+.stButton button {
+    background-color: #1f77b4;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.stButton button:hover {
+    background-color: #1668a5;
+}
+
+/* Sidebar */
+.css-1d391kg {
+    background-color: #f8f9fa;
+}
