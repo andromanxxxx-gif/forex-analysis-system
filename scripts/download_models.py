@@ -1,26 +1,28 @@
+# scripts/download_models.py
 import gdown
 import os
 import json
-from config import settings
+from pathlib import Path
 
 def download_models():
     """Download semua model dari Google Drive berdasarkan mapping file"""
     
-    # Path untuk file mapping
-    mapping_file = 'config/model_mapping.json'
+    # Path ke file mapping - relative ke root project
+    mapping_file = Path(__file__).parent.parent / 'config' / 'model_mapping.json'
     
-    # Load mapping dari file
-    if not os.path.exists(mapping_file):
+    # Pastikan file mapping ada
+    if not mapping_file.exists():
         print(f"Error: Mapping file {mapping_file} not found.")
         print("Please create the mapping file first.")
         return False
     
+    # Load mapping dari file
     with open(mapping_file, 'r') as f:
         model_mapping = json.load(f)
     
     # Buat folder jika belum ada
-    model_dir = 'models/saved_models'
-    os.makedirs(model_dir, exist_ok=True)
+    model_dir = Path(__file__).parent.parent / 'models' / 'saved_models'
+    model_dir.mkdir(parents=True, exist_ok=True)
     
     downloaded_count = 0
     
@@ -29,14 +31,14 @@ def download_models():
         model_url = f'https://drive.google.com/uc?id={ids["model_id"]}'
         scaler_url = f'https://drive.google.com/uc?id={ids["scaler_id"]}'
         
-        model_path = os.path.join(model_dir, f'{pair}_model.h5')
-        scaler_path = os.path.join(model_dir, f'{pair}_scaler.joblib')
+        model_path = model_dir / f'{pair}_model.h5'
+        scaler_path = model_dir / f'{pair}_scaler.joblib'
         
         # Download model
-        if not os.path.exists(model_path):
+        if not model_path.exists():
             print(f'Downloading model for {pair}...')
             try:
-                gdown.download(model_url, model_path, quiet=False)
+                gdown.download(model_url, str(model_path), quiet=False)
                 downloaded_count += 1
             except Exception as e:
                 print(f'Error downloading model for {pair}: {e}')
@@ -44,10 +46,10 @@ def download_models():
             print(f'Model for {pair} already exists.')
         
         # Download scaler
-        if not os.path.exists(scaler_path):
+        if not scaler_path.exists():
             print(f'Downloading scaler for {pair}...')
             try:
-                gdown.download(scaler_url, scaler_path, quiet=False)
+                gdown.download(scaler_url, str(scaler_path), quiet=False)
                 downloaded_count += 1
             except Exception as e:
                 print(f'Error downloading scaler for {pair}: {e}')
