@@ -66,11 +66,16 @@ df = df.sort_values("time").reset_index(drop=True)
 
 # === Tabel Sinyal Terbaru ===
 st.write("📌 **Sinyal Terbaru (H4)**")
-st.dataframe(
-    df.tail(n_rows)[
-        ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
-    ]
-)
+
+required_cols = ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
+
+# Tambahkan kolom kosong jika ada yang hilang
+for col in required_cols:
+    if col not in df.columns:
+        df[col] = None
+
+st.dataframe(df.tail(n_rows)[required_cols])
+
 
 # === Gauge: Probabilitas & Sentimen ===
 st.write("🧭 **Probabilitas & Sentimen (H4)**")
