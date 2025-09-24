@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 PAIRS = ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
 OUTPUT_DIR = os.path.join("data")
 
-N_PERIODS = 50  # jumlah bar dummy
-TIMEFRAME_HOURS = 4  # timeframe H4
+N_PERIODS = 1000   # jumlah bar dummy lebih banyak
+TIMEFRAME_HOURS = 4
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
