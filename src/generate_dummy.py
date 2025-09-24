@@ -1,65 +1,70 @@
 import os
 import json
 import random
+import pandas as pd
 from datetime import datetime, timedelta
 
-# Folder penyimpanan data
-DATA_DIR = os.path.join("data")
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# Pasangan forex
+# === Konfigurasi ===
 PAIRS = ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
+OUTPUT_DIR = os.path.join("data")
 
-def generate_signals(n=50):
-    """
-    Membuat data dummy historical signals berupa list of dict untuk setiap pair.
-    """
-    signals = {"generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), "pairs": {}}
-    now = datetime.utcnow()
+N_PERIODS = 50  # jumlah data dummy
+TIMEFRAME_HOURS = 4  # time frame H4 (4 jam)
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def generate_dummy_signals():
+    base_time = datetime.utcnow() - timedelta(hours=N_PERIODS * TIMEFRAME_HOURS)
+
+    signals = {"pairs": {}}
 
     for pair in PAIRS:
-        pair_signals = []
-        base_price = random.uniform(100, 200)  # harga dasar acak per pair
+        pair_data = []
+        price = random.uniform(140, 160)  # harga awal random
+        for i in range(N_PERIODS):
+            ts = base_time + timedelta(hours=i * TIMEFRAME_HOURS)
+            direction = random.choice(["BUY", "SELL"])
+            prob_up = round(random.uniform(0.4, 0.9), 2)
+            news_compound = round(random.uniform(-1, 1), 2)
+            macd = round(random.uniform(-2, 2), 2)
+            ema200 = price + random.uniform(-1, 1)
 
-        for i in range(n):
-            ts = (now - timedelta(hours=4 * (n - i))).strftime("%Y-%m-%d %H:%M:%S")
-            price = base_price + random.uniform(-2, 2)
-            ema200 = base_price + random.uniform(-1, 1)
-            macd = random.uniform(-1, 1)
-            signal_type = random.choice(["BUY", "SELL"])
-            stop_loss = round(price - random.uniform(0.5, 1.5), 2)
-            take_profit = round(price + random.uniform(0.5, 1.5), 2)
+            if direction == "BUY":
+                stop_loss = round(price - random.uniform(0.5, 1.0), 3)
+                take_profit = round(price + random.uniform(0.5, 1.0), 3)
+            else:
+                stop_loss = round(price + random.uniform(0.5, 1.0), 3)
+                take_profit = round(price - random.uniform(0.5, 1.0), 3)
 
-            pair_signals.append({
-                "time": ts,
-                "price": round(price, 2),
-                "ema200": round(ema200, 2),
-                "macd": round(macd, 2),
-                "signal": signal_type,
+            pair_data.append({
+                "time": ts.strftime("%Y-%m-%d %H:%M:%S"),
+                "signal": direction,
+                "price": round(price, 3),
                 "stop_loss": stop_loss,
                 "take_profit": take_profit,
-                "prob_up": round(random.uniform(0, 1), 3),
-                "news_compound": round(random.uniform(-1, 1), 3)
+                "prob_up": prob_up,
+                "news_compound": news_compound,
+                "macd": macd,
+                "ema200": round(ema200, 3)
             })
 
-        signals["pairs"][pair] = pair_signals
+            price += random.uniform(-0.5, 0.5)  # update harga acak
+
+        signals["pairs"][pair] = pair_data
 
     return signals
 
 
 if __name__ == "__main__":
-    signals = generate_signals(n=50)
-
+    dummy = generate_dummy_signals()
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    file_path = os.path.join(DATA_DIR, f"signals_dummy_{ts}.json")
-    last_file_path = os.path.join(DATA_DIR, "last_signal.json")
+    out_file = os.path.join(OUTPUT_DIR, f"signals_dummy_{ts}.json")
+    last_file = os.path.join(OUTPUT_DIR, "last_signal.json")
 
-    # Simpan file dummy penuh
-    with open(file_path, "w") as f:
-        json.dump(signals, f, indent=2)
+    with open(out_file, "w") as f:
+        json.dump(dummy, f, indent=2)
 
-    # Simpan file terakhir
-    with open(last_file_path, "w") as f:
-        json.dump(signals, f, indent=2)
+    with open(last_file, "w") as f:
+        json.dump(dummy, f, indent=2)
 
-    print(f"✅ Dummy signals saved to: {file_path} and {last_file_path}")
+    print(f"✅ Dummy signals saved to: {out_file} and {last_file}")
