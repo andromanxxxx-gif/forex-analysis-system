@@ -14,6 +14,32 @@ from src.news_analyzer import NewsAnalyzer
 from src.signal_generator import SignalGenerator
 from src.ml_predictor import MLForexPredictor
 from config import settings
+# dashboard/app.py (bagian yang berhubungan dengan auth)
+import sys
+from pathlib import Path
+import os
+
+# Tambahkan path ke src
+sys.path.append(str(Path(__file__).parent.parent))
+
+try:
+    from src.google_drive_auth import drive_auth
+    HAS_DRIVE_ACCESS = True
+except ImportError:
+    HAS_DRIVE_ACCESS = False
+
+# Di dalam fungsi yang perlu akses Google Drive:
+def load_data_from_drive():
+    if not HAS_DRIVE_ACCESS:
+        st.warning("Google Drive access not available")
+        return None
+    
+    try:
+        drive_service = drive_auth.get_service()
+        # ... kode untuk akses data
+    except Exception as e:
+        st.error(f"Error accessing Google Drive: {e}")
+        return None
 
 # Set page config
 st.set_page_config(
