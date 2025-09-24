@@ -6,6 +6,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import time
+import sys
+from pathlib import Path
 
 class DataCollector:
     def __init__(self):
@@ -59,5 +61,30 @@ class DataCollector:
                     
         except Exception as e:
             print(f"Error scraping news: {e}")
+        # Akses google drive
+sys.path.append(str(Path(__file__).parent.parent))
+
+try:
+    from src.google_drive_auth import drive_auth
+    HAS_DRIVE_ACCESS = True
+except ImportError:
+    HAS_DRIVE_ACCESS = False
+
+class DataCollector:
+    def __init__(self):
+        # ... kode existing
         
+    def save_to_drive(self, data, filename):
+        """Save data to Google Drive (jika diperlukan)"""
+        if not HAS_DRIVE_ACCESS:
+            print("Google Drive access not available")
+            return False
+        
+        try:
+            drive_service = drive_auth.get_service()
+            # ... implementasi save to drive
+            return True
+        except Exception as e:
+            print(f"Error saving to Google Drive: {e}")
+            return False
         return news_items
