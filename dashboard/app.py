@@ -1,6 +1,9 @@
 import sys
 import os
 from pathlib import Path
+import sys
+import os
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,6 +12,12 @@ from datetime import datetime, timedelta
 import numpy as np
 import json
 import os
+# Dapatkan path ke root project (direktori yang mengandung folder 'dashboard' dan 'src')
+project_root = Path(__file__).parent.parent
+# Tambahkan path project_root ke sys.path
+sys.path.insert(0, str(project_root))
+
+# Sekarang coba import modul dari src
 # Tambahkan path ke src folder
 project_root = Path(__file__).parent.parent
 src_path = project_root / 'src'
