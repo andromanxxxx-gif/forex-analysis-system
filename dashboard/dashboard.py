@@ -1,23 +1,9 @@
-import socket
 import os
 import json
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-
-# === Cari port kosong otomatis ===
-def get_free_port(start=8501, end=8600):
-    for port in range(start, end):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("", port))
-                return port
-            except OSError:
-                continue
-    raise RuntimeError("❌ Tidak ada port kosong yang tersedia di range!")
-
-FREE_PORT = get_free_port()
-st.write(f"🔌 Dashboard berjalan di port: {FREE_PORT}")
+import time
 
 # === Konfigurasi Streamlit ===
 st.set_page_config(page_title="Forex ML Dashboard", layout="wide")
@@ -35,14 +21,14 @@ refresh_options = {
 refresh_choice = st.sidebar.selectbox("Auto-refresh interval", list(refresh_options.keys()))
 refresh_seconds = refresh_options[refresh_choice]
 
-# === Auto refresh sesuai pilihan user ===
-st_autorefresh = st.experimental_rerun  # fallback
-try:
-    st_autorefresh = st.experimental_autorefresh
-except AttributeError:
-    pass
-
-st_autorefresh(interval=refresh_seconds * 1000, limit=None, key="refresh_timer")
+# === Auto refresh / fallback ===
+if hasattr(st, "experimental_autorefresh"):
+    st.experimental_autorefresh(interval=refresh_seconds * 1000, limit=None, key="refresh_timer")
+else:
+    if st.sidebar.button("🔄 Refresh Data"):
+        st.write("⏳ Refreshing...")
+        time.sleep(1)
+        st.experimental_rerun()
 
 # === Load Data Dummy ===
 DATA_PATH = os.path.join("data", "last_signal.json")
@@ -191,4 +177,4 @@ fig_macd.add_trace(go.Bar(
 fig_macd.update_layout(title=f"{pair} MACD", xaxis_title="Time", yaxis_title="MACD Value")
 st.plotly_chart(fig_macd, use_container_width=True)
 
-st.success(f"✅ Dashboard berhasil dimuat! Auto-refresh setiap {refresh_choice}. Port: {FREE_PORT}")
+st.success(f"✅ Dashboard berhasil dimuat! Auto-refresh setiap {refresh_choice}.")
