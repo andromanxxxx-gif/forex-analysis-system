@@ -1,3 +1,6 @@
+import sys
+import os
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -6,7 +9,26 @@ from datetime import datetime, timedelta
 import numpy as np
 import json
 import os
+# Tambahkan path ke src folder
+project_root = Path(__file__).parent.parent
+src_path = project_root / 'src'
+if src_path.exists() and str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
+print(f"Project root: {project_root}")
+print(f"Python path: {sys.path}")
+
+# Import modules setelah path setup
+try:
+    from src.data_collection import DataCollector
+    from src.technical_analysis import TechnicalAnalyzer
+    from src.news_analyzer import NewsAnalyzer
+    from src.signal_generator import SignalGenerator
+    from src.ml_predictor import MLForexPredictor
+    from config import settings
+    print("✅ All modules imported successfully!")
+except ImportError as e:
+    print(f"❌ Import error: {e}")
 # Import custom modules
 from src.data_collection import DataCollector
 from src.technical_analysis import TechnicalAnalyzer
