@@ -50,7 +50,7 @@ if "pairs" not in signals or not signals["pairs"]:
 PAIRS = list(signals["pairs"].keys())
 
 pair = st.sidebar.selectbox("Pilih Pair", PAIRS)
-n_rows = st.sidebar.slider("Jumlah data ditampilkan", 10, 50, 20)
+n_rows = st.sidebar.slider("Jumlah bar historis ditampilkan", 50, 2000, 200)
 
 # === Main Content ===
 st.title("📊 Forex ML Dashboard (Timeframe: H4)")
@@ -77,9 +77,16 @@ for col in required_cols:
     if col not in df.columns:
         df[col] = None
 
+# Batasi jumlah bar historis ditampilkan
+df_show = df.tail(n_rows)
+
+# Jika data terlalu besar → downsample (misal > 1000 bar)
+if len(df_show) > 1000:
+    df_show = df_show.iloc[::len(df_show)//1000]  # sampling agar max 1000 bar
+
 # === Tabel Sinyal Terbaru ===
 st.write("📌 **Sinyal Terbaru (H4)**")
-st.dataframe(df.tail(n_rows)[required_cols])
+st.dataframe(df_show[required_cols].tail(50))  # tampilkan 50 bar terakhir saja di tabel
 
 # === Gauge: Probabilitas & Sentimen ===
 st.write("🧭 **Probabilitas & Sentimen (H4)**")
@@ -89,7 +96,7 @@ col1, col2 = st.columns(2)
 with col1:
     fig_prob = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=(last_row["prob_up"] or 0) * 100,
+        value=(last_row.get("prob_up") or 0) * 100,
         title={"text": "Probabilitas Naik (%)"},
         gauge={
             "axis": {"range": [0, 100]},
@@ -106,7 +113,7 @@ with col1:
 with col2:
     fig_sent = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=last_row["news_compound"] or 0,
+        value=last_row.get("news_compound") or 0,
         title={"text": "Sentimen Berita (-1 = Negatif, +1 = Positif)"},
         gauge={
             "axis": {"range": [-1, 1]},
@@ -127,23 +134,23 @@ fig_candle = go.Figure()
 
 # Candlestick
 fig_candle.add_trace(go.Candlestick(
-    x=df["time"],
-    open=df["price"] - 0.2,
-    high=df["price"] + 0.4,
-    low=df["price"] - 0.4,
-    close=df["price"],
+    x=df_show["time"],
+    open=df_show["price"] - 0.2,
+    high=df_show["price"] + 0.4,
+    low=df_show["price"] - 0.4,
+    close=df_show["price"],
     name="Price"
 ))
 
 # EMA200
-if "ema200" in df.columns:
+if "ema200" in df_show.columns:
     fig_candle.add_trace(go.Scatter(
-        x=df["time"], y=df["ema200"],
+        x=df_show["time"], y=df_show["ema200"],
         mode="lines", name="EMA200", line=dict(color="orange")
     ))
 
 # Buy markers
-buy_df = df[df["signal"] == "BUY"]
+buy_df = df_show[df_show["signal"] == "BUY"]
 fig_candle.add_trace(go.Scatter(
     x=buy_df["time"], y=buy_df["price"],
     mode="markers", marker=dict(color="green", size=12, symbol="triangle-up"),
@@ -151,7 +158,7 @@ fig_candle.add_trace(go.Scatter(
 ))
 
 # Sell markers
-sell_df = df[df["signal"] == "SELL"]
+sell_df = df_show[df_show["signal"] == "SELL"]
 fig_candle.add_trace(go.Scatter(
     x=sell_df["time"], y=sell_df["price"],
     mode="markers", marker=dict(color="red", size=12, symbol="triangle-down"),
@@ -159,8 +166,8 @@ fig_candle.add_trace(go.Scatter(
 ))
 
 # TP/SL lines
-if "take_profit" in df.columns and "stop_loss" in df.columns:
-    for idx, row in df.iterrows():
+if "take_profit" in df_show.columns and "stop_loss" in df_show.columns:
+    for idx, row in df_show.iterrows():
         if pd.notnull(row["take_profit"]):
             fig_candle.add_trace(go.Scatter(
                 x=[row["time"], row["time"]],
@@ -191,12 +198,12 @@ st.plotly_chart(fig_candle, use_container_width=True)
 
 # === Chart MACD ===
 st.write("📉 **MACD (H4)**")
-if "macd" in df.columns:
+if "macd" in df_show.columns:
     fig_macd = go.Figure()
     fig_macd.add_trace(go.Bar(
-        x=df["time"], y=df["macd"], name="MACD", marker_color="blue"
+        x=df_show["time"], y=df_show["macd"], name="MACD", marker_color="blue"
     ))
     fig_macd.update_layout(title=f"{pair} MACD (H4)", xaxis_title="Time", yaxis_title="MACD Value")
     st.plotly_chart(fig_macd, use_container_width=True)
 
-st.success(f"✅ Dashboard H4 berhasil dimuat! Auto-refresh setiap {refresh_choice}.")
+st.success(f"✅ Dashboard H4 berhasil dimuat! Menampilkan {len(df_show)} bar historis. Auto-refresh setiap {refresh_choice}.")
