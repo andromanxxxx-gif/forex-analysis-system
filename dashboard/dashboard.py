@@ -22,14 +22,12 @@ refresh_choice = st.sidebar.selectbox("Auto-refresh interval", list(refresh_opti
 refresh_seconds = refresh_options[refresh_choice]
 
 # === Auto refresh / fallback ===
+i# === Auto refresh / fallback ===
 if hasattr(st, "experimental_autorefresh"):
     st.experimental_autorefresh(interval=refresh_seconds * 1000, limit=None, key="refresh_timer")
 else:
     if st.sidebar.button("🔄 Refresh Data"):
-        st.write("⏳ Refreshing...")
-        time.sleep(1)
-        st.experimental_rerun()
-
+        st.rerun()
 # === Load Data Dummy ===
 DATA_PATH = os.path.join("data", "last_signal.json")
 
