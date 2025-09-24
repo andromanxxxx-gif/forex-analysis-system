@@ -2,13 +2,19 @@
 import shutil
 from pathlib import Path
 from datetime import datetime
+import sys
+
+# Tambahkan path ke src
+sys.path.append(str(Path(__file__).parent.parent))
+
+from src.google_drive_auth import drive_auth
 
 def backup_auth_file():
     """Membuat backup dari file auth ke lokasi yang aman"""
     
-    source_path = Path("C:/hp/Json/google-auth.json")
+    auth_file = drive_auth.get_auth_file_path()
     
-    if not source_path.exists():
+    if not auth_file or not auth_file.exists():
         print("Error: Source auth file not found")
         return False
     
@@ -22,11 +28,11 @@ def backup_auth_file():
     
     try:
         # Salin file
-        shutil.copy2(source_path, backup_path)
-        print(f"Backup created successfully: {backup_path}")
+        shutil.copy2(auth_file, backup_path)
+        print(f"✅ Backup created successfully: {backup_path}")
         return True
     except Exception as e:
-        print(f"Error creating backup: {e}")
+        print(f"❌ Error creating backup: {e}")
         return False
 
 if __name__ == "__main__":
