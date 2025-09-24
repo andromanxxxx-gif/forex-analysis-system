@@ -3,10 +3,10 @@ import json
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-import time
+import subprocess
 
 # === Konfigurasi Streamlit ===
-st.set_page_config(page_title="Forex ML Dashboard", layout="wide")
+st.set_page_config(page_title="Forex ML Dashboard (H4)", layout="wide")
 
 # === Sidebar ===
 st.sidebar.title("⚙️ Settings")
@@ -21,22 +21,31 @@ refresh_options = {
 refresh_choice = st.sidebar.selectbox("Auto-refresh interval", list(refresh_options.keys()))
 refresh_seconds = refresh_options[refresh_choice]
 
-# === Auto refresh / fallback ===
-# === Auto refresh / fallback ===
+# === Auto refresh ===
 if hasattr(st, "experimental_autorefresh"):
     st.experimental_autorefresh(interval=refresh_seconds * 1000, limit=None, key="refresh_timer")
 else:
     if st.sidebar.button("🔄 Refresh Data"):
         st.rerun()
-# === Load Data Dummy ===
+
+# === Path data ===
 DATA_PATH = os.path.join("data", "last_signal.json")
 
+# === Auto-generate dummy jika data tidak ada ===
 if not os.path.exists(DATA_PATH):
-    st.error("❌ Data tidak ditemukan. Jalankan generate_dummy.py dulu!")
-    st.stop()
+    st.warning("⚠️ Data tidak ditemukan. Membuat data dummy baru...")
+    subprocess.run(["python", "src/generate_dummy.py"])
+    if not os.path.exists(DATA_PATH):
+        st.error("❌ Gagal membuat data dummy. Periksa generate_dummy.py!")
+        st.stop()
 
+# === Load Data Dummy ===
 with open(DATA_PATH, "r") as f:
     signals = json.load(f)
+
+if "pairs" not in signals or not signals["pairs"]:
+    st.error("❌ Format file data salah atau kosong.")
+    st.stop()
 
 PAIRS = list(signals["pairs"].keys())
 
@@ -62,18 +71,15 @@ else:
 
 df = df.sort_values("time").reset_index(drop=True)
 
-# === Tabel Sinyal Terbaru ===
-st.write("📌 **Sinyal Terbaru (H4)**")
-
+# Pastikan kolom ada
 required_cols = ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
-
-# Tambahkan kolom kosong jika ada yang hilang
 for col in required_cols:
     if col not in df.columns:
         df[col] = None
 
+# === Tabel Sinyal Terbaru ===
+st.write("📌 **Sinyal Terbaru (H4)**")
 st.dataframe(df.tail(n_rows)[required_cols])
-
 
 # === Gauge: Probabilitas & Sentimen ===
 st.write("🧭 **Probabilitas & Sentimen (H4)**")
@@ -83,7 +89,7 @@ col1, col2 = st.columns(2)
 with col1:
     fig_prob = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=last_row["prob_up"] * 100,
+        value=(last_row["prob_up"] or 0) * 100,
         title={"text": "Probabilitas Naik (%)"},
         gauge={
             "axis": {"range": [0, 100]},
@@ -100,7 +106,7 @@ with col1:
 with col2:
     fig_sent = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=last_row["news_compound"],
+        value=last_row["news_compound"] or 0,
         title={"text": "Sentimen Berita (-1 = Negatif, +1 = Positif)"},
         gauge={
             "axis": {"range": [-1, 1]},
@@ -130,10 +136,11 @@ fig_candle.add_trace(go.Candlestick(
 ))
 
 # EMA200
-fig_candle.add_trace(go.Scatter(
-    x=df["time"], y=df["ema200"],
-    mode="lines", name="EMA200", line=dict(color="orange")
-))
+if "ema200" in df.columns:
+    fig_candle.add_trace(go.Scatter(
+        x=df["time"], y=df["ema200"],
+        mode="lines", name="EMA200", line=dict(color="orange")
+    ))
 
 # Buy markers
 buy_df = df[df["signal"] == "BUY"]
@@ -152,23 +159,26 @@ fig_candle.add_trace(go.Scatter(
 ))
 
 # TP/SL lines
-for idx, row in df.iterrows():
-    fig_candle.add_trace(go.Scatter(
-        x=[row["time"], row["time"]],
-        y=[row["take_profit"], row["take_profit"]],
-        mode="lines",
-        line=dict(color="green", dash="dot"),
-        name="TP" if idx == 0 else None,
-        showlegend=(idx == 0)
-    ))
-    fig_candle.add_trace(go.Scatter(
-        x=[row["time"], row["time"]],
-        y=[row["stop_loss"], row["stop_loss"]],
-        mode="lines",
-        line=dict(color="red", dash="dot"),
-        name="SL" if idx == 0 else None,
-        showlegend=(idx == 0)
-    ))
+if "take_profit" in df.columns and "stop_loss" in df.columns:
+    for idx, row in df.iterrows():
+        if pd.notnull(row["take_profit"]):
+            fig_candle.add_trace(go.Scatter(
+                x=[row["time"], row["time"]],
+                y=[row["take_profit"], row["take_profit"]],
+                mode="lines",
+                line=dict(color="green", dash="dot"),
+                name="TP" if idx == 0 else None,
+                showlegend=(idx == 0)
+            ))
+        if pd.notnull(row["stop_loss"]):
+            fig_candle.add_trace(go.Scatter(
+                x=[row["time"], row["time"]],
+                y=[row["stop_loss"], row["stop_loss"]],
+                mode="lines",
+                line=dict(color="red", dash="dot"),
+                name="SL" if idx == 0 else None,
+                showlegend=(idx == 0)
+            ))
 
 fig_candle.update_layout(
     title=f"{pair} Price Action with EMA200 & TP/SL (Timeframe: H4)",
@@ -181,12 +191,12 @@ st.plotly_chart(fig_candle, use_container_width=True)
 
 # === Chart MACD ===
 st.write("📉 **MACD (H4)**")
-
-fig_macd = go.Figure()
-fig_macd.add_trace(go.Bar(
-    x=df["time"], y=df["macd"], name="MACD", marker_color="blue"
-))
-fig_macd.update_layout(title=f"{pair} MACD (H4)", xaxis_title="Time", yaxis_title="MACD Value")
-st.plotly_chart(fig_macd, use_container_width=True)
+if "macd" in df.columns:
+    fig_macd = go.Figure()
+    fig_macd.add_trace(go.Bar(
+        x=df["time"], y=df["macd"], name="MACD", marker_color="blue"
+    ))
+    fig_macd.update_layout(title=f"{pair} MACD (H4)", xaxis_title="Time", yaxis_title="MACD Value")
+    st.plotly_chart(fig_macd, use_container_width=True)
 
 st.success(f"✅ Dashboard H4 berhasil dimuat! Auto-refresh setiap {refresh_choice}.")
