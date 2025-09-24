@@ -1,60 +1,63 @@
-# src/generate_dummy.py
 import os
 import json
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# Folder tujuan simpan data dummy
-DATA_DIR = "data"
+# Folder penyimpanan data
+DATA_DIR = os.path.join("data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Pasangan forex yang dianalisis
 PAIRS = ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
 
-def gen_signal(symbol):
-    prob = round(random.uniform(0.2, 0.8), 3)   # probabilitas dummy
-    direction = "long" if prob > 0.55 else "short" if prob < 0.45 else "neutral"
-    last_price = round(random.uniform(100, 200), 3)
+def generate_signals(n=50):
+    """
+    Membuat data dummy signals berupa list of dict untuk setiap pair.
+    """
+    signals = {}
+    now = datetime.utcnow()
 
-    if direction == "long":
-        tp = round(last_price * (1 + 0.02), 3)
-        sl = round(last_price * (1 - 0.01), 3)
-    elif direction == "short":
-        tp = round(last_price * (1 - 0.02), 3)
-        sl = round(last_price * (1 + 0.01), 3)
-    else:
-        tp, sl = None, None
+    for pair in PAIRS:
+        pair_signals = []
+        base_price = random.uniform(150, 200)  # harga dasar acak per pair
 
-    return {
-        "method": "dummy",
-        "prob_up": prob,
-        "direction": direction,
-        "tp_price": tp,
-        "sl_price": sl,
-        "last_price": last_price,
-        "news_compound": round(random.uniform(-0.5, 0.5), 3)
-    }
+        for i in range(n):
+            ts = (now - timedelta(hours=4 * (n - i))).strftime("%Y-%m-%d %H:%M:%S")
+            price = base_price + random.uniform(-2, 2)
+            ema200 = base_price + random.uniform(-1, 1)
+            macd = random.uniform(-1, 1)
+            signal_type = random.choice(["BUY", "SELL"])
+            stop_loss = round(price - random.uniform(0.5, 1.5), 2)
+            take_profit = round(price + random.uniform(0.5, 1.5), 2)
 
-def main():
-    results = {"generated_at": datetime.utcnow().isoformat(), "pairs": {}}
+            pair_signals.append({
+                "time": ts,
+                "price": round(price, 2),
+                "ema200": round(ema200, 2),
+                "macd": round(macd, 2),
+                "signal": signal_type,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit
+            })
 
-    for s in PAIRS:
-        results["pairs"][s] = {
-            "symbol": s,
-            "timestamp": datetime.utcnow().isoformat(),
-            "result": gen_signal(s)
-        }
+        signals[pair] = pair_signals
 
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    out_file = os.path.join(DATA_DIR, f"signals_dummy_{ts}.json")
-    last_file = os.path.join(DATA_DIR, "last_signal.json")
+    return signals
 
-    with open(out_file, "w") as f:
-        json.dump(results, f, indent=2)
-
-    with open(last_file, "w") as f:
-        json.dump(results, f, indent=2)
-
-    print("Dummy signals saved to:", out_file, "and", last_file)
 
 if __name__ == "__main__":
-    main()
+    signals = generate_signals(n=50)
+
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    file_path = os.path.join(DATA_DIR, f"signals_dummy_{ts}.json")
+    last_file_path = os.path.join(DATA_DIR, "last_signal.json")
+
+    # Simpan file dummy penuh
+    with open(file_path, "w") as f:
+        json.dump(signals, f, indent=2)
+
+    # Simpan file "last_signal.json" untuk dashboard (tetap format list)
+    with open(last_file_path, "w") as f:
+        json.dump(signals, f, indent=2)
+
+    print(f"Dummy signals saved to: {file_path} and {last_file_path}")
