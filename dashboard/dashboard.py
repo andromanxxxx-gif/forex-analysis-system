@@ -155,4 +155,40 @@ fig_candle.add_trace(go.Scatter(
 
 # TP/SL lines
 for idx, row in df.iterrows():
-    fig_candl_
+    fig_candle.add_trace(go.Scatter(
+        x=[row["time"], row["time"]],
+        y=[row["take_profit"], row["take_profit"]],
+        mode="lines",
+        line=dict(color="green", dash="dot"),
+        name="TP" if idx == 0 else None,
+        showlegend=(idx == 0)
+    ))
+    fig_candle.add_trace(go.Scatter(
+        x=[row["time"], row["time"]],
+        y=[row["stop_loss"], row["stop_loss"]],
+        mode="lines",
+        line=dict(color="red", dash="dot"),
+        name="SL" if idx == 0 else None,
+        showlegend=(idx == 0)
+    ))
+
+fig_candle.update_layout(
+    title=f"{pair} Price Action with EMA200 & TP/SL",
+    xaxis_title="Time",
+    yaxis_title="Price",
+    xaxis_rangeslider_visible=False
+)
+
+st.plotly_chart(fig_candle, use_container_width=True)
+
+# === Chart MACD ===
+st.write("📉 **MACD**")
+
+fig_macd = go.Figure()
+fig_macd.add_trace(go.Bar(
+    x=df["time"], y=df["macd"], name="MACD", marker_color="blue"
+))
+fig_macd.update_layout(title=f"{pair} MACD", xaxis_title="Time", yaxis_title="MACD Value")
+st.plotly_chart(fig_macd, use_container_width=True)
+
+st.success(f"✅ Dashboard berhasil dimuat! Auto-refresh setiap {refresh_choice}. Port: {FREE_PORT}")
