@@ -1,8 +1,23 @@
+import socket
 import os
 import json
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
+
+# === Cari port kosong otomatis ===
+def get_free_port(start=8501, end=8600):
+    for port in range(start, end):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("", port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError("❌ Tidak ada port kosong yang tersedia di range!")
+
+FREE_PORT = get_free_port()
+st.write(f"🔌 Dashboard berjalan di port: {FREE_PORT}")
 
 # === Konfigurasi Streamlit ===
 st.set_page_config(page_title="Forex ML Dashboard", layout="wide")
@@ -21,7 +36,7 @@ refresh_choice = st.sidebar.selectbox("Auto-refresh interval", list(refresh_opti
 refresh_seconds = refresh_options[refresh_choice]
 
 # === Auto refresh sesuai pilihan user ===
-st_autorefresh = st.experimental_rerun  # fallback untuk versi lama
+st_autorefresh = st.experimental_rerun  # fallback
 try:
     st_autorefresh = st.experimental_autorefresh
 except AttributeError:
@@ -64,7 +79,7 @@ st.dataframe(
 
 # === Gauge: Probabilitas & Sentimen ===
 st.write("🧭 **Probabilitas & Sentimen**")
-last_row = df.iloc[-1]  # ambil sinyal terbaru
+last_row = df.iloc[-1]
 col1, col2 = st.columns(2)
 
 with col1:
@@ -106,7 +121,7 @@ st.write("📈 **Candlestick Chart + EMA200 + TP/SL**")
 
 fig_candle = go.Figure()
 
-# Candlestick (pakai price sebagai proxy OHLC dummy)
+# Candlestick
 fig_candle.add_trace(go.Candlestick(
     x=df["time"],
     open=df["price"] - 0.2,
@@ -140,40 +155,4 @@ fig_candle.add_trace(go.Scatter(
 
 # TP/SL lines
 for idx, row in df.iterrows():
-    fig_candle.add_trace(go.Scatter(
-        x=[row["time"], row["time"]],
-        y=[row["take_profit"], row["take_profit"]],
-        mode="lines",
-        line=dict(color="green", dash="dot"),
-        name="TP" if idx == 0 else None,
-        showlegend=(idx == 0)
-    ))
-    fig_candle.add_trace(go.Scatter(
-        x=[row["time"], row["time"]],
-        y=[row["stop_loss"], row["stop_loss"]],
-        mode="lines",
-        line=dict(color="red", dash="dot"),
-        name="SL" if idx == 0 else None,
-        showlegend=(idx == 0)
-    ))
-
-fig_candle.update_layout(
-    title=f"{pair} Price Action with EMA200 & TP/SL",
-    xaxis_title="Time",
-    yaxis_title="Price",
-    xaxis_rangeslider_visible=False
-)
-
-st.plotly_chart(fig_candle, use_container_width=True)
-
-# === Chart MACD ===
-st.write("📉 **MACD**")
-
-fig_macd = go.Figure()
-fig_macd.add_trace(go.Bar(
-    x=df["time"], y=df["macd"], name="MACD", marker_color="blue"
-))
-fig_macd.update_layout(title=f"{pair} MACD", xaxis_title="Time", yaxis_title="MACD Value")
-st.plotly_chart(fig_macd, use_container_width=True)
-
-st.success(f"✅ Dashboard berhasil dimuat! Auto-refresh setiap {refresh_choice}.")
+    fig_candl_
