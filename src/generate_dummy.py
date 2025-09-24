@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 PAIRS = ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
 OUTPUT_DIR = os.path.join("data")
 
-N_PERIODS = 1000   # jumlah bar dummy lebih banyak
-TIMEFRAME_HOURS = 4
+N_PERIODS = 2000  # jumlah bar dummy (≈ 1 tahun data H4)
+TIMEFRAME_HOURS = 4  # timeframe H4
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -40,7 +40,7 @@ def generate_dummy_signals():
                 stop_loss = round(price + random.uniform(0.5, 1.0), 3)
                 take_profit = round(price - random.uniform(0.5, 1.0), 3)
 
-            # tambahkan record lengkap
+            # record lengkap
             pair_data.append({
                 "time": ts.strftime("%Y-%m-%d %H:%M:%S"),
                 "signal": direction,
