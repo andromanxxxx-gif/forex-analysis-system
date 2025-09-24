@@ -22,7 +22,7 @@ refresh_choice = st.sidebar.selectbox("Auto-refresh interval", list(refresh_opti
 refresh_seconds = refresh_options[refresh_choice]
 
 # === Auto refresh / fallback ===
-i# === Auto refresh / fallback ===
+# === Auto refresh / fallback ===
 if hasattr(st, "experimental_autorefresh"):
     st.experimental_autorefresh(interval=refresh_seconds * 1000, limit=None, key="refresh_timer")
 else:
