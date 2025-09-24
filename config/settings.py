@@ -57,3 +57,17 @@ COLORS = {
     'neutral': '\033[93m', # Kuning
     'end': '\033[0m'    # Akhir warna
 }
+# config/settings.py
+import os
+from pathlib import Path
+
+# Google Drive Auth Configuration
+GOOGLE_AUTH_PATH = Path("C:/hp/Json/google-auth.json")
+
+# Fallback jika path utama tidak ada
+if not GOOGLE_AUTH_PATH.exists():
+    GOOGLE_AUTH_PATH = Path.home() / "hp" / "Json" / "google-auth.json"
+
+# Other existing settings...
+FOREX_PAIRS = ['GBPJPY=X', 'CHFJPY=X', 'USDJPY=X', 'EURJPY=X']
+# ... rest of your settings
