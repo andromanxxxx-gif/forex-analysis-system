@@ -46,17 +46,26 @@ pair = st.sidebar.selectbox("Pilih Pair", PAIRS)
 n_rows = st.sidebar.slider("Jumlah data ditampilkan", 10, 50, 20)
 
 # === Main Content ===
-st.title("📊 Forex ML Dashboard")
+st.title("📊 Forex ML Dashboard (Timeframe: H4)")
 st.subheader(f"Pair: {pair}")
 
 # === Convert ke DataFrame ===
 pair_data = signals["pairs"][pair]
 df = pd.DataFrame(pair_data)
-df["time"] = pd.to_datetime(df["time"])
+
+# Normalisasi kolom waktu
+if "time" in df.columns:
+    df["time"] = pd.to_datetime(df["time"])
+elif "timestamp" in df.columns:
+    df["time"] = pd.to_datetime(df["timestamp"])
+else:
+    st.error("❌ Data tidak memiliki kolom 'time' atau 'timestamp'")
+    st.stop()
+
 df = df.sort_values("time").reset_index(drop=True)
 
 # === Tabel Sinyal Terbaru ===
-st.write("📌 **Sinyal Terbaru**")
+st.write("📌 **Sinyal Terbaru (H4)**")
 st.dataframe(
     df.tail(n_rows)[
         ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
@@ -64,7 +73,7 @@ st.dataframe(
 )
 
 # === Gauge: Probabilitas & Sentimen ===
-st.write("🧭 **Probabilitas & Sentimen**")
+st.write("🧭 **Probabilitas & Sentimen (H4)**")
 last_row = df.iloc[-1]
 col1, col2 = st.columns(2)
 
@@ -103,7 +112,7 @@ with col2:
     st.plotly_chart(fig_sent, use_container_width=True)
 
 # === Candlestick Chart Harga + EMA200 + Buy/Sell markers + TP/SL ===
-st.write("📈 **Candlestick Chart + EMA200 + TP/SL**")
+st.write("📈 **Candlestick Chart (H4) + EMA200 + TP/SL**")
 
 fig_candle = go.Figure()
 
@@ -159,7 +168,7 @@ for idx, row in df.iterrows():
     ))
 
 fig_candle.update_layout(
-    title=f"{pair} Price Action with EMA200 & TP/SL",
+    title=f"{pair} Price Action with EMA200 & TP/SL (Timeframe: H4)",
     xaxis_title="Time",
     yaxis_title="Price",
     xaxis_rangeslider_visible=False
@@ -168,13 +177,13 @@ fig_candle.update_layout(
 st.plotly_chart(fig_candle, use_container_width=True)
 
 # === Chart MACD ===
-st.write("📉 **MACD**")
+st.write("📉 **MACD (H4)**")
 
 fig_macd = go.Figure()
 fig_macd.add_trace(go.Bar(
     x=df["time"], y=df["macd"], name="MACD", marker_color="blue"
 ))
-fig_macd.update_layout(title=f"{pair} MACD", xaxis_title="Time", yaxis_title="MACD Value")
+fig_macd.update_layout(title=f"{pair} MACD (H4)", xaxis_title="Time", yaxis_title="MACD Value")
 st.plotly_chart(fig_macd, use_container_width=True)
 
-st.success(f"✅ Dashboard berhasil dimuat! Auto-refresh setiap {refresh_choice}.")
+st.success(f"✅ Dashboard H4 berhasil dimuat! Auto-refresh setiap {refresh_choice}.")
