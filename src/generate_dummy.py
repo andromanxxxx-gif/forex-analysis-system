@@ -7,19 +7,19 @@ from datetime import datetime, timedelta
 DATA_DIR = os.path.join("data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Pasangan forex yang dianalisis
+# Pasangan forex
 PAIRS = ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
 
 def generate_signals(n=50):
     """
-    Membuat data dummy signals berupa list of dict untuk setiap pair.
+    Membuat data dummy historical signals berupa list of dict untuk setiap pair.
     """
-    signals = {}
+    signals = {"generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), "pairs": {}}
     now = datetime.utcnow()
 
     for pair in PAIRS:
         pair_signals = []
-        base_price = random.uniform(150, 200)  # harga dasar acak per pair
+        base_price = random.uniform(100, 200)  # harga dasar acak per pair
 
         for i in range(n):
             ts = (now - timedelta(hours=4 * (n - i))).strftime("%Y-%m-%d %H:%M:%S")
@@ -37,10 +37,12 @@ def generate_signals(n=50):
                 "macd": round(macd, 2),
                 "signal": signal_type,
                 "stop_loss": stop_loss,
-                "take_profit": take_profit
+                "take_profit": take_profit,
+                "prob_up": round(random.uniform(0, 1), 3),
+                "news_compound": round(random.uniform(-1, 1), 3)
             })
 
-        signals[pair] = pair_signals
+        signals["pairs"][pair] = pair_signals
 
     return signals
 
@@ -56,8 +58,8 @@ if __name__ == "__main__":
     with open(file_path, "w") as f:
         json.dump(signals, f, indent=2)
 
-    # Simpan file "last_signal.json" untuk dashboard (tetap format list)
+    # Simpan file terakhir
     with open(last_file_path, "w") as f:
         json.dump(signals, f, indent=2)
 
-    print(f"Dummy signals saved to: {file_path} and {last_file_path}")
+    print(f"✅ Dummy signals saved to: {file_path} and {last_file_path}")
