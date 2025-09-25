@@ -11,7 +11,6 @@ LAST_FILE = os.path.join(DATA_DIR, "last_signal.json")
 PAIRS = ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
 TIMEFRAMES = ["4h"]
 
-
 # === Fungsi Load Data ===
 def load_signals():
     if not os.path.exists(LAST_FILE):
@@ -77,8 +76,8 @@ st.dataframe(
 )
 
 
-# === Chart Candlestick + Prediksi + EMA200 ===
-st.subheader(f"📊 Candlestick Chart + EMA200 + Prediksi Candle ({pair}, {timeframe})")
+# === Chart Candlestick + Prediksi + EMA200 + SL/TP ===
+st.subheader(f"📊 Candlestick Chart + EMA200 + Prediksi Candle + SL/TP ({pair}, {timeframe})")
 
 fig = go.Figure()
 
@@ -122,8 +121,30 @@ fig.add_trace(go.Scatter(
     marker=dict(color="red", size=10, symbol="triangle-down")
 ))
 
+# Tambahkan garis Stop Loss & Take Profit
+for _, row in df.iterrows():
+    # Garis SL
+    fig.add_trace(go.Scatter(
+        x=[row["time"], row["time"] + pd.Timedelta(hours=4)],
+        y=[row["stop_loss"], row["stop_loss"]],
+        mode="lines",
+        line=dict(color="red", dash="dot"),
+        name="Stop Loss",
+        showlegend=False
+    ))
+
+    # Garis TP
+    fig.add_trace(go.Scatter(
+        x=[row["time"], row["time"] + pd.Timedelta(hours=4)],
+        y=[row["take_profit"], row["take_profit"]],
+        mode="lines",
+        line=dict(color="green", dash="dot"),
+        name="Take Profit",
+        showlegend=False
+    ))
+
 fig.update_layout(
-    title=f"{pair} Price Action + EMA200 + Prediksi Candle",
+    title=f"{pair} Price Action + EMA200 + Prediksi Candle + SL/TP",
     xaxis_title="Time",
     yaxis_title="Price",
     template="plotly_dark",
