@@ -1,56 +1,83 @@
-import pandas as pd
-import numpy as np
-import joblib
 import os
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 
 class Predictor:
-    def __init__(self, horizon_hours=4, model_path="../models/predictor_model.pkl"):
-        self.horizon = horizon_hours
+    def __init__(self, model_path="models/predictor.pkl"):
         self.model_path = model_path
         self.model = None
+        self._load_or_create_model()
 
+    def _load_or_create_model(self):
+        """Load model jika ada, kalau tidak buat dummy model dan simpan."""
         if os.path.exists(self.model_path):
-            self.model = joblib.load(self.model_path)
-            print("✅ Loaded trained model from", self.model_path)
+            try:
+                self.model = joblib.load(self.model_path)
+                print(f"✅ Model berhasil dimuat dari {self.model_path}")
+            except Exception as e:
+                print(f"⚠️ Gagal load model, buat dummy model baru. ({e})")
+                self._create_dummy_model()
         else:
-            print("⚠️ Model not found, fallback ke prediksi sederhana.")
+            print("⚠️ Model tidak ditemukan, membuat dummy model baru...")
+            self._create_dummy_model()
 
-    def predict_next(self, df: pd.DataFrame):
-        if "price" not in df.columns:
-            raise ValueError("DataFrame harus ada kolom 'price'.")
+    def _create_dummy_model(self):
+        """Buat dummy model RandomForestClassifier dengan data sintetis."""
+        # Data sintetis sederhana
+        np.random.seed(42)
+        X = np.random.rand(500, 4)  # fitur random
+        y = np.random.choice([0, 1], size=500)  # 0 = Sell, 1 = Buy
 
-        last_price = df["price"].iloc[-1]
-        mean_price = df["price"].tail(10).mean()
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Default prediksi sederhana
-        predicted_price = mean_price + (last_price - mean_price) * 0.3
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
 
-        signal = "BUY" if predicted_price > last_price else "SELL"
+        # Simpan model
+        os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
+        joblib.dump(model, self.model_path)
+        self.model = model
+        print(f"✅ Dummy model disimpan ke {self.model_path}")
 
-        if self.model:
-            # Feature untuk model
-            ema_200 = df["price"].ewm(span=200).mean().iloc[-1]
-            macd = df["price"].ewm(span=12).mean().iloc[-1] - df["price"].ewm(span=26).mean().iloc[-1]
-            ret = df["price"].pct_change().iloc[-1]
+    def predict(self, df: pd.DataFrame):
+        """
+        Prediksi berdasarkan DataFrame input.
+        - Jika ada kolom price, gunakan price untuk fitur.
+        - Kalau tidak, gunakan fitur random dummy.
+        Return:
+            - predicted: list Buy/Sell
+            - prob_up: probabilitas harga naik
+        """
+        if df.empty:
+            return [], []
 
-            X_new = pd.DataFrame([[ret, ema_200, macd]], columns=["return", "ema_200", "macd"])
-            pred_class = self.model.predict(X_new)[0]
-
-            signal = "BUY" if pred_class == 1 else "SELL"
-            predicted_price = last_price * (1.002 if pred_class == 1 else 0.998)
-
-        # Hitung TP/SL
-        if signal == "BUY":
-            take_profit = round(predicted_price * 1.005, 3)
-            stop_loss = round(predicted_price * 0.997, 3)
+        # Fitur sederhana: gunakan price + random noise
+        if "price" in df.columns:
+            X = np.column_stack([
+                df["price"].values,
+                np.random.rand(len(df)),
+                np.random.rand(len(df)),
+                np.random.rand(len(df))
+            ])
         else:
-            take_profit = round(predicted_price * 0.995, 3)
-            stop_loss = round(predicted_price * 1.003, 3)
+            X = np.random.rand(len(df), 4)
 
-        return {
-            "Predicted Signal": signal,
-            "Predicted Price": round(predicted_price, 3),
-            "Take Profit": take_profit,
-            "Stop Loss": stop_loss,
-            "Next Time": df["time"].iloc[-1] + pd.Timedelta(hours=self.horizon)
-        }
+        probs = self.model.predict_proba(X)
+        pred_labels = ["Buy" if p[1] > 0.5 else "Sell" for p in probs]
+        prob_up = [float(p[1]) for p in probs]
+
+        return pred_labels, prob_up
+
+
+if __name__ == "__main__":
+    # Test cepat
+    dummy_data = pd.DataFrame({
+        "price": np.linspace(150, 160, 10)
+    })
+    predictor = Predictor()
+    preds, probs = predictor.predict(dummy_data)
+    print("Predictions:", preds)
+    print("Probabilities:", probs)
