@@ -4,6 +4,8 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 import subprocess
+from src.predictor import Predictor
+
 
 # === Konfigurasi Streamlit ===
 st.set_page_config(page_title="Forex ML Dashboard (H4)", layout="wide")
@@ -83,6 +85,13 @@ df_show = df.tail(n_rows)
 # Jika data terlalu besar → downsample (misal > 1000 bar)
 if len(df_show) > 1000:
     df_show = df_show.iloc[::len(df_show)//1000]  # sampling agar max 1000 bar
+# === Prediksi Candle Berikutnya ===
+predictor = Predictor(horizon_hours=4)
+pred = predictor.predict_next(df_show)
+
+# tampilkan di tabel
+st.write("🔮 **Prediksi Candle Berikutnya (H4)**")
+st.table(pd.DataFrame([pred]))
 
 # === Tabel Sinyal Terbaru ===
 st.write("📌 **Sinyal Terbaru (H4)**")
@@ -108,6 +117,37 @@ with col1:
             ],
         }
     ))
+
+    # Marker prediksi
+fig_candle.add_trace(go.Scatter(
+    x=[pred["Next Time"]],
+    y=[pred["Predicted Price"]],
+    mode="markers+text",
+    marker=dict(color="blue", size=14, symbol="star"),
+    text=[f"{pred['Predicted Signal']}"],
+    textposition="top center",
+    name="Prediction"
+))
+
+# TP prediksi
+fig_candle.add_trace(go.Scatter(
+    x=[pred["Next Time"]],
+    y=[pred["Take Profit"]],
+    mode="markers",
+    marker=dict(color="green", size=10, symbol="triangle-up"),
+    name="Pred TP"
+))
+
+# SL prediksi
+fig_candle.add_trace(go.Scatter(
+    x=[pred["Next Time"]],
+    y=[pred["Stop Loss"]],
+    mode="markers",
+    marker=dict(color="red", size=10, symbol="triangle-down"),
+    name="Pred SL"
+))
+
+    
     st.plotly_chart(fig_prob, use_container_width=True)
 
 with col2:
