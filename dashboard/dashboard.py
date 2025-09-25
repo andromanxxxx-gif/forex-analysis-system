@@ -147,6 +147,53 @@ fig_candle.add_trace(go.Scatter(
     name="Pred SL"
 ))
 
+# --- Prediksi Candle Berikutnya ---
+from src.predictor import Predictor
+
+predictor = Predictor(horizon_hours=4)
+pred = predictor.predict_next(df_show)
+
+# Pastikan axis chart extend sampai waktu prediksi
+fig_candle.update_xaxes(range=[df_show["time"].iloc[-50], pred["Next Time"] + pd.Timedelta(hours=4)])
+
+# Marker prediksi (bintang biru)
+fig_candle.add_trace(go.Scatter(
+    x=[pred["Next Time"]],
+    y=[pred["Predicted Price"]],
+    mode="markers+text",
+    marker=dict(color="blue", size=16, symbol="star"),
+    text=[f"{pred['Predicted Signal']}"],
+    textfont=dict(size=12, color="white"),
+    textposition="top center",
+    name="Prediction"
+))
+
+# Marker TP (segitiga hijau)
+fig_candle.add_trace(go.Scatter(
+    x=[pred["Next Time"]],
+    y=[pred["Take Profit"]],
+    mode="markers+text",
+    marker=dict(color="green", size=12, symbol="triangle-up"),
+    text=["TP"],
+    textposition="bottom center",
+    name="Pred TP"
+))
+
+# Marker SL (segitiga merah)
+fig_candle.add_trace(go.Scatter(
+    x=[pred["Next Time"]],
+    y=[pred["Stop Loss"]],
+    mode="markers+text",
+    marker=dict(color="red", size=12, symbol="triangle-down"),
+    text=["SL"],
+    textposition="top center",
+    name="Pred SL"
+))
+
+# Tampilkan tabel prediksi di dashboard
+st.subheader("🔮 Prediksi Candle Berikutnya (H4)")
+st.table(pd.DataFrame([pred]))
+
     
     st.plotly_chart(fig_prob, use_container_width=True)
 
