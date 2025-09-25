@@ -79,9 +79,9 @@ fig_candle.add_trace(go.Candlestick(
     name="Price"
 ))
 
-# EMA200
+# EMA200 pakai .loc untuk hindari SettingWithCopyWarning
 if "price" in df_show.columns:
-    df_show["ema200"] = df_show["price"].ewm(span=200).mean()
+    df_show.loc[:, "ema200"] = df_show["price"].ewm(span=200).mean()
     fig_candle.add_trace(go.Scatter(
         x=df_show["time"],
         y=df_show["ema200"],
@@ -135,7 +135,7 @@ fig_candle.update_layout(
 # extend axis supaya prediksi kelihatan
 fig_candle.update_xaxes(range=[df_show["time"].iloc[-50], pred["Next Time"] + pd.Timedelta(hours=4)])
 
-st.plotly_chart(fig_candle, use_container_width=True)
+st.plotly_chart(fig_candle, width="stretch")
 
 # ==============================
 # Tabel Data Historis
@@ -143,4 +143,4 @@ st.plotly_chart(fig_candle, use_container_width=True)
 st.subheader("📊 Data Historis (Timeframe H4)")
 cols = ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
 available_cols = [c for c in cols if c in df_show.columns]
-st.dataframe(df_show[available_cols].tail(n_rows), use_container_width=True)
+st.dataframe(df_show[available_cols].tail(n_rows), width="stretch")
