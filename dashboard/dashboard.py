@@ -1,182 +1,106 @@
 import os
-import sys
 import json
 import pandas as pd
 import streamlit as st
-import plotly.graph_objects as go
-from streamlit import rerun
-
-# --- Fix path agar bisa import src/ ---
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import plotly.graph_objs as go
+from datetime import datetime
 from src.predictor import Predictor
 
-# ==============================
-# Konfigurasi Dashboard
-# ==============================
-st.set_page_config(
-    page_title="Forex ML Dashboard (H4)",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# ======================
+# Konfigurasi Halaman
+# ======================
+st.set_page_config(page_title="Forex ML Dashboard", layout="wide")
+st.title("📊 Forex ML Dashboard (MACD + EMA200 + News)")
 
-DATA_FILE = os.path.join("data", "last_signal.json")
+# ======================
+# Load Dummy Signals
+# ======================
+DATA_PATH = os.path.join("data", "last_signal.json")
 
-# ==============================
-# Sidebar Settings
-# ==============================
-st.sidebar.header("⚙️ Settings")
-pair_selected = st.sidebar.selectbox("Pilih Pair", ["GBPJPY", "USDJPY", "EURJPY", "CHFJPY"])
-n_rows = st.sidebar.slider("Jumlah bar historis ditampilkan", min_value=50, max_value=500, value=100)
+signals = {}
+if os.path.exists(DATA_PATH):
+    with open(DATA_PATH, "r") as f:
+        signals = json.load(f)
+else:
+    st.warning("⚠️ Data dummy belum tersedia. Jalankan generator_dummy.py dulu.")
 
-# Timeframe fix: H4
-st.sidebar.markdown("⏱ **Timeframe: 4 jam (H4)**")
+# ======================
+# Init Predictor
+# ======================
+predictor = Predictor(model_path="models/predictor.pkl")
 
-if st.sidebar.button("Refresh Data"):
-    rerun()
+# ======================
+# Sidebar
+# ======================
+pairs = list(signals.keys()) if signals else ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
+selected_pair = st.sidebar.selectbox("Pilih Pasangan Forex", pairs)
 
-# ==============================
-# Load Data
-# ==============================
-if not os.path.exists(DATA_FILE):
-    st.error("❌ Data tidak ditemukan. Jalankan generate_dummy.py dulu!")
-    st.stop()
+timeframes = ["10m", "30m", "1h", "4h", "1d"]
+selected_tf = st.sidebar.selectbox("Pilih Timeframe", timeframes, index=3)  # default 4h
 
-with open(DATA_FILE, "r") as f:
-    signals = json.load(f)
+n_rows = st.sidebar.slider("Jumlah data terakhir", 10, 200, 50)
 
-if pair_selected not in signals:
-    st.error(f"❌ Pair {pair_selected} tidak ada di data dummy.")
-    st.stop()
+# ======================
+# Tampilkan Data
+# ======================
+if selected_pair in signals:
+    df = pd.DataFrame(signals[selected_pair])
+    if not df.empty:
+        df = df.copy()  # hindari SettingWithCopyWarning
 
-df = pd.DataFrame(signals[pair_selected])
+        # Pastikan kolom waktu ada
+        if "time" in df.columns:
+            df["time"] = pd.to_datetime(df["time"])
+        else:
+            df["time"] = pd.date_range(end=datetime.now(), periods=len(df), freq="4h")
 
-if "time" not in df.columns:
-    st.error("❌ Data tidak memiliki kolom 'time'.")
-    st.stop()
+        # Tambahkan prediksi model
+        try:
+            df["predicted"], df["prob_up"] = predictor.predict(df)
+        except Exception as e:
+            st.warning(f"⚠️ Model not found, fallback ke prediksi sederhana. ({e})")
+            df["predicted"] = df["signal"]
+            df["prob_up"] = 0.5
 
-df["time"] = pd.to_datetime(df["time"])
-df = df.sort_values("time")
-df_show = df.tail(n_rows)
+        # ======================
+        # Chart Harga
+        # ======================
+        fig_price = go.Figure()
+        fig_price.add_trace(
+            go.Candlestick(
+                x=df["time"],
+                open=df["price"],
+                high=df["price"] * 1.002,
+                low=df["price"] * 0.998,
+                close=df["price"],
+                name="Candles"
+            )
+        )
+        fig_price.update_layout(title=f"{selected_pair} - Timeframe {selected_tf}", xaxis_rangeslider_visible=False)
 
-# ==============================
-# Prediksi Candle Berikutnya
-# ==============================
-predictor = Predictor(horizon_hours=4)
-pred = predictor.predict_next(df_show)
+        st.subheader("📈 Chart Harga")
+        st.plotly_chart(fig_price, config={"responsive": True}, width="stretch")
 
-st.subheader("🔮 Prediksi Candle Berikutnya (Timeframe H4)")
-st.table(pd.DataFrame([pred]))
+        # ======================
+        # Chart Probabilitas
+        # ======================
+        fig_prob = go.Figure()
+        fig_prob.add_trace(go.Scatter(x=df["time"], y=df["prob_up"], mode="lines+markers", name="Prob Naik"))
+        fig_prob.update_layout(title="Prediksi Probabilitas Naik")
 
-# ==============================
-# Chart Candlestick + EMA200 + Prediksi
-# ==============================
-fig_candle = go.Figure()
+        st.subheader("📊 Prediksi Probabilitas")
+        st.plotly_chart(fig_prob, config={"responsive": True}, width="stretch")
 
-fig_candle.add_trace(go.Candlestick(
-    x=df_show["time"],
-    open=df_show["open"],
-    high=df_show["high"],
-    low=df_show["low"],
-    close=df_show["price"],
-    name="Price"
-))
-
-# EMA200 pakai .loc untuk hindari warning
-df_show.loc[:, "ema200"] = df_show["price"].ewm(span=200).mean()
-fig_candle.add_trace(go.Scatter(
-    x=df_show["time"],
-    y=df_show["ema200"],
-    mode="lines",
-    line=dict(color="orange", width=1),
-    name="EMA200"
-))
-
-# Marker prediksi
-fig_candle.add_trace(go.Scatter(
-    x=[pred["Next Time"]],
-    y=[pred["Predicted Price"]],
-    mode="markers+text",
-    marker=dict(color="blue", size=16, symbol="star"),
-    text=[f"{pred['Predicted Signal']}"],
-    textfont=dict(size=12, color="white"),
-    textposition="top center",
-    name="Prediction"
-))
-
-# TP
-fig_candle.add_trace(go.Scatter(
-    x=[pred["Next Time"]],
-    y=[pred["Take Profit"]],
-    mode="markers+text",
-    marker=dict(color="green", size=12, symbol="triangle-up"),
-    text=["TP"],
-    textposition="bottom center",
-    name="Pred TP"
-))
-
-# SL
-fig_candle.add_trace(go.Scatter(
-    x=[pred["Next Time"]],
-    y=[pred["Stop Loss"]],
-    mode="markers+text",
-    marker=dict(color="red", size=12, symbol="triangle-down"),
-    text=["SL"],
-    textposition="top center",
-    name="Pred SL"
-))
-
-fig_candle.update_layout(
-    title=f"{pair_selected} Price Action (Timeframe H4) with EMA200 & Prediction",
-    xaxis_title="Time (H4 candles)",
-    yaxis_title="Price",
-    template="plotly_dark",
-    xaxis_rangeslider_visible=False,
-)
-fig_candle.update_xaxes(range=[df_show["time"].iloc[-50], pred["Next Time"] + pd.Timedelta(hours=4)])
-
-st.plotly_chart(fig_candle, width="stretch")
-
-# ==============================
-# Analisis Probabilitas & News
-# ==============================
-col1, col2 = st.columns(2)
-
-if "prob_up" in df_show.columns:
-    fig_prob = go.Figure()
-    fig_prob.add_trace(go.Scatter(
-        x=df_show["time"],
-        y=df_show["prob_up"],
-        mode="lines+markers",
-        line=dict(color="cyan"),
-        name="Prob Up"
-    ))
-    fig_prob.update_layout(
-        title="📈 Probabilitas Harga Naik",
-        yaxis=dict(range=[0, 1]),
-        template="plotly_dark"
-    )
-    col1.plotly_chart(fig_prob, width="stretch")
-
-if "news_compound" in df_show.columns:
-    fig_sent = go.Figure()
-    fig_sent.add_trace(go.Scatter(
-        x=df_show["time"],
-        y=df_show["news_compound"],
-        mode="lines+markers",
-        line=dict(color="magenta"),
-        name="News Sentiment"
-    ))
-    fig_sent.update_layout(
-        title="📰 Sentimen Berita (Compound)",
-        yaxis=dict(range=[-1, 1]),
-        template="plotly_dark"
-    )
-    col2.plotly_chart(fig_sent, width="stretch")
-
-# ==============================
-# Tabel Data Historis
-# ==============================
-st.subheader("📊 Data Historis (Timeframe H4)")
-cols = ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
-available_cols = [c for c in cols if c in df_show.columns]
-st.dataframe(df_show[available_cols].tail(n_rows), width="stretch")
+        # ======================
+        # Tabel Sinyal
+        # ======================
+        st.subheader("📋 Data Sinyal Terakhir")
+        st.dataframe(
+            df.tail(n_rows)[
+                ["time", "signal", "predicted", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
+            ]
+        )
+    else:
+        st.warning("⚠️ Data kosong untuk pasangan ini.")
+else:
+    st.error("❌ Pasangan tidak ditemukan dalam data.")
