@@ -2,78 +2,124 @@ import os
 import json
 import random
 from datetime import datetime, timedelta
+import pandas as pd
+import numpy as np
 
-# Folder data
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-os.makedirs(DATA_DIR, exist_ok=True)
+# ==============================
+# Konfigurasi
+# ==============================
+PAIRS = ["GBPJPY", "USDJPY", "EURJPY", "CHFJPY"]
+N_BARS = 500  # jumlah candle (H4)
+OUTPUT_DIR = os.path.join("data")
 
-def generate_dummy_signals(pair: str, n: int = 300):
-    """Generate dummy OHLC + signals untuk pair forex"""
-    now = datetime.utcnow()
-    start_price = random.uniform(100, 170)  # harga awal random
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    signals = []
-    for i in range(n):
-        # waktu candle H4
-        ts = now - timedelta(hours=4 * (n - i))
+# ==============================
+# Fungsi Generator
+# ==============================
+def generate_pair_data(pair, start_price):
+    data = []
+    time = datetime.utcnow() - timedelta(hours=N_BARS * 4)
 
-        # OHLC simulasi
-        open_price = start_price + random.uniform(-1, 1)
-        close_price = open_price + random.uniform(-0.8, 0.8)
-        high_price = max(open_price, close_price) + random.uniform(0, 0.5)
-        low_price = min(open_price, close_price) - random.uniform(0, 0.5)
+    # nilai awal
+    last_price = start_price
+    last_sent = random.uniform(-0.2, 0.2)  # sentimen berita awal
+    last_prob = 0.5  # netral
 
-        # prediksi sinyal
-        signal = "BUY" if close_price > open_price else "SELL"
+    prices = []
 
-        # TP/SL dummy (0.3% – 0.6%)
-        if signal == "BUY":
-            take_profit = round(close_price * (1 + random.uniform(0.003, 0.006)), 3)
-            stop_loss = round(close_price * (1 - random.uniform(0.003, 0.006)), 3)
+    for i in range(N_BARS):
+        # simulasi harga OHLC
+        open_price = last_price
+        change = random.uniform(-0.8, 0.8)
+        close_price = max(50, open_price + change)
+        high_price = max(open_price, close_price) + random.uniform(0, 0.4)
+        low_price = min(open_price, close_price) - random.uniform(0, 0.4)
+
+        prices.append(close_price)
+
+        # EMA200
+        if len(prices) >= 200:
+            ema200 = pd.Series(prices).ewm(span=200).mean().iloc[-1]
         else:
-            take_profit = round(close_price * (1 - random.uniform(0.003, 0.006)), 3)
-            stop_loss = round(close_price * (1 + random.uniform(0.003, 0.006)), 3)
+            ema200 = close_price
 
-        prob_up = round(random.uniform(0.3, 0.7), 2)
-        news_compound = round(random.uniform(-1, 1), 2)
+        # MACD sederhana (12 vs 26 EMA)
+        ema12 = pd.Series(prices).ewm(span=12).mean().iloc[-1]
+        ema26 = pd.Series(prices).ewm(span=26).mean().iloc[-1]
+        macd = ema12 - ema26
 
-        signals.append({
-            "time": ts.strftime("%Y-%m-%d %H:%M:%S"),
+        # Tentukan sinyal
+        if close_price > ema200 and macd > 0:
+            signal = "BUY"
+        elif close_price < ema200 and macd < 0:
+            signal = "SELL"
+        else:
+            signal = "HOLD"
+
+        # Probabilitas naik (berdasar arah harga)
+        if change >= 0:
+            last_prob = min(1, last_prob + random.uniform(0.01, 0.05))
+        else:
+            last_prob = max(0, last_prob - random.uniform(0.01, 0.05))
+
+        # Sentimen berita (random walk)
+        last_sent += random.uniform(-0.05, 0.05)
+        last_sent = max(-1, min(1, last_sent))
+
+        # Stop Loss / Take Profit (sederhana)
+        if signal == "BUY":
+            sl = close_price - random.uniform(0.5, 1.0)
+            tp = close_price + random.uniform(0.5, 1.0)
+        elif signal == "SELL":
+            sl = close_price + random.uniform(0.5, 1.0)
+            tp = close_price - random.uniform(0.5, 1.0)
+        else:
+            sl, tp = None, None
+
+        # Simpan record
+        data.append({
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "open": round(open_price, 3),
             "high": round(high_price, 3),
             "low": round(low_price, 3),
-            "price": round(close_price, 3),   # close
+            "price": round(close_price, 3),
             "signal": signal,
-            "take_profit": take_profit,
-            "stop_loss": stop_loss,
-            "prob_up": prob_up,
-            "news_compound": news_compound
+            "stop_loss": round(sl, 3) if sl else None,
+            "take_profit": round(tp, 3) if tp else None,
+            "prob_up": round(last_prob, 2),
+            "news_compound": round(last_sent, 2)
         })
 
-        start_price = close_price
+        # Update
+        last_price = close_price
+        time += timedelta(hours=4)
 
-    return signals
+    return data
 
+
+# ==============================
+# Main Generator
+# ==============================
 def main():
-    pairs = ["GBPJPY", "USDJPY", "EURJPY", "CHFJPY"]
-    all_data = {}
+    signals = {}
+    for pair in PAIRS:
+        start_price = random.uniform(130, 160) if "JPY" in pair else random.uniform(1.0, 2.0)
+        signals[pair] = generate_pair_data(pair, start_price)
 
-    for pair in pairs:
-        all_data[pair] = generate_dummy_signals(pair, n=400)
-
-    # Simpan ke file
+    # simpan ke file dengan timestamp
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    file_path = os.path.join(DATA_DIR, f"signals_dummy_{ts}.json")
-    last_file = os.path.join(DATA_DIR, "last_signal.json")
+    out_file = os.path.join(OUTPUT_DIR, f"signals_dummy_{ts}.json")
+    last_file = os.path.join(OUTPUT_DIR, "last_signal.json")
 
-    with open(file_path, "w") as f:
-        json.dump(all_data, f, indent=2)
+    with open(out_file, "w") as f:
+        json.dump(signals, f, indent=2)
 
     with open(last_file, "w") as f:
-        json.dump(all_data, f, indent=2)
+        json.dump(signals, f, indent=2)
 
-    print(f"✅ Dummy signals saved to: {file_path}")
-    print(f"✅ Latest dummy saved to: {last_file}")
+    print(f"✅ Dummy signals saved to:\n  {out_file}\n  {last_file}")
+
 
 if __name__ == "__main__":
     main()
