@@ -2,13 +2,12 @@ import os
 import sys
 import json
 import pandas as pd
-import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
+from streamlit import rerun
 
 # --- Fix path agar bisa import src/ ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from src.predictor import Predictor
 
 # ==============================
@@ -31,7 +30,7 @@ pair_selected = st.sidebar.selectbox("Pilih Pair", ["GBPJPY", "USDJPY", "EURJPY"
 n_rows = st.sidebar.slider("Jumlah bar historis ditampilkan", min_value=50, max_value=500, value=100)
 
 if st.sidebar.button("Refresh Data"):
-    st.experimental_rerun()
+    rerun()
 
 # ==============================
 # Load Data
@@ -49,15 +48,12 @@ if pair_selected not in signals:
 
 df = pd.DataFrame(signals[pair_selected])
 
-# pastikan ada kolom time
 if "time" not in df.columns:
     st.error("❌ Data tidak memiliki kolom 'time'.")
     st.stop()
 
 df["time"] = pd.to_datetime(df["time"])
 df = df.sort_values("time")
-
-# filter hanya ambil n_rows terakhir
 df_show = df.tail(n_rows)
 
 # ==============================
@@ -66,7 +62,7 @@ df_show = df.tail(n_rows)
 predictor = Predictor(horizon_hours=4)
 pred = predictor.predict_next(df_show)
 
-st.subheader("🔮 Prediksi Candle Berikutnya (H4)")
+st.subheader("🔮 Prediksi Candle Berikutnya (Timeframe H4)")
 st.table(pd.DataFrame([pred]))
 
 # ==============================
@@ -129,8 +125,8 @@ fig_candle.add_trace(go.Scatter(
 ))
 
 fig_candle.update_layout(
-    title=f"{pair_selected} Price Action with EMA200 & Prediction (Timeframe H4)",
-    xaxis_title="Time",
+    title=f"{pair_selected} Price Action (Timeframe H4) with EMA200 & Prediction",
+    xaxis_title="Time (H4 candles)",
     yaxis_title="Price",
     template="plotly_dark",
     xaxis_rangeslider_visible=False,
@@ -144,7 +140,7 @@ st.plotly_chart(fig_candle, use_container_width=True)
 # ==============================
 # Tabel Data Historis
 # ==============================
-st.subheader("📊 Data Historis")
+st.subheader("📊 Data Historis (Timeframe H4)")
 cols = ["time", "signal", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
 available_cols = [c for c in cols if c in df_show.columns]
 st.dataframe(df_show[available_cols].tail(n_rows), use_container_width=True)
