@@ -193,10 +193,7 @@ fig_candle.add_trace(go.Scatter(
 # Tampilkan tabel prediksi di dashboard
 st.subheader("🔮 Prediksi Candle Berikutnya (H4)")
 st.table(pd.DataFrame([pred]))
-
-    
-    st.plotly_chart(fig_prob, use_container_width=True)
-
+st.plotly_chart(fig_prob, use_container_width=True)
 with col2:
     fig_sent = go.Figure(go.Indicator(
         mode="gauge+number",
