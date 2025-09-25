@@ -312,7 +312,7 @@ if st.sidebar.button("Refresh Data"):
     st.cache_data.clear()
 
 with st.spinner("Loading data..."):
-    df = load_data(selected_pair, period, timeframe)
+    df = load_dummy_data(selected_pair_name, period, timeframe)
 
 if df is None or df.empty:
     st.error("Failed to load data. Please check your internet connection and try again.")
