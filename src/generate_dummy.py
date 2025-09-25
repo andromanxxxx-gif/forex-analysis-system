@@ -1,125 +1,106 @@
 import os
 import json
-import random
-from datetime import datetime, timedelta
 import pandas as pd
-import numpy as np
+import streamlit as st
+import plotly.graph_objs as go
+from datetime import datetime
+from src.predictor import Predictor
 
-# ==============================
-# Konfigurasi
-# ==============================
-PAIRS = ["GBPJPY", "USDJPY", "EURJPY", "CHFJPY"]
-N_BARS = 500  # jumlah candle (H4)
-OUTPUT_DIR = os.path.join("data")
+# ======================
+# Konfigurasi Halaman
+# ======================
+st.set_page_config(page_title="Forex ML Dashboard", layout="wide")
+st.title("📊 Forex ML Dashboard (MACD + EMA200 + News)")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# ======================
+# Load Dummy Signals
+# ======================
+DATA_PATH = os.path.join("data", "last_signal.json")
 
-# ==============================
-# Fungsi Generator
-# ==============================
-def generate_pair_data(pair, start_price):
-    data = []
-    time = datetime.utcnow() - timedelta(hours=N_BARS * 4)
+signals = {}
+if os.path.exists(DATA_PATH):
+    with open(DATA_PATH, "r") as f:
+        signals = json.load(f)
+else:
+    st.warning("⚠️ Data dummy belum tersedia. Jalankan generator_dummy.py dulu.")
 
-    # nilai awal
-    last_price = start_price
-    last_sent = random.uniform(-0.2, 0.2)  # sentimen berita awal
-    last_prob = 0.5  # netral
+# ======================
+# Init Predictor
+# ======================
+predictor = Predictor(model_path="models/predictor.pkl")
 
-    prices = []
+# ======================
+# Sidebar
+# ======================
+pairs = list(signals.keys()) if signals else ["GBPJPY", "CHFJPY", "EURJPY", "USDJPY"]
+selected_pair = st.sidebar.selectbox("Pilih Pasangan Forex", pairs)
 
-    for i in range(N_BARS):
-        # simulasi harga OHLC
-        open_price = last_price
-        change = random.uniform(-0.8, 0.8)
-        close_price = max(50, open_price + change)
-        high_price = max(open_price, close_price) + random.uniform(0, 0.4)
-        low_price = min(open_price, close_price) - random.uniform(0, 0.4)
+timeframes = ["10m", "30m", "1h", "4h", "1d"]
+selected_tf = st.sidebar.selectbox("Pilih Timeframe", timeframes, index=3)  # default 4h
 
-        prices.append(close_price)
+n_rows = st.sidebar.slider("Jumlah data terakhir", 10, 200, 50)
 
-        # EMA200
-        if len(prices) >= 200:
-            ema200 = pd.Series(prices).ewm(span=200).mean().iloc[-1]
+# ======================
+# Tampilkan Data
+# ======================
+if selected_pair in signals:
+    df = pd.DataFrame(signals[selected_pair])
+    if not df.empty:
+        df = df.copy()  # hindari SettingWithCopyWarning
+
+        # Pastikan kolom waktu ada
+        if "time" in df.columns:
+            df["time"] = pd.to_datetime(df["time"])
         else:
-            ema200 = close_price
+            df["time"] = pd.date_range(end=datetime.now(), periods=len(df), freq="4h")
 
-        # MACD sederhana (12 vs 26 EMA)
-        ema12 = pd.Series(prices).ewm(span=12).mean().iloc[-1]
-        ema26 = pd.Series(prices).ewm(span=26).mean().iloc[-1]
-        macd = ema12 - ema26
+        # Tambahkan prediksi model
+        try:
+            df["predicted"], df["prob_up"] = predictor.predict(df)
+        except Exception as e:
+            st.warning(f"⚠️ Model not found, fallback ke prediksi sederhana. ({e})")
+            df["predicted"] = df["signal"]
+            df["prob_up"] = 0.5
 
-        # Tentukan sinyal
-        if close_price > ema200 and macd > 0:
-            signal = "BUY"
-        elif close_price < ema200 and macd < 0:
-            signal = "SELL"
-        else:
-            signal = "HOLD"
+        # ======================
+        # Chart Harga
+        # ======================
+        fig_price = go.Figure()
+        fig_price.add_trace(
+            go.Candlestick(
+                x=df["time"],
+                open=df["price"],
+                high=df["price"] * 1.002,
+                low=df["price"] * 0.998,
+                close=df["price"],
+                name="Candles"
+            )
+        )
+        fig_price.update_layout(title=f"{selected_pair} - Timeframe {selected_tf}", xaxis_rangeslider_visible=False)
 
-        # Probabilitas naik (berdasar arah harga)
-        if change >= 0:
-            last_prob = min(1, last_prob + random.uniform(0.01, 0.05))
-        else:
-            last_prob = max(0, last_prob - random.uniform(0.01, 0.05))
+        st.subheader("📈 Chart Harga")
+        st.plotly_chart(fig_price, config={"responsive": True}, width="stretch")
 
-        # Sentimen berita (random walk)
-        last_sent += random.uniform(-0.05, 0.05)
-        last_sent = max(-1, min(1, last_sent))
+        # ======================
+        # Chart Probabilitas
+        # ======================
+        fig_prob = go.Figure()
+        fig_prob.add_trace(go.Scatter(x=df["time"], y=df["prob_up"], mode="lines+markers", name="Prob Naik"))
+        fig_prob.update_layout(title="Prediksi Probabilitas Naik")
 
-        # Stop Loss / Take Profit (sederhana)
-        if signal == "BUY":
-            sl = close_price - random.uniform(0.5, 1.0)
-            tp = close_price + random.uniform(0.5, 1.0)
-        elif signal == "SELL":
-            sl = close_price + random.uniform(0.5, 1.0)
-            tp = close_price - random.uniform(0.5, 1.0)
-        else:
-            sl, tp = None, None
+        st.subheader("📊 Prediksi Probabilitas")
+        st.plotly_chart(fig_prob, config={"responsive": True}, width="stretch")
 
-        # Simpan record
-        data.append({
-            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "open": round(open_price, 3),
-            "high": round(high_price, 3),
-            "low": round(low_price, 3),
-            "price": round(close_price, 3),
-            "signal": signal,
-            "stop_loss": round(sl, 3) if sl else None,
-            "take_profit": round(tp, 3) if tp else None,
-            "prob_up": round(last_prob, 2),
-            "news_compound": round(last_sent, 2)
-        })
-
-        # Update
-        last_price = close_price
-        time += timedelta(hours=4)
-
-    return data
-
-
-# ==============================
-# Main Generator
-# ==============================
-def main():
-    signals = {}
-    for pair in PAIRS:
-        start_price = random.uniform(130, 160) if "JPY" in pair else random.uniform(1.0, 2.0)
-        signals[pair] = generate_pair_data(pair, start_price)
-
-    # simpan ke file dengan timestamp
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    out_file = os.path.join(OUTPUT_DIR, f"signals_dummy_{ts}.json")
-    last_file = os.path.join(OUTPUT_DIR, "last_signal.json")
-
-    with open(out_file, "w") as f:
-        json.dump(signals, f, indent=2)
-
-    with open(last_file, "w") as f:
-        json.dump(signals, f, indent=2)
-
-    print(f"✅ Dummy signals saved to:\n  {out_file}\n  {last_file}")
-
-
-if __name__ == "__main__":
-    main()
+        # ======================
+        # Tabel Sinyal
+        # ======================
+        st.subheader("📋 Data Sinyal Terakhir")
+        st.dataframe(
+            df.tail(n_rows)[
+                ["time", "signal", "predicted", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
+            ]
+        )
+    else:
+        st.warning("⚠️ Data kosong untuk pasangan ini.")
+else:
+    st.error("❌ Pasangan tidak ditemukan dalam data.")
