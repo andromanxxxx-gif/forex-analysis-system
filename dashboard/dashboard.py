@@ -1,10 +1,19 @@
 import os
+import sys
 import json
 import pandas as pd
 import streamlit as st
 import plotly.graph_objs as go
 from datetime import datetime
-from src.predictor import Predictor
+
+# ======================
+# Fix Import Path untuk src/
+# ======================
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from src.predictor import Predictor  # sekarang aman
 
 # ======================
 # Konfigurasi Halaman
@@ -15,19 +24,19 @@ st.title("📊 Forex ML Dashboard (MACD + EMA200 + News)")
 # ======================
 # Load Dummy Signals
 # ======================
-DATA_PATH = os.path.join("data", "last_signal.json")
+DATA_PATH = os.path.join(PROJECT_ROOT, "data", "last_signal.json")
 
 signals = {}
 if os.path.exists(DATA_PATH):
     with open(DATA_PATH, "r") as f:
         signals = json.load(f)
 else:
-    st.warning("⚠️ Data dummy belum tersedia. Jalankan generator_dummy.py dulu.")
+    st.warning("⚠️ Data dummy belum tersedia. Jalankan generate_dummy.py dulu.")
 
 # ======================
 # Init Predictor
 # ======================
-predictor = Predictor(model_path="models/predictor.pkl")
+predictor = Predictor(model_path=os.path.join(PROJECT_ROOT, "models", "predictor.pkl"))
 
 # ======================
 # Sidebar
@@ -95,11 +104,9 @@ if selected_pair in signals:
         # Tabel Sinyal
         # ======================
         st.subheader("📋 Data Sinyal Terakhir")
-        st.dataframe(
-            df.tail(n_rows)[
-                ["time", "signal", "predicted", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
-            ]
-        )
+        expected_cols = ["time", "signal", "predicted", "price", "stop_loss", "take_profit", "prob_up", "news_compound"]
+        available_cols = [col for col in expected_cols if col in df.columns]
+        st.dataframe(df.tail(n_rows)[available_cols])
     else:
         st.warning("⚠️ Data kosong untuk pasangan ini.")
 else:
