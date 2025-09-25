@@ -25,9 +25,11 @@ DATA_FILE = os.path.join("data", "last_signal.json")
 # Sidebar Settings
 # ==============================
 st.sidebar.header("⚙️ Settings")
-refresh_interval = st.sidebar.selectbox("Auto-refresh interval", ["1 menit", "5 menit", "10 menit"])
 pair_selected = st.sidebar.selectbox("Pilih Pair", ["GBPJPY", "USDJPY", "EURJPY", "CHFJPY"])
 n_rows = st.sidebar.slider("Jumlah bar historis ditampilkan", min_value=50, max_value=500, value=100)
+
+# Timeframe fix: H4
+st.sidebar.markdown("⏱ **Timeframe: 4 jam (H4)**")
 
 if st.sidebar.button("Refresh Data"):
     rerun()
@@ -79,16 +81,15 @@ fig_candle.add_trace(go.Candlestick(
     name="Price"
 ))
 
-# EMA200 pakai .loc untuk hindari SettingWithCopyWarning
-if "price" in df_show.columns:
-    df_show.loc[:, "ema200"] = df_show["price"].ewm(span=200).mean()
-    fig_candle.add_trace(go.Scatter(
-        x=df_show["time"],
-        y=df_show["ema200"],
-        mode="lines",
-        line=dict(color="orange", width=1),
-        name="EMA200"
-    ))
+# EMA200 pakai .loc untuk hindari warning
+df_show.loc[:, "ema200"] = df_show["price"].ewm(span=200).mean()
+fig_candle.add_trace(go.Scatter(
+    x=df_show["time"],
+    y=df_show["ema200"],
+    mode="lines",
+    line=dict(color="orange", width=1),
+    name="EMA200"
+))
 
 # Marker prediksi
 fig_candle.add_trace(go.Scatter(
@@ -131,11 +132,46 @@ fig_candle.update_layout(
     template="plotly_dark",
     xaxis_rangeslider_visible=False,
 )
-
-# extend axis supaya prediksi kelihatan
 fig_candle.update_xaxes(range=[df_show["time"].iloc[-50], pred["Next Time"] + pd.Timedelta(hours=4)])
 
 st.plotly_chart(fig_candle, width="stretch")
+
+# ==============================
+# Analisis Probabilitas & News
+# ==============================
+col1, col2 = st.columns(2)
+
+if "prob_up" in df_show.columns:
+    fig_prob = go.Figure()
+    fig_prob.add_trace(go.Scatter(
+        x=df_show["time"],
+        y=df_show["prob_up"],
+        mode="lines+markers",
+        line=dict(color="cyan"),
+        name="Prob Up"
+    ))
+    fig_prob.update_layout(
+        title="📈 Probabilitas Harga Naik",
+        yaxis=dict(range=[0, 1]),
+        template="plotly_dark"
+    )
+    col1.plotly_chart(fig_prob, width="stretch")
+
+if "news_compound" in df_show.columns:
+    fig_sent = go.Figure()
+    fig_sent.add_trace(go.Scatter(
+        x=df_show["time"],
+        y=df_show["news_compound"],
+        mode="lines+markers",
+        line=dict(color="magenta"),
+        name="News Sentiment"
+    ))
+    fig_sent.update_layout(
+        title="📰 Sentimen Berita (Compound)",
+        yaxis=dict(range=[-1, 1]),
+        template="plotly_dark"
+    )
+    col2.plotly_chart(fig_sent, width="stretch")
 
 # ==============================
 # Tabel Data Historis
