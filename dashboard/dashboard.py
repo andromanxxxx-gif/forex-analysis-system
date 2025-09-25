@@ -5,7 +5,16 @@ import streamlit as st
 import plotly.graph_objects as go
 import subprocess
 from src.predictor import Predictor
+import sys, os
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import sys, os
 
+# tambahkan parent folder ke sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from src.predictor import Predictor
 
 # === Konfigurasi Streamlit ===
 st.set_page_config(page_title="Forex ML Dashboard (H4)", layout="wide")
