@@ -8,6 +8,3 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 google-auth-oauthlib==1.1.0
 google-api-python-client==2.108.0
-matplotlib==3.7.2
-seaborn==0.12.2
-unittest-xml-reporting==3.2.0
