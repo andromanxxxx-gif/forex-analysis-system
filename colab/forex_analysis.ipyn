@@ -1,11 +1,64 @@
-# Cell 1: Setup
-from src.gdrive_manager import GDRIVE_MANAGER
-from src.technical_analyzer import TechnicalAnalyzer
+# [1] Install Packages
+!pip install yfinance ta plotly pandas numpy google-auth-oauthlib google-api-python-client
 
-# Cell 2: Load data dari Google Drive
-data = GDRIVE_MANAGER.load_data("GBPJPY_data.csv")
-analyzer = TechnicalAnalyzer()
-results = analyzer.deep_analysis(data)
+# [2] Import Libraries
+import pandas as pd
+import numpy as np
+import yfinance as yf
+import ta
+from google.colab import auth
+from google.auth import default
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+import plotly.graph_objects as go
+from datetime import datetime
 
-# Cell 3: Save results back to Google Drive
-GDRIVE_MANAGER.save_data(results, "GBPJPY_analysis.csv")
+# [3] Authenticate Google Drive
+auth.authenticate_user()
+creds, _ = default()
+drive_service = build('drive', 'v3', credentials=creds)
+
+# [4] Forex Analysis Class
+class ColabForexAnalyzer:
+    def __init__(self):
+        self.pairs = {
+            'GBPJPY': 'GBPJPY=X',
+            'USDJPY': 'USDJPY=X', 
+            'CHFJPY': 'CHFJPY=X',
+            'EURJPY': 'EURJPY=X',
+            'EURNZD': 'EURNZD=X'
+        }
+    
+    def analyze_and_save(self, pair_name):
+        """Analisis dan simpan ke Google Drive"""
+        # Get real data from Yahoo Finance
+        yf_symbol = self.pairs[pair_name]
+        data = yf.download(yf_symbol, period='60d', interval='1h')
+        
+        # Calculate indicators
+        data['EMA_200'] = ta.trend.ema_indicator(data['Close'], window=200)
+        macd = ta.trend.MACD(data['Close'])
+        data['MACD'] = macd.macd()
+        data['MACD_Signal'] = macd.macd_signal()
+        data['OBV'] = ta.volume.on_balance_volume(data['Close'], data['Volume'])
+        
+        # Save to Google Drive
+        filename = f"{pair_name}_analysis.csv"
+        data.to_csv(filename)
+        
+        file_metadata = {'name': filename, 'mimeType': 'text/csv'}
+        media = MediaFileUpload(filename, mimetype='text/csv')
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        
+        print(f"✅ {pair_name} analysis saved to Google Drive! File ID: {file['id']}")
+        return data
+
+# [5] Jalankan Analisis
+analyzer = ColabForexAnalyzer()
+
+print("🚀 Starting Forex Analysis...")
+for pair in analyzer.pairs.keys():
+    data = analyzer.analyze_and_save(pair)
+    print(f"📊 {pair} analysis completed!")
+
+print("🎉 All analyses saved to Google Drive!")
