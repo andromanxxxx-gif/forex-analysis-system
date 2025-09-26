@@ -12,13 +12,22 @@ def run_cmd(cmd):
 def main():
     print("🔧 Memperbaiki environment...")
 
-    # Upgrade pip, setuptools, dan wheel (supaya kompatibel dengan Python 3.12+)
+    # Cek versi Python
+    major, minor = sys.version_info[:2]
+    print(f"ℹ️ Python versi terdeteksi: {major}.{minor}")
+
+    if major < 3 or (major == 3 and minor < 10):
+        print("⚠️ Versi Python Anda terlalu lama. Disarankan pakai Python 3.10+.")
+    elif major == 3 and minor >= 12:
+        print("⚠️ Python 3.12+ terdeteksi. Pastikan setuptools terbaru dipakai.")
+
+    # Upgrade pip, setuptools, dan wheel
     run_cmd("python -m pip install --upgrade pip setuptools wheel")
 
     # Paksa upgrade setuptools ke versi terbaru (fix ImpImporter error)
     run_cmd("pip install --upgrade setuptools==70.0.0")
 
-    # Install paket utama yang sering dipakai
+    # Install paket utama
     packages = [
         "streamlit",
         "pandas",
