@@ -1,0 +1,11 @@
+# Cell 1: Setup
+from src.gdrive_manager import GDRIVE_MANAGER
+from src.technical_analyzer import TechnicalAnalyzer
+
+# Cell 2: Load data dari Google Drive
+data = GDRIVE_MANAGER.load_data("GBPJPY_data.csv")
+analyzer = TechnicalAnalyzer()
+results = analyzer.deep_analysis(data)
+
+# Cell 3: Save results back to Google Drive
+GDRIVE_MANAGER.save_data(results, "GBPJPY_analysis.csv")
