@@ -1,3 +1,13 @@
+# Di bagian atas app.py tambahkan:
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.data_fetcher import ForexDataFetcher
+from src.technical_analyzer import TechnicalAnalyzer
+from src.news_analyzer import NewsAnalyzer
+from src.ai_predictor import AIPredictor
+from src.dummy_data_generator import ForexDataGenerator
+from src.backtester import ForexBacktester
 import streamlit as st
 import pandas as pd
 import numpy as np
