@@ -2,7 +2,15 @@
 import pandas as pd
 import numpy as np
 
-def calculate_indicators(df):
+def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Hitung indikator teknikal: EMA200, MACD, OBV
+    df harus punya kolom: 'Open', 'High', 'Low', 'Close', 'Volume'
+    """
+    # Pastikan kolom numerik
+    for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+        df[col] = df[col].astype(float)
+    
     # EMA 200
     df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
     
@@ -17,26 +25,26 @@ def calculate_indicators(df):
     
     return df
 
-def generate_signal(df):
-    latest = df.iloc[-1]
-    signal = "HOLD"
-    if latest['Close'] > latest['EMA200'] and latest['MACD'] > latest['MACD_signal']:
-        signal = "BUY"
-    elif latest['Close'] < latest['EMA200'] and latest['MACD'] < latest['MACD_signal']:
-        signal = "SELL"
+
+def generate_signal(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Menghasilkan sinyal trading: Buy / Sell / Hold berdasarkan indikator
+    """
+    df['Signal'] = 'Hold'
     
-    # Tentukan TP/SL sederhana
-    if signal == "BUY":
-        tp = latest['Close'] * 1.01
-        sl = latest['Close'] * 0.995
-    elif signal == "SELL":
-        tp = latest['Close'] * 0.99
-        sl = latest['Close'] * 1.005
-    else:
-        tp = sl = latest['Close']
+    # Sinyal EMA200
+    df.loc[df['Close'] > df['EMA200'], 'Signal'] = 'Buy'
+    df.loc[df['Close'] < df['EMA200'], 'Signal'] = 'Sell'
     
-    return {
-        "signal": signal,
-        "take_profit": round(tp, 5),
-        "stop_loss": round(sl, 5)
-    }
+    # Sinyal tambahan MACD crossover
+    buy_condition = (df['MACD'] > df['MACD_signal']) & (df['Close'] > df['EMA200'])
+    sell_condition = (df['MACD'] < df['MACD_signal']) & (df['Close'] < df['EMA200'])
+    
+    df.loc[buy_condition, 'Signal'] = 'Buy'
+    df.loc[sell_condition, 'Signal'] = 'Sell'
+    
+    # Tambahkan prediksi TP/SL sederhana
+    df['TP'] = df['Close'] * 1.01  # Target profit +1%
+    df['SL'] = df['Close'] * 0.99  # Stop loss -1%
+    
+    return df
