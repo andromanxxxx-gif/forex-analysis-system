@@ -291,6 +291,72 @@
         let currentChartType = 'candlestick';
         let currentAnalysis = null;
         
+        // Candlestick chart plugin untuk Chart.js
+        const candlestickPlugin = {
+            id: 'candlestick',
+            beforeDraw: function(chart) {
+                if (chart.config.type !== 'candlestick') return;
+                
+                const ctx = chart.ctx;
+                const datasets = chart.data.datasets;
+                
+                datasets.forEach((dataset, datasetIndex) => {
+                    if (dataset.type === 'candlestick') {
+                        const meta = chart.getDatasetMeta(datasetIndex);
+                        
+                        meta.data.forEach((element, index) => {
+                            const {x, y} = element;
+                            const data = dataset.data[index];
+                            
+                            if (!data || typeof data !== 'object') return;
+                            
+                            const open = data.o;
+                            const high = data.h;
+                            const low = data.l;
+                            const close = data.c;
+                            
+                            // Calculate pixel values
+                            const yOpen = chart.scales.y.getPixelForValue(open);
+                            const yHigh = chart.scales.y.getPixelForValue(high);
+                            const yLow = chart.scales.y.getPixelForValue(low);
+                            const yClose = chart.scales.y.getPixelForValue(close);
+                            
+                            const width = 8; // Width of candlestick
+                            
+                            // Draw high-low line
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(x, yHigh);
+                            ctx.lineTo(x, yLow);
+                            ctx.strokeStyle = open > close ? '#e74c3c' : '#27ae60';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                            
+                            // Draw candle body
+                            const bodyTop = Math.min(yOpen, yClose);
+                            const bodyBottom = Math.max(yOpen, yClose);
+                            const bodyHeight = bodyBottom - bodyTop;
+                            
+                            if (bodyHeight > 0) {
+                                ctx.fillStyle = open > close ? '#e74c3c' : '#27ae60';
+                                ctx.fillRect(x - width/2, bodyTop, width, bodyHeight);
+                                
+                                // Draw border
+                                ctx.strokeStyle = '#2c3e50';
+                                ctx.lineWidth = 1;
+                                ctx.strokeRect(x - width/2, bodyTop, width, bodyHeight);
+                            }
+                            
+                            ctx.restore();
+                        });
+                    }
+                });
+            }
+        };
+
+        // Register plugin
+        Chart.register(candlestickPlugin);
+        
         function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
             const timeframe = document.getElementById('timeframeSelect').value;
@@ -354,18 +420,18 @@
             }
         }
 
-        function createCandlestickDataset(chartData) {
-            const candles = [];
+        function createCandlestickData(chartData) {
+            const candlestickData = [];
             for (let i = 0; i < chartData.dates.length; i++) {
-                candles.push({
-                    x: i, // Use index instead of date for simplicity
+                candlestickData.push({
+                    x: chartData.dates[i],
                     o: chartData.open[i],
                     h: chartData.high[i],
                     l: chartData.low[i],
                     c: chartData.close[i]
                 });
             }
-            return candles;
+            return candlestickData;
         }
 
         function createChart(chartData, analysis) {
@@ -376,42 +442,44 @@
             const ctx = document.getElementById('priceChart').getContext('2d');
             
             if (currentChartType === 'candlestick') {
-                // Simplified candlestick chart
+                // Candlestick Chart dengan plugin custom
+                const candlestickData = createCandlestickData(chartData);
+                
                 currentChart = new Chart(ctx, {
-                    type: 'line',
+                    type: 'scatter', // Use scatter as base for custom rendering
                     data: {
-                        labels: chartData.dates,
                         datasets: [
                             {
-                                label: 'Price',
-                                data: chartData.close,
-                                borderColor: '#3498db',
-                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                                borderWidth: 2,
-                                fill: true
+                                label: 'Candlestick',
+                                data: candlestickData,
+                                type: 'candlestick'
                             },
                             {
                                 label: 'EMA 20',
-                                data: chartData.ema_20,
-                                borderColor: '#e74c3c',
-                                borderWidth: 1,
-                                borderDash: [5, 5],
-                                fill: false
+                                data: chartData.ema_20.map((val, idx) => ({x: chartData.dates[idx], y: val})),
+                                borderColor: '#FF6B00',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
                             },
                             {
                                 label: 'EMA 50',
-                                data: chartData.ema_50,
-                                borderColor: '#f39c12',
-                                borderWidth: 1,
-                                borderDash: [5, 5],
-                                fill: false
+                                data: chartData.ema_50.map((val, idx) => ({x: chartData.dates[idx], y: val})),
+                                borderColor: '#2979FF',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
                             },
                             {
                                 label: 'EMA 200',
-                                data: chartData.ema_200,
-                                borderColor: '#27ae60',
-                                borderWidth: 2,
-                                fill: false
+                                data: chartData.ema_200.map((val, idx) => ({x: chartData.dates[idx], y: val})),
+                                borderColor: '#00C853',
+                                borderWidth: 3,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
                             }
                         ]
                     },
@@ -421,19 +489,57 @@
                         plugins: {
                             title: {
                                 display: true,
-                                text: 'Price Chart with Moving Averages',
-                                font: { size: 16 }
+                                text: 'Candlestick Chart with Moving Averages',
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const point = context.raw;
+                                        if (point.o !== undefined) {
+                                            return [
+                                                `Open: ${point.o.toFixed(4)}`,
+                                                `High: ${point.h.toFixed(4)}`,
+                                                `Low: ${point.l.toFixed(4)}`,
+                                                `Close: ${point.c.toFixed(4)}`,
+                                                `Change: ${((point.c - point.o) / point.o * 100).toFixed(2)}%`
+                                            ];
+                                        }
+                                        return `${context.dataset.label}: ${point.y.toFixed(4)}`;
+                                    }
+                                }
                             }
                         },
                         scales: {
                             x: {
-                                title: { display: true, text: 'Time' },
-                                ticks: { maxTicksLimit: 8 }
+                                type: 'category',
+                                title: {
+                                    display: true,
+                                    text: 'Time'
+                                },
+                                ticks: {
+                                    maxTicksLimit: 8,
+                                    autoSkip: true
+                                }
                             },
                             y: {
-                                title: { display: true, text: 'Price' },
-                                ticks: { callback: value => value.toFixed(3) }
+                                title: {
+                                    display: true,
+                                    text: 'Price'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(3);
+                                    }
+                                }
                             }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
                         }
                     }
                 });
@@ -450,7 +556,8 @@
                                 borderColor: '#3498db',
                                 backgroundColor: 'rgba(52, 152, 219, 0.1)',
                                 borderWidth: 2,
-                                fill: true
+                                fill: true,
+                                tension: 0.1
                             },
                             {
                                 label: 'EMA 20',
@@ -458,7 +565,8 @@
                                 borderColor: '#e74c3c',
                                 borderWidth: 1,
                                 borderDash: [5, 5],
-                                fill: false
+                                fill: false,
+                                tension: 0.1
                             },
                             {
                                 label: 'EMA 50',
@@ -466,14 +574,16 @@
                                 borderColor: '#f39c12',
                                 borderWidth: 1,
                                 borderDash: [5, 5],
-                                fill: false
+                                fill: false,
+                                tension: 0.1
                             },
                             {
                                 label: 'EMA 200',
                                 data: chartData.ema_200,
                                 borderColor: '#27ae60',
                                 borderWidth: 2,
-                                fill: false
+                                fill: false,
+                                tension: 0.1
                             }
                         ]
                     },
@@ -584,7 +694,6 @@
         }
 
         function colorCodePercentageChanges() {
-            // Color code all percentage changes
             const changes = document.querySelectorAll('.percentage-change');
             changes.forEach(element => {
                 const value = parseFloat(element.textContent);
