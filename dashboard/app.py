@@ -443,6 +443,21 @@ def get_analysis():
         if timeframe not in timeframe_mapping:
             return jsonify({'error': 'Invalid timeframe'})
         
+        # Get data dengan validasi
+        yf_timeframe = timeframe_mapping[timeframe]
+        period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
+        
+        data = get_data_with_fallback(pair, timeframe, period)
+        
+        # Validasi dan perbaiki data
+        data = validate_and_fix_data(data)
+        
+        print(f"Validated data: {len(data)} rows")
+        
+        if data.empty:
+            return jsonify({'error': 'No valid data available after validation'})
+        
+        # ... rest of your existing code ...        
         # Get data with fallback
         yf_timeframe = timeframe_mapping[timeframe]
         period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
