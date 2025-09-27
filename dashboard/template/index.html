@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Forex Trading System</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -213,12 +212,32 @@
         .level-buy { background: #d4edda; color: #155724; }
         .level-sell { background: #f8d7da; color: #721c24; }
         .level-neutral { background: #fff3cd; color: #856404; }
+        .historical-stats {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #3498db;
+        }
         @media (max-width: 768px) {
             .analysis-grid { grid-template-columns: 1fr; }
             .controls { flex-direction: column; align-items: stretch; }
             .control-group { justify-content: space-between; }
             .chart-container { height: 350px; }
             .trading-levels { flex-direction: column; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -339,7 +358,7 @@
             const candles = [];
             for (let i = 0; i < chartData.dates.length; i++) {
                 candles.push({
-                    x: chartData.dates[i],
+                    x: i, // Use index instead of date for simplicity
                     o: chartData.open[i],
                     h: chartData.high[i],
                     l: chartData.low[i],
@@ -355,76 +374,65 @@
             }
             
             const ctx = document.getElementById('priceChart').getContext('2d');
-            const signal = analysis.SIGNAL.toLowerCase();
             
             if (currentChartType === 'candlestick') {
-                // Candlestick Chart
-                const candleData = createCandlestickDataset(chartData);
-                
+                // Simplified candlestick chart
                 currentChart = new Chart(ctx, {
-                    type: 'bar',
+                    type: 'line',
                     data: {
-                        datasets: [{
-                            label: 'Price',
-                            data: candleData,
-                            borderColor: '#000',
-                            borderWidth: 1,
-                            backgroundColor: candleData.map(d => 
-                                d.c >= d.o ? 'rgba(76, 175, 80, 0.8)' : 'rgba(244, 67, 54, 0.8)'
-                            )
-                        }, {
-                            label: 'EMA 20',
-                            data: chartData.ema_20.map((val, idx) => ({x: chartData.dates[idx], y: val})),
-                            borderColor: '#FF9800',
-                            borderWidth: 2,
-                            fill: false,
-                            pointRadius: 0
-                        }, {
-                            label: 'EMA 50',
-                            data: chartData.ema_50.map((val, idx) => ({x: chartData.dates[idx], y: val})),
-                            borderColor: '#2196F3',
-                            borderWidth: 2,
-                            fill: false,
-                            pointRadius: 0
-                        }, {
-                            label: 'EMA 200',
-                            data: chartData.ema_200.map((val, idx) => ({x: chartData.dates[idx], y: val})),
-                            borderColor: '#9C27B0',
-                            borderWidth: 2,
-                            fill: false,
-                            pointRadius: 0
-                        }]
+                        labels: chartData.dates,
+                        datasets: [
+                            {
+                                label: 'Price',
+                                data: chartData.close,
+                                borderColor: '#3498db',
+                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: true
+                            },
+                            {
+                                label: 'EMA 20',
+                                data: chartData.ema_20,
+                                borderColor: '#e74c3c',
+                                borderWidth: 1,
+                                borderDash: [5, 5],
+                                fill: false
+                            },
+                            {
+                                label: 'EMA 50',
+                                data: chartData.ema_50,
+                                borderColor: '#f39c12',
+                                borderWidth: 1,
+                                borderDash: [5, 5],
+                                fill: false
+                            },
+                            {
+                                label: 'EMA 200',
+                                data: chartData.ema_200,
+                                borderColor: '#27ae60',
+                                borderWidth: 2,
+                                fill: false
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Price Chart with Moving Averages',
+                                font: { size: 16 }
+                            }
+                        },
                         scales: {
                             x: {
-                                type: 'category',
                                 title: { display: true, text: 'Time' },
                                 ticks: { maxTicksLimit: 8 }
                             },
                             y: {
                                 title: { display: true, text: 'Price' },
                                 ticks: { callback: value => value.toFixed(3) }
-                            }
-                        },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Candlestick Chart with EMAs',
-                                font: { size: 16 }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const point = context.raw;
-                                        if (point.o !== undefined) {
-                                            return `O: ${point.o.toFixed(4)} H: ${point.h.toFixed(4)} L: ${point.l.toFixed(4)} C: ${point.c.toFixed(4)}`;
-                                        }
-                                        return `${context.dataset.label}: ${point.y.toFixed(4)}`;
-                                    }
-                                }
                             }
                         }
                     }
@@ -435,34 +443,39 @@
                     type: 'line',
                     data: {
                         labels: chartData.dates,
-                        datasets: [{
-                            label: 'Close Price',
-                            data: chartData.close,
-                            borderColor: '#3498db',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            borderWidth: 2,
-                            fill: true
-                        }, {
-                            label: 'EMA 20',
-                            data: chartData.ema_20,
-                            borderColor: '#e74c3c',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
-                            fill: false
-                        }, {
-                            label: 'EMA 50',
-                            data: chartData.ema_50,
-                            borderColor: '#f39c12',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
-                            fill: false
-                        }, {
-                            label: 'EMA 200',
-                            data: chartData.ema_200,
-                            borderColor: '#27ae60',
-                            borderWidth: 2,
-                            fill: false
-                        }]
+                        datasets: [
+                            {
+                                label: 'Close Price',
+                                data: chartData.close,
+                                borderColor: '#3498db',
+                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: true
+                            },
+                            {
+                                label: 'EMA 20',
+                                data: chartData.ema_20,
+                                borderColor: '#e74c3c',
+                                borderWidth: 1,
+                                borderDash: [5, 5],
+                                fill: false
+                            },
+                            {
+                                label: 'EMA 50',
+                                data: chartData.ema_50,
+                                borderColor: '#f39c12',
+                                borderWidth: 1,
+                                borderDash: [5, 5],
+                                fill: false
+                            },
+                            {
+                                label: 'EMA 200',
+                                data: chartData.ema_200,
+                                borderColor: '#27ae60',
+                                borderWidth: 2,
+                                fill: false
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -513,7 +526,7 @@
                     </div>
                     <div class="level-item level-neutral">
                         <div>Current Price</div>
-                        <div>${currentPrice}</div>
+                        <div>${currentPrice.toFixed(4)}</div>
                     </div>
                 </div>
             `;
@@ -524,6 +537,66 @@
                 existingLevels.remove();
             }
             chartContainer.insertAdjacentHTML('beforeend', levelsHtml);
+        }
+
+        function displayHistoricalStats(stats) {
+            if (!stats) return '';
+            
+            return `
+                <div class="historical-stats">
+                    <h4>📈 Historical Performance</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div>1 Period</div>
+                            <div id="change1Period" class="percentage-change">${stats['1_period_change']?.toFixed(2) || '0.00'}%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>5 Periods</div>
+                            <div id="change5Periods" class="percentage-change">${stats['5_period_change']?.toFixed(2) || '0.00'}%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>10 Periods</div>
+                            <div id="change10Periods" class="percentage-change">${stats['10_period_change']?.toFixed(2) || '0.00'}%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>20 Periods</div>
+                            <div id="change20Periods" class="percentage-change">${stats['20_period_change']?.toFixed(2) || '0.00'}%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>10P High</div>
+                            <div>${stats['high_10_period']?.toFixed(4) || '0.0000'}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>10P Low</div>
+                            <div>${stats['low_10_period']?.toFixed(4) || '0.0000'}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>Volatility</div>
+                            <div>${stats['volatility']?.toFixed(2) || '0.00'}%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div>Data Points</div>
+                            <div>${stats['total_periods'] || '0'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function colorCodePercentageChanges() {
+            // Color code all percentage changes
+            const changes = document.querySelectorAll('.percentage-change');
+            changes.forEach(element => {
+                const value = parseFloat(element.textContent);
+                if (value > 0) {
+                    element.style.color = '#27ae60';
+                    element.innerHTML = '+' + element.innerHTML;
+                } else if (value < 0) {
+                    element.style.color = '#e74c3c';
+                } else {
+                    element.style.color = '#7f8c8d';
+                }
+            });
         }
 
         function displayAnalysis(data) {
@@ -575,11 +648,15 @@
                             <div class="tech-item"><strong>ATR:</strong> ${data.technical_indicators.ATR}</div>
                             <div class="tech-item"><strong>Support:</strong> ${data.technical_indicators.Support}</div>
                             <div class="tech-item"><strong>Resistance:</strong> ${data.technical_indicators.Resistance}</div>
+                            <div class="tech-item"><strong>BB Upper:</strong> ${data.technical_indicators.BB_Upper}</div>
+                            <div class="tech-item"><strong>BB Lower:</strong> ${data.technical_indicators.BB_Lower}</div>
                         </div>
+                        
+                        ${displayHistoricalStats(data.historical_stats)}
                     </div>
 
                     <div class="card">
-                        <h3>📰 Market News & Analysis</h3>
+                        <h3>📰 Real Market News</h3>
                         ${data.fundamental_news.map(news => `
                             <div class="news-item">
                                 <strong>📻 ${news.source}</strong> 
@@ -587,6 +664,9 @@
                                 ${news.headline}
                             </div>
                         `).join('')}
+                        <div style="margin-top: 15px; font-size: 0.9em; color: #7f8c8d; text-align: center;">
+                            <em>Data period: ${data.data_period} (${data.data_points} points)</em>
+                        </div>
                     </div>
 
                     <div class="card">
@@ -603,9 +683,9 @@
                         <h3>📈 Real-time Price Chart</h3>
                         <div class="chart-controls">
                             <button class="chart-btn ${currentChartType === 'candlestick' ? 'active' : ''}" 
-                                    onclick="switchChartType('candlestick')">Candlestick</button>
+                                    onclick="switchChartType('candlestick')">Candlestick View</button>
                             <button class="chart-btn ${currentChartType === 'line' ? 'active' : ''}" 
-                                    onclick="switchChartType('line')">Line Chart</button>
+                                    onclick="switchChartType('line')">Line Chart View</button>
                         </div>
                         <div class="chart-container">
                             <canvas id="priceChart"></canvas>
@@ -615,6 +695,9 @@
             `;
             
             document.getElementById('results').innerHTML = html;
+            
+            // Color code percentage changes
+            setTimeout(colorCodePercentageChanges, 100);
             
             // Create chart after DOM is updated
             if (data.chart_data && data.chart_data.dates.length > 0) {
@@ -638,14 +721,13 @@
                 
                 const ai = analysis.ai_analysis;
                 const signalClass = `signal-${ai.SIGNAL.toLowerCase().split(' ')[0]}`;
-                const signalType = ai.SIGNAL.toLowerCase().split(' ')[0];
                 
                 html += `
                     <div class="card ${signalClass}">
                         <h3>${pair} - ${analysis.timeframe}</h3>
                         <div class="price-display">${analysis.current_price}</div>
                         
-                        <div class="signal-display signal-${signalType}-display">
+                        <div class="signal-display signal-${ai.SIGNAL.toLowerCase().split(' ')[0]}-display">
                             ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)
                         </div>
                         
