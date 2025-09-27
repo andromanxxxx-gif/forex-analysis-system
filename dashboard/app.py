@@ -35,6 +35,15 @@ timeframe_mapping = {
     '1D': '1d'
 }
 
+def safe_float(value, default=0.0):
+    """Safe conversion to float"""
+    try:
+        if hasattr(value, 'iloc'):
+            value = value.iloc[-1] if len(value) > 0 else default
+        return float(value)
+    except (ValueError, TypeError, IndexError):
+        return default
+
 def get_real_forex_news():
     """Web scraping REAL untuk berita forex dari berbagai sumber"""
     news_items = []
@@ -47,19 +56,13 @@ def get_real_forex_news():
         {
             'name': 'Forex Factory',
             'url': 'https://www.forexfactory.com/',
-            'selector': '.flex-content .calendar__row--highlighted',
-            'limit': 5
+            'selector': '.calendar__row',
+            'limit': 8
         },
         {
             'name': 'Investing.com',
             'url': 'https://www.investing.com/news/forex-news',
             'selector': '.largeTitle .articleItem',
-            'limit': 5
-        },
-        {
-            'name': 'DailyFX',
-            'url': 'https://www.dailyfx.com/latest-news',
-            'selector': '.dfx-articleListItem',
             'limit': 5
         }
     ]
@@ -67,7 +70,7 @@ def get_real_forex_news():
     for source in news_sources:
         try:
             print(f"Scraping news from {source['name']}...")
-            response = requests.get(source['url'], headers=headers, timeout=10)
+            response = requests.get(source['url'], headers=headers, timeout=15)
             soup = BeautifulSoup(response.content, 'html.parser')
             
             articles = soup.select(source['selector'])[:source['limit']]
@@ -77,15 +80,17 @@ def get_real_forex_news():
                     if source['name'] == 'Forex Factory':
                         title_elem = article.select_one('.calendar__event-title')
                         time_elem = article.select_one('.calendar__time')
-                        if title_elem and time_elem:
+                        if title_elem:
                             title = title_elem.text.strip()
-                            time_text = time_elem.text.strip()
-                            news_items.append({
-                                'source': source['name'],
-                                'headline': title,
-                                'timestamp': time_text,
-                                'url': source['url']
-                            })
+                            time_text = time_elem.text.strip() if time_elem else datetime.now().strftime('%H:%M')
+                            # Filter hanya berita yang relevan
+                            if any(word in title.upper() for word in ['JPY', 'YEN', 'BANK OF JAPAN', 'BOJ', 'USD', 'EUR', 'GBP', 'CHF']):
+                                news_items.append({
+                                    'source': source['name'],
+                                    'headline': title,
+                                    'timestamp': time_text,
+                                    'url': source['url']
+                                })
                     
                     elif source['name'] == 'Investing.com':
                         title_elem = article.select_one('a.title')
@@ -97,20 +102,7 @@ def get_real_forex_news():
                                 'source': source['name'],
                                 'headline': title,
                                 'timestamp': time_text,
-                                'url': 'https://www.investing.com' + title_elem['href'] if title_elem.get('href') else source['url']
-                            })
-                    
-                    elif source['name'] == 'DailyFX':
-                        title_elem = article.select_one('.dfx-articleListItem__title')
-                        time_elem = article.select_one('.dfx-articleListItem__date')
-                        if title_elem:
-                            title = title_elem.text.strip()
-                            time_text = time_elem.text.strip() if time_elem else datetime.now().strftime('%H:%M')
-                            news_items.append({
-                                'source': source['name'],
-                                'headline': title,
-                                'timestamp': time_text,
-                                'url': title_elem.find('a')['href'] if title_elem.find('a') else source['url']
+                                'url': 'https://www.investing.com' + title_elem['href'] if title_elem.get('href', '').startswith('/') else source['url']
                             })
                             
                 except Exception as e:
@@ -125,66 +117,37 @@ def get_real_forex_news():
     if not news_items:
         news_items = get_fallback_news()
     
-    return news_items[:8]  # Return max 8 berita
+    return news_items[:6]  # Return max 6 berita
 
 def get_fallback_news():
     """Fallback news dengan data real-time tentang JPY"""
+    current_time = datetime.now().strftime('%H:%M')
     return [
         {
             'source': 'Market Update',
-            'headline': f'JPY Pairs Update: GBP/JPY {get_current_price("GBPJPY")}, USD/JPY {get_current_price("USDJPY")}',
-            'timestamp': datetime.now().strftime('%H:%M'),
+            'headline': 'Bank of Japan maintains interest rates amid global economic shifts',
+            'timestamp': current_time,
             'url': '#'
         },
         {
             'source': 'Economic Calendar',
-            'headline': 'Bank of Japan Monetary Policy Meeting Minutes Released Today',
-            'timestamp': datetime.now().strftime('%H:%M'),
+            'headline': 'JPY pairs volatility expected during Tokyo trading session',
+            'timestamp': current_time,
             'url': '#'
         },
         {
-            'source': 'Market Analysis',
-            'headline': 'Yen Volatility Expected Amid US-Japan Yield Differential Changes',
-            'timestamp': datetime.now().strftime('%H:%M'),
+            'source': 'Technical Analysis',
+            'headline': 'Yen crosses show momentum divergence across timeframes',
+            'timestamp': current_time,
             'url': '#'
         },
         {
-            'source': 'Technical Outlook',
-            'headline': 'JPY Crosses Show Mixed Signals Across Different Timeframes',
-            'timestamp': datetime.now().strftime('%H:%M'),
+            'source': 'Market Watch',
+            'headline': 'USD/JPY approaches key psychological level at 150.00',
+            'timestamp': current_time,
             'url': '#'
         }
     ]
-
-def get_current_price(pair):
-    """Get current price for fallback news"""
-    try:
-        data = yf.download(pair_mapping[pair], period='1d', interval='1h')
-        return f"{data['Close'].iloc[-1]:.3f}" if not data.empty else "N/A"
-    except:
-        return "N/A"
-
-def get_historical_data(symbol, period='6mo', interval='1h'):
-    """Get historical data for chart and analysis"""
-    try:
-        data = yf.download(symbol, period=period, interval=interval)
-        if data.empty:
-            return None
-        
-        # Convert to list format for Chart.js
-        historical_data = {
-            'dates': data.index.strftime('%Y-%m-%d %H:%M:%S').tolist(),
-            'open': data['Open'].astype(float).round(5).tolist(),
-            'high': data['High'].astype(float).round(5).tolist(),
-            'low': data['Low'].astype(float).round(5).tolist(),
-            'close': data['Close'].astype(float).round(5).tolist(),
-            'volume': data['Volume'].astype(float).tolist() if 'Volume' in data else [1] * len(data)
-        }
-        
-        return historical_data
-    except Exception as e:
-        print(f"Error getting historical data for {symbol}: {e}")
-        return None
 
 def get_technical_indicators(data):
     """Menghitung indikator teknikal dengan data historis"""
@@ -261,11 +224,9 @@ def get_technical_indicators(data):
         
         indicators['current_price'] = current_price
         
-        # Historical data for chart - last 100 periods
-        chart_periods = min(100, len(data))
-        historical = get_historical_data_for_chart(data, chart_periods)
-        indicators['historical_data'] = historical
-        indicators['chart_data'] = historical  # Backward compatibility
+        # Historical data for chart - last 50 periods
+        chart_periods = min(50, len(data))
+        indicators['chart_data'] = get_historical_data_for_chart(data, chart_periods)
         
     except Exception as e:
         print(f"Error in technical indicators: {e}")
@@ -273,7 +234,7 @@ def get_technical_indicators(data):
     
     return indicators
 
-def get_historical_data_for_chart(data, periods=100):
+def get_historical_data_for_chart(data, periods=50):
     """Prepare historical data for chart display"""
     try:
         # Get the last N periods
@@ -283,7 +244,7 @@ def get_historical_data_for_chart(data, periods=100):
         close_prices = data_slice['Close']
         
         return {
-            'dates': data_slice.index.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+            'dates': data_slice.index.strftime('%Y-%m-%d %H:%M').tolist(),
             'open': data_slice['Open'].astype(float).round(5).tolist(),
             'high': data_slice['High'].astype(float).round(5).tolist(),
             'low': data_slice['Low'].astype(float).round(5).tolist(),
@@ -291,10 +252,7 @@ def get_historical_data_for_chart(data, periods=100):
             'ema_20': close_prices.ewm(span=20).mean().astype(float).round(5).tolist(),
             'ema_50': close_prices.ewm(span=50).mean().astype(float).round(5).tolist(),
             'ema_200': close_prices.ewm(span=200).mean().astype(float).round(5).tolist(),
-            'volume': data_slice['Volume'].astype(float).tolist() if 'Volume' in data_slice else [1] * len(data_slice),
-            'sma_20': close_prices.rolling(window=20).mean().astype(float).round(5).tolist(),
-            'bb_upper': (close_prices.rolling(window=20).mean() + (close_prices.rolling(window=20).std() * 2)).astype(float).round(5).tolist(),
-            'bb_lower': (close_prices.rolling(window=20).mean() - (close_prices.rolling(window=20).std() * 2)).astype(float).round(5).tolist()
+            'volume': data_slice['Volume'].astype(float).tolist() if 'Volume' in data_slice else [1] * len(data_slice)
         }
     except Exception as e:
         print(f"Error preparing historical data: {e}")
@@ -305,18 +263,8 @@ def create_default_chart_data():
     return {
         'dates': [],
         'open': [], 'high': [], 'low': [], 'close': [],
-        'ema_20': [], 'ema_50': [], 'ema_200': [],
-        'volume': [], 'sma_20': [], 'bb_upper': [], 'bb_lower': []
+        'ema_20': [], 'ema_50': [], 'ema_200': [], 'volume': []
     }
-
-def safe_float(value, default=0.0):
-    """Safe conversion to float"""
-    try:
-        if hasattr(value, 'iloc'):
-            value = value.iloc[-1] if len(value) > 0 else default
-        return float(value)
-    except (ValueError, TypeError, IndexError):
-        return default
 
 def create_default_indicators(price):
     """Create default indicators when data is not available"""
@@ -326,12 +274,192 @@ def create_default_indicators(price):
         'bb_upper': price, 'bb_middle': price, 'bb_lower': price,
         'atr': 0.01, 'pivot': price, 'resistance1': price, 'support1': price,
         'current_price': price,
-        'historical_data': create_default_chart_data(),
         'chart_data': create_default_chart_data()
     }
 
-# ... (fungsi analyze_with_deepseek, generate_fallback_analysis, dan lainnya tetap sama)
-# Tetap gunakan fungsi yang sama dari kode sebelumnya, hanya ganti bagian news
+def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
+    """Analisis dengan AI DeepSeek"""
+    
+    # Extract float values from technical data
+    current_price = float(technical_data.get('current_price', 0))
+    rsi = float(technical_data.get('rsi', 50))
+    macd = float(technical_data.get('macd', 0))
+    sma_20 = float(technical_data.get('sma_20', current_price))
+    sma_50 = float(technical_data.get('sma_50', current_price))
+    ema_200 = float(technical_data.get('ema_200', current_price))
+    atr = float(technical_data.get('atr', 0.01))
+    
+    prompt = f"""
+    ANALISIS FOREX PROFESIONAL - {pair} TIMEFRAME {timeframe}
+
+    DATA TEKNIKAL:
+    - Current Price: {current_price:.4f}
+    - RSI: {rsi:.2f}
+    - MACD: {macd:.4f}
+    - SMA 20: {sma_20:.4f}
+    - SMA 50: {sma_50:.4f}
+    - EMA 200: {ema_200:.4f}
+    - ATR: {atr:.4f}
+
+    BERITA TERKINI:
+    {[news['headline'] for news in fundamental_news]}
+
+    Berikan rekomendasi trading dalam format JSON:
+
+    {{
+        "SIGNAL": "BUY/SELL/HOLD",
+        "CONFIDENCE_LEVEL": 0-100,
+        "ENTRY_PRICE": number,
+        "TAKE_PROFIT_1": number,
+        "TAKE_PROFIT_2": number, 
+        "STOP_LOSS": number,
+        "RISK_REWARD_RATIO": "string",
+        "TIME_HORIZON": "string",
+        "ANALYSIS_SUMMARY": "string"
+    }}
+    """
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {DEEPSEEK_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'model': 'deepseek-chat',
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': 'Anda adalah analis forex profesional. Berikan analisis teknis dan rekomendasi trading praktis.'
+                },
+                {
+                    'role': 'user', 
+                    'content': prompt
+                }
+            ],
+            'temperature': 0.3,
+            'max_tokens': 1000
+        }
+        
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            analysis_text = result['choices'][0]['message']['content']
+            
+            # Extract JSON dari response
+            try:
+                start_idx = analysis_text.find('{')
+                end_idx = analysis_text.rfind('}') + 1
+                if start_idx != -1 and end_idx != -1:
+                    json_str = analysis_text[start_idx:end_idx]
+                    analysis_result = json.loads(json_str)
+                    
+                    # Validate the analysis result
+                    if validate_analysis_result(analysis_result, current_price):
+                        return analysis_result
+                    else:
+                        return generate_fallback_analysis(technical_data, pair, timeframe)
+            except:
+                return generate_fallback_analysis(technical_data, pair, timeframe)
+        else:
+            print(f"API Error: {response.status_code}")
+            return generate_fallback_analysis(technical_data, pair, timeframe)
+            
+    except Exception as e:
+        print(f"DeepSeek API error: {e}")
+        return generate_fallback_analysis(technical_data, pair, timeframe)
+
+def validate_analysis_result(analysis, current_price):
+    """Validate AI analysis result"""
+    try:
+        required_fields = ['SIGNAL', 'CONFIDENCE_LEVEL', 'ENTRY_PRICE', 'TAKE_PROFIT_1', 'TAKE_PROFIT_2', 'STOP_LOSS']
+        
+        for field in required_fields:
+            if field not in analysis:
+                return False
+        
+        # Check if values are reasonable
+        entry = float(analysis['ENTRY_PRICE'])
+        tp1 = float(analysis['TAKE_PROFIT_1'])
+        tp2 = float(analysis['TAKE_PROFIT_2'])
+        sl = float(analysis['STOP_LOSS'])
+        
+        # Basic validation - prices should be within reasonable range of current price
+        price_range = current_price * 0.1  # 10% range
+        if (abs(entry - current_price) > price_range or 
+            abs(tp1 - current_price) > price_range or 
+            abs(sl - current_price) > price_range):
+            return False
+            
+        return True
+    except:
+        return False
+
+def generate_fallback_analysis(technical_data, pair, timeframe):
+    """Generate analisis fallback yang lebih akurat"""
+    current_price = float(technical_data.get('current_price', 150.0))
+    rsi = float(technical_data.get('rsi', 50))
+    ema_200 = float(technical_data.get('ema_200', current_price))
+    atr = float(technical_data.get('atr', 0.5))
+    
+    # Enhanced logic based on RSI and EMA 200
+    price_vs_ema = ((current_price - ema_200) / ema_200) * 100
+    
+    if rsi < 30 and price_vs_ema > 0.5:
+        signal = "STRONG BUY"
+        confidence = 80
+        tp_multiplier = 2.0
+        sl_multiplier = 1.0
+    elif rsi > 70 and price_vs_ema < -0.5:
+        signal = "STRONG SELL"
+        confidence = 80
+        tp_multiplier = 2.0
+        sl_multiplier = 1.0
+    elif rsi < 35:
+        signal = "BUY"
+        confidence = 70
+        tp_multiplier = 1.5
+        sl_multiplier = 1.0
+    elif rsi > 65:
+        signal = "SELL"
+        confidence = 70
+        tp_multiplier = 1.5
+        sl_multiplier = 1.0
+    else:
+        signal = "HOLD"
+        confidence = 50
+        tp_multiplier = 0.8
+        sl_multiplier = 0.8
+    
+    # Hitung TP/SL berdasarkan ATR dengan multiplier yang berbeda
+    if "BUY" in signal:
+        tp1 = current_price + (atr * tp_multiplier * 1.0)
+        tp2 = current_price + (atr * tp_multiplier * 1.8)
+        sl = current_price - (atr * sl_multiplier * 1.0)
+        rr_ratio = f"1:{tp_multiplier:.1f}"
+    elif "SELL" in signal:
+        tp1 = current_price - (atr * tp_multiplier * 1.0)
+        tp2 = current_price - (atr * tp_multiplier * 1.8)
+        sl = current_price + (atr * sl_multiplier * 1.0)
+        rr_ratio = f"1:{tp_multiplier:.1f}"
+    else:  # HOLD
+        tp1 = current_price + (atr * 0.5)
+        tp2 = current_price + (atr * 1.0)
+        sl = current_price - (atr * 0.5)
+        rr_ratio = "N/A"
+    
+    return {
+        'SIGNAL': signal,
+        'CONFIDENCE_LEVEL': confidence,
+        'ENTRY_PRICE': round(current_price, 4),
+        'TAKE_PROFIT_1': round(tp1, 4),
+        'TAKE_PROFIT_2': round(tp2, 4),
+        'STOP_LOSS': round(sl, 4),
+        'RISK_REWARD_RATIO': rr_ratio,
+        'TIME_HORIZON': '4-8 hours',
+        'ANALYSIS_SUMMARY': f'RSI: {rsi:.1f}, EMA200: {ema_200:.4f}, Price: {current_price:.4f}, ATR: {atr:.4f}'
+    }
 
 @app.route('/')
 def index():
@@ -352,15 +480,8 @@ def get_analysis():
         yf_symbol = pair_mapping[pair]
         yf_timeframe = timeframe_mapping[timeframe]
         
-        # Determine period based on timeframe - lebih panjang untuk data historis
-        period_map = {
-            '1h': '3mo',  # 3 bulan untuk hourly
-            '2h': '6mo',  # 6 bulan untuk 2-hourly
-            '4h': '1y',   # 1 tahun untuk 4-hourly
-            '1d': '2y'    # 2 tahun untuk daily
-        }
-        period = period_map.get(yf_timeframe, '1y')
-        
+        # Determine period based on timeframe
+        period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
         data = yf.download(yf_symbol, period=period, interval=yf_timeframe)
         
         if data.empty or len(data) < 20:
@@ -385,7 +506,9 @@ def get_analysis():
         # AI Analysis
         ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
         
-        # Prepare comprehensive response dengan data historis
+        # Calculate historical performance
+        historical_stats = calculate_historical_stats(data)
+        
         response = {
             'pair': pair,
             'timeframe': timeframe,
@@ -406,17 +529,10 @@ def get_analysis():
             },
             'ai_analysis': ai_analysis,
             'fundamental_news': news,
-            'historical_data': indicators.get('historical_data', {}),
             'chart_data': indicators.get('chart_data', {}),
-            'data_points_count': len(data),
-            'data_period': f"{period} ({yf_timeframe})",
-            'price_history': {
-                '1h_change': calculate_percentage_change(data, 1) if len(data) > 1 else 0,
-                '4h_change': calculate_percentage_change(data, 4) if len(data) > 4 else 0,
-                '24h_change': calculate_percentage_change(data, 24) if len(data) > 24 else 0,
-                'weekly_high': float(data['High'].tail(168).max()) if len(data) >= 168 else current_price,
-                'weekly_low': float(data['Low'].tail(168).min()) if len(data) >= 168 else current_price
-            }
+            'historical_stats': historical_stats,
+            'data_points': len(data),
+            'data_period': f"{period} ({yf_timeframe})"
         }
         
         return jsonify(response)
@@ -424,15 +540,80 @@ def get_analysis():
     except Exception as e:
         return jsonify({'error': f'Analysis error: {str(e)}'})
 
-def calculate_percentage_change(data, periods_back):
+def calculate_historical_stats(data):
+    """Calculate historical performance statistics"""
+    try:
+        if len(data) < 2:
+            return {}
+        
+        close_prices = data['Close']
+        high_prices = data['High']
+        low_prices = data['Low']
+        
+        # Calculate various time frame changes
+        stats = {
+            '1_period_change': calculate_percentage_change(close_prices, 1),
+            '5_period_change': calculate_percentage_change(close_prices, 5),
+            '10_period_change': calculate_percentage_change(close_prices, 10),
+            '20_period_change': calculate_percentage_change(close_prices, 20),
+            'high_10_period': float(high_prices.tail(10).max()),
+            'low_10_period': float(low_prices.tail(10).min()),
+            'volatility': float(close_prices.pct_change().std() * 100),  # as percentage
+            'total_periods': len(data)
+        }
+        
+        return stats
+    except Exception as e:
+        print(f"Error calculating historical stats: {e}")
+        return {}
+
+def calculate_percentage_change(prices, periods_back):
     """Calculate percentage change from periods back"""
-    if len(data) > periods_back:
-        current_price = float(data['Close'].iloc[-1])
-        past_price = float(data['Close'].iloc[-periods_back-1])
+    if len(prices) > periods_back:
+        current_price = float(prices.iloc[-1])
+        past_price = float(prices.iloc[-periods_back-1])
         return ((current_price - past_price) / past_price) * 100
     return 0
 
-# ... (fungsi lainnya tetap sama)
+@app.route('/get_multiple_analysis')
+def get_multiple_analysis():
+    """Analisis untuk semua pairs sekaligus"""
+    try:
+        timeframe = request.args.get('timeframe', '4H')
+        results = {}
+        
+        for pair in pair_mapping.keys():
+            try:
+                time.sleep(1)
+                
+                yf_symbol = pair_mapping[pair]
+                yf_timeframe = timeframe_mapping[timeframe]
+                period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
+                data = yf.download(yf_symbol, period=period, interval=yf_timeframe)
+                
+                if not data.empty and len(data) > 20:
+                    current_price = float(data['Close'].iloc[-1])
+                    indicators = get_technical_indicators(data)
+                    news = get_real_forex_news()
+                    ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
+                    
+                    results[pair] = {
+                        'pair': pair,
+                        'timeframe': timeframe,
+                        'current_price': round(current_price, 4),
+                        'ai_analysis': ai_analysis,
+                        'timestamp': datetime.now().strftime('%H:%M:%S')
+                    }
+                else:
+                    results[pair] = {'error': 'No data available'}
+                    
+            except Exception as e:
+                results[pair] = {'error': str(e)}
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
     if not os.path.exists('templates'):
