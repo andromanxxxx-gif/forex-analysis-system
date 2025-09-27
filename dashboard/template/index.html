@@ -3,441 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Analysis Dashboard</title>
+    <title>Forex Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
-            --accent: #e74c3c;
-            --light: #ecf0f1;
-            --dark: #2c3e50;
-            --success: #2ecc71;
-            --warning: #f39c12;
-            --danger: #e74c3c;
-            --buy: #2ecc71;
-            --sell: #e74c3c;
-            --hold: #f39c12;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background-color: #f5f7fa;
-            color: #333;
-            line-height: 1.6;
-            padding: 20px;
-        }
-        
-        .dashboard {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        header {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-            text-align: center;
-        }
-        
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-        
-        .subtitle {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
-        
-        .controls {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            flex-wrap: wrap;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        select, button {
-            padding: 12px 18px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 1rem;
-            min-width: 120px;
-        }
-        
-        button {
-            background: var(--secondary);
-            color: white;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        button:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-        
-        .main-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 25px;
-            margin-bottom: 25px;
-        }
-        
-        .chart-container, .info-panel {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        .chart-wrapper {
-            height: 450px;
-            margin-top: 15px;
-        }
-        
-        .panel-title {
-            font-size: 1.4rem;
-            margin-bottom: 20px;
-            color: var(--primary);
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-        }
-        
-        /* Trading Recommendations */
-        .trading-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-        }
-        
-        .recommendation {
-            font-size: 2rem;
-            font-weight: bold;
-            text-align: center;
-            margin: 15px 0;
-        }
-        
-        .buy { color: var(--buy); }
-        .sell { color: var(--sell); }
-        .hold { color: var(--hold); }
-        
-        .levels {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .level-item {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .level-value {
-            font-size: 1.3rem;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        
-        /* Technical Indicators */
-        .indicators-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        
-        .indicator {
-            background: var(--light);
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .indicator-value {
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-top: 5px;
-        }
-        
-        .positive { color: var(--success); }
-        .negative { color: var(--danger); }
-        .neutral { color: var(--warning); }
-        
-        /* News Sentiment */
-        .sentiment {
-            margin: 20px 0;
-        }
-        
-        .sentiment-bars {
-            display: flex;
-            height: 30px;
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        
-        .positive-bar {
-            background: var(--success);
-            height: 100%;
-        }
-        
-        .negative-bar {
-            background: var(--danger);
-            height: 100%;
-        }
-        
-        .ai-prediction {
-            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        
-        footer {
-            text-align: center;
-            margin-top: 30px;
-            padding: 20px;
-            color: #6c757d;
-            font-size: 0.9rem;
-            border-top: 1px solid #eee;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .error {
-            background: var(--danger);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
-        
-        @media (max-width: 1024px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .indicators-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .levels {
-                grid-template-columns: 1fr;
-            }
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .controls { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .signal { font-size: 24px; font-weight: bold; margin: 10px 0; }
+        .buy { color: green; }
+        .sell { color: red; }
+        .hold { color: orange; }
     </style>
 </head>
 <body>
-    <div class="dashboard">
-        <header>
+    <div class="container">
+        <div class="header">
             <h1>Forex Analysis Dashboard</h1>
-            <p class="subtitle">Monitoring & Analisis Trading Forex Real-time</p>
-        </header>
+            <p>Simple and Clean Forex Analysis</p>
+        </div>
         
         <div class="controls">
-            <form method="POST" style="display: flex; gap: 15px; align-items: center;">
-                <select name="pair" id="pairSelect">
-                    <option value="EURUSD" {% if pair == 'EURUSD' %}selected{% endif %}>EUR/USD</option>
-                    <option value="GBPJPY" {% if pair == 'GBPJPY' %}selected{% endif %}>GBP/JPY</option>
-                    <option value="USDJPY" {% if pair == 'USDJPY' %}selected{% endif %}>USD/JPY</option>
-                    <option value="GBPUSD" {% if pair == 'GBPUSD' %}selected{% endif %}>GBP/USD</option>
-                </select>
-                <button type="submit">🔄 Refresh Data</button>
-            </form>
-            <div id="status" style="margin-left: auto; font-weight: bold; color: var(--success);">
-                ✅ System Ready
-            </div>
+            <select id="pairSelect" onchange="loadData()">
+                <option value="EURUSD">EUR/USD</option>
+                <option value="GBPJPY">GBP/JPY</option>
+                <option value="USDJPY">USD/JPY</option>
+                <option value="GBPUSD">GBP/USD</option>
+            </select>
+            <button onclick="loadData()">Refresh</button>
+            <span id="status" style="margin-left: 20px;"></span>
         </div>
         
-        <div class="main-content">
-            <div class="chart-container">
-                <h2 class="panel-title">{{ pair }} Price Chart</h2>
-                <div class="chart-wrapper">
-                    <canvas id="priceChart"></canvas>
-                </div>
-            </div>
-            
-            <div class="info-panel">
-                <h2 class="panel-title">Trading Signals & Analysis</h2>
-                <div class="trading-card">
-                    <div style="text-align: center; margin-bottom: 15px;">
-                        <div style="font-size: 1.2rem;">Trading Recommendation</div>
-                        <div class="recommendation {{ signal.lower() }}">{{ signal }}</div>
-                        <div>Confidence: {{ confidence }}%</div>
-                    </div>
-                    
-                    <div class="levels">
-                        <div class="level-item">
-                            <div>Current Price</div>
-                            <div class="level-value">{{ current_price }}</div>
-                        </div>
-                        <div class="level-item">
-                            <div>Take Profit</div>
-                            <div class="level-value">{{ sl_recommendation.take_profit }}</div>
-                        </div>
-                        <div class="level-item">
-                            <div>Stop Loss</div>
-                            <div class="level-value">{{ sl_recommendation.stop_loss }}</div>
-                        </div>
-                        <div class="level-item">
-                            <div>Risk/Reward</div>
-                            <div class="level-value">{{ sl_recommendation.risk_reward }}</div>
-                        </div>
-                    </div>
-                </div>
+        <div id="content">
+            <div class="card">
+                <h2>Loading data...</h2>
             </div>
         </div>
-        
-        <div class="chart-container">
-            <h2 class="panel-title">Technical Indicators</h2>
-            <div class="indicators-grid">
-                <div class="indicator">
-                    <div>RSI (14)</div>
-                    <div class="indicator-value {% if indicators.rsi > 70 %}negative{% elif indicators.rsi < 30 %}positive{% else %}neutral{% endif %}">
-                        {{ indicators.rsi }}
-                    </div>
-                    <div style="font-size: 0.8rem; margin-top: 5px;">
-                        {% if indicators.rsi > 70 %}Overbought{% elif indicators.rsi < 30 %}Oversold{% else %}Neutral{% endif %}
-                    </div>
-                </div>
-                
-                <div class="indicator">
-                    <div>MACD</div>
-                    <div class="indicator-value {% if indicators.macd > 0 %}positive{% else %}negative{% endif %}">
-                        {{ indicators.macd }}
-                    </div>
-                    <div style="font-size: 0.8rem; margin-top: 5px;">
-                        {% if indicators.macd > 0 %}Bullish{% else %}Bearish{% endif %}
-                    </div>
-                </div>
-                
-                <div class="indicator">
-                    <div>SMA (20)</div>
-                    <div class="indicator-value">{{ indicators.sma_20 }}</div>
-                    <div style="font-size: 0.8rem; margin-top: 5px;">
-                        Trend: {% if current_price > indicators.sma_20 %}Bullish{% else %}Bearish{% endif %}
-                    </div>
-                </div>
-                
-                <div class="indicator">
-                    <div>Volume</div>
-                    <div class="indicator-value">{{ indicators.volume }}</div>
-                    <div style="font-size: 0.8rem; margin-top: 5px;">
-                        Market Activity
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
-            <div class="chart-container">
-                <h2 class="panel-title">News Sentiment</h2>
-                <div class="sentiment">
-                    <div style="margin-bottom: 15px;">
-                        <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 10px;">
-                            Market Sentiment Analysis
-                        </div>
-                        <div>Positive: {{ sentiment.positive }}% | Negative: {{ sentiment.negative }}%</div>
-                    </div>
-                    
-                    <div class="sentiment-bars">
-                        <div class="positive-bar" style="width: {{ sentiment.positive }}%"></div>
-                        <div class="negative-bar" style="width: {{ sentiment.negative }}%"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="chart-container">
-                <h2 class="panel-title">AI Prediction</h2>
-                <div class="ai-prediction">
-                    <div style="font-size: 1.1rem; font-weight: bold; margin-bottom: 10px;">
-                        AI Market Prediction
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        {{ prediction }}
-                    </div>
-                    <div style="font-size: 0.9rem; opacity: 0.9;">
-                        🤖 Powered by Advanced AI Algorithms
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <footer>
-            <p>Forex Analysis System © 2025 - Real-time Market Analysis</p>
-        </footer>
     </div>
 
     <script>
-        // Initialize chart with data passed from Flask
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        const priceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: {{ chart_data.timestamps | tojson }},
-                datasets: [{
-                    label: 'Price',
-                    data: {{ chart_data.prices | tojson }},
-                    borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Waktu (Jam)'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Price'
-                        }
-                    }
+        async function loadData() {
+            const pair = document.getElementById('pairSelect').value;
+            const status = document.getElementById('status');
+            
+            status.textContent = 'Loading...';
+            status.style.color = 'blue';
+            
+            try {
+                const response = await fetch(`/get_data?pair=${pair}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
                 }
+                
+                updateDashboard(data);
+                status.textContent = '✓ Loaded';
+                status.style.color = 'green';
+                
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="card" style="color: red;">
+                        <h2>Error</h2>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                status.textContent = '✗ Error';
+                status.style.color = 'red';
             }
-        });
+        }
+        
+        function updateDashboard(data) {
+            const signalClass = data.signal.toLowerCase();
+            
+            document.getElementById('content').innerHTML = `
+                <div class="card">
+                    <h2>${data.pair} Analysis</h2>
+                    <div class="signal ${signalClass}">${data.signal}</div>
+                    <p>Confidence: ${data.confidence}%</p>
+                    <p>Current Price: ${data.current_price}</p>
+                    <p>Price Change: ${data.price_change}%</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Trading Recommendations</h3>
+                    <p>Take Profit: ${data.take_profit}</p>
+                    <p>Stop Loss: ${data.stop_loss}</p>
+                    <p>Risk/Reward: ${data.risk_reward}</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Technical Indicators</h3>
+                    <p>More indicators coming soon...</p>
+                </div>
+            `;
+        }
+        
+        // Load data on page load
+        loadData();
     </script>
 </body>
 </html>
