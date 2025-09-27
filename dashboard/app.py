@@ -40,6 +40,21 @@ def fetch_data(pair):
         print(f"Error fetching data: {e}")
         return create_mock_data()
 
+def create_mock_data():
+    """Create mock data when real data is unavailable"""
+    dates = pd.date_range(end=datetime.now(), periods=100, freq='H')
+    prices = [1.0750 + 0.002 * np.sin(i * 0.1) + 0.001 * random.random() for i in range(100)]
+    
+    df = pd.DataFrame({
+        'Close': prices,
+        'High': [p + 0.001 for p in prices],
+        'Low': [p - 0.001 for p in prices],
+        'Open': [p - 0.0005 for p in prices],
+        'Volume': [1000000 + random.randint(-100000, 100000) for _ in prices]
+    }, index=dates)
+    
+    return df
+
 def calculate_indicators(df):
     """Calculate technical indicators"""
     try:
@@ -72,6 +87,16 @@ def calculate_indicators(df):
     except Exception as e:
         print(f"Error calculating indicators: {e}")
         return create_sample_indicators()
+
+def create_sample_indicators():
+    """Create sample technical indicators"""
+    return {
+        'sma_20': 1.0752,
+        'sma_50': 1.0748,
+        'rsi': 55.5,
+        'macd': 0.0008,
+        'volume': 1250000
+    }
 
 def generate_signal(df):
     """Generate trading signals"""
@@ -111,40 +136,25 @@ def analyze_pair(pair):
         }
         
         volatility = volatility_map.get(pair, 0.01)
+        current_price = 1.0750  # Default base price for EURUSD, will be adjusted
+        
+        # Adjust current_price based on pair
+        price_map = {
+            'EURUSD': 1.0750,
+            'GBPJPY': 185.00,
+            'USDJPY': 150.00,
+            'GBPUSD': 1.2500
+        }
+        current_price = price_map.get(pair, 1.0750)
         
         return {
-            'stop_loss': round(1 - volatility, 4),
-            'take_profit': round(1 + volatility, 4),
+            'stop_loss': round(current_price * (1 - volatility), 4),
+            'take_profit': round(current_price * (1 + volatility), 4),
             'risk_reward': '1:1.5'
         }
     except Exception as e:
         print(f"Error analyzing pair: {e}")
         return {'stop_loss': 1.070, 'take_profit': 1.085, 'risk_reward': '1:1.5'}
-
-def create_mock_data():
-    """Create mock data when real data is unavailable"""
-    dates = pd.date_range(end=datetime.now(), periods=100, freq='H')
-    prices = [1.0750 + 0.002 * np.sin(i * 0.1) + 0.001 * random.random() for i in range(100)]
-    
-    df = pd.DataFrame({
-        'Close': prices,
-        'High': [p + 0.001 for p in prices],
-        'Low': [p - 0.001 for p in prices],
-        'Open': [p - 0.0005 for p in prices],
-        'Volume': [1000000 + random.randint(-100000, 100000) for _ in prices]
-    }, index=dates)
-    
-    return df
-
-def create_sample_indicators():
-    """Create sample technical indicators"""
-    return {
-        'sma_20': 1.0752,
-        'sma_50': 1.0748,
-        'rsi': 55.5,
-        'macd': 0.0008,
-        'volume': 1250000
-    }
 
 @app.route("/", methods=["GET", "POST"])
 def index():
