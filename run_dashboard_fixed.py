@@ -1,20 +1,13 @@
-import os
+# run_dashboard.py
+from pathlib import Path
+import subprocess
 import sys
-import webbrowser
-import time
-import threading
 
-def launch_dashboard():
-    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard", "app.py")
-    if not os.path.exists(dashboard_path):
-        print(f"❌ Dashboard app.py tidak ditemukan di: {dashboard_path}")
-        return
-    def open_browser():
-        time.sleep(3)
-        webbrowser.open("http://127.0.0.1:5000")
-    threading.Thread(target=open_browser, daemon=True).start()
-    os.chdir(os.path.dirname(dashboard_path))
-    os.system(f"{sys.executable} app.py")
+dashboard_path = Path(__file__).parent / "dashboard" / "app.py"
+print("=====================================================")
+print("        🚀 FOREX ANALYSIS SYSTEM - DASHBOARD")
+print("=====================================================")
+print(f"✅ Menjalankan dashboard Flask dari: {dashboard_path}")
+print("🌐 Dashboard akan terbuka otomatis di http://127.0.0.1:5000\n")
 
-if __name__ == "__main__":
-    launch_dashboard()
+subprocess.run([sys.executable, str(dashboard_path)])
