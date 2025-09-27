@@ -1,35 +1,32 @@
 import pandas as pd
 
 def calculate_indicators(df):
-    # EMA200
-    df["EMA200"] = df["Close"].ewm(span=200, adjust=False).mean()
+    # EMA 200
+    df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
     
     # MACD
-    df["EMA12"] = df["Close"].ewm(span=12, adjust=False).mean()
-    df["EMA26"] = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = df["EMA12"] - df["EMA26"]
-    df["MACD_signal"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    exp12 = df['Close'].ewm(span=12, adjust=False).mean()
+    exp26 = df['Close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = exp12 - exp26
+    df['Signal_MACD'] = df['MACD'].ewm(span=9, adjust=False).mean()
     
     # OBV
-    df["OBV"] = (df["Volume"] * ((df["Close"] - df["Close"].shift(1)) / abs(df["Close"] - df["Close"].shift(1)).fillna(0))).fillna(0).cumsum()
+    df['OBV'] = (df['Volume'] * ((df['Close'] - df['Open']).apply(lambda x: 1 if x>0 else (-1 if x<0 else 0)))).cumsum()
     
     return df
 
 def generate_signal(df):
-    """Simple logic: Buy if MACD crosses above signal & Close > EMA200"""
-    last = df.iloc[-1]
-    prev = df.iloc[-2]
-    signal = "Hold"
-    tp = None
-    sl = None
+    df['Signal'] = 'Hold'
+    df['Take_Profit'] = None
+    df['Stop_Loss'] = None
     
-    if prev["MACD"] < prev["MACD_signal"] and last["MACD"] > last["MACD_signal"] and last["Close"] > last["EMA200"]:
-        signal = "Buy"
-        tp = last["Close"] * 1.01  # contoh TP +1%
-        sl = last["Close"] * 0.995  # contoh SL -0.5%
-    elif prev["MACD"] > prev["MACD_signal"] and last["MACD"] < last["MACD_signal"] and last["Close"] < last["EMA200"]:
-        signal = "Sell"
-        tp = last["Close"] * 0.99  # TP -1%
-        sl = last["Close"] * 1.005  # SL +0.5%
-    
-    return signal, round(tp, 5) if tp else None, round(sl, 5) if sl else None
+    for i in range(1, len(df)):
+        if df['MACD'][i] > df['Signal_MACD'][i] and df['Close'][i] > df['EMA200'][i]:
+            df.at[i, 'Signal'] = 'Buy'
+            df.at[i, 'Take_Profit'] = df['Close'][i] * 1.01
+            df.at[i, 'Stop_Loss'] = df['Close'][i] * 0.995
+        elif df['MACD'][i] < df['Signal_MACD'][i] and df['Close'][i] < df['EMA200'][i]:
+            df.at[i, 'Signal'] = 'Sell'
+            df.at[i, 'Take_Profit'] = df['Close'][i] * 0.99
+            df.at[i, 'Stop_Loss'] = df['Close'][i] * 1.005
+    return df
