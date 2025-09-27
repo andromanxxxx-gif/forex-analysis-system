@@ -1,3 +1,8 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+# Atau hanya untuk yfinance warnings
+import yfinance as yf
+yf.pdr_override()  # Menekan warnings khusus yfinance
 import streamlit as st
 import pandas as pd
 import numpy as np
