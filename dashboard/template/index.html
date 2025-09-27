@@ -1,66 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Forex Dashboard</title>
+    <title>Forex Analysis Dashboard</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <meta http-equiv="refresh" content="10">
 </head>
 <body>
-    <h1>Forex Analysis Dashboard</h1>
+<h2>Forex Dashboard</h2>
+<form method="POST">
     <label for="pair">Select Pair:</label>
-    <select id="pair">
+    <select name="pair" onchange="this.form.submit()">
         {% for p in pairs %}
-            <option value="{{ p }}">{{ p }}</option>
+        <option value="{{ p }}" {% if p==selected_pair %}selected{% endif %}>{{ p }}</option>
         {% endfor %}
     </select>
-    <div id="chart"></div>
-    <div id="signal"></div>
+</form>
 
+<h3>Signal: {{ signal }}</h3>
+{% if tp and sl %}
+<p>Take Profit: {{ tp }} | Stop Loss: {{ sl }}</p>
+{% endif %}
+
+<div id="chart"></div>
 <script>
-async function fetchData(pair){
-    const res = await fetch("/get_data", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({pair})
-    });
-    return await res.json();
-}
-
-function plotData(data){
-    const traceCandlestick = {
-        x: data.dates,
-        open: data.open,
-        high: data.high,
-        low: data.low,
-        close: data.close,
-        type: 'candlestick',
-        name: 'Price'
-    };
-    const traceEMA = {
-        x: data.dates,
-        y: data.ema200,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'EMA200',
-        line: {color: 'blue'}
-    };
-    const layout = {title: 'Forex Chart'};
-    Plotly.newPlot('chart', [traceCandlestick, traceEMA], layout);
-
-    let signalText = `Signal: ${data.signal}`;
-    if(data.tp && data.sl){
-        signalText += `<br>TP: ${data.tp} | SL: ${data.sl}`;
-    }
-    document.getElementById('signal').innerHTML = signalText;
-}
-
-async function updateChart(){
-    const pair = document.getElementById("pair").value;
-    const data = await fetchData(pair);
-    plotData(data);
-}
-
-document.getElementById("pair").addEventListener("change", updateChart);
-updateChart();
+var graph = {{ graphJSON | safe }};
+Plotly.newPlot('chart', graph.data, graph.layout);
 </script>
 </body>
 </html>
