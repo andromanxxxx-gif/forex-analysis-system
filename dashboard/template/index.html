@@ -2,46 +2,26 @@
 <html>
 <head>
     <title>Forex Analysis Dashboard</title>
+    <style>
+        table.data {border-collapse: collapse; width: 100%;}
+        table.data th, table.data td {border: 1px solid #ddd; padding: 8px;}
+        table.data th {background-color: #f2f2f2;}
+    </style>
 </head>
 <body>
     <h1>Forex Analysis Dashboard</h1>
-    
-    <form method="POST">
+    <form method="post">
         <label for="pair">Select Pair:</label>
-        <select name="pair" onchange="this.form.submit()">
-            {% for p in pairs %}
-            <option value="{{ p }}" {% if p == selected_pair %}selected{% endif %}>{{ p }}</option>
-            {% endfor %}
+        <select name="pair" id="pair" onchange="this.form.submit()">
+            <option value="EUR/USD" {% if pair=='EUR/USD' %}selected{% endif %}>EUR/USD</option>
+            <option value="GBP/USD" {% if pair=='GBP/USD' %}selected{% endif %}>GBP/USD</option>
+            <option value="USD/JPY" {% if pair=='USD/JPY' %}selected{% endif %}>USD/JPY</option>
         </select>
     </form>
-    
-    <h2>Technical Analysis</h2>
-    <ul>
-        <li>Signal: {{ signal.signal }}</li>
-        <li>Take Profit: {{ signal.TP }}</li>
-        <li>Stop Loss: {{ signal.SL }}</li>
-    </ul>
-    
-    <h2>News Summary</h2>
-    <p>{{ news }}</p>
-    
-    <h2>AI Recommendation (DeepSeek)</h2>
-    <p>{{ ai_reco }}</p>
-    
-    <h2>Price Data</h2>
-    <table border="1">
-        <tr>
-            {% for col in df[0].keys() %}
-            <th>{{ col }}</th>
-            {% endfor %}
-        </tr>
-        {% for row in df %}
-        <tr>
-            {% for col in row.values() %}
-            <td>{{ col }}</td>
-            {% endfor %}
-        </tr>
-        {% endfor %}
-    </table>
+    <h2>Selected Pair: {{ pair }}</h2>
+    <h3>Signal Recommendation: {{ signal }}</h3>
+    {% for table in tables %}
+        {{ table|safe }}
+    {% endfor %}
 </body>
 </html>
