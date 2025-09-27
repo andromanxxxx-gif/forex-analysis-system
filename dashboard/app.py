@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, render_template, request, jsonify
 import yfinance as yf
 import pandas as pd
@@ -10,7 +9,8 @@ import json
 from bs4 import BeautifulSoup
 import time
 import os
-from database import db  # Import database
+import sqlite3
+import traceback
 
 warnings.filterwarnings("ignore")
 
@@ -36,6 +36,145 @@ timeframe_mapping = {
     '1D': '1d'
 }
 
+# Database class
+class Database:
+    def __init__(self, db_path='forex_analysis.db'):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        """Initialize database tables"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Analysis results table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pair TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                timestamp DATETIME NOT NULL,
+                current_price REAL,
+                price_change REAL,
+                technical_indicators TEXT,
+                ai_analysis TEXT,
+                chart_data TEXT
+            )
+        ''')
+        
+        # News table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS news_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT,
+                headline TEXT,
+                timestamp TEXT,
+                url TEXT,
+                saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Price data table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS price_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pair TEXT,
+                timeframe TEXT,
+                date TEXT,
+                open REAL,
+                high REAL,
+                low REAL,
+                close REAL,
+                volume REAL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+    
+    def save_analysis(self, analysis_data):
+        """Save analysis results to database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO analysis_results 
+                (pair, timeframe, timestamp, current_price, price_change, technical_indicators, ai_analysis, chart_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                analysis_data['pair'],
+                analysis_data['timeframe'],
+                analysis_data['timestamp'],
+                analysis_data['current_price'],
+                analysis_data['price_change'],
+                json.dumps(analysis_data['technical_indicators']),
+                json.dumps(analysis_data['ai_analysis']),
+                json.dumps(analysis_data.get('chart_data', {}))
+            ))
+            
+            conn.commit()
+            conn.close()
+            print(f"Analysis saved for {analysis_data['pair']}")
+            
+        except Exception as e:
+            print(f"Error saving analysis: {e}")
+    
+    def save_news(self, news_items):
+        """Save news items to database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            for news in news_items:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO news_items (source, headline, timestamp, url)
+                    VALUES (?, ?, ?, ?)
+                ''', (news['source'], news['headline'], news['timestamp'], news['url']))
+            
+            conn.commit()
+            conn.close()
+            print(f"News items saved: {len(news_items)}")
+            
+        except Exception as e:
+            print(f"Error saving news: {e}")
+    
+    def save_price_data(self, pair, timeframe, data):
+        """Save price data to database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            if len(data) > 0:
+                latest = data.iloc[-1]
+                
+                # Convert index to date string if it's a timestamp
+                if hasattr(data.index, 'strftime'):
+                    date_str = data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    date_str = str(data.index[-1])
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO price_data 
+                    (pair, timeframe, date, open, high, low, close, volume)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    pair, timeframe, date_str,
+                    float(latest['Open']), float(latest['High']),
+                    float(latest['Low']), float(latest['Close']),
+                    float(latest.get('Volume', 0))
+                ))
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            print(f"Error saving price data: {e}")
+
+# Global database instance
+db = Database()
+
 def safe_float(value, default=0.0):
     """Safe conversion to float"""
     try:
@@ -50,9 +189,6 @@ def safe_float(value, default=0.0):
 def get_real_forex_news():
     """Web scraping REAL untuk berita forex"""
     news_items = []
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
     
     try:
         # Fallback news dengan data real
@@ -100,12 +236,191 @@ def get_current_price(pair):
     except:
         return "N/A"
 
+def create_default_chart_data():
+    """Create default chart data"""
+    dates = [datetime.now().strftime('%Y-%m-%d %H:%M')]
+    return {
+        'dates': dates,
+        'open': [150.0], 'high': [151.0], 'low': [149.0], 'close': [150.5],
+        'ema_20': [150.0], 'ema_50': [150.0], 'ema_200': [150.0]
+    }
+
+def create_default_indicators(price):
+    """Create default indicators"""
+    return {
+        'sma_20': price, 'sma_50': price, 'ema_12': price, 'ema_26': price, 'ema_200': price,
+        'rsi': 50.0, 'macd': 0.0, 'macd_signal': 0.0, 'macd_hist': 0.0,
+        'bb_upper': price, 'bb_middle': price, 'bb_lower': price,
+        'atr': 0.01, 'pivot': price, 'resistance1': price, 'support1': price,
+        'current_price': price,
+        'chart_data': create_default_chart_data()
+    }
+
+def load_historical_data_from_file(pair, timeframe):
+    """Load historical data from local files dengan format yang benar"""
+    # Normalize timeframe untuk match filename
+    timeframe_map = {'1D': '1D', '1H': '1H', '4H': '4H', '2H': '2H'}
+    file_timeframe = timeframe_map.get(timeframe, timeframe)
+    
+    data_dir = 'data/historical'
+    filename = f"{pair}_{file_timeframe}.csv"
+    filepath = os.path.join(data_dir, filename)
+    
+    print(f"Looking for historical file: {filepath}")
+    
+    if os.path.exists(filepath):
+        try:
+            # Load data from CSV
+            data = pd.read_csv(filepath)
+            print(f"Raw CSV columns: {data.columns.tolist()}")
+            print(f"Raw CSV shape: {data.shape}")
+            
+            # Normalize column names (case insensitive)
+            data.columns = [col.strip().title() for col in data.columns]
+            
+            # Cari kolom tanggal - coba beberapa kemungkinan nama
+            date_columns = ['Date', 'Datetime', 'Time', 'Timestamp']
+            date_col = None
+            for col in date_columns:
+                if col in data.columns:
+                    date_col = col
+                    break
+            
+            if date_col is None:
+                print("No date column found, using index")
+                # Jika tidak ada kolom tanggal, buat dari index
+                if timeframe == '1D':
+                    freq = 'D'
+                else:
+                    freq = 'H'
+                data['Date'] = pd.date_range(end=datetime.now(), periods=len(data), freq=freq)
+                date_col = 'Date'
+            else:
+                # Convert date column to datetime
+                data[date_col] = pd.to_datetime(data[date_col], errors='coerce')
+                # Drop rows dengan tanggal invalid
+                data = data.dropna(subset=[date_col])
+            
+            # Set date sebagai index
+            data = data.set_index(date_col)
+            
+            # Normalize OHLC column names
+            column_mapping = {
+                'Open': 'Open', 'High': 'High', 'Low': 'Low', 'Close': 'Close',
+                'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close',
+                'OPEN': 'Open', 'HIGH': 'High', 'LOW': 'Low', 'CLOSE': 'Close'
+            }
+            
+            for old_col, new_col in column_mapping.items():
+                if old_col in data.columns and new_col not in data.columns:
+                    data[new_col] = data[old_col]
+            
+            # Pastikan kolom yang diperlukan ada
+            required_columns = ['Open', 'High', 'Low', 'Close']
+            missing_cols = [col for col in required_columns if col not in data.columns]
+            
+            if missing_cols:
+                print(f"Missing columns: {missing_cols}")
+                # Create missing columns dengan nilai default
+                for col in missing_cols:
+                    if col == 'Open':
+                        data[col] = data.get('Close', 150)
+                    elif col == 'High':
+                        data[col] = data.get('Close', 150) * 1.01
+                    elif col == 'Low':
+                        data[col] = data.get('Close', 150) * 0.99
+                    elif col == 'Close':
+                        data[col] = 150  # Default value
+            
+            # Urutkan berdasarkan tanggal
+            data = data.sort_index()
+            
+            # Pastikan data numerik
+            for col in required_columns:
+                data[col] = pd.to_numeric(data[col], errors='coerce')
+            
+            # Drop rows dengan nilai NaN
+            data = data.dropna(subset=required_columns)
+            
+            print(f"Loaded historical data from {filepath}: {len(data)} rows")
+            print(f"Date range: {data.index.min()} to {data.index.max()}")
+            
+            return data
+            
+        except Exception as e:
+            print(f"Error loading {filepath}: {e}")
+            traceback.print_exc()
+            return None
+    else:
+        print(f"Historical file not found: {filepath}")
+        return None
+
+def get_historical_data_for_chart(data, periods=50):
+    """Prepare historical data for chart display dengan handling index yang berbeda"""
+    try:
+        if data.empty:
+            print("Data is empty, returning default chart data")
+            return create_default_chart_data()
+        
+        # Get the last N periods
+        data_slice = data.tail(periods)
+        
+        # Convert index to datetime strings - handle berbagai tipe index
+        dates = []
+        for idx in data_slice.index:
+            if hasattr(idx, 'strftime'):
+                dates.append(idx.strftime('%Y-%m-%d %H:%M'))
+            else:
+                # Coba konversi ke datetime
+                try:
+                    dt = pd.to_datetime(idx)
+                    dates.append(dt.strftime('%Y-%m-%d %H:%M'))
+                except:
+                    dates.append(str(idx))
+        
+        # Pastikan kolom OHLC ada dan numerik
+        for col in ['Open', 'High', 'Low', 'Close']:
+            if col not in data_slice.columns:
+                print(f"Warning: Column {col} not found in data")
+                return create_default_chart_data()
+        
+        # Calculate technical indicators untuk chart
+        close_prices = data_slice['Close']
+        
+        # Hitung EMA dengan handling data pendek
+        ema_20 = close_prices.ewm(span=min(20, len(close_prices)), adjust=False).mean()
+        ema_50 = close_prices.ewm(span=min(50, len(close_prices)), adjust=False).mean()
+        ema_200 = close_prices.ewm(span=min(200, len(close_prices)), adjust=False).mean()
+        
+        chart_data = {
+            'dates': dates,
+            'open': data_slice['Open'].astype(float).round(5).tolist(),
+            'high': data_slice['High'].astype(float).round(5).tolist(),
+            'low': data_slice['Low'].astype(float).round(5).tolist(),
+            'close': data_slice['Close'].astype(float).round(5).tolist(),
+            'ema_20': ema_20.astype(float).round(5).fillna(method='bfill').tolist(),
+            'ema_50': ema_50.astype(float).round(5).fillna(method='bfill').tolist(),
+            'ema_200': ema_200.astype(float).round(5).fillna(method='bfill').tolist()
+        }
+        
+        print(f"Chart data prepared: {len(chart_data['dates'])} periods")
+        print(f"First 3 dates: {chart_data['dates'][:3]}")
+        print(f"First 3 prices: {chart_data['close'][:3]}")
+        
+        return chart_data
+        
+    except Exception as e:
+        print(f"Error preparing chart data: {e}")
+        traceback.print_exc()
+        return create_default_chart_data()
+
 def get_technical_indicators(data):
     """Menghitung indikator teknikal"""
     indicators = {}
     
     try:
         if data.empty or len(data) < 20:
+            print("Insufficient data for indicators, using defaults")
             return create_default_indicators(150.0)
         
         # Price data
@@ -116,11 +431,11 @@ def get_technical_indicators(data):
         current_price = safe_float(close)
         
         # Trend Indicators
-        indicators['sma_20'] = safe_float(close.rolling(window=20).mean())
-        indicators['sma_50'] = safe_float(close.rolling(window=50).mean())
-        indicators['ema_12'] = safe_float(close.ewm(span=12).mean())
-        indicators['ema_26'] = safe_float(close.ewm(span=26).mean())
-        indicators['ema_200'] = safe_float(close.ewm(span=200).mean())
+        indicators['sma_20'] = safe_float(close.rolling(window=min(20, len(close))).mean())
+        indicators['sma_50'] = safe_float(close.rolling(window=min(50, len(close))).mean())
+        indicators['ema_12'] = safe_float(close.ewm(span=12, adjust=False).mean())
+        indicators['ema_26'] = safe_float(close.ewm(span=26, adjust=False).mean())
+        indicators['ema_200'] = safe_float(close.ewm(span=min(200, len(close)), adjust=False).mean())
         
         # RSI Calculation
         try:
@@ -135,11 +450,11 @@ def get_technical_indicators(data):
         
         # MACD Calculation
         try:
-            ema_12 = close.ewm(span=12).mean()
-            ema_26 = close.ewm(span=26).mean()
+            ema_12 = close.ewm(span=12, adjust=False).mean()
+            ema_26 = close.ewm(span=26, adjust=False).mean()
             macd_line = ema_12 - ema_26
             indicators['macd'] = safe_float(macd_line)
-            indicators['macd_signal'] = safe_float(macd_line.ewm(span=9).mean())
+            indicators['macd_signal'] = safe_float(macd_line.ewm(span=9, adjust=False).mean())
             indicators['macd_hist'] = indicators['macd'] - indicators['macd_signal']
         except:
             indicators['macd'] = indicators['macd_signal'] = indicators['macd_hist'] = 0.0
@@ -180,122 +495,10 @@ def get_technical_indicators(data):
         
     except Exception as e:
         print(f"Error in technical indicators: {e}")
+        traceback.print_exc()
         indicators = create_default_indicators(150.0)
     
     return indicators
-
-def get_historical_data_for_chart(data, periods=50):
-    """Prepare historical data for chart display"""
-    try:
-        # Get the last N periods
-        data_slice = data.tail(periods)
-        
-        # Convert index to datetime strings
-        if hasattr(data_slice.index, 'strftime'):
-            dates = data_slice.index.strftime('%Y-%m-%d %H:%M').tolist()
-        else:
-            dates = [str(idx) for idx in data_slice.index]
-        
-        # Calculate technical indicators for the chart
-        close_prices = data_slice['Close']
-        
-        chart_data = {
-            'dates': dates,
-            'open': data_slice['Open'].astype(float).round(5).tolist(),
-            'high': data_slice['High'].astype(float).round(5).tolist(),
-            'low': data_slice['Low'].astype(float).round(5).tolist(),
-            'close': data_slice['Close'].astype(float).round(5).tolist(),
-            'ema_20': close_prices.ewm(span=20).mean().astype(float).round(5).fillna(0).tolist(),
-            'ema_50': close_prices.ewm(span=50).mean().astype(float).round(5).fillna(0).tolist(),
-            'ema_200': close_prices.ewm(span=200).mean().astype(float).round(5).fillna(0).tolist()
-        }
-        
-        print(f"Chart data prepared: {len(chart_data['dates'])} periods")
-        return chart_data
-        
-    except Exception as e:
-        print(f"Error preparing chart data: {e}")
-        return create_default_chart_data()
-
-def create_default_chart_data():
-    """Create default chart data"""
-    return {
-        'dates': [datetime.now().strftime('%Y-%m-%d %H:%M')],
-        'open': [150.0], 'high': [151.0], 'low': [149.0], 'close': [150.5],
-        'ema_20': [150.0], 'ema_50': [150.0], 'ema_200': [150.0]
-    }
-
-def create_default_indicators(price):
-    """Create default indicators"""
-    return {
-        'sma_20': price, 'sma_50': price, 'ema_12': price, 'ema_26': price, 'ema_200': price,
-        'rsi': 50.0, 'macd': 0.0, 'macd_signal': 0.0, 'macd_hist': 0.0,
-        'bb_upper': price, 'bb_middle': price, 'bb_lower': price,
-        'atr': 0.01, 'pivot': price, 'resistance1': price, 'support1': price,
-        'current_price': price,
-        'chart_data': create_default_chart_data()
-    }
-
-def validate_and_fix_data(data):
-    """Validasi dan perbaiki data yang rusak"""
-    try:
-        # Pastikan data tidak kosong
-        if data.empty:
-            return create_fallback_data()
-        
-        # Periksa dan perbaiki nilai yang tidak valid
-        for col in ['Open', 'High', 'Low', 'Close']:
-            if col in data.columns:
-                # Ganti nilai NaN dengan forward fill
-                data[col] = data[col].fillna(method='ffill')
-                # Jika masih ada NaN, isi dengan mean
-                if data[col].isna().any():
-                    data[col] = data[col].fillna(data[col].mean())
-        
-        # Pastikan ada cukup data
-        if len(data) < 20:
-            return enhance_data_with_historical(data)
-        
-        return data
-        
-    except Exception as e:
-        print(f"Error validating data: {e}")
-        return create_fallback_data()
-
-def create_fallback_data():
-    """Buat data fallback yang realistis"""
-    dates = pd.date_range(end=datetime.now(), periods=100, freq='H')
-    base_price = 200.0
-    noise = np.random.normal(0, 0.5, 100)
-    prices = base_price + np.cumsum(noise)
-    
-    data = pd.DataFrame({
-        'Open': prices,
-        'High': prices + np.abs(np.random.normal(0, 0.3, 100)),
-        'Low': prices - np.abs(np.random.normal(0, 0.3, 100)),
-        'Close': prices,
-        'Volume': np.random.randint(1000, 10000, 100)
-    }, index=dates)
-    
-    return data
-
-def enhance_data_with_historical(data):
-    """Tingkatkan data dengan menambahkan data historis sintetis"""
-    if data.empty:
-        return create_fallback_data()
-    
-    # Duplikat dan modifikasi data yang ada untuk membuat lebih banyak poin
-    enhanced_data = data.copy()
-    while len(enhanced_data) < 50:
-        additional_data = data.copy()
-        # Tambahkan sedikit variasi
-        multiplier = 1 + np.random.normal(0, 0.01, len(additional_data))
-        for col in ['Open', 'High', 'Low', 'Close']:
-            additional_data[col] = additional_data[col] * multiplier
-        
-        enhanced_data = pd.concat([enhanced_data, additional_data])
-    
-    return enhanced_data.tail(100)  # Ambil 100 data terakhir
 
 def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
     """Analisis dengan AI DeepSeek"""
@@ -343,54 +546,18 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
         'ANALYSIS_SUMMARY': f'RSI: {rsi:.1f}, Price: {current_price:.4f}, ATR: {atr:.4f}. Signal based on technical analysis.'
     }
 
-def load_historical_data_from_file(pair, timeframe):
-    """Load historical data from local files dengan error handling"""
-    data_dir = 'data/historical'
-    filename = f"{pair}_{timeframe}.csv"
-    filepath = os.path.join(data_dir, filename)
-    
-    if os.path.exists(filepath):
-        try:
-            # Load data from CSV
-            data = pd.read_csv(filepath)
-            
-            # Check if datetime column exists
-            if 'datetime' in data.columns:
-                data['datetime'] = pd.to_datetime(data['datetime'])
-                data.set_index('datetime', inplace=True)
-            elif 'Date' in data.columns:
-                data['Date'] = pd.to_datetime(data['Date'])
-                data.set_index('Date', inplace=True)
-            
-            # Ensure required columns exist
-            required_columns = ['Open', 'High', 'Low', 'Close']
-            column_mapping = {
-                'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close'
-            }
-            
-            # Rename columns if needed
-            for old_col, new_col in column_mapping.items():
-                if old_col in data.columns and new_col not in data.columns:
-                    data[new_col] = data[old_col]
-            
-            if all(col in data.columns for col in required_columns):
-                print(f"Loaded historical data from {filepath}: {len(data)} rows")
-                return data
-            else:
-                print(f"Missing required columns in {filepath}")
-                return None
-                
-        except Exception as e:
-            print(f"Error loading {filepath}: {e}")
-            return None
-    else:
-        print(f"Historical file not found: {filepath}")
-        return None
-
 def get_data_with_fallback(pair, timeframe, period):
     """Get data with fallback to historical files"""
     try:
-        # Try to get real-time data first
+        # Untuk timeframe 1D, prioritaskan data historis dulu
+        if timeframe == '1D':
+            print(f"Timeframe 1D detected, trying historical data first...")
+            historical_data = load_historical_data_from_file(pair, timeframe)
+            if historical_data is not None and len(historical_data) > 20:
+                print("Using historical data for 1D timeframe")
+                return historical_data
+        
+        # Try to get real-time data
         yf_symbol = pair_mapping[pair]
         yf_timeframe = timeframe_mapping[timeframe]
         
@@ -409,14 +576,29 @@ def get_data_with_fallback(pair, timeframe, period):
             print("Real-time data insufficient, trying historical files...")
             historical_data = load_historical_data_from_file(pair, timeframe)
             
-            if historical_data is not None:
+            if historical_data is not None and len(historical_data) > 0:
                 return historical_data
             else:
                 # Final fallback - create minimal data
                 print("Creating minimal fallback data...")
-                dates = pd.date_range(end=datetime.now(), periods=50, freq='H')
+                if timeframe == '1D':
+                    freq = 'D'
+                    periods = 100
+                else:
+                    freq = 'H' 
+                    periods = 50
+                    
+                dates = pd.date_range(end=datetime.now(), periods=periods, freq=freq)
+                base_price = 150.0
+                variations = np.random.normal(0, 0.5, periods)
+                prices = base_price + np.cumsum(variations)
+                
                 data = pd.DataFrame({
-                    'Open': 150.0, 'High': 151.0, 'Low': 149.0, 'Close': 150.0
+                    'Open': prices,
+                    'High': prices + np.abs(np.random.normal(0, 0.3, periods)),
+                    'Low': prices - np.abs(np.random.normal(0, 0.3, periods)),
+                    'Close': prices,
+                    'Volume': np.random.randint(1000, 10000, periods)
                 }, index=dates)
                 return data
                 
@@ -443,21 +625,6 @@ def get_analysis():
         if timeframe not in timeframe_mapping:
             return jsonify({'error': 'Invalid timeframe'})
         
-        # Get data dengan validasi
-        yf_timeframe = timeframe_mapping[timeframe]
-        period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
-        
-        data = get_data_with_fallback(pair, timeframe, period)
-        
-        # Validasi dan perbaiki data
-        data = validate_and_fix_data(data)
-        
-        print(f"Validated data: {len(data)} rows")
-        
-        if data.empty:
-            return jsonify({'error': 'No valid data available after validation'})
-        
-        # ... rest of your existing code ...        
         # Get data with fallback
         yf_timeframe = timeframe_mapping[timeframe]
         period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
@@ -520,6 +687,7 @@ def get_analysis():
         
     except Exception as e:
         print(f"Error in analysis: {str(e)}")
+        traceback.print_exc()
         return jsonify({'error': f'Analysis error: {str(e)}'})
 
 @app.route('/get_historical_data')
