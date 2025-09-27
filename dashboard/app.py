@@ -5,10 +5,10 @@ import numpy as np
 import requests
 import warnings
 from datetime import datetime, timedelta
-import talib
 import json
 from bs4 import BeautifulSoup
 import time
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -253,7 +253,7 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
 
 @app.route('/')
 def index():
-    return render_template('index.html', pairs=list(pair_mapping.keys()))
+    return render_template('index.html')
 
 @app.route('/get_analysis')
 def get_analysis():
@@ -358,4 +358,11 @@ def get_multiple_analysis():
         return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
+    # Check if templates folder exists
+    if not os.path.exists('templates'):
+        print("ERROR: 'templates' folder not found!")
+        print("Please create a 'templates' folder with 'index.html' inside")
+    else:
+        print("Template folder found. Starting server...")
+    
     app.run(debug=True, host='127.0.0.1', port=5000)
