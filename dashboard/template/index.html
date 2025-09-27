@@ -247,6 +247,13 @@
             text-align: center;
             color: #2c3e50;
         }
+        .system-status {
+            background: #d4edda;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-size: 0.8em;
+        }
         @media (max-width: 768px) {
             .analysis-grid { grid-template-columns: 1fr; }
             .controls { flex-direction: column; align-items: stretch; }
@@ -288,6 +295,7 @@
             <button onclick="loadAnalysis()">🔄 Refresh Analysis</button>
             <button onclick="loadAllAnalysis()">📊 Analyze All Pairs</button>
             <button onclick="autoRefreshToggle()">⏰ Auto Refresh: <span id="autoRefreshStatus">OFF</span></button>
+            <button onclick="checkSystemStatus()">📈 System Status</button>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
@@ -298,6 +306,7 @@
         </div>
         
         <div id="error" class="error" style="display: none;"></div>
+        <div id="systemStatus" style="display: none;"></div>
         <div id="results"></div>
     </div>
 
@@ -313,6 +322,7 @@
             
             showLoading();
             hideError();
+            hideSystemStatus();
             
             console.log(`Loading analysis for ${pair} ${timeframe}`);
             
@@ -343,6 +353,8 @@
         function loadAllAnalysis() {
             const timeframe = document.getElementById('timeframeSelect').value;
             showLoading();
+            hideError();
+            hideSystemStatus();
             
             fetch(`/get_multiple_analysis?timeframe=${timeframe}`)
                 .then(response => response.json())
@@ -354,6 +366,43 @@
                     hideLoading();
                     showError('Error loading all analysis: ' + error.message);
                 });
+        }
+
+        function checkSystemStatus() {
+            fetch('/system_status')
+                .then(response => response.json())
+                .then(data => {
+                    displaySystemStatus(data);
+                })
+                .catch(error => {
+                    showError('Error checking system status: ' + error.message);
+                });
+        }
+
+        function displaySystemStatus(status) {
+            const statusDiv = document.getElementById('systemStatus');
+            if (status.status === 'operational') {
+                statusDiv.innerHTML = `
+                    <div class="system-status">
+                        <strong>✅ System Status: Operational</strong><br>
+                        Analysis Records: ${status.database.analysis_records} | 
+                        News Records: ${status.database.news_records} | 
+                        Price Records: ${status.database.price_records}
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ System Status: Error</strong><br>
+                        ${status.message}
+                    </div>
+                `;
+            }
+            statusDiv.style.display = 'block';
+        }
+
+        function hideSystemStatus() {
+            document.getElementById('systemStatus').style.display = 'none';
         }
 
         function autoRefreshToggle() {
@@ -396,7 +445,7 @@
                 return;
             }
             
-            console.log('Creating chart with data:', chartData);
+            console.log('Creating chart with data points:', chartData.dates.length);
             
             try {
                 currentChart = new Chart(chartContext, {
@@ -540,11 +589,57 @@
         function displayHistoricalStats(data) {
             if (!data || !data.data_points) return '';
             
-            return `
+            let statsHtml = '';
+            
+            if (data.historical_stats) {
+                statsHtml = `
+                    <div class="historical-stats">
+                        <h4>📈 Historical Performance</h4>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div>1 Period</div>
+                                <div class="percentage-change">${data.historical_stats['1_period_change']?.toFixed(2) || '0.00'}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>5 Periods</div>
+                                <div class="percentage-change">${data.historical_stats['5_period_change']?.toFixed(2) || '0.00'}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>10 Periods</div>
+                                <div class="percentage-change">${data.historical_stats['10_period_change']?.toFixed(2) || '0.00'}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>20 Periods</div>
+                                <div class="percentage-change">${data.historical_stats['20_period_change']?.toFixed(2) || '0.00'}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>10P High</div>
+                                <div>${data.historical_stats['high_10_period']?.toFixed(4) || '0.0000'}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>10P Low</div>
+                                <div>${data.historical_stats['low_10_period']?.toFixed(4) || '0.0000'}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>Volatility</div>
+                                <div>${data.historical_stats['volatility']?.toFixed(2) || '0.00'}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div>Data Points</div>
+                                <div>${data.historical_stats['total_periods'] || '0'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            statsHtml += `
                 <div class="data-info">
                     <strong>Data Information:</strong> ${data.data_points} data points | ${data.data_period || 'N/A'}
                 </div>
             `;
+            
+            return statsHtml;
         }
 
         function colorCodePercentageChanges() {
@@ -613,6 +708,8 @@
                             <div class="tech-item"><strong>ATR:</strong> ${data.technical_indicators.ATR}</div>
                             <div class="tech-item"><strong>Support:</strong> ${data.technical_indicators.Support}</div>
                             <div class="tech-item"><strong>Resistance:</strong> ${data.technical_indicators.Resistance}</div>
+                            <div class="tech-item"><strong>BB Upper:</strong> ${data.technical_indicators.BB_Upper}</div>
+                            <div class="tech-item"><strong>BB Lower:</strong> ${data.technical_indicators.BB_Lower}</div>
                         </div>
                         ${displayHistoricalStats(data)}
                     </div>
@@ -652,6 +749,9 @@
             `;
             
             document.getElementById('results').innerHTML = html;
+            
+            // Color code percentage changes
+            setTimeout(colorCodePercentageChanges, 100);
             
             // Create chart after DOM is updated
             setTimeout(() => {
@@ -734,6 +834,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Page loaded, starting analysis...');
             loadAnalysis();
+            
+            // Check system status on load
+            setTimeout(checkSystemStatus, 2000);
         });
     </script>
 </body>
