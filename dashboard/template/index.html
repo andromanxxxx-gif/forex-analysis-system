@@ -2,29 +2,44 @@
 <html>
 <head>
     <title>Forex Analysis Dashboard</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <meta http-equiv="refresh" content="10">
 </head>
 <body>
-<h2>Forex Dashboard</h2>
-<form method="POST">
-    <label for="pair">Select Pair:</label>
-    <select name="pair" onchange="this.form.submit()">
-        {% for p in pairs %}
-        <option value="{{ p }}" {% if p==selected_pair %}selected{% endif %}>{{ p }}</option>
+    <h1>Forex Analysis Dashboard</h1>
+    
+    <form method="POST">
+        <label>Pilih Pair:</label>
+        <select name="pair" onchange="this.form.submit()">
+            {% for p in pairs %}
+            <option value="{{p}}" {% if p==pair %}selected{% endif %}>{{p}}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <h2>Pair: {{pair}}</h2>
+    <h3>Signal: {{signal}}</h3>
+    <p>Take Profit: {{tp}} | Stop Loss: {{sl}}</p>
+
+    <h3>Data Terbaru</h3>
+    <table border="1">
+        <tr>
+            {% for col in data[0].keys() %}
+            <th>{{col}}</th>
+            {% endfor %}
+        </tr>
+        {% for row in data %}
+        <tr>
+            {% for col in row.values() %}
+            <td>{{col}}</td>
+            {% endfor %}
+        </tr>
         {% endfor %}
-    </select>
-</form>
+    </table>
 
-<h3>Signal: {{ signal }}</h3>
-{% if tp and sl %}
-<p>Take Profit: {{ tp }} | Stop Loss: {{ sl }}</p>
-{% endif %}
-
-<div id="chart"></div>
-<script>
-var graph = {{ graphJSON | safe }};
-Plotly.newPlot('chart', graph.data, graph.layout);
-</script>
+    <h3>Berita Terkini</h3>
+    <ul>
+        {% for n in news %}
+        <li>{{n.headline}} - Sentimen: {{n.sentiment}}</li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
