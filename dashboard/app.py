@@ -1,18 +1,19 @@
-# dashboard/app.py
-from flask import Flask, render_template, request
-from pathlib import Path
 import sys
+from pathlib import Path
+
+# Tambahkan root project ke sys.path agar Python bisa menemukan modul src
+root_path = Path(__file__).parent.parent.resolve()
+if str(root_path) not in sys.path:
+    sys.path.append(str(root_path))
+
+from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
 from src.trading_signals import calculate_indicators, generate_signal
 
-# Tambahkan root project ke sys.path
-root_path = Path(__file__).parent.parent.resolve()
-sys.path.append(str(root_path))
-
 app = Flask(__name__)
 
-# Dummy data
+# Dummy data generator
 def get_dummy_data(pair):
     dates = pd.date_range(end=pd.Timestamp.today(), periods=100)
     data = pd.DataFrame({
