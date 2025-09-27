@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import datetime
 
 def collect_project_info():
     """Kumpulkan semua informasi project untuk analisis"""
@@ -46,8 +47,7 @@ def collect_project_info():
     project_info['system_info'] = {
         'python_version': sys.version,
         'platform': sys.platform,
-        'current_directory': os.getcwd(),
-        'environment_variables': dict(os.environ)
+        'current_directory': os.getcwd()
     }
     
     return project_info
@@ -58,6 +58,20 @@ def create_analysis_report():
     
     report = f"""
 # FOREX ANALYSIS SYSTEM - COMPLETE ANALYSIS REPORT
-Generated on: {import datetime; datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ## PROJECT STRUCTURE:
+"""
+    
+    for path, data in info['structure'].items():
+        report += f"{path} ({data['size']} bytes)\n"
+    
+    report += f"""
+## SYSTEM INFORMATION:
+- Python: {info['system_info']['python_version']}
+- Platform: {info['system_info']['platform']}
+- Directory: {info['system_info']['current_directory']}
+
+## app.py CONTENT:
+```python
+{info['app_py']}
