@@ -1,67 +1,44 @@
 #!/usr/bin/env python3
 """
-AUTO-LAUNCHER untuk Flask Dashboard
+🚀 FOREX ANALYSIS SYSTEM - DASHBOARD LAUNCHER
+Menjalankan Flask dashboard dengan satu perintah
 """
 
 import os
 import sys
-import subprocess
-import webbrowser
-import time
-from pathlib import Path
 import threading
+import time
+import webbrowser
 
-class FlaskDashboardLauncher:
-    def __init__(self):
-        self.root_dir = Path(__file__).parent
-        self.dashboard_dir = self.root_dir / "dashboard"
-        self.app_file = self.dashboard_dir / "app.py"
-        self.url = "http://127.0.0.1:5000"
+# Tambahkan root project ke sys.path supaya modul src bisa diimport
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-    def print_banner(self):
-        banner = """
+# Banner
+BANNER = """
 =====================================================
         🚀 FOREX ANALYSIS SYSTEM - DASHBOARD
 =====================================================
 """
-        print(banner)
 
-    def check_app_file(self):
-        """Cek apakah app.py ada"""
-        if not self.app_file.exists():
-            print(f"❌ File tidak ditemukan: {self.app_file}")
-            return False
-        return True
+print(BANNER)
 
-    def open_browser(self):
-        """Tunggu sebentar lalu buka browser"""
-        time.sleep(3)
-        webbrowser.open(self.url)
+# Fungsi buka browser otomatis
+def open_browser():
+    time.sleep(2)  # Tunggu server Flask siap
+    webbrowser.open("http://127.0.0.1:5000")
 
-    def launch(self):
-        """Jalankan Flask dashboard"""
-        if not self.check_app_file():
-            return
+# Start browser thread
+threading.Thread(target=open_browser).start()
 
-        print(f"✅ Menjalankan dashboard Flask dari: {self.app_file}")
-        print(f"🌐 Dashboard akan terbuka otomatis di {self.url}\n")
-
-        # Thread untuk auto-buka browser
-        browser_thread = threading.Thread(target=self.open_browser, daemon=True)
-        browser_thread.start()
-
-        # Jalankan Flask app
-        try:
-            subprocess.run([sys.executable, str(self.app_file)])
-        except KeyboardInterrupt:
-            print("\n🛑 Dashboard dihentikan oleh user.")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-
-def main():
-    launcher = FlaskDashboardLauncher()
-    launcher.print_banner()
-    launcher.launch()
-
-if __name__ == "__main__":
-    main()
+# Jalankan Flask app
+try:
+    from dashboard import app
+    # Pastikan debug=True untuk auto-reload saat development
+    app.run(host="0.0.0.0", port=5000, debug=True)
+except ModuleNotFoundError as e:
+    print(f"❌ Module not found: {e}")
+    print("Pastikan folder 'src' ada di root project dan sys.path sudah benar.")
+except Exception as e:
+    print(f"❌ Unexpected error: {e}")
