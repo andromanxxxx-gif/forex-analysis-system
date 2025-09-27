@@ -1,25 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Forex Analysis Dashboard</title>
+    <title>Forex Dashboard</title>
 </head>
 <body>
     <h1>Forex Analysis Dashboard</h1>
 
     <form method="post">
         <label for="pair">Select Pair:</label>
-        <select name="pair" onchange="this.form.submit()">
-            <option value="EUR/USD" {% if pair=='EUR/USD' %}selected{% endif %}>EUR/USD</option>
-            <option value="GBP/USD" {% if pair=='GBP/USD' %}selected{% endif %}>GBP/USD</option>
-            <option value="USD/JPY" {% if pair=='USD/JPY' %}selected{% endif %}>USD/JPY</option>
+        <select name="pair" id="pair">
+            <option {% if pair=="EUR/USD" %}selected{% endif %}>EUR/USD</option>
+            <option {% if pair=="GBP/USD" %}selected{% endif %}>GBP/USD</option>
+            <option {% if pair=="USD/JPY" %}selected{% endif %}>USD/JPY</option>
         </select>
+        <button type="submit">Update</button>
     </form>
 
-    <h2>Technical Signal: {{ signal }}</h2>
-    <h2>AI Recommendation: {{ ai_recommendation }}</h2>
+    <h2>Latest Technical Data (last 10 rows)</h2>
+    {{ tables|safe }}
 
-    {% for table in tables %}
-        {{ table | safe }}
-    {% endfor %}
+    <h2>Signal Recommendation</h2>
+    <p>Technical Signal: {{ signal_info['signal'] }}</p>
+    <p>Take Profit: {{ signal_info['take_profit'] }}</p>
+    <p>Stop Loss: {{ signal_info['stop_loss'] }}</p>
+
+    <h2>AI News Recommendation</h2>
+    <p>{{ ai_recommendation }}</p>
 </body>
 </html>
