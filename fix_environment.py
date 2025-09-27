@@ -1,47 +1,27 @@
-import os
-import sys
-import subprocess
-
-def run_cmd(cmd):
-    print(f"\n>>> {cmd}")
-    result = subprocess.run(cmd, shell=True)
-    if result.returncode != 0:
-        print(f"❌ Gagal menjalankan: {cmd}")
-        sys.exit(1)
-
-def main():
-    print("🔧 Memperbaiki environment...")
-
-    # Cek versi Python
-    major, minor = sys.version_info[:2]
-    print(f"ℹ️ Python versi terdeteksi: {major}.{minor}")
-
-    if major < 3 or (major == 3 and minor < 10):
-        print("⚠️ Versi Python Anda terlalu lama. Disarankan pakai Python 3.10+.")
-    elif major == 3 and minor >= 12:
-        print("⚠️ Python 3.12+ terdeteksi. Pastikan setuptools terbaru dipakai.")
-
-    # Upgrade pip, setuptools, dan wheel
-    run_cmd("python -m pip install --upgrade pip setuptools wheel")
-
-    # Paksa upgrade setuptools ke versi terbaru (fix ImpImporter error)
-    run_cmd("pip install --upgrade setuptools==70.0.0")
-
-    # Install paket utama
-    packages = [
-        "streamlit",
-        "pandas",
-        "numpy",
-        "matplotlib",
-        "scikit-learn"
-    ]
-    run_cmd(f"pip install {' '.join(packages)}")
-
-    # Install requirements.txt kalau ada
-    if os.path.exists("requirements.txt"):
-        run_cmd("pip install -r requirements.txt")
-
-    print("\n✅ Environment sudah diperbaiki dan siap dipakai.")
-
-if __name__ == "__main__":
-    main()
+def fix_dashboard_imports():
+    """Perbaiki import di dashboard"""
+    dashboard_dir = Path(__file__).parent / "dashboard"
+    app_file = dashboard_dir / "app.py"
+    
+    if app_file.exists():
+        # Backup original file
+        shutil.copy2(app_file, app_file.with_suffix('.py.backup'))
+        
+        # Baca content dengan encoding utf-8
+        try:
+            with open(app_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            # Jika utf-8 gagal, coba latin-1
+            with open(app_file, 'r', encoding='latin-1') as f:
+                content = f.read()
+        
+        # Ganti import yang problematic
+        new_content = content.replace(
+            "from src.signal_generator import SignalGenerator", 
+            "try:\n    from src.signal_generator import SignalGenerator\nexcept ImportError:\n    SignalGenerator = None"
+        )
+        
+        # Tulis kembali dengan encoding utf-8
+        with open(app_file, 'w', encoding='utf-8') as f:
+            f.write(new_content)
