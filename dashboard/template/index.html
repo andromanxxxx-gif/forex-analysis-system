@@ -9,48 +9,53 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             min-height: 100vh;
             padding: 20px;
+            color: #333;
         }
         .container { 
             max-width: 1400px; 
             margin: 0 auto; 
-            background: rgba(255,255,255,0.95); 
+            background: rgba(255,255,255,0.98); 
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             overflow: hidden;
         }
         .header { 
             background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
             color: white; 
-            padding: 30px; 
+            padding: 25px; 
             text-align: center;
         }
         .header h1 { 
-            font-size: 2.5em; 
-            margin-bottom: 10px;
+            font-size: 2.2em; 
+            margin-bottom: 8px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
         }
         .controls { 
             background: white; 
-            padding: 20px; 
+            padding: 18px; 
             border-bottom: 1px solid #eee;
             display: flex;
-            gap: 15px;
+            gap: 12px;
             flex-wrap: wrap;
             align-items: center;
         }
         .control-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         select, button {
-            padding: 10px 15px;
+            padding: 9px 14px;
             border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 6px;
+            font-size: 13px;
             transition: all 0.3s;
         }
         select:focus, button:hover {
@@ -62,133 +67,134 @@
             color: white;
             border: none;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
         }
         button:hover {
             background: #2980b9;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
         }
         .analysis-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
-            gap: 20px; 
-            padding: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); 
+            gap: 18px; 
+            padding: 18px;
         }
         .card { 
             background: white; 
-            padding: 25px; 
-            border-radius: 12px; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s;
-            border-left: 5px solid #3498db;
+            padding: 22px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-left: 4px solid #3498db;
         }
         .card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
         }
         .signal-buy { border-left-color: #27ae60; }
         .signal-sell { border-left-color: #e74c3c; }
         .signal-hold { border-left-color: #f39c12; }
         .card h2, .card h3 { 
             color: #2c3e50; 
-            margin-bottom: 15px;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 10px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 8px;
         }
         .price-display {
-            font-size: 1.8em;
+            font-size: 1.6em;
             font-weight: bold;
             color: #2c3e50;
-            margin: 10px 0;
+            margin: 8px 0;
         }
         .price-change {
-            font-size: 1.2em;
+            font-size: 1.1em;
             font-weight: bold;
-            padding: 5px 10px;
-            border-radius: 5px;
+            padding: 4px 8px;
+            border-radius: 4px;
             display: inline-block;
         }
         .positive { background: #d4edda; color: #155724; }
         .negative { background: #f8d7da; color: #721c24; }
         .confidence-bar { 
             background: #ecf0f1; 
-            height: 25px; 
-            border-radius: 12px; 
-            margin: 15px 0; 
+            height: 22px; 
+            border-radius: 10px; 
+            margin: 12px 0; 
             overflow: hidden;
         }
         .confidence-fill { 
             height: 100%; 
-            border-radius: 12px; 
+            border-radius: 10px; 
             transition: width 0.5s ease-in-out;
             background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60);
         }
         .news-item { 
             border-bottom: 1px solid #ecf0f1; 
-            padding: 12px 0; 
+            padding: 10px 0; 
             transition: background 0.3s;
         }
         .news-item:hover {
             background: #f8f9fa;
-            border-radius: 5px;
-            padding-left: 10px;
+            border-radius: 4px;
+            padding-left: 8px;
         }
         .signal-display {
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: bold;
             text-align: center;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 12px 0;
         }
         .signal-buy-display { background: #d4edda; color: #155724; }
         .signal-sell-display { background: #f8d7da; color: #721c24; }
         .signal-hold-display { background: #fff3cd; color: #856404; }
         .loading { 
             text-align: center; 
-            padding: 40px; 
-            font-size: 1.2em;
+            padding: 35px; 
+            font-size: 1.1em;
             color: #7f8c8d;
         }
         .error { 
             background: #f8d7da; 
             color: #721c24; 
-            padding: 15px; 
-            margin: 20px;
-            border-radius: 8px;
-            border-left: 5px solid #e74c3c;
+            padding: 12px; 
+            margin: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #e74c3c;
         }
         .technical-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 8px;
         }
         .tech-item {
             background: #f8f9fa;
-            padding: 8px;
-            border-radius: 5px;
-            font-size: 0.9em;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
         }
         .chart-container {
             grid-column: 1 / -1;
-            height: 500px;
-            margin: 20px 0;
+            height: 450px;
+            margin: 15px 0;
             position: relative;
         }
         .chart-controls {
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+            gap: 8px;
+            margin-bottom: 12px;
             flex-wrap: wrap;
         }
         .chart-btn {
-            padding: 8px 15px;
+            padding: 6px 12px;
             border: 1px solid #ddd;
             background: #f8f9fa;
-            border-radius: 5px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
         }
         .chart-btn.active {
             background: #3498db;
@@ -198,15 +204,15 @@
         .trading-levels {
             display: flex;
             justify-content: space-between;
-            margin-top: 15px;
+            margin-top: 12px;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
         .level-item {
             text-align: center;
-            padding: 8px 12px;
-            border-radius: 5px;
-            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: bold;
         }
         .level-buy { background: #d4edda; color: #155724; }
@@ -214,28 +220,38 @@
         .level-neutral { background: #fff3cd; color: #856404; }
         .historical-stats {
             background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
         }
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
         }
         .stat-item {
             text-align: center;
-            padding: 8px;
+            padding: 6px;
             background: white;
+            border-radius: 4px;
+            border-left: 2px solid #3498db;
+            font-size: 0.8em;
+        }
+        .data-info {
+            background: #e8f4fd;
+            padding: 10px;
             border-radius: 5px;
-            border-left: 3px solid #3498db;
+            margin-top: 10px;
+            font-size: 0.85em;
+            text-align: center;
+            color: #2c3e50;
         }
         @media (max-width: 768px) {
             .analysis-grid { grid-template-columns: 1fr; }
             .controls { flex-direction: column; align-items: stretch; }
             .control-group { justify-content: space-between; }
-            .chart-container { height: 350px; }
+            .chart-container { height: 320px; }
             .trading-levels { flex-direction: column; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
         }
@@ -276,7 +292,7 @@
 
         <div id="loading" class="loading" style="display: none;">
             <div>🔄 Loading AI Analysis...</div>
-            <div style="font-size: 0.9em; margin-top: 10px; color: #95a5a6;">
+            <div style="font-size: 0.9em; margin-top: 8px; color: #95a5a6;">
                 Analyzing technical indicators and market news...
             </div>
         </div>
@@ -288,74 +304,8 @@
     <script>
         let autoRefreshInterval = null;
         let currentChart = null;
-        let currentChartType = 'candlestick';
+        let currentChartType = 'line';
         let currentAnalysis = null;
-        
-        // Candlestick chart plugin untuk Chart.js
-        const candlestickPlugin = {
-            id: 'candlestick',
-            beforeDraw: function(chart) {
-                if (chart.config.type !== 'candlestick') return;
-                
-                const ctx = chart.ctx;
-                const datasets = chart.data.datasets;
-                
-                datasets.forEach((dataset, datasetIndex) => {
-                    if (dataset.type === 'candlestick') {
-                        const meta = chart.getDatasetMeta(datasetIndex);
-                        
-                        meta.data.forEach((element, index) => {
-                            const {x, y} = element;
-                            const data = dataset.data[index];
-                            
-                            if (!data || typeof data !== 'object') return;
-                            
-                            const open = data.o;
-                            const high = data.h;
-                            const low = data.l;
-                            const close = data.c;
-                            
-                            // Calculate pixel values
-                            const yOpen = chart.scales.y.getPixelForValue(open);
-                            const yHigh = chart.scales.y.getPixelForValue(high);
-                            const yLow = chart.scales.y.getPixelForValue(low);
-                            const yClose = chart.scales.y.getPixelForValue(close);
-                            
-                            const width = 8; // Width of candlestick
-                            
-                            // Draw high-low line
-                            ctx.save();
-                            ctx.beginPath();
-                            ctx.moveTo(x, yHigh);
-                            ctx.lineTo(x, yLow);
-                            ctx.strokeStyle = open > close ? '#e74c3c' : '#27ae60';
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                            
-                            // Draw candle body
-                            const bodyTop = Math.min(yOpen, yClose);
-                            const bodyBottom = Math.max(yOpen, yClose);
-                            const bodyHeight = bodyBottom - bodyTop;
-                            
-                            if (bodyHeight > 0) {
-                                ctx.fillStyle = open > close ? '#e74c3c' : '#27ae60';
-                                ctx.fillRect(x - width/2, bodyTop, width, bodyHeight);
-                                
-                                // Draw border
-                                ctx.strokeStyle = '#2c3e50';
-                                ctx.lineWidth = 1;
-                                ctx.strokeRect(x - width/2, bodyTop, width, bodyHeight);
-                            }
-                            
-                            ctx.restore();
-                        });
-                    }
-                });
-            }
-        };
-
-        // Register plugin
-        Chart.register(candlestickPlugin);
         
         function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
@@ -364,19 +314,28 @@
             showLoading();
             hideError();
             
+            console.log(`Loading analysis for ${pair} ${timeframe}`);
+            
             fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     hideLoading();
                     if (data.error) {
                         showError('Analysis Error: ' + data.error);
                     } else {
+                        console.log('Analysis data received:', data);
                         currentAnalysis = data;
                         displayAnalysis(data);
                     }
                 })
                 .catch(error => {
                     hideLoading();
+                    console.error('Fetch error:', error);
                     showError('Network Error: ' + error.message);
                 });
         }
@@ -420,139 +379,34 @@
             }
         }
 
-        function createCandlestickData(chartData) {
-            const candlestickData = [];
-            for (let i = 0; i < chartData.dates.length; i++) {
-                candlestickData.push({
-                    x: chartData.dates[i],
-                    o: chartData.open[i],
-                    h: chartData.high[i],
-                    l: chartData.low[i],
-                    c: chartData.close[i]
-                });
-            }
-            return candlestickData;
-        }
-
         function createChart(chartData, analysis) {
             if (currentChart) {
                 currentChart.destroy();
             }
             
-            const ctx = document.getElementById('priceChart').getContext('2d');
+            const ctx = document.getElementById('priceChart');
+            if (!ctx) {
+                console.error('Chart canvas not found!');
+                return;
+            }
             
-            if (currentChartType === 'candlestick') {
-                // Candlestick Chart dengan plugin custom
-                const candlestickData = createCandlestickData(chartData);
-                
-                currentChart = new Chart(ctx, {
-                    type: 'scatter', // Use scatter as base for custom rendering
-                    data: {
-                        datasets: [
-                            {
-                                label: 'Candlestick',
-                                data: candlestickData,
-                                type: 'candlestick'
-                            },
-                            {
-                                label: 'EMA 20',
-                                data: chartData.ema_20.map((val, idx) => ({x: chartData.dates[idx], y: val})),
-                                borderColor: '#FF6B00',
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                fill: false,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'EMA 50',
-                                data: chartData.ema_50.map((val, idx) => ({x: chartData.dates[idx], y: val})),
-                                borderColor: '#2979FF',
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                fill: false,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'EMA 200',
-                                data: chartData.ema_200.map((val, idx) => ({x: chartData.dates[idx], y: val})),
-                                borderColor: '#00C853',
-                                borderWidth: 3,
-                                pointRadius: 0,
-                                fill: false,
-                                tension: 0.1
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Candlestick Chart with Moving Averages',
-                                font: { size: 16, weight: 'bold' }
-                            },
-                            legend: {
-                                position: 'top',
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const point = context.raw;
-                                        if (point.o !== undefined) {
-                                            return [
-                                                `Open: ${point.o.toFixed(4)}`,
-                                                `High: ${point.h.toFixed(4)}`,
-                                                `Low: ${point.l.toFixed(4)}`,
-                                                `Close: ${point.c.toFixed(4)}`,
-                                                `Change: ${((point.c - point.o) / point.o * 100).toFixed(2)}%`
-                                            ];
-                                        }
-                                        return `${context.dataset.label}: ${point.y.toFixed(4)}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                type: 'category',
-                                title: {
-                                    display: true,
-                                    text: 'Time'
-                                },
-                                ticks: {
-                                    maxTicksLimit: 8,
-                                    autoSkip: true
-                                }
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: 'Price'
-                                },
-                                ticks: {
-                                    callback: function(value) {
-                                        return value.toFixed(3);
-                                    }
-                                }
-                            }
-                        },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
-                        }
-                    }
-                });
-            } else {
-                // Line Chart
-                currentChart = new Chart(ctx, {
+            const chartContext = ctx.getContext('2d');
+            if (!chartContext) {
+                console.error('Could not get chart context!');
+                return;
+            }
+            
+            console.log('Creating chart with data:', chartData);
+            
+            try {
+                currentChart = new Chart(chartContext, {
                     type: 'line',
                     data: {
-                        labels: chartData.dates,
+                        labels: chartData.dates || [],
                         datasets: [
                             {
                                 label: 'Close Price',
-                                data: chartData.close,
+                                data: chartData.close || [],
                                 borderColor: '#3498db',
                                 backgroundColor: 'rgba(52, 152, 219, 0.1)',
                                 borderWidth: 2,
@@ -561,7 +415,7 @@
                             },
                             {
                                 label: 'EMA 20',
-                                data: chartData.ema_20,
+                                data: chartData.ema_20 || [],
                                 borderColor: '#e74c3c',
                                 borderWidth: 1,
                                 borderDash: [5, 5],
@@ -570,7 +424,7 @@
                             },
                             {
                                 label: 'EMA 50',
-                                data: chartData.ema_50,
+                                data: chartData.ema_50 || [],
                                 borderColor: '#f39c12',
                                 borderWidth: 1,
                                 borderDash: [5, 5],
@@ -579,7 +433,7 @@
                             },
                             {
                                 label: 'EMA 200',
-                                data: chartData.ema_200,
+                                data: chartData.ema_200 || [],
                                 borderColor: '#27ae60',
                                 borderWidth: 2,
                                 fill: false,
@@ -595,6 +449,22 @@
                                 display: true,
                                 text: 'Price Chart with Moving Averages',
                                 font: { size: 16 }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y.toFixed(4);
+                                        }
+                                        return label;
+                                    }
+                                }
                             }
                         },
                         scales: {
@@ -604,15 +474,31 @@
                             },
                             y: {
                                 title: { display: true, text: 'Price' },
-                                ticks: { callback: value => value.toFixed(3) }
+                                ticks: { 
+                                    callback: function(value) {
+                                        return value.toFixed(3);
+                                    }
+                                }
                             }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
                         }
                     }
                 });
+                
+                console.log('Chart created successfully');
+                
+                // Add trading levels
+                if (chartData.close && chartData.close.length > 0) {
+                    addTradingLevels(analysis, chartData.close[chartData.close.length - 1]);
+                }
+            } catch (error) {
+                console.error('Error creating chart:', error);
+                showError('Chart Error: ' + error.message);
             }
-            
-            // Add trading levels to chart
-            addTradingLevels(analysis, chartData.close[chartData.close.length - 1]);
         }
 
         function addTradingLevels(analysis, currentPrice) {
@@ -636,59 +522,27 @@
                     </div>
                     <div class="level-item level-neutral">
                         <div>Current Price</div>
-                        <div>${currentPrice.toFixed(4)}</div>
+                        <div>${typeof currentPrice === 'number' ? currentPrice.toFixed(4) : currentPrice}</div>
                     </div>
                 </div>
             `;
             
             const chartContainer = document.querySelector('.chart-container');
-            const existingLevels = chartContainer.querySelector('.trading-levels');
-            if (existingLevels) {
-                existingLevels.remove();
+            if (chartContainer) {
+                const existingLevels = chartContainer.querySelector('.trading-levels');
+                if (existingLevels) {
+                    existingLevels.remove();
+                }
+                chartContainer.insertAdjacentHTML('beforeend', levelsHtml);
             }
-            chartContainer.insertAdjacentHTML('beforeend', levelsHtml);
         }
 
-        function displayHistoricalStats(stats) {
-            if (!stats) return '';
+        function displayHistoricalStats(data) {
+            if (!data || !data.data_points) return '';
             
             return `
-                <div class="historical-stats">
-                    <h4>📈 Historical Performance</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div>1 Period</div>
-                            <div id="change1Period" class="percentage-change">${stats['1_period_change']?.toFixed(2) || '0.00'}%</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>5 Periods</div>
-                            <div id="change5Periods" class="percentage-change">${stats['5_period_change']?.toFixed(2) || '0.00'}%</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>10 Periods</div>
-                            <div id="change10Periods" class="percentage-change">${stats['10_period_change']?.toFixed(2) || '0.00'}%</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>20 Periods</div>
-                            <div id="change20Periods" class="percentage-change">${stats['20_period_change']?.toFixed(2) || '0.00'}%</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>10P High</div>
-                            <div>${stats['high_10_period']?.toFixed(4) || '0.0000'}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>10P Low</div>
-                            <div>${stats['low_10_period']?.toFixed(4) || '0.0000'}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>Volatility</div>
-                            <div>${stats['volatility']?.toFixed(2) || '0.00'}%</div>
-                        </div>
-                        <div class="stat-item">
-                            <div>Data Points</div>
-                            <div>${stats['total_periods'] || '0'}</div>
-                        </div>
-                    </div>
+                <div class="data-info">
+                    <strong>Data Information:</strong> ${data.data_points} data points | ${data.data_period || 'N/A'}
                 </div>
             `;
         }
@@ -709,6 +563,8 @@
         }
 
         function displayAnalysis(data) {
+            console.log('Displaying analysis:', data);
+            
             const analysis = data.ai_analysis;
             const signalClass = `signal-${analysis.SIGNAL.toLowerCase().split(' ')[0]}`;
             const signalDisplayClass = `signal-${analysis.SIGNAL.toLowerCase().split(' ')[0]}-display`;
@@ -735,7 +591,7 @@
                             🚨 TRADING SIGNAL: ${analysis.SIGNAL} 🚨
                         </div>
                         
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin: 12px 0;">
                             <h4>📈 Trading Levels</h4>
                             <p><strong>Entry Price:</strong> ${analysis.ENTRY_PRICE}</p>
                             <p><strong>Take Profit 1:</strong> ${analysis.TAKE_PROFIT_1}</p>
@@ -757,33 +613,27 @@
                             <div class="tech-item"><strong>ATR:</strong> ${data.technical_indicators.ATR}</div>
                             <div class="tech-item"><strong>Support:</strong> ${data.technical_indicators.Support}</div>
                             <div class="tech-item"><strong>Resistance:</strong> ${data.technical_indicators.Resistance}</div>
-                            <div class="tech-item"><strong>BB Upper:</strong> ${data.technical_indicators.BB_Upper}</div>
-                            <div class="tech-item"><strong>BB Lower:</strong> ${data.technical_indicators.BB_Lower}</div>
                         </div>
-                        
-                        ${displayHistoricalStats(data.historical_stats)}
+                        ${displayHistoricalStats(data)}
                     </div>
 
                     <div class="card">
-                        <h3>📰 Real Market News</h3>
-                        ${data.fundamental_news.map(news => `
+                        <h3>📰 Market News</h3>
+                        ${(data.fundamental_news || []).map(news => `
                             <div class="news-item">
                                 <strong>📻 ${news.source}</strong> 
                                 <span style="float: right; color: #7f8c8d;">${news.timestamp}</span><br>
                                 ${news.headline}
                             </div>
                         `).join('')}
-                        <div style="margin-top: 15px; font-size: 0.9em; color: #7f8c8d; text-align: center;">
-                            <em>Data period: ${data.data_period} (${data.data_points} points)</em>
-                        </div>
                     </div>
 
                     <div class="card">
                         <h3>🤖 AI Analysis Summary</h3>
-                        <p style="line-height: 1.6; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <p style="line-height: 1.6; background: #f8f9fa; padding: 12px; border-radius: 6px;">
                             ${analysis.ANALYSIS_SUMMARY}
                         </p>
-                        <div style="margin-top: 15px; text-align: center; color: #7f8c8d;">
+                        <div style="margin-top: 12px; text-align: center; color: #7f8c8d;">
                             <small>Last updated: ${data.timestamp}</small>
                         </div>
                     </div>
@@ -791,10 +641,8 @@
                     <div class="card" style="grid-column: 1 / -1;">
                         <h3>📈 Real-time Price Chart</h3>
                         <div class="chart-controls">
-                            <button class="chart-btn ${currentChartType === 'candlestick' ? 'active' : ''}" 
-                                    onclick="switchChartType('candlestick')">Candlestick View</button>
                             <button class="chart-btn ${currentChartType === 'line' ? 'active' : ''}" 
-                                    onclick="switchChartType('line')">Line Chart View</button>
+                                    onclick="switchChartType('line')">Line Chart</button>
                         </div>
                         <div class="chart-container">
                             <canvas id="priceChart"></canvas>
@@ -805,13 +653,16 @@
             
             document.getElementById('results').innerHTML = html;
             
-            // Color code percentage changes
-            setTimeout(colorCodePercentageChanges, 100);
-            
             // Create chart after DOM is updated
-            if (data.chart_data && data.chart_data.dates.length > 0) {
-                setTimeout(() => createChart(data.chart_data, data.ai_analysis), 100);
-            }
+            setTimeout(() => {
+                if (data.chart_data && data.chart_data.dates && data.chart_data.dates.length > 0) {
+                    console.log('Creating chart with data length:', data.chart_data.dates.length);
+                    createChart(data.chart_data, data.ai_analysis);
+                } else {
+                    console.warn('No chart data available');
+                    showError('No chart data available for display');
+                }
+            }, 100);
         }
 
         function displayAllAnalysis(data) {
@@ -840,7 +691,7 @@
                             ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)
                         </div>
                         
-                        <div style="margin: 10px 0;">
+                        <div style="margin: 8px 0;">
                             <strong>Entry:</strong> ${ai.ENTRY_PRICE}<br>
                             <strong>TP1:</strong> ${ai.TAKE_PROFIT_1}<br>
                             <strong>TP2:</strong> ${ai.TAKE_PROFIT_2}<br>
@@ -848,7 +699,7 @@
                             <strong>R/R:</strong> ${ai.RISK_REWARD_RATIO}
                         </div>
                         
-                        <div style="font-size: 0.9em; color: #7f8c8d;">
+                        <div style="font-size: 0.8em; color: #7f8c8d;">
                             Updated: ${analysis.timestamp}
                         </div>
                     </div>
@@ -869,16 +720,21 @@
         }
 
         function showError(message) {
-            document.getElementById('error').innerText = message;
-            document.getElementById('error').style.display = 'block';
+            const errorDiv = document.getElementById('error');
+            errorDiv.innerText = message;
+            errorDiv.style.display = 'block';
+            console.error('Error:', message);
         }
 
         function hideError() {
             document.getElementById('error').style.display = 'none';
         }
 
-        // Initial load
-        loadAnalysis();
+        // Initial load when page is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, starting analysis...');
+            loadAnalysis();
+        });
     </script>
 </body>
 </html>
