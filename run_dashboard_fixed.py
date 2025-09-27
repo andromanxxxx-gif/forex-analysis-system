@@ -1,63 +1,67 @@
-# run_dashboard.py - Streamlit-only version
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import numpy as np
-import warnings
-warnings.filterwarnings("ignore")
+#!/usr/bin/env python3
+"""
+AUTO-LAUNCHER untuk Flask Dashboard
+"""
 
-st.set_page_config(page_title="Forex Analysis System", layout="wide")
+import os
+import sys
+import subprocess
+import webbrowser
+import time
+from pathlib import Path
+import threading
 
-# Forex pairs mapping
-pair_mapping = {
-    'GBPJPY': 'GBPJPY=X',
-    'EURUSD': 'EURUSD=X',
-    'USDJPY': 'USDJPY=X',
-    'GBPUSD': 'GBPUSD=X'
-}
+class FlaskDashboardLauncher:
+    def __init__(self):
+        self.root_dir = Path(__file__).parent
+        self.dashboard_dir = self.root_dir / "dashboard"
+        self.app_file = self.dashboard_dir / "app.py"
+        self.url = "http://127.0.0.1:5000"
+
+    def print_banner(self):
+        banner = """
+=====================================================
+        🚀 FOREX ANALYSIS SYSTEM - DASHBOARD
+=====================================================
+"""
+        print(banner)
+
+    def check_app_file(self):
+        """Cek apakah app.py ada"""
+        if not self.app_file.exists():
+            print(f"❌ File tidak ditemukan: {self.app_file}")
+            return False
+        return True
+
+    def open_browser(self):
+        """Tunggu sebentar lalu buka browser"""
+        time.sleep(3)
+        webbrowser.open(self.url)
+
+    def launch(self):
+        """Jalankan Flask dashboard"""
+        if not self.check_app_file():
+            return
+
+        print(f"✅ Menjalankan dashboard Flask dari: {self.app_file}")
+        print(f"🌐 Dashboard akan terbuka otomatis di {self.url}\n")
+
+        # Thread untuk auto-buka browser
+        browser_thread = threading.Thread(target=self.open_browser, daemon=True)
+        browser_thread.start()
+
+        # Jalankan Flask app
+        try:
+            subprocess.run([sys.executable, str(self.app_file)])
+        except KeyboardInterrupt:
+            print("\n🛑 Dashboard dihentikan oleh user.")
+        except Exception as e:
+            print(f"❌ Error: {e}")
 
 def main():
-    st.title("🎯 FOREX ANALYSIS SYSTEM")
-    st.markdown("---")
-    
-    # Currency pair selection
-    pair = st.selectbox("Select Currency Pair:", list(pair_mapping.keys()))
-    
-    if st.button("Analyze"):
-        try:
-            with st.spinner("Fetching data..."):
-                data = yf.download(pair_mapping[pair], period='7d', interval='1h', auto_adjust=True)
-            
-            if data.empty:
-                st.error("No data retrieved")
-                return
-            
-            # Display basic info
-            col1, col2, col3 = st.columns(3)
-            
-            latest_close = data['Close'].iloc[-1]
-            previous_close = data['Close'].iloc[-2]
-            change = ((latest_close - previous_close) / previous_close) * 100
-            
-            with col1:
-                st.metric("Current Price", f"{latest_close:.4f}", f"{change:.2f}%")
-            
-            with col2:
-                st.metric("Signal", "HOLD", "50.0% Confidence")
-            
-            with col3:
-                st.metric("Status", "Active", "Real-time")
-            
-            # Display chart
-            st.subheader(f"{pair} Price Chart (2H)")
-            st.line_chart(data['Close'])
-            
-            # Display raw data
-            with st.expander("View Raw Data"):
-                st.dataframe(data.tail(10))
-                
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
+    launcher = FlaskDashboardLauncher()
+    launcher.print_banner()
+    launcher.launch()
 
 if __name__ == "__main__":
     main()
