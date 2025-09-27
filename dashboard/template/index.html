@@ -2,26 +2,24 @@
 <html>
 <head>
     <title>Forex Analysis Dashboard</title>
-    <style>
-        table.data {border-collapse: collapse; width: 100%;}
-        table.data th, table.data td {border: 1px solid #ddd; padding: 8px;}
-        table.data th {background-color: #f2f2f2;}
-    </style>
 </head>
 <body>
     <h1>Forex Analysis Dashboard</h1>
+
     <form method="post">
         <label for="pair">Select Pair:</label>
-        <select name="pair" id="pair" onchange="this.form.submit()">
+        <select name="pair" onchange="this.form.submit()">
             <option value="EUR/USD" {% if pair=='EUR/USD' %}selected{% endif %}>EUR/USD</option>
             <option value="GBP/USD" {% if pair=='GBP/USD' %}selected{% endif %}>GBP/USD</option>
             <option value="USD/JPY" {% if pair=='USD/JPY' %}selected{% endif %}>USD/JPY</option>
         </select>
     </form>
-    <h2>Selected Pair: {{ pair }}</h2>
-    <h3>Signal Recommendation: {{ signal }}</h3>
+
+    <h2>Technical Signal: {{ signal }}</h2>
+    <h2>AI Recommendation: {{ ai_recommendation }}</h2>
+
     {% for table in tables %}
-        {{ table|safe }}
+        {{ table | safe }}
     {% endfor %}
 </body>
 </html>
