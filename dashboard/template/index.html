@@ -1,270 +1,67 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Analysis System</title>
+    <title>📊 Forex Analysis Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
-            --accent: #e74c3c;
-            --light: #ecf0f1;
-            --dark: #2c3e50;
-            --success: #2ecc71;
-            --warning: #f39c12;
-            --danger: #e74c3c;
-            --hold: #f39c12;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background-color: #f5f7fa;
-            color: #333;
-            line-height: 1.6;
-            padding: 20px;
-        }
-        
-        .dashboard {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        header {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        h1 {
-            font-size: 2.2rem;
-            margin-bottom: 10px;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            background-color: var(--success);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            margin-left: 10px;
-        }
-        
-        .controls {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        
-        select, button {
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-        
-        button {
-            background: var(--secondary);
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        
-        button:hover {
-            background: #2980b9;
-        }
-        
-        .main-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-        }
-        
-        .chart-container, .info-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .chart-wrapper {
-            height: 400px;
-        }
-        
-        .signal-card {
-            background: var(--light);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .signal-type {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--hold);
-        }
-        
-        .confidence-bar {
-            height: 10px;
-            background: #ddd;
-            border-radius: 5px;
-            margin: 10px 0;
-            overflow: hidden;
-        }
-        
-        .confidence-level {
-            height: 100%;
-            background: var(--hold);
-            width: 50%;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-        
-        .error {
-            background: var(--danger);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-        }
-    </style>
 </head>
 <body>
-    <div class="dashboard">
-        <header>
-            <h1>Forex Analysis System <span class="status-badge">Running Successfully</span></h1>
-            <p>Real-time Forex Analysis Dashboard</p>
-        </header>
-        
-        <div class="controls">
-            <select id="pairSelect">
-                <option value="GBPJPY">GBP/JPY</option>
-                <option value="EURUSD">EUR/USD</option>
-                <option value="USDJPY">USD/JPY</option>
-                <option value="GBPUSD">GBP/USD</option>
-            </select>
-            <button onclick="loadData()">Refresh Data</button>
-            <div id="status"></div>
-        </div>
-        
-        <div class="main-content">
-            <div class="chart-container">
-                <h2>Price Chart</h2>
-                <div class="chart-wrapper">
-                    <canvas id="priceChart"></canvas>
-                </div>
-            </div>
-            
-            <div class="info-panel">
-                <h2>Trading Signals</h2>
-                <div id="signalInfo">
-                    <div class="loading">Loading data...</div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <header>
+        <h1>📊 Forex Analysis Dashboard</h1>
+        <p>Monitoring & Analisis Trading Forex 🚀</p>
+    </header>
+
+    <main>
+        <section class="card">
+            <h2>Harga EUR/USD</h2>
+            <canvas id="eurusdChart"></canvas>
+        </section>
+
+        <section class="card">
+            <h2>Sentimen Berita</h2>
+            <p>📈 Positif: <span style="color:green;">65%</span> |
+               📉 Negatif: <span style="color:red;">35%</span></p>
+        </section>
+
+        <section class="card">
+            <h2>Prediksi AI</h2>
+            <p>📌 Model Machine Learning memprediksi tren naik dalam 24 jam ke depan.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>Forex Analysis System © 2025</p>
+    </footer>
 
     <script>
-        let priceChart = null;
-        
-        async function loadData() {
-            const pair = document.getElementById('pairSelect').value;
-            const status = document.getElementById('status');
-            
-            status.innerHTML = '🔄 Loading...';
-            
-            try {
-                const response = await fetch(`/get_data?pair=${pair}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                
-                updateDashboard(data);
-                status.innerHTML = '✅ Data loaded successfully';
-                
-            } catch (error) {
-                document.getElementById('signalInfo').innerHTML = 
-                    `<div class="error">Error: ${error.message}</div>`;
-                status.innerHTML = '❌ Error loading data';
-            }
-        }
-        
-        function updateDashboard(data) {
-            // Update signal info
-            document.getElementById('signalInfo').innerHTML = `
-                <div class="signal-card">
-                    <div class="signal-type">${data.signal}</div>
-                    <div>Confidence: ${data.confidence}%</div>
-                    <div class="confidence-bar">
-                        <div class="confidence-level" style="width: ${data.confidence}%"></div>
-                    </div>
-                    <div>Current Price: ${data.current_price}</div>
-                    ${data.rsi ? `<div>RSI: ${data.rsi}</div>` : ''}
-                </div>
-            `;
-            
-            // Update chart if we have chart data
-            if (data.chart_data && data.chart_data.prices) {
-                updateChart(data.chart_data);
-            }
-        }
-        
-        function updateChart(chartData) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            
-            if (priceChart) {
-                priceChart.destroy();
-            }
-            
-            // Create simple price chart
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.timestamps || Array.from({length: chartData.prices.length}, (_, i) => `Point ${i+1}`),
-                    datasets: [{
-                        label: 'Price',
-                        data: chartData.prices,
-                        borderColor: '#3498db',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        borderWidth: 2,
-                        fill: true
-                    }]
+        // Dummy data untuk chart EUR/USD
+        const ctx = document.getElementById('eurusdChart').getContext('2d');
+        const eurusdChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ["09:00", "10:00", "11:00", "12:00", "13:00"],
+                datasets: [{
+                    label: 'EUR/USD',
+                    data: [1.073, 1.075, 1.074, 1.078, 1.080],
+                    borderColor: 'blue',
+                    backgroundColor: 'rgba(0,0,255,0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: true },
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: false
-                        }
-                    }
+                scales: {
+                    x: { title: { display: true, text: 'Waktu (Jam)' } },
+                    y: { title: { display: true, text: 'Harga' } }
                 }
-            });
-        }
-        
-        // Load data when page loads
-        document.addEventListener('DOMContentLoaded', loadData);
+            }
+        });
     </script>
 </body>
 </html>
