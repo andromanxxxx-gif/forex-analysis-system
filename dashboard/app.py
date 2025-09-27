@@ -1,64 +1,41 @@
-# dashboard/app.py
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import pandas as pd
-import yfinance as yf
-import plotly.graph_objs as go
 from src.trading_signals import calculate_indicators, generate_signal
-from src.news_analyzer import NewsAnalyzer
-from config.settings import DEEPSEEK_API_KEY
+from src.news_analyzer import analyze_news
+from src.ai_analysis import get_ai_recommendation
 
 app = Flask(__name__)
 
-# Inisialisasi analisis berita AI
-news_ai = NewsAnalyzer(api_key=DEEPSEEK_API_KEY)
-
-# Default pairs
-PAIRS = {
-    "EUR/USD": "EURUSD=X",
-    "GBP/USD": "GBPUSD=X",
-    "USD/JPY": "JPY=X"
+# Dummy data
+PAIRS = ["EUR/USD", "GBP/USD", "USD/JPY"]
+DATA = {
+    pair: pd.DataFrame({
+        "Open": [1.1,1.2,1.15,1.18,1.17],
+        "High": [1.2,1.25,1.2,1.22,1.19],
+        "Low":  [1.05,1.18,1.1,1.15,1.14],
+        "Close":[1.18,1.2,1.15,1.16,1.18],
+        "Volume":[1000,1500,1200,1300,1100]
+    }) for pair in PAIRS
 }
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return render_template("index.html", pairs=list(PAIRS.keys()))
-
-@app.route("/get_data", methods=["POST"])
-def get_data():
-    pair_name = request.json.get("pair")
-    ticker = PAIRS.get(pair_name, "EURUSD=X")
-    
-    # Ambil data historis 1 bulan
-    df = yf.download(ticker, period="1mo", interval="1h")
-    if df.empty:
-        return jsonify({"error": "Data not found"}), 404
-    
-    df.reset_index(inplace=True)
+    pair = request.form.get("pair", "EUR/USD")
+    df = DATA[pair].copy()
     df = calculate_indicators(df)
-
-    # Generate signals
-    signals = generate_signal(df)
-
-    # AI News Analysis
-    news_summary = news_ai.analyze(pair_name)
-
-    # Buat chart
-    fig = go.Figure()
-    fig.add_trace(go.Candlestick(
-        x=df['Datetime'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
-        name='Candlestick'
-    ))
-    fig.add_trace(go.Scatter(x=df['Datetime'], y=df['EMA200'], mode='lines', name='EMA200'))
+    signal_info = generate_signal(df)
+    news_summary = analyze_news()
+    ai_reco = get_ai_recommendation(news_summary)
     
-    fig.update_layout(title=f"{pair_name} Chart", xaxis_title="Datetime", yaxis_title="Price")
-    
-    chart_html = fig.to_html(full_html=False)
-    
-    return jsonify({
-        "chart": chart_html,
-        "signals": signals,
-        "news_summary": news_summary
-    })
+    return render_template(
+        "index.html",
+        pairs=PAIRS,
+        selected_pair=pair,
+        df=df.to_dict(orient="records"),
+        signal=signal_info,
+        news=news_summary,
+        ai_reco=ai_reco
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
