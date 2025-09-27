@@ -1,38 +1,32 @@
-import sys
-from pathlib import Path
-
-# Tambahkan root project ke sys.path agar Python bisa menemukan modul src
-root_path = Path(__file__).parent.parent.resolve()
-if str(root_path) not in sys.path:
-    sys.path.append(str(root_path))
-
 from flask import Flask, render_template, request
 import pandas as pd
-import numpy as np
 from src.trading_signals import calculate_indicators, generate_signal
+from src.ai_analysis import analyze_news
 
 app = Flask(__name__)
 
-# Dummy data generator
+# Dummy historical data
 def get_dummy_data(pair):
-    dates = pd.date_range(end=pd.Timestamp.today(), periods=100)
     data = pd.DataFrame({
-        'Date': dates,
-        'Open': np.random.rand(100) * 100,
-        'Close': np.random.rand(100) * 100,
-        'High': np.random.rand(100) * 100,
-        'Low': np.random.rand(100) * 100,
-        'Volume': np.random.randint(100, 1000, size=100)
+        "Open": [1.0, 1.01, 1.02, 1.03, 1.04],
+        "Close": [1.01, 1.02, 1.03, 1.02, 1.05],
+        "Volume": [1000, 1200, 1100, 1050, 1300]
     })
-    data = calculate_indicators(data)
     return data
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     pair = request.form.get("pair", "EUR/USD")
     data = get_dummy_data(pair)
+    data = calculate_indicators(data)
     signal = generate_signal(data)
-    return render_template("index.html", pair=pair, signal=signal, tables=[data.to_html(classes='data')], titles=data.columns.values)
+    
+    # Contoh analisis berita AI
+    news_text = f"Latest news for {pair}"
+    ai_recommendation = analyze_news(news_text)
+
+    tables = [data.to_html(classes='data')]
+    return render_template("index.html", pair=pair, signal=signal, ai_recommendation=ai_recommendation, tables=tables)
 
 if __name__ == "__main__":
     app.run(debug=True)
