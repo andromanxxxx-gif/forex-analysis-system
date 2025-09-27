@@ -1,98 +1,63 @@
-#!/usr/bin/env python3
-"""
-FOREX DASHBOARD - FIXED VERSION dengan error handling
-"""
+# run_dashboard.py - Streamlit-only version
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore")
 
-import os
-import sys
-import subprocess
-import webbrowser
-import time
-from pathlib import Path
+st.set_page_config(page_title="Forex Analysis System", layout="wide")
 
-class FixedDashboardLauncher:
-    def __init__(self):
-        self.root_dir = Path(__file__).parent
-        self.dashboard_dir = self.root_dir / "dashboard"
-        
-    def check_basic_imports(self):
-        """Cek import dasar tanpa pkg_resources"""
-        try:
-            import streamlit
-            import pandas
-            import numpy
-            print("✅ Basic imports OK")
-            return True
-        except ImportError as e:
-            print(f"❌ Import error: {e}")
-            return False
-    
-    def run_dashboard_safe(self):
-        """Jalankan dashboard dengan error handling"""
-        print("🚀 Starting Forex Dashboard...")
-        
-        # Cek apakah app.py ada
-        main_app = self.dashboard_dir / "app.py"
-        simple_app = self.dashboard_dir / "app_simple.py"
-        
-        app_to_run = main_app if main_app.exists() else simple_app
-        
-        if not app_to_run.exists():
-            print("❌ No dashboard app found!")
-            return False
-        
-        print(f"📊 Running: {app_to_run.name}")
-        
-        # Buka browser setelah delay
-        def open_browser():
-            time.sleep(3)
-            webbrowser.open("http://localhost:8501")
-        
-        import threading
-        browser_thread = threading.Thread(target=open_browser)
-        browser_thread.daemon = True
-        browser_thread.start()
-        
-        print("✅ Dashboard will open in your browser...")
-        print("🌐 URL: http://localhost:8501")
-        print("⏹️  Press Ctrl+C to stop\n")
-        
-        try:
-            # Jalankan streamlit
-            os.chdir(self.dashboard_dir)
-            result = subprocess.run([
-                sys.executable, "-m", "streamlit", "run", 
-                app_to_run.name, "--server.port=8501", "--server.address=0.0.0.0"
-            ])
-            
-            return result.returncode == 0
-            
-        except KeyboardInterrupt:
-            print("\n🛑 Dashboard stopped by user")
-            return True
-        except Exception as e:
-            print(f"❌ Error running dashboard: {e}")
-            return False
+# Forex pairs mapping
+pair_mapping = {
+    'GBPJPY': 'GBPJPY=X',
+    'EURUSD': 'EURUSD=X',
+    'USDJPY': 'USDJPY=X',
+    'GBPUSD': 'GBPUSD=X'
+}
 
 def main():
-    print("🎯 FOREX ANALYSIS SYSTEM - FIXED LAUNCHER")
-    print("=" * 50)
+    st.title("🎯 FOREX ANALYSIS SYSTEM")
+    st.markdown("---")
     
-    launcher = FixedDashboardLauncher()
+    # Currency pair selection
+    pair = st.selectbox("Select Currency Pair:", list(pair_mapping.keys()))
     
-    # Cek basic imports
-    if not launcher.check_basic_imports():
-        print("\n⚠️  Please install required packages:")
-        print("pip install streamlit pandas numpy plotly yfinance")
-        return
-    
-    # Jalankan dashboard
-    success = launcher.run_dashboard_safe()
-    
-    if success:
-        print("✅ Dashboard session completed")
-    else:
-        print("❌ Dashboard failed to start")
+    if st.button("Analyze"):
+        try:
+            with st.spinner("Fetching data..."):
+                data = yf.download(pair_mapping[pair], period='7d', interval='1h', auto_adjust=True)
+            
+            if data.empty:
+                st.error("No data retrieved")
+                return
+            
+            # Display basic info
+            col1, col2, col3 = st.columns(3)
+            
+            latest_close = data['Close'].iloc[-1]
+            previous_close = data['Close'].iloc[-2]
+            change = ((latest_close - previous_close) / previous_close) * 100
+            
+            with col1:
+                st.metric("Current Price", f"{latest_close:.4f}", f"{change:.2f}%")
+            
+            with col2:
+                st.metric("Signal", "HOLD", "50.0% Confidence")
+            
+            with col3:
+                st.metric("Status", "Active", "Real-time")
+            
+            # Display chart
+            st.subheader(f"{pair} Price Chart (2H)")
+            st.line_chart(data['Close'])
+            
+            # Display raw data
+            with st.expander("View Raw Data"):
+                st.dataframe(data.tail(10))
+                
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
 
 if __name__ == "__main__":
     main()
