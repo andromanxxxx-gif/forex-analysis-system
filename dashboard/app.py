@@ -1,56 +1,64 @@
 # dashboard/app.py
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
+import pandas as pd
 import yfinance as yf
+import plotly.graph_objs as go
 from src.trading_signals import calculate_indicators, generate_signal
-from src.deepseek_client import analyze_market
+from src.news_analyzer import NewsAnalyzer
+from config.settings import DEEPSEEK_API_KEY
 
 app = Flask(__name__)
-PAIRS = ["EURUSD=X", "GBPUSD=X", "USDJPY=X"]
 
-def summarize_technical(df):
-    last = df.iloc[-1]
-    summary = f"""
-Pair: {last.name}
-Close: {last['Close']:.5f}
-EMA200: {last['EMA200']:.5f}
-MACD: {last['MACD']:.5f}, Signal: {last['MACD_signal']:.5f}
-OBV: {last['OBV']:.2f}
-"""
-    return summary
+# Inisialisasi analisis berita AI
+news_ai = NewsAnalyzer(api_key=DEEPSEEK_API_KEY)
 
-@app.route("/", methods=["GET", "POST"])
+# Default pairs
+PAIRS = {
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/JPY": "JPY=X"
+}
+
+@app.route("/")
 def index():
-    pair = request.form.get("pair", PAIRS[0])
-    news_text = request.form.get("news_text", "")
+    return render_template("index.html", pairs=list(PAIRS.keys()))
+
+@app.route("/get_data", methods=["POST"])
+def get_data():
+    pair_name = request.json.get("pair")
+    ticker = PAIRS.get(pair_name, "EURUSD=X")
     
-    df = yf.download(pair, period="7d", interval="1h")
-    df = df.reset_index()
+    # Ambil data historis 1 bulan
+    df = yf.download(ticker, period="1mo", interval="1h")
+    if df.empty:
+        return jsonify({"error": "Data not found"}), 404
+    
+    df.reset_index(inplace=True)
     df = calculate_indicators(df)
-    signal = generate_signal(df)
+
+    # Generate signals
+    signals = generate_signal(df)
+
+    # AI News Analysis
+    news_summary = news_ai.analyze(pair_name)
+
+    # Buat chart
+    fig = go.Figure()
+    fig.add_trace(go.Candlestick(
+        x=df['Datetime'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+        name='Candlestick'
+    ))
+    fig.add_trace(go.Scatter(x=df['Datetime'], y=df['EMA200'], mode='lines', name='EMA200'))
     
-    tech_summary = summarize_technical(df)
-    ai_recommendation = analyze_market(tech_summary, news_text) if news_text else analyze_market(tech_summary)
+    fig.update_layout(title=f"{pair_name} Chart", xaxis_title="Datetime", yaxis_title="Price")
     
-    chart_data = df.to_dict(orient="records")
+    chart_html = fig.to_html(full_html=False)
     
-    return render_template(
-        "index.html",
-        pairs=PAIRS,
-        selected_pair=pair,
-        chart_data=chart_data,
-        signal=signal,
-        ai_recommendation=ai_recommendation
-    )
+    return jsonify({
+        "chart": chart_html,
+        "signals": signals,
+        "news_summary": news_summary
+    })
 
 if __name__ == "__main__":
-   import webbrowser
-import threading
-import time
-
-def open_browser():
-    time.sleep(2)  # tunggu server siap
-    webbrowser.open("http://127.0.0.1:5000")
-
-threading.Thread(target=open_browser).start()
-
     app.run(debug=True)
