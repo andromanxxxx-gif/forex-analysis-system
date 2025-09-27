@@ -44,37 +44,39 @@ def safe_float(value, default=0.0):
         return default
 
 def get_technical_indicators(data):
-    """Menghitung indikator teknikal dengan penanganan error yang lebih baik"""
+    """Menghitung indikator teknikal dengan EMA 200"""
     indicators = {}
     
     try:
         # Pastikan data tidak empty
         if data.empty or len(data) < 20:
-            return create_default_indicators(150.0)  # Default value
+            return create_default_indicators(150.0)
         
-        # Price data - convert to float explicitly
+        # Price data
         high = data['High']
         low = data['Low']
         close = data['Close']
+        open_price = data['Open']
         
         current_price = safe_float(close)
         
-        # Trend Indicators dengan safe conversion
+        # Trend Indicators
         indicators['sma_20'] = safe_float(close.rolling(window=20).mean())
         indicators['sma_50'] = safe_float(close.rolling(window=50).mean())
         indicators['ema_12'] = safe_float(close.ewm(span=12).mean())
         indicators['ema_26'] = safe_float(close.ewm(span=26).mean())
+        indicators['ema_200'] = safe_float(close.ewm(span=200).mean())  # EMA 200
         
-        # RSI Calculation dengan error handling
+        # RSI Calculation
         try:
             delta = close.diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / loss
             rsi_value = 100 - (100 / (1 + safe_float(rs)))
-            indicators['rsi'] = max(0, min(100, rsi_value))  # Clamp between 0-100
+            indicators['rsi'] = max(0, min(100, rsi_value))
         except:
-            indicators['rsi'] = 50.0  # Default RSI
+            indicators['rsi'] = 50.0
         
         # MACD Calculation
         try:
@@ -117,6 +119,18 @@ def get_technical_indicators(data):
         
         indicators['current_price'] = current_price
         
+        # Chart data - last 50 periods for the chart
+        indicators['chart_data'] = {
+            'dates': data.index[-50:].strftime('%Y-%m-%d %H:%M').tolist(),
+            'open': data['Open'][-50:].astype(float).round(4).tolist(),
+            'high': data['High'][-50:].astype(float).round(4).tolist(),
+            'low': data['Low'][-50:].astype(float).round(4).tolist(),
+            'close': data['Close'][-50:].astype(float).round(4).tolist(),
+            'ema_20': data['Close'].ewm(span=20).mean()[-50:].astype(float).round(4).tolist(),
+            'ema_50': data['Close'].ewm(span=50).mean()[-50:].astype(float).round(4).tolist(),
+            'ema_200': data['Close'].ewm(span=200).mean()[-50:].astype(float).round(4).tolist()
+        }
+        
     except Exception as e:
         print(f"Error in technical indicators: {e}")
         indicators = create_default_indicators(150.0)
@@ -126,11 +140,16 @@ def get_technical_indicators(data):
 def create_default_indicators(price):
     """Create default indicators when data is not available"""
     return {
-        'sma_20': price, 'sma_50': price, 'ema_12': price, 'ema_26': price,
+        'sma_20': price, 'sma_50': price, 'ema_12': price, 'ema_26': price, 'ema_200': price,
         'rsi': 50.0, 'macd': 0.0, 'macd_signal': 0.0, 'macd_hist': 0.0,
         'bb_upper': price, 'bb_middle': price, 'bb_lower': price,
         'atr': 0.01, 'pivot': price, 'resistance1': price, 'support1': price,
-        'current_price': price
+        'current_price': price,
+        'chart_data': {
+            'dates': [],
+            'open': [], 'high': [], 'low': [], 'close': [],
+            'ema_20': [], 'ema_50': [], 'ema_200': []
+        }
     }
 
 def get_fundamental_news():
@@ -162,6 +181,7 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
     macd = float(technical_data.get('macd', 0))
     sma_20 = float(technical_data.get('sma_20', current_price))
     sma_50 = float(technical_data.get('sma_50', current_price))
+    ema_200 = float(technical_data.get('ema_200', current_price))
     atr = float(technical_data.get('atr', 0.01))
     
     prompt = f"""
@@ -173,6 +193,7 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
     - MACD: {macd:.4f}
     - SMA 20: {sma_20:.4f}
     - SMA 50: {sma_50:.4f}
+    - EMA 200: {ema_200:.4f}
     - ATR: {atr:.4f}
 
     BERITA TERKINI:
@@ -242,13 +263,20 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
     """Generate analisis fallback"""
     current_price = float(technical_data.get('current_price', 150.0))
     rsi = float(technical_data.get('rsi', 50))
+    ema_200 = float(technical_data.get('ema_200', current_price))
     
-    # Simple logic based on RSI
-    if rsi < 30:
+    # Enhanced logic based on RSI and EMA 200
+    if rsi < 30 and current_price > ema_200:
+        signal = "STRONG BUY"
+        confidence = 80
+    elif rsi > 70 and current_price < ema_200:
+        signal = "STRONG SELL"
+        confidence = 80
+    elif rsi < 30:
         signal = "BUY"
         confidence = 70
     elif rsi > 70:
-        signal = "SELL" 
+        signal = "SELL"
         confidence = 70
     else:
         signal = "HOLD"
@@ -256,11 +284,11 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
     
     atr = float(technical_data.get('atr', 0.5))
     
-    if signal == "BUY":
+    if signal in ["STRONG BUY", "BUY"]:
         tp1 = current_price + (atr * 1.5)
         tp2 = current_price + (atr * 2.5)
         sl = current_price - (atr * 1.0)
-    elif signal == "SELL":
+    elif signal in ["STRONG SELL", "SELL"]:
         tp1 = current_price - (atr * 1.5)
         tp2 = current_price - (atr * 2.5) 
         sl = current_price + (atr * 1.0)
@@ -276,7 +304,7 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
         'STOP_LOSS': round(sl, 4),
         'RISK_REWARD_RATIO': '1:1.5',
         'TIME_HORIZON': '4-8 hours',
-        'ANALYSIS_SUMMARY': f'Fallback analysis: RSI {rsi:.1f}, Price {current_price:.4f}'
+        'ANALYSIS_SUMMARY': f'Fallback analysis: RSI {rsi:.1f}, EMA200 {ema_200:.4f}, Price {current_price:.4f}'
     }
 
 @app.route('/')
@@ -305,7 +333,7 @@ def get_analysis():
         if data.empty or len(data) < 20:
             return jsonify({'error': 'Insufficient data available'})
         
-        # Current price data - ensure float conversion
+        # Current price data
         current_price = float(data['Close'].iloc[-1])
         price_change_pct = 0.0
         
@@ -324,7 +352,6 @@ def get_analysis():
         # AI Analysis
         ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
         
-        # Ensure all values are proper floats
         response = {
             'pair': pair,
             'timeframe': timeframe,
@@ -336,12 +363,14 @@ def get_analysis():
                 'MACD': round(float(indicators.get('macd', 0)), 4),
                 'SMA_20': round(float(indicators.get('sma_20', current_price)), 4),
                 'SMA_50': round(float(indicators.get('sma_50', current_price)), 4),
+                'EMA_200': round(float(indicators.get('ema_200', current_price)), 4),
                 'ATR': round(float(indicators.get('atr', 0.01)), 4),
                 'Support': round(float(indicators.get('support1', current_price)), 4),
                 'Resistance': round(float(indicators.get('resistance1', current_price)), 4)
             },
             'ai_analysis': ai_analysis,
-            'fundamental_news': news
+            'fundamental_news': news,
+            'chart_data': indicators.get('chart_data', {})
         }
         
         return jsonify(response)
@@ -358,9 +387,8 @@ def get_multiple_analysis():
         
         for pair in pair_mapping.keys():
             try:
-                time.sleep(1)  # Delay to avoid rate limiting
+                time.sleep(1)
                 
-                # Direct analysis for each pair
                 yf_symbol = pair_mapping[pair]
                 yf_timeframe = timeframe_mapping[timeframe]
                 period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
