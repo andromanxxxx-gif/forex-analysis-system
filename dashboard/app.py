@@ -34,118 +34,146 @@ timeframe_mapping = {
     '1D': '1d'
 }
 
+def safe_float(value, default=0.0):
+    """Safe conversion to float"""
+    try:
+        if hasattr(value, 'iloc'):
+            value = value.iloc[-1] if len(value) > 0 else default
+        return float(value)
+    except (ValueError, TypeError, IndexError):
+        return default
+
 def get_technical_indicators(data):
-    """Menghitung indikator teknikal"""
+    """Menghitung indikator teknikal dengan penanganan error yang lebih baik"""
     indicators = {}
     
     try:
-        # Price data
+        # Pastikan data tidak empty
+        if data.empty or len(data) < 20:
+            return create_default_indicators(150.0)  # Default value
+        
+        # Price data - convert to float explicitly
         high = data['High']
         low = data['Low']
         close = data['Close']
         
-        # Trend Indicators
-        indicators['sma_20'] = close.rolling(window=20).mean().iloc[-1]
-        indicators['sma_50'] = close.rolling(window=50).mean().iloc[-1]
-        indicators['ema_12'] = close.ewm(span=12).mean().iloc[-1]
-        indicators['ema_26'] = close.ewm(span=26).mean().iloc[-1]
+        current_price = safe_float(close)
         
-        # Momentum Indicators - RSI
-        delta = close.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        indicators['rsi'] = 100 - (100 / (1 + rs.iloc[-1]))
+        # Trend Indicators dengan safe conversion
+        indicators['sma_20'] = safe_float(close.rolling(window=20).mean())
+        indicators['sma_50'] = safe_float(close.rolling(window=50).mean())
+        indicators['ema_12'] = safe_float(close.ewm(span=12).mean())
+        indicators['ema_26'] = safe_float(close.ewm(span=26).mean())
         
-        # MACD
-        ema_12 = close.ewm(span=12).mean()
-        ema_26 = close.ewm(span=26).mean()
-        indicators['macd'] = (ema_12 - ema_26).iloc[-1]
-        indicators['macd_signal'] = (ema_12 - ema_26).ewm(span=9).mean().iloc[-1]
-        indicators['macd_hist'] = indicators['macd'] - indicators['macd_signal']
+        # RSI Calculation dengan error handling
+        try:
+            delta = close.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi_value = 100 - (100 / (1 + safe_float(rs)))
+            indicators['rsi'] = max(0, min(100, rsi_value))  # Clamp between 0-100
+        except:
+            indicators['rsi'] = 50.0  # Default RSI
         
-        # Volatility Indicators - Bollinger Bands
-        sma_20 = close.rolling(window=20).mean()
-        std_20 = close.rolling(window=20).std()
-        indicators['bb_upper'] = (sma_20 + (std_20 * 2)).iloc[-1]
-        indicators['bb_middle'] = sma_20.iloc[-1]
-        indicators['bb_lower'] = (sma_20 - (std_20 * 2)).iloc[-1]
+        # MACD Calculation
+        try:
+            ema_12 = close.ewm(span=12).mean()
+            ema_26 = close.ewm(span=26).mean()
+            macd_line = ema_12 - ema_26
+            indicators['macd'] = safe_float(macd_line)
+            indicators['macd_signal'] = safe_float(macd_line.ewm(span=9).mean())
+            indicators['macd_hist'] = indicators['macd'] - indicators['macd_signal']
+        except:
+            indicators['macd'] = indicators['macd_signal'] = indicators['macd_hist'] = 0.0
         
-        # ATR (Average True Range)
-        tr1 = high - low
-        tr2 = (high - close.shift()).abs()
-        tr3 = (low - close.shift()).abs()
-        true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        indicators['atr'] = true_range.rolling(window=14).mean().iloc[-1]
+        # Bollinger Bands
+        try:
+            sma_20 = close.rolling(window=20).mean()
+            std_20 = close.rolling(window=20).std()
+            indicators['bb_upper'] = safe_float(sma_20 + (std_20 * 2))
+            indicators['bb_middle'] = safe_float(sma_20)
+            indicators['bb_lower'] = safe_float(sma_20 - (std_20 * 2))
+        except:
+            indicators['bb_upper'] = indicators['bb_middle'] = indicators['bb_lower'] = current_price
+        
+        # ATR Calculation
+        try:
+            tr1 = high - low
+            tr2 = abs(high - close.shift())
+            tr3 = abs(low - close.shift())
+            true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            indicators['atr'] = safe_float(true_range.rolling(window=14).mean())
+        except:
+            indicators['atr'] = 0.01
         
         # Support Resistance
-        indicators['pivot'] = (high.iloc[-1] + low.iloc[-1] + close.iloc[-1]) / 3
-        indicators['resistance1'] = 2 * indicators['pivot'] - low.iloc[-1]
-        indicators['support1'] = 2 * indicators['pivot'] - high.iloc[-1]
+        try:
+            indicators['pivot'] = (safe_float(high) + safe_float(low) + current_price) / 3
+            indicators['resistance1'] = 2 * indicators['pivot'] - safe_float(low)
+            indicators['support1'] = 2 * indicators['pivot'] - safe_float(high)
+        except:
+            indicators['pivot'] = indicators['resistance1'] = indicators['support1'] = current_price
+        
+        indicators['current_price'] = current_price
         
     except Exception as e:
         print(f"Error in technical indicators: {e}")
-        # Set default values
-        current_price = close.iloc[-1] if 'close' in locals() else 0
-        indicators = {
-            'sma_20': current_price, 'sma_50': current_price,
-            'ema_12': current_price, 'ema_26': current_price,
-            'rsi': 50, 'macd': 0, 'macd_signal': 0, 'macd_hist': 0,
-            'bb_upper': current_price, 'bb_middle': current_price, 'bb_lower': current_price,
-            'atr': 0.01, 'pivot': current_price, 'resistance1': current_price, 'support1': current_price
-        }
+        indicators = create_default_indicators(150.0)
     
     return indicators
 
+def create_default_indicators(price):
+    """Create default indicators when data is not available"""
+    return {
+        'sma_20': price, 'sma_50': price, 'ema_12': price, 'ema_26': price,
+        'rsi': 50.0, 'macd': 0.0, 'macd_signal': 0.0, 'macd_hist': 0.0,
+        'bb_upper': price, 'bb_middle': price, 'bb_lower': price,
+        'atr': 0.01, 'pivot': price, 'resistance1': price, 'support1': price,
+        'current_price': price
+    }
+
 def get_fundamental_news():
     """Web scraping untuk berita fundamental forex"""
-    news_items = []
-    
-    try:
-        # Contoh berita statis (bisa diganti dengan web scraping real)
-        news_items = [
-            {
-                'source': 'Market Watch',
-                'headline': 'Bank of Japan maintains ultra-loose monetary policy',
-                'timestamp': datetime.now().strftime('%H:%M')
-            },
-            {
-                'source': 'Reuters', 
-                'headline': 'Yen volatility expected amid economic data releases',
-                'timestamp': datetime.now().strftime('%H:%M')
-            },
-            {
-                'source': 'Bloomberg',
-                'headline': 'JPY pairs show strong technical momentum',
-                'timestamp': datetime.now().strftime('%H:%M')
-            }
-        ]
-                
-    except Exception as e:
-        print(f"Error fetching news: {e}")
-        news_items = [
-            {'source': 'System', 'headline': 'Market Analysis in Progress', 'timestamp': 'Now'},
-            {'source': 'System', 'headline': 'Technical Analysis Completed', 'timestamp': 'Now'}
-        ]
-    
-    return news_items[:3]
+    return [
+        {
+            'source': 'Market Watch',
+            'headline': 'Bank of Japan maintains ultra-loose monetary policy',
+            'timestamp': datetime.now().strftime('%H:%M')
+        },
+        {
+            'source': 'Reuters', 
+            'headline': 'Yen volatility expected amid economic data releases',
+            'timestamp': datetime.now().strftime('%H:%M')
+        },
+        {
+            'source': 'Bloomberg',
+            'headline': 'JPY pairs show strong technical momentum',
+            'timestamp': datetime.now().strftime('%H:%M')
+        }
+    ]
 
 def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
     """Analisis dengan AI DeepSeek"""
+    
+    # Extract float values from technical data
+    current_price = float(technical_data.get('current_price', 0))
+    rsi = float(technical_data.get('rsi', 50))
+    macd = float(technical_data.get('macd', 0))
+    sma_20 = float(technical_data.get('sma_20', current_price))
+    sma_50 = float(technical_data.get('sma_50', current_price))
+    atr = float(technical_data.get('atr', 0.01))
     
     prompt = f"""
     ANALISIS FOREX PROFESIONAL - {pair} TIMEFRAME {timeframe}
 
     DATA TEKNIKAL:
-    - Current Price: {technical_data.get('current_price', 0)}
-    - RSI: {technical_data.get('rsi', 0):.2f}
-    - MACD: {technical_data.get('macd', 0):.4f}
-    - Signal: {technical_data.get('macd_signal', 0):.4f}
-    - SMA 20: {technical_data.get('sma_20', 0):.4f}
-    - SMA 50: {technical_data.get('sma_50', 0):.4f}
-    - Support: {technical_data.get('support1', 0):.4f}
-    - Resistance: {technical_data.get('resistance1', 0):.4f}
-    - ATR: {technical_data.get('atr', 0):.4f}
+    - Current Price: {current_price:.4f}
+    - RSI: {rsi:.2f}
+    - MACD: {macd:.4f}
+    - SMA 20: {sma_20:.4f}
+    - SMA 50: {sma_50:.4f}
+    - ATR: {atr:.4f}
 
     BERITA TERKINI:
     {[news['headline'] for news in fundamental_news]}
@@ -212,8 +240,8 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
 
 def generate_fallback_analysis(technical_data, pair, timeframe):
     """Generate analisis fallback"""
-    current_price = technical_data.get('current_price', 0)
-    rsi = technical_data.get('rsi', 50)
+    current_price = float(technical_data.get('current_price', 150.0))
+    rsi = float(technical_data.get('rsi', 50))
     
     # Simple logic based on RSI
     if rsi < 30:
@@ -226,7 +254,7 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
         signal = "HOLD"
         confidence = 50
     
-    atr = technical_data.get('atr', 0.01)
+    atr = float(technical_data.get('atr', 0.5))
     
     if signal == "BUY":
         tp1 = current_price + (atr * 1.5)
@@ -277,9 +305,13 @@ def get_analysis():
         if data.empty or len(data) < 20:
             return jsonify({'error': 'Insufficient data available'})
         
-        # Current price data
-        current_price = data['Close'].iloc[-1]
-        price_change_pct = ((current_price - data['Close'].iloc[-2]) / data['Close'].iloc[-2] * 100) if len(data) > 1 else 0
+        # Current price data - ensure float conversion
+        current_price = float(data['Close'].iloc[-1])
+        price_change_pct = 0.0
+        
+        if len(data) > 1:
+            prev_price = float(data['Close'].iloc[-2])
+            price_change_pct = ((current_price - prev_price) / prev_price) * 100
         
         # Technical indicators
         indicators = get_technical_indicators(data)
@@ -292,20 +324,21 @@ def get_analysis():
         # AI Analysis
         ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
         
+        # Ensure all values are proper floats
         response = {
             'pair': pair,
             'timeframe': timeframe,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'current_price': round(current_price, 4),
-            'price_change': round(price_change_pct, 2),
+            'current_price': round(float(current_price), 4),
+            'price_change': round(float(price_change_pct), 2),
             'technical_indicators': {
-                'RSI': round(indicators['rsi'], 2),
-                'MACD': round(indicators['macd'], 4),
-                'SMA_20': round(indicators['sma_20'], 4),
-                'SMA_50': round(indicators['sma_50'], 4),
-                'ATR': round(indicators['atr'], 4),
-                'Support': round(indicators['support1'], 4),
-                'Resistance': round(indicators['resistance1'], 4)
+                'RSI': round(float(indicators.get('rsi', 50)), 2),
+                'MACD': round(float(indicators.get('macd', 0)), 4),
+                'SMA_20': round(float(indicators.get('sma_20', current_price)), 4),
+                'SMA_50': round(float(indicators.get('sma_50', current_price)), 4),
+                'ATR': round(float(indicators.get('atr', 0.01)), 4),
+                'Support': round(float(indicators.get('support1', current_price)), 4),
+                'Resistance': round(float(indicators.get('resistance1', current_price)), 4)
             },
             'ai_analysis': ai_analysis,
             'fundamental_news': news
@@ -314,7 +347,7 @@ def get_analysis():
         return jsonify(response)
         
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({'error': f'Analysis error: {str(e)}'})
 
 @app.route('/get_multiple_analysis')
 def get_multiple_analysis():
@@ -325,16 +358,16 @@ def get_multiple_analysis():
         
         for pair in pair_mapping.keys():
             try:
-                time.sleep(0.5)  # Small delay to avoid rate limiting
+                time.sleep(1)  # Delay to avoid rate limiting
                 
-                # Simulate API call for each pair
+                # Direct analysis for each pair
                 yf_symbol = pair_mapping[pair]
                 yf_timeframe = timeframe_mapping[timeframe]
                 period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
                 data = yf.download(yf_symbol, period=period, interval=yf_timeframe)
                 
                 if not data.empty and len(data) > 20:
-                    current_price = data['Close'].iloc[-1]
+                    current_price = float(data['Close'].iloc[-1])
                     indicators = get_technical_indicators(data)
                     news = get_fundamental_news()
                     ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
@@ -358,7 +391,6 @@ def get_multiple_analysis():
         return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    # Check if templates folder exists
     if not os.path.exists('templates'):
         print("ERROR: 'templates' folder not found!")
         print("Please create a 'templates' folder with 'index.html' inside")
