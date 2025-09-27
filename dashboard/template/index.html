@@ -1,107 +1,179 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Dashboard</title>
+    <title>AI Forex Trading System</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; }
         .header { background: #2c3e50; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
         .controls { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .signal { font-size: 24px; font-weight: bold; margin: 10px 0; }
-        .buy { color: green; }
-        .sell { color: red; }
-        .hold { color: orange; }
+        .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .signal-buy { border-left: 5px solid #27ae60; }
+        .signal-sell { border-left: 5px solid #e74c3c; }
+        .signal-hold { border-left: 5px solid #f39c12; }
+        .news-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .confidence-bar { background: #ecf0f1; height: 20px; border-radius: 10px; margin: 10px 0; }
+        .confidence-fill { height: 100%; border-radius: 10px; transition: width 0.3s; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Forex Analysis Dashboard</h1>
-            <p>Simple and Clean Forex Analysis</p>
+            <h1>🤖 AI Forex Trading System</h1>
+            <p>Analisis Real-time GBPJPY, USDJPY, EURJPY, CHFJPY</p>
         </div>
-        
+
         <div class="controls">
-            <select id="pairSelect" onchange="loadData()">
-                <option value="EURUSD">EUR/USD</option>
-                <option value="GBPJPY">GBP/JPY</option>
-                <option value="USDJPY">USD/JPY</option>
-                <option value="GBPUSD">GBP/USD</option>
-            </select>
-            <button onclick="loadData()">Refresh</button>
-            <span id="status" style="margin-left: 20px;"></span>
+            <label>Pair: 
+                <select id="pairSelect">
+                    <option value="GBPJPY">GBP/JPY</option>
+                    <option value="USDJPY">USD/JPY</option>
+                    <option value="EURJPY">EUR/JPY</option>
+                    <option value="CHFJPY">CHF/JPY</option>
+                </select>
+            </label>
+            <label>Timeframe: 
+                <select id="timeframeSelect">
+                    <option value="1H">1 Hour</option>
+                    <option value="2H">2 Hours</option>
+                    <option value="4H" selected>4 Hours</option>
+                    <option value="1D">1 Day</option>
+                </select>
+            </label>
+            <button onclick="loadAnalysis()">🔄 Refresh Analysis</button>
+            <button onclick="loadAllAnalysis()">📊 Analyze All Pairs</button>
         </div>
-        
-        <div id="content">
-            <div class="card">
-                <h2>Loading data...</h2>
-            </div>
-        </div>
+
+        <div id="loading" style="display: none;">Loading analysis...</div>
+        <div id="results"></div>
+        <div id="error" style="color: red; display: none;"></div>
     </div>
 
     <script>
-        async function loadData() {
+        function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
-            const status = document.getElementById('status');
+            const timeframe = document.getElementById('timeframeSelect').value;
             
-            status.textContent = 'Loading...';
-            status.style.color = 'blue';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
             
-            try {
-                const response = await fetch(`/get_data?pair=${pair}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                
-                updateDashboard(data);
-                status.textContent = '✓ Loaded';
-                status.style.color = 'green';
-                
-            } catch (error) {
-                document.getElementById('content').innerHTML = `
-                    <div class="card" style="color: red;">
-                        <h2>Error</h2>
-                        <p>${error.message}</p>
-                    </div>
-                `;
-                status.textContent = '✗ Error';
-                status.style.color = 'red';
-            }
+            fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    if (data.error) {
+                        document.getElementById('error').innerText = 'Error: ' + data.error;
+                        document.getElementById('error').style.display = 'block';
+                    } else {
+                        displayAnalysis(data);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').innerText = 'Network error: ' + error;
+                    document.getElementById('error').style.display = 'block';
+                });
         }
-        
-        function updateDashboard(data) {
-            const signalClass = data.signal.toLowerCase();
+
+        function loadAllAnalysis() {
+            const timeframe = document.getElementById('timeframeSelect').value;
+            document.getElementById('loading').style.display = 'block';
             
-            document.getElementById('content').innerHTML = `
-                <div class="card">
-                    <h2>${data.pair} Analysis</h2>
-                    <div class="signal ${signalClass}">${data.signal}</div>
-                    <p>Confidence: ${data.confidence}%</p>
-                    <p>Current Price: ${data.current_price}</p>
-                    <p>Price Change: ${data.price_change}%</p>
-                </div>
-                
-                <div class="card">
-                    <h3>Trading Recommendations</h3>
-                    <p>Take Profit: ${data.take_profit}</p>
-                    <p>Stop Loss: ${data.stop_loss}</p>
-                    <p>Risk/Reward: ${data.risk_reward}</p>
-                </div>
-                
-                <div class="card">
-                    <h3>Technical Indicators</h3>
-                    <p>More indicators coming soon...</p>
+            fetch(`/get_multiple_analysis?timeframe=${timeframe}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    displayAllAnalysis(data);
+                })
+                .catch(console.error);
+        }
+
+        function displayAnalysis(data) {
+            const analysis = data.ai_analysis;
+            const signalClass = `signal-${analysis.SIGNAL.toLowerCase()}`;
+            
+            const html = `
+                <div class="analysis-grid">
+                    <div class="card ${signalClass}">
+                        <h2>${data.pair} - ${data.timeframe}</h2>
+                        <p>Price: <strong>${data.current_price}</strong> (${data.price_change}%)</p>
+                        
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${analysis.CONFIDENCE_LEVEL}%; 
+                                background: ${analysis.CONFIDENCE_LEVEL > 70 ? '#27ae60' : analysis.CONFIDENCE_LEVEL > 50 ? '#f39c12' : '#e74c3c'}">
+                            </div>
+                        </div>
+                        <p>Confidence: ${analysis.CONFIDENCE_LEVEL}%</p>
+                        
+                        <h3>💰 Trading Signal: ${analysis.SIGNAL}</h3>
+                        <p><strong>Entry:</strong> ${analysis.ENTRY_PRICE}</p>
+                        <p><strong>Take Profit 1:</strong> ${analysis.TAKE_PROFIT_1}</p>
+                        <p><strong>Take Profit 2:</strong> ${analysis.TAKE_PROFIT_2}</p>
+                        <p><strong>Stop Loss:</strong> ${analysis.STOP_LOSS}</p>
+                        <p><strong>Risk/Reward:</strong> ${analysis.RISK_REWARD_RATIO}</p>
+                        <p><strong>Time Horizon:</strong> ${analysis.TIME_HORIZON}</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>📊 Technical Indicators</h3>
+                        ${Object.entries(data.technical_indicators).map(([key, value]) => 
+                            `<p><strong>${key}:</strong> ${value}</p>`
+                        ).join('')}
+                    </div>
+
+                    <div class="card">
+                        <h3>📰 Fundamental News</h3>
+                        ${data.fundamental_news.map(news => 
+                            `<div class="news-item">
+                                <strong>${news.source}</strong> (${news.timestamp})<br>
+                                ${news.headline}
+                            </div>`
+                        ).join('')}
+                    </div>
+
+                    <div class="card">
+                        <h3>🤖 AI Analysis Summary</h3>
+                        <p>${analysis.ANALYSIS_SUMMARY}</p>
+                        <p><small>Last updated: ${data.timestamp}</small></p>
+                    </div>
                 </div>
             `;
+            
+            document.getElementById('results').innerHTML = html;
         }
-        
-        // Load data on page load
-        loadData();
+
+        function displayAllAnalysis(data) {
+            let html = '<div class="analysis-grid">';
+            
+            for (const [pair, analysis] of Object.entries(data)) {
+                if (analysis.error) continue;
+                
+                const ai = analysis.ai_analysis;
+                const signalClass = `signal-${ai.SIGNAL.toLowerCase()}`;
+                
+                html += `
+                    <div class="card ${signalClass}">
+                        <h3>${pair} - ${analysis.timeframe}</h3>
+                        <p>Price: ${analysis.current_price} (${analysis.price_change}%)</p>
+                        <h4>Signal: ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)</h4>
+                        <p>TP: ${ai.TAKE_PROFIT_1} | SL: ${ai.STOP_LOSS}</p>
+                        <p>RR: ${ai.RISK_REWARD_RATIO}</p>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            document.getElementById('results').innerHTML = html;
+        }
+
+        // Load initial analysis
+        loadAnalysis();
+        // Auto-refresh every 5 minutes
+        setInterval(loadAnalysis, 300000);
     </script>
 </body>
 </html>
