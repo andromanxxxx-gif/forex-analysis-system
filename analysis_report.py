@@ -1,77 +1,44 @@
+# simple_test.py
 import os
+
+print("📁 STRUCTURE CHECK:")
+print("=" * 50)
+
+# Check if essential files exist
+files_to_check = [
+    'dashboard/app.py',
+    'dashboard/templates/index.html',
+    'dashboard/requirements.txt'
+]
+
+for file in files_to_check:
+    if os.path.exists(file):
+        print(f"✅ {file} - EXISTS")
+        try:
+            size = os.path.getsize(file)
+            print(f"   Size: {size} bytes")
+            
+            # Read first few lines for content check
+            with open(file, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+                print(f"   First line: {first_line[:100]}...")
+                
+        except Exception as e:
+            print(f"   Error reading: {e}")
+    else:
+        print(f"❌ {file} - MISSING")
+
+print("\n🐍 PYTHON INFO:")
 import sys
-from pathlib import Path
-import datetime
+print(f"Python: {sys.version}")
 
-def collect_project_info():
-    """Kumpulkan semua informasi project untuk analisis"""
-    project_info = {
-        'structure': {},
-        'app_py': '',
-        'index_html': '',
-        'requirements': '',
-        'error_logs': '',
-        'system_info': {}
-    }
-    
-    # Struktur project
-    base_path = Path('.')
-    for file_path in base_path.rglob('*'):
-        if file_path.is_file():
-            relative_path = file_path.relative_to(base_path)
-            project_info['structure'][str(relative_path)] = {
-                'size': file_path.stat().st_size,
-                'modified': file_path.stat().st_mtime
-            }
-    
-    # Baca file penting
-    try:
-        with open('dashboard/app.py', 'r', encoding='utf-8') as f:
-            project_info['app_py'] = f.read()
-    except Exception as e:
-        project_info['app_py'] = f"Error reading app.py: {e}"
-    
-    try:
-        with open('dashboard/templates/index.html', 'r', encoding='utf-8') as f:
-            project_info['index_html'] = f.read()
-    except Exception as e:
-        project_info['index_html'] = f"Error reading index.html: {e}"
-    
-    try:
-        with open('dashboard/requirements.txt', 'r', encoding='utf-8') as f:
-            project_info['requirements'] = f.read()
-    except:
-        project_info['requirements'] = "No requirements.txt found"
-    
-    # System info
-    project_info['system_info'] = {
-        'python_version': sys.version,
-        'platform': sys.platform,
-        'current_directory': os.getcwd()
-    }
-    
-    return project_info
-
-def create_analysis_report():
-    """Buat laporan analisis lengkap"""
-    info = collect_project_info()
-    
-    report = f"""
-# FOREX ANALYSIS SYSTEM - COMPLETE ANALYSIS REPORT
-Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-## PROJECT STRUCTURE:
-"""
-    
-    for path, data in info['structure'].items():
-        report += f"{path} ({data['size']} bytes)\n"
-    
-    report += f"""
-## SYSTEM INFORMATION:
-- Python: {info['system_info']['python_version']}
-- Platform: {info['system_info']['platform']}
-- Directory: {info['system_info']['current_directory']}
-
-## app.py CONTENT:
-```python
-{info['app_py']}
+print("\n📊 FOLDER STRUCTURE:")
+for root, dirs, files in os.walk('.'):
+    level = root.replace('.', '').count(os.sep)
+    indent = ' ' * 2 * level
+    print(f"{indent}{os.path.basename(root)}/")
+    subindent = ' ' * 2 * (level + 1)
+    for file in files[:5]:  # Show first 5 files per folder
+        print(f"{subindent}{file}")
+    if len(files) > 5:
+        print(f"{subindent}... and {len(files) - 5} more files")
