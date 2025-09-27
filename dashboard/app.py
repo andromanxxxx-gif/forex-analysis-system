@@ -48,7 +48,6 @@ def get_technical_indicators(data):
     indicators = {}
     
     try:
-        # Pastikan data tidak empty
         if data.empty or len(data) < 20:
             return create_default_indicators(150.0)
         
@@ -65,7 +64,7 @@ def get_technical_indicators(data):
         indicators['sma_50'] = safe_float(close.rolling(window=50).mean())
         indicators['ema_12'] = safe_float(close.ewm(span=12).mean())
         indicators['ema_26'] = safe_float(close.ewm(span=26).mean())
-        indicators['ema_200'] = safe_float(close.ewm(span=200).mean())  # EMA 200
+        indicators['ema_200'] = safe_float(close.ewm(span=200).mean())
         
         # RSI Calculation
         try:
@@ -119,16 +118,18 @@ def get_technical_indicators(data):
         
         indicators['current_price'] = current_price
         
-        # Chart data - last 50 periods for the chart
+        # Chart data - last 30 periods for better performance
+        chart_periods = min(30, len(data))
         indicators['chart_data'] = {
-            'dates': data.index[-50:].strftime('%Y-%m-%d %H:%M').tolist(),
-            'open': data['Open'][-50:].astype(float).round(4).tolist(),
-            'high': data['High'][-50:].astype(float).round(4).tolist(),
-            'low': data['Low'][-50:].astype(float).round(4).tolist(),
-            'close': data['Close'][-50:].astype(float).round(4).tolist(),
-            'ema_20': data['Close'].ewm(span=20).mean()[-50:].astype(float).round(4).tolist(),
-            'ema_50': data['Close'].ewm(span=50).mean()[-50:].astype(float).round(4).tolist(),
-            'ema_200': data['Close'].ewm(span=200).mean()[-50:].astype(float).round(4).tolist()
+            'dates': data.index[-chart_periods:].strftime('%Y-%m-%d %H:%M').tolist(),
+            'open': data['Open'][-chart_periods:].astype(float).round(4).tolist(),
+            'high': data['High'][-chart_periods:].astype(float).round(4).tolist(),
+            'low': data['Low'][-chart_periods:].astype(float).round(4).tolist(),
+            'close': data['Close'][-chart_periods:].astype(float).round(4).tolist(),
+            'ema_20': data['Close'].ewm(span=20).mean()[-chart_periods:].astype(float).round(4).tolist(),
+            'ema_50': data['Close'].ewm(span=50).mean()[-chart_periods:].astype(float).round(4).tolist(),
+            'ema_200': data['Close'].ewm(span=200).mean()[-chart_periods:].astype(float).round(4).tolist(),
+            'volume': data['Volume'][-chart_periods:].astype(float).tolist() if 'Volume' in data else [1] * chart_periods
         }
         
     except Exception as e:
@@ -148,7 +149,7 @@ def create_default_indicators(price):
         'chart_data': {
             'dates': [],
             'open': [], 'high': [], 'low': [], 'close': [],
-            'ema_20': [], 'ema_50': [], 'ema_200': []
+            'ema_20': [], 'ema_50': [], 'ema_200': [], 'volume': []
         }
     }
 
@@ -248,7 +249,13 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
                 end_idx = analysis_text.rfind('}') + 1
                 if start_idx != -1 and end_idx != -1:
                     json_str = analysis_text[start_idx:end_idx]
-                    return json.loads(json_str)
+                    analysis_result = json.loads(json_str)
+                    
+                    # Validate the analysis result
+                    if validate_analysis_result(analysis_result, current_price):
+                        return analysis_result
+                    else:
+                        return generate_fallback_analysis(technical_data, pair, timeframe)
             except:
                 return generate_fallback_analysis(technical_data, pair, timeframe)
         else:
@@ -259,41 +266,86 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
         print(f"DeepSeek API error: {e}")
         return generate_fallback_analysis(technical_data, pair, timeframe)
 
+def validate_analysis_result(analysis, current_price):
+    """Validate AI analysis result"""
+    try:
+        required_fields = ['SIGNAL', 'CONFIDENCE_LEVEL', 'ENTRY_PRICE', 'TAKE_PROFIT_1', 'TAKE_PROFIT_2', 'STOP_LOSS']
+        
+        for field in required_fields:
+            if field not in analysis:
+                return False
+        
+        # Check if values are reasonable
+        entry = float(analysis['ENTRY_PRICE'])
+        tp1 = float(analysis['TAKE_PROFIT_1'])
+        tp2 = float(analysis['TAKE_PROFIT_2'])
+        sl = float(analysis['STOP_LOSS'])
+        
+        # Basic validation - prices should be within reasonable range of current price
+        price_range = current_price * 0.1  # 10% range
+        if (abs(entry - current_price) > price_range or 
+            abs(tp1 - current_price) > price_range or 
+            abs(sl - current_price) > price_range):
+            return False
+            
+        return True
+    except:
+        return False
+
 def generate_fallback_analysis(technical_data, pair, timeframe):
-    """Generate analisis fallback"""
+    """Generate analisis fallback yang lebih akurat"""
     current_price = float(technical_data.get('current_price', 150.0))
     rsi = float(technical_data.get('rsi', 50))
     ema_200 = float(technical_data.get('ema_200', current_price))
+    atr = float(technical_data.get('atr', 0.5))
     
-    # Enhanced logic based on RSI and EMA 200
-    if rsi < 30 and current_price > ema_200:
+    # Enhanced logic based on RSI and EMA 200 dengan perhitungan yang lebih realistis
+    price_vs_ema = ((current_price - ema_200) / ema_200) * 100
+    
+    if rsi < 30 and price_vs_ema > 0.5:
         signal = "STRONG BUY"
         confidence = 80
-    elif rsi > 70 and current_price < ema_200:
+        tp_multiplier = 2.0
+        sl_multiplier = 1.0
+    elif rsi > 70 and price_vs_ema < -0.5:
         signal = "STRONG SELL"
         confidence = 80
-    elif rsi < 30:
+        tp_multiplier = 2.0
+        sl_multiplier = 1.0
+    elif rsi < 35:
         signal = "BUY"
         confidence = 70
-    elif rsi > 70:
+        tp_multiplier = 1.5
+        sl_multiplier = 1.0
+    elif rsi > 65:
         signal = "SELL"
         confidence = 70
+        tp_multiplier = 1.5
+        sl_multiplier = 1.0
     else:
         signal = "HOLD"
         confidence = 50
+        # Untuk HOLD, berikan level acuan yang masuk akal
+        tp_multiplier = 0.8
+        sl_multiplier = 0.8
     
-    atr = float(technical_data.get('atr', 0.5))
-    
-    if signal in ["STRONG BUY", "BUY"]:
-        tp1 = current_price + (atr * 1.5)
-        tp2 = current_price + (atr * 2.5)
-        sl = current_price - (atr * 1.0)
-    elif signal in ["STRONG SELL", "SELL"]:
-        tp1 = current_price - (atr * 1.5)
-        tp2 = current_price - (atr * 2.5) 
-        sl = current_price + (atr * 1.0)
-    else:
-        tp1 = tp2 = sl = current_price
+    # Hitung TP/SL berdasarkan ATR dengan multiplier yang berbeda
+    if "BUY" in signal:
+        tp1 = current_price + (atr * tp_multiplier * 1.0)
+        tp2 = current_price + (atr * tp_multiplier * 1.8)
+        sl = current_price - (atr * sl_multiplier * 1.0)
+        rr_ratio = f"1:{tp_multiplier:.1f}"
+    elif "SELL" in signal:
+        tp1 = current_price - (atr * tp_multiplier * 1.0)
+        tp2 = current_price - (atr * tp_multiplier * 1.8)
+        sl = current_price + (atr * sl_multiplier * 1.0)
+        rr_ratio = f"1:{tp_multiplier:.1f}"
+    else:  # HOLD
+        # Untuk HOLD, berikan level acuan di atas dan bawah
+        tp1 = current_price + (atr * 0.5)
+        tp2 = current_price + (atr * 1.0)
+        sl = current_price - (atr * 0.5)
+        rr_ratio = "N/A"
     
     return {
         'SIGNAL': signal,
@@ -302,9 +354,9 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
         'TAKE_PROFIT_1': round(tp1, 4),
         'TAKE_PROFIT_2': round(tp2, 4),
         'STOP_LOSS': round(sl, 4),
-        'RISK_REWARD_RATIO': '1:1.5',
+        'RISK_REWARD_RATIO': rr_ratio,
         'TIME_HORIZON': '4-8 hours',
-        'ANALYSIS_SUMMARY': f'Fallback analysis: RSI {rsi:.1f}, EMA200 {ema_200:.4f}, Price {current_price:.4f}'
+        'ANALYSIS_SUMMARY': f'RSI: {rsi:.1f}, EMA200: {ema_200:.4f}, Price: {current_price:.4f}, ATR: {atr:.4f}'
     }
 
 @app.route('/')
