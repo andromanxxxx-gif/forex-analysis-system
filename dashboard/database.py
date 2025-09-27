@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import json
+import os
 
 class ForexDatabase:
     def __init__(self, db_path='forex_data.db'):
@@ -59,8 +60,14 @@ class ForexDatabase:
             )
         ''')
         
+        # Create indexes for better performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_pair_timeframe ON trading_analysis(pair, timeframe)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON trading_analysis(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_price_data ON price_data(pair, timestamp)')
+        
         conn.commit()
         conn.close()
+        print(f"Database initialized: {self.db_path}")
     
     def save_analysis(self, analysis_data):
         """Save analysis data to database"""
@@ -89,6 +96,7 @@ class ForexDatabase:
         
         conn.commit()
         conn.close()
+        print(f"Analysis saved for {analysis_data['pair']} {analysis_data['timeframe']}")
     
     def save_news(self, news_items):
         """Save news data to database"""
@@ -103,6 +111,7 @@ class ForexDatabase:
         
         conn.commit()
         conn.close()
+        print(f"News saved: {len(news_items)} items")
     
     def get_recent_analysis(self, pair, timeframe, limit=10):
         """Get recent analysis for a pair"""
@@ -118,24 +127,53 @@ class ForexDatabase:
         
         results = cursor.fetchall()
         conn.close()
-        
         return results
     
     def get_historical_prices(self, pair, days=30):
         """Get historical prices for chart"""
         conn = sqlite3.connect(self.db_path)
         
-        query = f"""
+        query = """
             SELECT timestamp, open, high, low, close, volume
             FROM price_data 
-            WHERE pair = ? AND timestamp >= datetime('now', '-{days} days')
+            WHERE pair = ? AND timestamp >= datetime('now', '-' || ? || ' days')
             ORDER BY timestamp
         """
         
-        df = pd.read_sql_query(query, conn, params=(pair,))
+        df = pd.read_sql_query(query, conn, params=(pair, days))
         conn.close()
-        
         return df
+
+    def save_price_data(self, pair, data):
+        """Save price data to database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        for index, row in data.iterrows():
+            # Determine column names based on data structure
+            open_col = 'Open' if 'Open' in row else 'open'
+            high_col = 'High' if 'High' in row else 'high'
+            low_col = 'Low' if 'Low' in row else 'low'
+            close_col = 'Close' if 'Close' in row else 'close'
+            volume_col = 'Volume' if 'Volume' in row else 'volume'
+            
+            cursor.execute('''
+                INSERT OR REPLACE INTO price_data 
+                (pair, timestamp, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                pair,
+                index.to_pydatetime(),
+                row[open_col],
+                row[high_col],
+                row[low_col],
+                row[close_col],
+                row[volume_col] if volume_col in row else 0
+            ))
+        
+        conn.commit()
+        conn.close()
+        print(f"Price data saved for {pair}: {len(data)} records")
 
 # Global database instance
 db = ForexDatabase()
