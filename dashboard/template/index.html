@@ -6,139 +6,354 @@
     <title>AI Forex Trading System</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .controls { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .signal-buy { border-left: 5px solid #27ae60; }
-        .signal-sell { border-left: 5px solid #e74c3c; }
-        .signal-hold { border-left: 5px solid #f39c12; }
-        .news-item { border-bottom: 1px solid #eee; padding: 10px 0; }
-        .confidence-bar { background: #ecf0f1; height: 20px; border-radius: 10px; margin: 10px 0; }
-        .confidence-fill { height: 100%; border-radius: 10px; transition: width 0.3s; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            background: rgba(255,255,255,0.95); 
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white; 
+            padding: 30px; 
+            text-align: center;
+        }
+        .header h1 { 
+            font-size: 2.5em; 
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p { 
+            font-size: 1.2em; 
+            opacity: 0.9;
+        }
+        .controls { 
+            background: white; 
+            padding: 20px; 
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        select, button {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        select:focus, button:hover {
+            border-color: #3498db;
+            outline: none;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .analysis-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
+            gap: 20px; 
+            padding: 20px;
+        }
+        .card { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            border-left: 5px solid #3498db;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .signal-buy { border-left-color: #27ae60; }
+        .signal-sell { border-left-color: #e74c3c; }
+        .signal-hold { border-left-color: #f39c12; }
+        .card h2, .card h3 { 
+            color: #2c3e50; 
+            margin-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        .price-display {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .price-change {
+            font-size: 1.2em;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        .positive { background: #d4edda; color: #155724; }
+        .negative { background: #f8d7da; color: #721c24; }
+        .confidence-bar { 
+            background: #ecf0f1; 
+            height: 25px; 
+            border-radius: 12px; 
+            margin: 15px 0; 
+            overflow: hidden;
+        }
+        .confidence-fill { 
+            height: 100%; 
+            border-radius: 12px; 
+            transition: width 0.5s ease-in-out;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60);
+        }
+        .news-item { 
+            border-bottom: 1px solid #ecf0f1; 
+            padding: 12px 0; 
+            transition: background 0.3s;
+        }
+        .news-item:hover {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding-left: 10px;
+        }
+        .news-item:last-child { border-bottom: none; }
+        .signal-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .signal-buy-display { background: #d4edda; color: #155724; }
+        .signal-sell-display { background: #f8d7da; color: #721c24; }
+        .signal-hold-display { background: #fff3cd; color: #856404; }
+        .loading { 
+            text-align: center; 
+            padding: 40px; 
+            font-size: 1.2em;
+            color: #7f8c8d;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            padding: 15px; 
+            margin: 20px;
+            border-radius: 8px;
+            border-left: 5px solid #e74c3c;
+        }
+        .technical-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .tech-item {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .analysis-grid { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .control-group { justify-content: space-between; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🤖 AI Forex Trading System</h1>
-            <p>Analisis Real-time GBPJPY, USDJPY, EURJPY, CHFJPY</p>
+            <p>Real-time Analysis for JPY Pairs - Powered by DeepSeek AI</p>
         </div>
 
         <div class="controls">
-            <label>Pair: 
+            <div class="control-group">
+                <label><strong>Currency Pair:</strong></label>
                 <select id="pairSelect">
                     <option value="GBPJPY">GBP/JPY</option>
                     <option value="USDJPY">USD/JPY</option>
                     <option value="EURJPY">EUR/JPY</option>
                     <option value="CHFJPY">CHF/JPY</option>
                 </select>
-            </label>
-            <label>Timeframe: 
+            </div>
+            
+            <div class="control-group">
+                <label><strong>Timeframe:</strong></label>
                 <select id="timeframeSelect">
                     <option value="1H">1 Hour</option>
                     <option value="2H">2 Hours</option>
                     <option value="4H" selected>4 Hours</option>
                     <option value="1D">1 Day</option>
                 </select>
-            </label>
+            </div>
+
             <button onclick="loadAnalysis()">🔄 Refresh Analysis</button>
             <button onclick="loadAllAnalysis()">📊 Analyze All Pairs</button>
+            <button onclick="autoRefreshToggle()">⏰ Auto Refresh: <span id="autoRefreshStatus">OFF</span></button>
         </div>
 
-        <div id="loading" style="display: none;">Loading analysis...</div>
+        <div id="loading" class="loading" style="display: none;">
+            <div>🔄 Loading AI Analysis...</div>
+            <div style="font-size: 0.9em; margin-top: 10px; color: #95a5a6;">
+                Analyzing technical indicators and market news...
+            </div>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
         <div id="results"></div>
-        <div id="error" style="color: red; display: none;"></div>
     </div>
 
     <script>
+        let autoRefreshInterval = null;
+        
         function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
             const timeframe = document.getElementById('timeframeSelect').value;
             
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').style.display = 'none';
+            showLoading();
+            hideError();
             
             fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}`)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('loading').style.display = 'none';
+                    hideLoading();
                     if (data.error) {
-                        document.getElementById('error').innerText = 'Error: ' + data.error;
-                        document.getElementById('error').style.display = 'block';
+                        showError('Analysis Error: ' + data.error);
                     } else {
                         displayAnalysis(data);
                     }
                 })
                 .catch(error => {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('error').innerText = 'Network error: ' + error;
-                    document.getElementById('error').style.display = 'block';
+                    hideLoading();
+                    showError('Network Error: ' + error.message);
                 });
         }
 
         function loadAllAnalysis() {
             const timeframe = document.getElementById('timeframeSelect').value;
-            document.getElementById('loading').style.display = 'block';
+            showLoading();
             
             fetch(`/get_multiple_analysis?timeframe=${timeframe}`)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('loading').style.display = 'none';
+                    hideLoading();
                     displayAllAnalysis(data);
                 })
-                .catch(console.error);
+                .catch(error => {
+                    hideLoading();
+                    showError('Error loading all analysis: ' + error.message);
+                });
+        }
+
+        function autoRefreshToggle() {
+            const statusElement = document.getElementById('autoRefreshStatus');
+            
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                statusElement.textContent = 'OFF';
+                statusElement.style.color = '#e74c3c';
+            } else {
+                autoRefreshInterval = setInterval(loadAnalysis, 300000); // 5 minutes
+                statusElement.textContent = 'ON (5min)';
+                statusElement.style.color = '#27ae60';
+                loadAnalysis(); // Immediate refresh
+            }
         }
 
         function displayAnalysis(data) {
             const analysis = data.ai_analysis;
             const signalClass = `signal-${analysis.SIGNAL.toLowerCase()}`;
+            const signalDisplayClass = `signal-${analysis.SIGNAL.toLowerCase()}-display`;
+            const priceChangeClass = data.price_change >= 0 ? 'positive' : 'negative';
+            const priceChangeSymbol = data.price_change >= 0 ? '↗' : '↘';
             
             const html = `
                 <div class="analysis-grid">
                     <div class="card ${signalClass}">
-                        <h2>${data.pair} - ${data.timeframe}</h2>
-                        <p>Price: <strong>${data.current_price}</strong> (${data.price_change}%)</p>
+                        <h2>${data.pair} Analysis - ${data.timeframe}</h2>
+                        <div class="price-display">${data.current_price}</div>
+                        <div class="price-change ${priceChangeClass}">
+                            ${priceChangeSymbol} ${data.price_change}%
+                        </div>
                         
                         <div class="confidence-bar">
-                            <div class="confidence-fill" style="width: ${analysis.CONFIDENCE_LEVEL}%; 
-                                background: ${analysis.CONFIDENCE_LEVEL > 70 ? '#27ae60' : analysis.CONFIDENCE_LEVEL > 50 ? '#f39c12' : '#e74c3c'}">
-                            </div>
+                            <div class="confidence-fill" style="width: ${analysis.CONFIDENCE_LEVEL}%"></div>
                         </div>
-                        <p>Confidence: ${analysis.CONFIDENCE_LEVEL}%</p>
+                        <div style="text-align: center; margin: 10px 0;">
+                            <strong>AI Confidence: ${analysis.CONFIDENCE_LEVEL}%</strong>
+                        </div>
                         
-                        <h3>💰 Trading Signal: ${analysis.SIGNAL}</h3>
-                        <p><strong>Entry:</strong> ${analysis.ENTRY_PRICE}</p>
-                        <p><strong>Take Profit 1:</strong> ${analysis.TAKE_PROFIT_1}</p>
-                        <p><strong>Take Profit 2:</strong> ${analysis.TAKE_PROFIT_2}</p>
-                        <p><strong>Stop Loss:</strong> ${analysis.STOP_LOSS}</p>
-                        <p><strong>Risk/Reward:</strong> ${analysis.RISK_REWARD_RATIO}</p>
-                        <p><strong>Time Horizon:</strong> ${analysis.TIME_HORIZON}</p>
+                        <div class="signal-display ${signalDisplayClass}">
+                            🚨 TRADING SIGNAL: ${analysis.SIGNAL} 🚨
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <h4>📈 Trading Levels</h4>
+                            <p><strong>Entry Price:</strong> ${analysis.ENTRY_PRICE}</p>
+                            <p><strong>Take Profit 1:</strong> ${analysis.TAKE_PROFIT_1}</p>
+                            <p><strong>Take Profit 2:</strong> ${analysis.TAKE_PROFIT_2}</p>
+                            <p><strong>Stop Loss:</strong> ${analysis.STOP_LOSS}</p>
+                            <p><strong>Risk/Reward:</strong> ${analysis.RISK_REWARD_RATIO}</p>
+                            <p><strong>Time Horizon:</strong> ${analysis.TIME_HORIZON}</p>
+                        </div>
                     </div>
 
                     <div class="card">
                         <h3>📊 Technical Indicators</h3>
-                        ${Object.entries(data.technical_indicators).map(([key, value]) => 
-                            `<p><strong>${key}:</strong> ${value}</p>`
-                        ).join('')}
+                        <div class="technical-grid">
+                            <div class="tech-item"><strong>RSI:</strong> ${data.technical_indicators.RSI}</div>
+                            <div class="tech-item"><strong>MACD:</strong> ${data.technical_indicators.MACD}</div>
+                            <div class="tech-item"><strong>SMA 20:</strong> ${data.technical_indicators.SMA_20}</div>
+                            <div class="tech-item"><strong>SMA 50:</strong> ${data.technical_indicators.SMA_50}</div>
+                            <div class="tech-item"><strong>ATR:</strong> ${data.technical_indicators.ATR}</div>
+                            <div class="tech-item"><strong>Support:</strong> ${data.technical_indicators.Support}</div>
+                            <div class="tech-item"><strong>Resistance:</strong> ${data.technical_indicators.Resistance}</div>
+                        </div>
                     </div>
 
                     <div class="card">
-                        <h3>📰 Fundamental News</h3>
-                        ${data.fundamental_news.map(news => 
-                            `<div class="news-item">
-                                <strong>${news.source}</strong> (${news.timestamp})<br>
+                        <h3>📰 Market News & Analysis</h3>
+                        ${data.fundamental_news.map(news => `
+                            <div class="news-item">
+                                <strong>📻 ${news.source}</strong> 
+                                <span style="float: right; color: #7f8c8d;">${news.timestamp}</span><br>
                                 ${news.headline}
-                            </div>`
-                        ).join('')}
+                            </div>
+                        `).join('')}
                     </div>
 
                     <div class="card">
                         <h3>🤖 AI Analysis Summary</h3>
-                        <p>${analysis.ANALYSIS_SUMMARY}</p>
-                        <p><small>Last updated: ${data.timestamp}</small></p>
+                        <p style="line-height: 1.6; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                            ${analysis.ANALYSIS_SUMMARY}
+                        </p>
+                        <div style="margin-top: 15px; text-align: center; color: #7f8c8d;">
+                            <small>Last updated: ${data.timestamp}</small>
+                        </div>
                     </div>
                 </div>
             `;
@@ -150,7 +365,15 @@
             let html = '<div class="analysis-grid">';
             
             for (const [pair, analysis] of Object.entries(data)) {
-                if (analysis.error) continue;
+                if (analysis.error) {
+                    html += `
+                        <div class="card">
+                            <h3>${pair}</h3>
+                            <div style="color: #e74c3c;">Error: ${analysis.error}</div>
+                        </div>
+                    `;
+                    continue;
+                }
                 
                 const ai = analysis.ai_analysis;
                 const signalClass = `signal-${ai.SIGNAL.toLowerCase()}`;
@@ -158,10 +381,23 @@
                 html += `
                     <div class="card ${signalClass}">
                         <h3>${pair} - ${analysis.timeframe}</h3>
-                        <p>Price: ${analysis.current_price} (${analysis.price_change}%)</p>
-                        <h4>Signal: ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)</h4>
-                        <p>TP: ${ai.TAKE_PROFIT_1} | SL: ${ai.STOP_LOSS}</p>
-                        <p>RR: ${ai.RISK_REWARD_RATIO}</p>
+                        <div class="price-display">${analysis.current_price}</div>
+                        
+                        <div class="signal-display signal-${ai.SIGNAL.toLowerCase()}-display">
+                            ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)
+                        </div>
+                        
+                        <div style="margin: 10px 0;">
+                            <strong>Entry:</strong> ${ai.ENTRY_PRICE}<br>
+                            <strong>TP1:</strong> ${ai.TAKE_PROFIT_1} | 
+                            <strong>TP2:</strong> ${ai.TAKE_PROFIT_2}<br>
+                            <strong>SL:</strong> ${ai.STOP_LOSS}<br>
+                            <strong>R/R:</strong> ${ai.RISK_REWARD_RATIO}
+                        </div>
+                        
+                        <div style="font-size: 0.9em; color: #7f8c8d;">
+                            Updated: ${analysis.timestamp}
+                        </div>
                     </div>
                 `;
             }
@@ -170,10 +406,26 @@
             document.getElementById('results').innerHTML = html;
         }
 
-        // Load initial analysis
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').innerText = message;
+            document.getElementById('error').style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        // Initial load
         loadAnalysis();
-        // Auto-refresh every 5 minutes
-        setInterval(loadAnalysis, 300000);
     </script>
 </body>
 </html>
