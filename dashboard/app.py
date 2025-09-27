@@ -6,7 +6,6 @@ import requests
 import warnings
 from datetime import datetime, timedelta
 import json
-from bs4 import BeautifulSoup
 import time
 import os
 import sqlite3
@@ -15,10 +14,6 @@ import traceback
 warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
-
-# Konfigurasi DeepSeek API
-DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs mapping
 pair_mapping = {
@@ -36,7 +31,6 @@ timeframe_mapping = {
     '1D': '1d'
 }
 
-# Database class
 class Database:
     def __init__(self, db_path='forex_analysis.db'):
         self.db_path = db_path
@@ -47,7 +41,6 @@ class Database:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Analysis results table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS analysis_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +55,6 @@ class Database:
             )
         ''')
         
-        # News table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS news_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,22 +63,6 @@ class Database:
                 timestamp TEXT,
                 url TEXT,
                 saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Price data table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS price_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pair TEXT,
-                timeframe TEXT,
-                date TEXT,
-                open REAL,
-                high REAL,
-                low REAL,
-                close REAL,
-                volume REAL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
@@ -135,44 +111,10 @@ class Database:
             
             conn.commit()
             conn.close()
-            print(f"News items saved: {len(news_items)}")
             
         except Exception as e:
             print(f"Error saving news: {e}")
-    
-    def save_price_data(self, pair, timeframe, data):
-        """Save price data to database"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            if len(data) > 0:
-                latest = data.iloc[-1]
-                
-                # Convert index to date string if it's a timestamp
-                if hasattr(data.index, 'strftime'):
-                    date_str = data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    date_str = str(data.index[-1])
-                
-                cursor.execute('''
-                    INSERT OR REPLACE INTO price_data 
-                    (pair, timeframe, date, open, high, low, close, volume)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    pair, timeframe, date_str,
-                    float(latest['Open']), float(latest['High']),
-                    float(latest['Low']), float(latest['Close']),
-                    float(latest.get('Volume', 0))
-                ))
-            
-            conn.commit()
-            conn.close()
-            
-        except Exception as e:
-            print(f"Error saving price data: {e}")
 
-# Global database instance
 db = Database()
 
 def safe_float(value, default=0.0):
@@ -187,54 +129,36 @@ def safe_float(value, default=0.0):
         return default
 
 def get_real_forex_news():
-    """Web scraping REAL untuk berita forex"""
-    news_items = []
-    
+    """Get forex news"""
     try:
-        # Fallback news dengan data real
         current_time = datetime.now().strftime('%H:%M')
         news_items = [
             {
                 'source': 'Market Update',
-                'headline': f'JPY Pairs Active - GBP/JPY: {get_current_price("GBPJPY")}, USD/JPY: {get_current_price("USDJPY")}',
+                'headline': 'JPY Pairs Showing Volatility in Current Session',
                 'timestamp': current_time,
                 'url': '#'
             },
             {
                 'source': 'Economic Calendar', 
-                'headline': 'Bank of Japan Policy Decision Expected This Week',
+                'headline': 'Bank of Japan Monetary Policy Meeting This Week',
                 'timestamp': current_time,
                 'url': '#'
             },
             {
                 'source': 'Technical Analysis',
-                'headline': 'Yen Crosses Show Mixed Signals in Asian Session',
-                'timestamp': current_time,
-                'url': '#'
-            },
-            {
-                'source': 'Market Watch',
-                'headline': 'Volatility Expected in JPY Pairs During London Session',
+                'headline': 'Yen Crosses Exhibit Range-Bound Trading Pattern',
                 'timestamp': current_time,
                 'url': '#'
             }
         ]
         
-        # Simpan ke database
         db.save_news(news_items)
+        return news_items
                 
     except Exception as e:
-        print(f"Error in news scraping: {e}")
-    
-    return news_items
-
-def get_current_price(pair):
-    """Get current price for news"""
-    try:
-        data = yf.download(pair_mapping[pair], period='1d', interval='1h', progress=False)
-        return f"{data['Close'].iloc[-1]:.3f}" if not data.empty else "N/A"
-    except:
-        return "N/A"
+        print(f"Error in news: {e}")
+        return []
 
 def create_default_chart_data():
     """Create default chart data"""
@@ -257,8 +181,7 @@ def create_default_indicators(price):
     }
 
 def load_historical_data_from_file(pair, timeframe):
-    """Load historical data from local files dengan format yang benar"""
-    # Normalize timeframe untuk match filename
+    """Load historical data from local files"""
     timeframe_map = {'1D': '1D', '1H': '1H', '4H': '4H', '2H': '2H'}
     file_timeframe = timeframe_map.get(timeframe, timeframe)
     
@@ -270,15 +193,14 @@ def load_historical_data_from_file(pair, timeframe):
     
     if os.path.exists(filepath):
         try:
-            # Load data from CSV
             data = pd.read_csv(filepath)
             print(f"Raw CSV columns: {data.columns.tolist()}")
             print(f"Raw CSV shape: {data.shape}")
             
-            # Normalize column names (case insensitive)
+            # Normalize column names
             data.columns = [col.strip().title() for col in data.columns]
             
-            # Cari kolom tanggal - coba beberapa kemungkinan nama
+            # Find date column
             date_columns = ['Date', 'Datetime', 'Time', 'Timestamp']
             date_col = None
             for col in date_columns:
@@ -288,41 +210,19 @@ def load_historical_data_from_file(pair, timeframe):
             
             if date_col is None:
                 print("No date column found, using index")
-                # Jika tidak ada kolom tanggal, buat dari index
-                if timeframe == '1D':
-                    freq = 'D'
-                else:
-                    freq = 'H'
+                freq = 'D' if timeframe == '1D' else 'H'
                 data['Date'] = pd.date_range(end=datetime.now(), periods=len(data), freq=freq)
                 date_col = 'Date'
             else:
-                # Convert date column to datetime
                 data[date_col] = pd.to_datetime(data[date_col], errors='coerce')
-                # Drop rows dengan tanggal invalid
                 data = data.dropna(subset=[date_col])
             
-            # Set date sebagai index
             data = data.set_index(date_col)
             
-            # Normalize OHLC column names
-            column_mapping = {
-                'Open': 'Open', 'High': 'High', 'Low': 'Low', 'Close': 'Close',
-                'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close',
-                'OPEN': 'Open', 'HIGH': 'High', 'LOW': 'Low', 'CLOSE': 'Close'
-            }
-            
-            for old_col, new_col in column_mapping.items():
-                if old_col in data.columns and new_col not in data.columns:
-                    data[new_col] = data[old_col]
-            
-            # Pastikan kolom yang diperlukan ada
+            # Ensure required columns
             required_columns = ['Open', 'High', 'Low', 'Close']
-            missing_cols = [col for col in required_columns if col not in data.columns]
-            
-            if missing_cols:
-                print(f"Missing columns: {missing_cols}")
-                # Create missing columns dengan nilai default
-                for col in missing_cols:
+            for col in required_columns:
+                if col not in data.columns:
                     if col == 'Open':
                         data[col] = data.get('Close', 150)
                     elif col == 'High':
@@ -330,64 +230,46 @@ def load_historical_data_from_file(pair, timeframe):
                     elif col == 'Low':
                         data[col] = data.get('Close', 150) * 0.99
                     elif col == 'Close':
-                        data[col] = 150  # Default value
+                        data[col] = 150
             
-            # Urutkan berdasarkan tanggal
             data = data.sort_index()
             
-            # Pastikan data numerik
             for col in required_columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce')
             
-            # Drop rows dengan nilai NaN
             data = data.dropna(subset=required_columns)
             
-            print(f"Loaded historical data from {filepath}: {len(data)} rows")
-            print(f"Date range: {data.index.min()} to {data.index.max()}")
-            
+            print(f"Loaded historical data: {len(data)} rows")
             return data
             
         except Exception as e:
             print(f"Error loading {filepath}: {e}")
-            traceback.print_exc()
             return None
     else:
         print(f"Historical file not found: {filepath}")
         return None
 
 def get_historical_data_for_chart(data, periods=50):
-    """Prepare historical data for chart display dengan handling index yang berbeda"""
+    """Prepare historical data for chart display"""
     try:
         if data.empty:
-            print("Data is empty, returning default chart data")
             return create_default_chart_data()
         
-        # Get the last N periods
         data_slice = data.tail(periods)
         
-        # Convert index to datetime strings - handle berbagai tipe index
         dates = []
         for idx in data_slice.index:
             if hasattr(idx, 'strftime'):
                 dates.append(idx.strftime('%Y-%m-%d %H:%M'))
             else:
-                # Coba konversi ke datetime
                 try:
                     dt = pd.to_datetime(idx)
                     dates.append(dt.strftime('%Y-%m-%d %H:%M'))
                 except:
                     dates.append(str(idx))
         
-        # Pastikan kolom OHLC ada dan numerik
-        for col in ['Open', 'High', 'Low', 'Close']:
-            if col not in data_slice.columns:
-                print(f"Warning: Column {col} not found in data")
-                return create_default_chart_data()
-        
-        # Calculate technical indicators untuk chart
         close_prices = data_slice['Close']
         
-        # Hitung EMA dengan handling data pendek
         ema_20 = close_prices.ewm(span=min(20, len(close_prices)), adjust=False).mean()
         ema_50 = close_prices.ewm(span=min(50, len(close_prices)), adjust=False).mean()
         ema_200 = close_prices.ewm(span=min(200, len(close_prices)), adjust=False).mean()
@@ -404,26 +286,20 @@ def get_historical_data_for_chart(data, periods=50):
         }
         
         print(f"Chart data prepared: {len(chart_data['dates'])} periods")
-        print(f"First 3 dates: {chart_data['dates'][:3]}")
-        print(f"First 3 prices: {chart_data['close'][:3]}")
-        
         return chart_data
         
     except Exception as e:
         print(f"Error preparing chart data: {e}")
-        traceback.print_exc()
         return create_default_chart_data()
 
 def get_technical_indicators(data):
-    """Menghitung indikator teknikal"""
+    """Calculate technical indicators"""
     indicators = {}
     
     try:
         if data.empty or len(data) < 20:
-            print("Insufficient data for indicators, using defaults")
             return create_default_indicators(150.0)
         
-        # Price data
         high = data['High']
         low = data['Low']
         close = data['Close']
@@ -459,26 +335,6 @@ def get_technical_indicators(data):
         except:
             indicators['macd'] = indicators['macd_signal'] = indicators['macd_hist'] = 0.0
         
-        # Bollinger Bands
-        try:
-            sma_20 = close.rolling(window=20).mean()
-            std_20 = close.rolling(window=20).std()
-            indicators['bb_upper'] = safe_float(sma_20 + (std_20 * 2))
-            indicators['bb_middle'] = safe_float(sma_20)
-            indicators['bb_lower'] = safe_float(sma_20 - (std_20 * 2))
-        except:
-            indicators['bb_upper'] = indicators['bb_middle'] = indicators['bb_lower'] = current_price
-        
-        # ATR Calculation
-        try:
-            tr1 = high - low
-            tr2 = abs(high - close.shift())
-            tr3 = abs(low - close.shift())
-            true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-            indicators['atr'] = safe_float(true_range.rolling(window=14).mean())
-        except:
-            indicators['atr'] = 0.01
-        
         # Support Resistance
         try:
             indicators['pivot'] = (safe_float(high) + safe_float(low) + current_price) / 3
@@ -488,27 +344,21 @@ def get_technical_indicators(data):
             indicators['pivot'] = indicators['resistance1'] = indicators['support1'] = current_price
         
         indicators['current_price'] = current_price
-        
-        # Chart data - last 50 periods
-        chart_periods = min(50, len(data))
-        indicators['chart_data'] = get_historical_data_for_chart(data, chart_periods)
+        indicators['chart_data'] = get_historical_data_for_chart(data, min(50, len(data)))
         
     except Exception as e:
         print(f"Error in technical indicators: {e}")
-        traceback.print_exc()
         indicators = create_default_indicators(150.0)
     
     return indicators
 
 def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
-    """Analisis dengan AI DeepSeek"""
+    """Analysis with AI"""
     
-    # Extract values
     current_price = float(technical_data.get('current_price', 0))
     rsi = float(technical_data.get('rsi', 50))
     atr = float(technical_data.get('atr', 0.01))
     
-    # Simple analysis without API call for reliability
     if rsi < 30:
         signal = "BUY"
         confidence = 75
@@ -519,7 +369,6 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
         signal = "HOLD"
         confidence = 50
     
-    # Calculate TP/SL based on ATR
     if signal == "BUY":
         tp1 = current_price + (atr * 2)
         tp2 = current_price + (atr * 3)
@@ -549,15 +398,12 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
 def get_data_with_fallback(pair, timeframe, period):
     """Get data with fallback to historical files"""
     try:
-        # Untuk timeframe 1D, prioritaskan data historis dulu
         if timeframe == '1D':
-            print(f"Timeframe 1D detected, trying historical data first...")
             historical_data = load_historical_data_from_file(pair, timeframe)
             if historical_data is not None and len(historical_data) > 20:
                 print("Using historical data for 1D timeframe")
                 return historical_data
         
-        # Try to get real-time data
         yf_symbol = pair_mapping[pair]
         yf_timeframe = timeframe_mapping[timeframe]
         
@@ -566,21 +412,14 @@ def get_data_with_fallback(pair, timeframe, period):
         
         if not data.empty and len(data) > 20:
             print(f"Using real-time data for {pair}: {len(data)} rows")
-            
-            # Save to database
-            db.save_price_data(pair, timeframe, data)
-            
             return data
         else:
-            # Fallback to historical data
-            print("Real-time data insufficient, trying historical files...")
             historical_data = load_historical_data_from_file(pair, timeframe)
             
             if historical_data is not None and len(historical_data) > 0:
                 return historical_data
             else:
-                # Final fallback - create minimal data
-                print("Creating minimal fallback data...")
+                print("Creating fallback data...")
                 if timeframe == '1D':
                     freq = 'D'
                     periods = 100
@@ -603,8 +442,7 @@ def get_data_with_fallback(pair, timeframe, period):
                 return data
                 
     except Exception as e:
-        print(f"Error getting real-time data: {e}")
-        # Fallback to historical data
+        print(f"Error getting data: {e}")
         historical_data = load_historical_data_from_file(pair, timeframe)
         return historical_data if historical_data is not None else pd.DataFrame()
 
@@ -625,7 +463,6 @@ def get_analysis():
         if timeframe not in timeframe_mapping:
             return jsonify({'error': 'Invalid timeframe'})
         
-        # Get data with fallback
         yf_timeframe = timeframe_mapping[timeframe]
         period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
         
@@ -636,7 +473,6 @@ def get_analysis():
         if data.empty or len(data) < 20:
             return jsonify({'error': 'Insufficient data available'})
         
-        # Current price data
         current_price = float(data['Close'].iloc[-1])
         price_change_pct = 0.0
         
@@ -644,18 +480,13 @@ def get_analysis():
             prev_price = float(data['Close'].iloc[-2])
             price_change_pct = ((current_price - prev_price) / prev_price) * 100
         
-        # Technical indicators
         indicators = get_technical_indicators(data)
         indicators['current_price'] = current_price
         indicators['price_change'] = price_change_pct
         
-        # Fundamental news
         news = get_real_forex_news()
-        
-        # AI Analysis
         ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
         
-        # Prepare response
         response = {
             'pair': pair,
             'timeframe': timeframe,
@@ -675,13 +506,10 @@ def get_analysis():
             'ai_analysis': ai_analysis,
             'fundamental_news': news,
             'chart_data': indicators.get('chart_data', create_default_chart_data()),
-            'data_points': len(data),
-            'data_period': f"{period} ({yf_timeframe})"
+            'data_points': len(data)
         }
         
-        # Save to database
         db.save_analysis(response)
-        
         print(f"Analysis completed for {pair}")
         return jsonify(response)
         
@@ -690,36 +518,16 @@ def get_analysis():
         traceback.print_exc()
         return jsonify({'error': f'Analysis error: {str(e)}'})
 
-@app.route('/get_historical_data')
-def get_historical_data():
-    """Endpoint untuk data historis"""
-    try:
-        pair = request.args.get('pair', 'GBPJPY')
-        days = int(request.args.get('days', '30'))
-        
-        # Get from yfinance as fallback
-        yf_symbol = pair_mapping.get(pair, 'GBPJPY=X')
-        data = yf.download(yf_symbol, period=f'{days}d', interval='1h', progress=False)
-        
-        if data.empty:
-            return jsonify({'error': 'No historical data available'})
-        
-        chart_data = get_historical_data_for_chart(data, min(100, len(data)))
-        return jsonify(chart_data)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)})
-
 @app.route('/get_multiple_analysis')
 def get_multiple_analysis():
-    """Analisis untuk semua pairs sekaligus"""
+    """Analysis for all pairs"""
     try:
         timeframe = request.args.get('timeframe', '4H')
         results = {}
         
         for pair in pair_mapping.keys():
             try:
-                time.sleep(0.5)  # Rate limiting
+                time.sleep(0.5)
                 
                 yf_symbol = pair_mapping[pair]
                 yf_timeframe = timeframe_mapping[timeframe]
@@ -752,9 +560,7 @@ def get_multiple_analysis():
 
 if __name__ == '__main__':
     print("Starting Forex Analysis System...")
-    print("Database initialized:", db.db_path)
     
-    # Create necessary directories
     os.makedirs('data/historical', exist_ok=True)
     
     if not os.path.exists('templates'):
@@ -763,6 +569,5 @@ if __name__ == '__main__':
         print("Contents:", os.listdir('.'))
     else:
         print("Template folder found.")
-        print("Templates available:", os.listdir('templates'))
     
     app.run(debug=True, host='127.0.0.1', port=5000)
