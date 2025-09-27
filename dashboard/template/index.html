@@ -1,67 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📊 Forex Analysis Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Forex Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <header>
-        <h1>📊 Forex Analysis Dashboard</h1>
-        <p>Monitoring & Analisis Trading Forex 🚀</p>
-    </header>
+    <h1>Forex Analysis Dashboard</h1>
+    <label for="pair">Select Pair:</label>
+    <select id="pair">
+        {% for p in pairs %}
+            <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+    </select>
+    <div id="chart"></div>
+    <div id="signal"></div>
 
-    <main>
-        <section class="card">
-            <h2>Harga EUR/USD</h2>
-            <canvas id="eurusdChart"></canvas>
-        </section>
+<script>
+async function fetchData(pair){
+    const res = await fetch("/get_data", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({pair})
+    });
+    return await res.json();
+}
 
-        <section class="card">
-            <h2>Sentimen Berita</h2>
-            <p>📈 Positif: <span style="color:green;">65%</span> |
-               📉 Negatif: <span style="color:red;">35%</span></p>
-        </section>
+function plotData(data){
+    const traceCandlestick = {
+        x: data.dates,
+        open: data.open,
+        high: data.high,
+        low: data.low,
+        close: data.close,
+        type: 'candlestick',
+        name: 'Price'
+    };
+    const traceEMA = {
+        x: data.dates,
+        y: data.ema200,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'EMA200',
+        line: {color: 'blue'}
+    };
+    const layout = {title: 'Forex Chart'};
+    Plotly.newPlot('chart', [traceCandlestick, traceEMA], layout);
 
-        <section class="card">
-            <h2>Prediksi AI</h2>
-            <p>📌 Model Machine Learning memprediksi tren naik dalam 24 jam ke depan.</p>
-        </section>
-    </main>
+    let signalText = `Signal: ${data.signal}`;
+    if(data.tp && data.sl){
+        signalText += `<br>TP: ${data.tp} | SL: ${data.sl}`;
+    }
+    document.getElementById('signal').innerHTML = signalText;
+}
 
-    <footer>
-        <p>Forex Analysis System © 2025</p>
-    </footer>
+async function updateChart(){
+    const pair = document.getElementById("pair").value;
+    const data = await fetchData(pair);
+    plotData(data);
+}
 
-    <script>
-        // Dummy data untuk chart EUR/USD
-        const ctx = document.getElementById('eurusdChart').getContext('2d');
-        const eurusdChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ["09:00", "10:00", "11:00", "12:00", "13:00"],
-                datasets: [{
-                    label: 'EUR/USD',
-                    data: [1.073, 1.075, 1.074, 1.078, 1.080],
-                    borderColor: 'blue',
-                    backgroundColor: 'rgba(0,0,255,0.1)',
-                    fill: true,
-                    tension: 0.3
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: true },
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Waktu (Jam)' } },
-                    y: { title: { display: true, text: 'Harga' } }
-                }
-            }
-        });
-    </script>
+document.getElementById("pair").addEventListener("change", updateChart);
+updateChart();
+</script>
 </body>
 </html>
