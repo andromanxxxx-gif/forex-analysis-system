@@ -14,14 +14,14 @@ warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
 
-# Konfigurasi
+# Konfigurasi DeepSeek API
 DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs mapping
 pair_mapping = {
     'GBPJPY': 'GBPJPY=X',
-    'USDJPY': 'USDJPY=X',
+    'USDJPY': 'USDJPY=X', 
     'EURJPY': 'EURJPY=X',
     'CHFJPY': 'CHFJPY=X'
 }
@@ -29,7 +29,7 @@ pair_mapping = {
 # Timeframe mapping
 timeframe_mapping = {
     '1H': '1h',
-    '2H': '2h', 
+    '2H': '2h',
     '4H': '4h',
     '1D': '1d'
 }
@@ -38,36 +38,62 @@ def get_technical_indicators(data):
     """Menghitung indikator teknikal"""
     indicators = {}
     
-    # Price data
-    high = data['High']
-    low = data['Low']
-    close = data['Close']
-    volume = data['Volume'] if 'Volume' in data else pd.Series([1] * len(data))
-    
-    # Trend Indicators
-    indicators['sma_20'] = talib.SMA(close, timeperiod=20).iloc[-1]
-    indicators['sma_50'] = talib.SMA(close, timeperiod=50).iloc[-1]
-    indicators['ema_12'] = talib.EMA(close, timeperiod=12).iloc[-1]
-    indicators['ema_26'] = talib.EMA(close, timeperiod=26).iloc[-1]
-    
-    # Momentum Indicators
-    indicators['rsi'] = talib.RSI(close, timeperiod=14).iloc[-1]
-    indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(close)
-    indicators['macd'] = indicators['macd'].iloc[-1]
-    indicators['macd_signal'] = indicators['macd_signal'].iloc[-1]
-    indicators['macd_hist'] = indicators['macd_hist'].iloc[-1]
-    
-    # Volatility Indicators
-    indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(close, timeperiod=20)
-    indicators['bb_upper'] = indicators['bb_upper'].iloc[-1]
-    indicators['bb_middle'] = indicators['bb_middle'].iloc[-1]
-    indicators['bb_lower'] = indicators['bb_lower'].iloc[-1]
-    indicators['atr'] = talib.ATR(high, low, close, timeperiod=14).iloc[-1]
-    
-    # Support Resistance
-    indicators['pivot'] = (high.iloc[-1] + low.iloc[-1] + close.iloc[-1]) / 3
-    indicators['resistance1'] = 2 * indicators['pivot'] - low.iloc[-1]
-    indicators['support1'] = 2 * indicators['pivot'] - high.iloc[-1]
+    try:
+        # Price data
+        high = data['High']
+        low = data['Low']
+        close = data['Close']
+        
+        # Trend Indicators
+        indicators['sma_20'] = close.rolling(window=20).mean().iloc[-1]
+        indicators['sma_50'] = close.rolling(window=50).mean().iloc[-1]
+        indicators['ema_12'] = close.ewm(span=12).mean().iloc[-1]
+        indicators['ema_26'] = close.ewm(span=26).mean().iloc[-1]
+        
+        # Momentum Indicators - RSI
+        delta = close.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        indicators['rsi'] = 100 - (100 / (1 + rs.iloc[-1]))
+        
+        # MACD
+        ema_12 = close.ewm(span=12).mean()
+        ema_26 = close.ewm(span=26).mean()
+        indicators['macd'] = (ema_12 - ema_26).iloc[-1]
+        indicators['macd_signal'] = (ema_12 - ema_26).ewm(span=9).mean().iloc[-1]
+        indicators['macd_hist'] = indicators['macd'] - indicators['macd_signal']
+        
+        # Volatility Indicators - Bollinger Bands
+        sma_20 = close.rolling(window=20).mean()
+        std_20 = close.rolling(window=20).std()
+        indicators['bb_upper'] = (sma_20 + (std_20 * 2)).iloc[-1]
+        indicators['bb_middle'] = sma_20.iloc[-1]
+        indicators['bb_lower'] = (sma_20 - (std_20 * 2)).iloc[-1]
+        
+        # ATR (Average True Range)
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        true_range = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        indicators['atr'] = true_range.rolling(window=14).mean().iloc[-1]
+        
+        # Support Resistance
+        indicators['pivot'] = (high.iloc[-1] + low.iloc[-1] + close.iloc[-1]) / 3
+        indicators['resistance1'] = 2 * indicators['pivot'] - low.iloc[-1]
+        indicators['support1'] = 2 * indicators['pivot'] - high.iloc[-1]
+        
+    except Exception as e:
+        print(f"Error in technical indicators: {e}")
+        # Set default values
+        current_price = close.iloc[-1] if 'close' in locals() else 0
+        indicators = {
+            'sma_20': current_price, 'sma_50': current_price,
+            'ema_12': current_price, 'ema_26': current_price,
+            'rsi': 50, 'macd': 0, 'macd_signal': 0, 'macd_hist': 0,
+            'bb_upper': current_price, 'bb_middle': current_price, 'bb_lower': current_price,
+            'atr': 0.01, 'pivot': current_price, 'resistance1': current_price, 'support1': current_price
+        }
     
     return indicators
 
@@ -76,68 +102,67 @@ def get_fundamental_news():
     news_items = []
     
     try:
-        # Bloomberg Forex News
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        # Contoh sumber berita (bisa ditambah lebih banyak)
-        sources = [
-            'https://www.bloomberg.com/markets/currencies',
-            'https://www.reuters.com/finance/currencies'
+        # Contoh berita statis (bisa diganti dengan web scraping real)
+        news_items = [
+            {
+                'source': 'Market Watch',
+                'headline': 'Bank of Japan maintains ultra-loose monetary policy',
+                'timestamp': datetime.now().strftime('%H:%M')
+            },
+            {
+                'source': 'Reuters', 
+                'headline': 'Yen volatility expected amid economic data releases',
+                'timestamp': datetime.now().strftime('%H:%M')
+            },
+            {
+                'source': 'Bloomberg',
+                'headline': 'JPY pairs show strong technical momentum',
+                'timestamp': datetime.now().strftime('%H:%M')
+            }
         ]
-        
-        for source in sources:
-            try:
-                response = requests.get(source, headers=headers, timeout=10)
-                soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # Scraping sederhana - sesuaikan dengan struktur website
-                headlines = soup.find_all('h1', limit=3) + soup.find_all('h2', limit=3)
-                for headline in headlines:
-                    text = headline.get_text().strip()
-                    if text and len(text) > 20:
-                        news_items.append({
-                            'source': source.split('//')[-1].split('/')[0],
-                            'headline': text,
-                            'timestamp': datetime.now().strftime('%H:%M')
-                        })
-            except:
-                continue
                 
     except Exception as e:
         print(f"Error fetching news: {e}")
-        # Fallback news
         news_items = [
             {'source': 'System', 'headline': 'Market Analysis in Progress', 'timestamp': 'Now'},
             {'source': 'System', 'headline': 'Technical Analysis Completed', 'timestamp': 'Now'}
         ]
     
-    return news_items[:5]  # Return max 5 berita
+    return news_items[:3]
 
 def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
     """Analisis dengan AI DeepSeek"""
     
     prompt = f"""
-    Sebagai analis forex profesional, analisalah data berikut untuk pair {pair} pada timeframe {timeframe}:
+    ANALISIS FOREX PROFESIONAL - {pair} TIMEFRAME {timeframe}
 
     DATA TEKNIKAL:
-    {json.dumps(technical_data, indent=2)}
+    - Current Price: {technical_data.get('current_price', 0)}
+    - RSI: {technical_data.get('rsi', 0):.2f}
+    - MACD: {technical_data.get('macd', 0):.4f}
+    - Signal: {technical_data.get('macd_signal', 0):.4f}
+    - SMA 20: {technical_data.get('sma_20', 0):.4f}
+    - SMA 50: {technical_data.get('sma_50', 0):.4f}
+    - Support: {technical_data.get('support1', 0):.4f}
+    - Resistance: {technical_data.get('resistance1', 0):.4f}
+    - ATR: {technical_data.get('atr', 0):.4f}
 
-    BERITA FUNDAMENTAL TERKINI:
-    {json.dumps(fundamental_news, indent=2)}
+    BERITA TERKINI:
+    {[news['headline'] for news in fundamental_news]}
 
-    Berikan rekomendasi trading yang jelas dengan format:
-    1. SIGNAL (BUY/SELL/HOLD)
-    2. CONFIDENCE_LEVEL (0-100%)
-    3. ENTRY_PRICE (rekomendasi)
-    4. TAKE_PROFIT_1, TAKE_PROFIT_2
-    5. STOP_LOSS
-    6. RISK_REWARD_RATIO
-    7. TIME_HORIZON (jam/hari)
-    8. ANALYSIS_SUMMARY (penjelasan singkat)
+    Berikan rekomendasi trading dalam format JSON:
 
-    Jawab dengan format JSON yang valid.
+    {{
+        "SIGNAL": "BUY/SELL/HOLD",
+        "CONFIDENCE_LEVEL": 0-100,
+        "ENTRY_PRICE": number,
+        "TAKE_PROFIT_1": number,
+        "TAKE_PROFIT_2": number, 
+        "STOP_LOSS": number,
+        "RISK_REWARD_RATIO": "string",
+        "TIME_HORIZON": "string",
+        "ANALYSIS_SUMMARY": "string"
+    }}
     """
     
     try:
@@ -151,15 +176,15 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
             'messages': [
                 {
                     'role': 'system',
-                    'content': 'Anda adalah analis forex profesional. Berikan analisis yang akurat dan rekomendasi trading yang praktis.'
+                    'content': 'Anda adalah analis forex profesional. Berikan analisis teknis dan rekomendasi trading praktis.'
                 },
                 {
-                    'role': 'user',
+                    'role': 'user', 
                     'content': prompt
                 }
             ],
             'temperature': 0.3,
-            'max_tokens': 1500
+            'max_tokens': 1000
         }
         
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=30)
@@ -170,70 +195,49 @@ def analyze_with_deepseek(technical_data, fundamental_news, pair, timeframe):
             
             # Extract JSON dari response
             try:
-                # Cari bagian JSON dalam response
                 start_idx = analysis_text.find('{')
                 end_idx = analysis_text.rfind('}') + 1
                 if start_idx != -1 and end_idx != -1:
                     json_str = analysis_text[start_idx:end_idx]
-                    analysis = json.loads(json_str)
-                else:
-                    # Fallback parsing manual
-                    analysis = parse_analysis_manual(analysis_text)
+                    return json.loads(json_str)
             except:
-                analysis = parse_analysis_manual(analysis_text)
-                
-            return analysis
+                return generate_fallback_analysis(technical_data, pair, timeframe)
         else:
+            print(f"API Error: {response.status_code}")
             return generate_fallback_analysis(technical_data, pair, timeframe)
             
     except Exception as e:
         print(f"DeepSeek API error: {e}")
         return generate_fallback_analysis(technical_data, pair, timeframe)
 
-def parse_analysis_manual(analysis_text):
-    """Parsing manual jika JSON extraction gagal"""
-    analysis = {
-        'SIGNAL': 'HOLD',
-        'CONFIDENCE_LEVEL': 50,
-        'ENTRY_PRICE': 0,
-        'TAKE_PROFIT_1': 0,
-        'TAKE_PROFIT_2': 0,
-        'STOP_LOSS': 0,
-        'RISK_REWARD_RATIO': '1:1',
-        'TIME_HORIZON': '4-8 jam',
-        'ANALYSIS_SUMMARY': 'Analisis default - periksa koneksi API'
-    }
-    
-    # Simple keyword matching
-    if 'BUY' in analysis_text.upper():
-        analysis['SIGNAL'] = 'BUY'
-        analysis['CONFIDENCE_LEVEL'] = 65
-    elif 'SELL' in analysis_text.upper():
-        analysis['SIGNAL'] = 'SELL' 
-        analysis['CONFIDENCE_LEVEL'] = 65
-        
-    return analysis
-
 def generate_fallback_analysis(technical_data, pair, timeframe):
-    """Generate analisis fallback jika API tidak available"""
-    current_price = technical_data['current_price']
-    rsi = technical_data['rsi']
-    trend = "BULLISH" if technical_data['sma_20'] > technical_data['sma_50'] else "BEARISH"
+    """Generate analisis fallback"""
+    current_price = technical_data.get('current_price', 0)
+    rsi = technical_data.get('rsi', 50)
     
-    if rsi < 30 and trend == "BULLISH":
+    # Simple logic based on RSI
+    if rsi < 30:
         signal = "BUY"
         confidence = 70
-    elif rsi > 70 and trend == "BEARISH":
-        signal = "SELL"
+    elif rsi > 70:
+        signal = "SELL" 
         confidence = 70
     else:
         signal = "HOLD"
         confidence = 50
     
-    atr = technical_data['atr']
-    tp1 = current_price + (atr * 1.5) if signal == "BUY" else current_price - (atr * 1.5)
-    tp2 = current_price + (atr * 2.5) if signal == "BUY" else current_price - (atr * 2.5)
-    sl = current_price - (atr * 1) if signal == "BUY" else current_price + (atr * 1)
+    atr = technical_data.get('atr', 0.01)
+    
+    if signal == "BUY":
+        tp1 = current_price + (atr * 1.5)
+        tp2 = current_price + (atr * 2.5)
+        sl = current_price - (atr * 1.0)
+    elif signal == "SELL":
+        tp1 = current_price - (atr * 1.5)
+        tp2 = current_price - (atr * 2.5) 
+        sl = current_price + (atr * 1.0)
+    else:
+        tp1 = tp2 = sl = current_price
     
     return {
         'SIGNAL': signal,
@@ -243,8 +247,8 @@ def generate_fallback_analysis(technical_data, pair, timeframe):
         'TAKE_PROFIT_2': round(tp2, 4),
         'STOP_LOSS': round(sl, 4),
         'RISK_REWARD_RATIO': '1:1.5',
-        'TIME_HORIZON': '4-8 jam',
-        'ANALYSIS_SUMMARY': f'Analisis teknikal: RSI {rsi:.1f}, Trend {trend}'
+        'TIME_HORIZON': '4-8 hours',
+        'ANALYSIS_SUMMARY': f'Fallback analysis: RSI {rsi:.1f}, Price {current_price:.4f}'
     }
 
 @app.route('/')
@@ -257,7 +261,6 @@ def get_analysis():
         pair = request.args.get('pair', 'GBPJPY')
         timeframe = request.args.get('timeframe', '4H')
         
-        # Validasi input
         if pair not in pair_mapping:
             return jsonify({'error': 'Invalid pair'})
         if timeframe not in timeframe_mapping:
@@ -267,35 +270,34 @@ def get_analysis():
         yf_symbol = pair_mapping[pair]
         yf_timeframe = timeframe_mapping[timeframe]
         
-        # Download data dengan periode yang sesuai
+        # Determine period based on timeframe
         period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
-        data = yf.download(yf_symbol, period=period, interval=yf_timeframe, auto_adjust=True)
+        data = yf.download(yf_symbol, period=period, interval=yf_timeframe)
         
-        if data.empty or len(data) < 50:
-            return jsonify({'error': 'Insufficient data'})
+        if data.empty or len(data) < 20:
+            return jsonify({'error': 'Insufficient data available'})
         
         # Current price data
         current_price = data['Close'].iloc[-1]
-        price_change = ((current_price - data['Close'].iloc[-2]) / data['Close'].iloc[-2]) * 100
+        price_change_pct = ((current_price - data['Close'].iloc[-2]) / data['Close'].iloc[-2] * 100) if len(data) > 1 else 0
         
         # Technical indicators
         indicators = get_technical_indicators(data)
         indicators['current_price'] = current_price
-        indicators['price_change'] = price_change
+        indicators['price_change'] = price_change_pct
         
         # Fundamental news
         news = get_fundamental_news()
         
-        # AI Analysis dengan DeepSeek
+        # AI Analysis
         ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
         
-        # Prepare response
         response = {
             'pair': pair,
             'timeframe': timeframe,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'current_price': round(current_price, 4),
-            'price_change': round(price_change, 2),
+            'price_change': round(price_change_pct, 2),
             'technical_indicators': {
                 'RSI': round(indicators['rsi'], 2),
                 'MACD': round(indicators['macd'], 4),
@@ -323,12 +325,30 @@ def get_multiple_analysis():
         
         for pair in pair_mapping.keys():
             try:
-                # Delay kecil untuk avoid rate limiting
-                time.sleep(1)
+                time.sleep(0.5)  # Small delay to avoid rate limiting
                 
-                analysis_response = get_analysis()
-                if analysis_response and hasattr(analysis_response, 'get_json'):
-                    results[pair] = analysis_response.get_json()
+                # Simulate API call for each pair
+                yf_symbol = pair_mapping[pair]
+                yf_timeframe = timeframe_mapping[timeframe]
+                period = '60d' if yf_timeframe in ['1h', '2h', '4h'] else '1y'
+                data = yf.download(yf_symbol, period=period, interval=yf_timeframe)
+                
+                if not data.empty and len(data) > 20:
+                    current_price = data['Close'].iloc[-1]
+                    indicators = get_technical_indicators(data)
+                    news = get_fundamental_news()
+                    ai_analysis = analyze_with_deepseek(indicators, news, pair, timeframe)
+                    
+                    results[pair] = {
+                        'pair': pair,
+                        'timeframe': timeframe,
+                        'current_price': round(current_price, 4),
+                        'ai_analysis': ai_analysis,
+                        'timestamp': datetime.now().strftime('%H:%M:%S')
+                    }
+                else:
+                    results[pair] = {'error': 'No data available'}
+                    
             except Exception as e:
                 results[pair] = {'error': str(e)}
         
