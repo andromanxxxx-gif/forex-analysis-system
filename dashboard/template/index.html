@@ -32,10 +32,6 @@
             margin-bottom: 10px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
-        .header p { 
-            font-size: 1.2em; 
-            opacity: 0.9;
-        }
         .controls { 
             background: white; 
             padding: 20px; 
@@ -137,7 +133,6 @@
             border-radius: 5px;
             padding-left: 10px;
         }
-        .news-item:last-child { border-bottom: none; }
         .signal-display {
             font-size: 1.5em;
             font-weight: bold;
@@ -175,11 +170,6 @@
             border-radius: 5px;
             font-size: 0.9em;
         }
-        @media (max-width: 768px) {
-            .analysis-grid { grid-template-columns: 1fr; }
-            .controls { flex-direction: column; align-items: stretch; }
-            .control-group { justify-content: space-between; }
-        }
     </style>
 </head>
 <body>
@@ -212,14 +202,10 @@
 
             <button onclick="loadAnalysis()">🔄 Refresh Analysis</button>
             <button onclick="loadAllAnalysis()">📊 Analyze All Pairs</button>
-            <button onclick="autoRefreshToggle()">⏰ Auto Refresh: <span id="autoRefreshStatus">OFF</span></button>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
             <div>🔄 Loading AI Analysis...</div>
-            <div style="font-size: 0.9em; margin-top: 10px; color: #95a5a6;">
-                Analyzing technical indicators and market news...
-            </div>
         </div>
         
         <div id="error" class="error" style="display: none;"></div>
@@ -227,8 +213,6 @@
     </div>
 
     <script>
-        let autoRefreshInterval = null;
-        
         function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
             const timeframe = document.getElementById('timeframeSelect').value;
@@ -266,22 +250,6 @@
                     hideLoading();
                     showError('Error loading all analysis: ' + error.message);
                 });
-        }
-
-        function autoRefreshToggle() {
-            const statusElement = document.getElementById('autoRefreshStatus');
-            
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
-                statusElement.textContent = 'OFF';
-                statusElement.style.color = '#e74c3c';
-            } else {
-                autoRefreshInterval = setInterval(loadAnalysis, 300000); // 5 minutes
-                statusElement.textContent = 'ON (5min)';
-                statusElement.style.color = '#27ae60';
-                loadAnalysis(); // Immediate refresh
-            }
         }
 
         function displayAnalysis(data) {
@@ -336,10 +304,10 @@
                     </div>
 
                     <div class="card">
-                        <h3>📰 Market News & Analysis</h3>
+                        <h3>📰 Market News</h3>
                         ${data.fundamental_news.map(news => `
                             <div class="news-item">
-                                <strong>📻 ${news.source}</strong> 
+                                <strong>${news.source}</strong> 
                                 <span style="float: right; color: #7f8c8d;">${news.timestamp}</span><br>
                                 ${news.headline}
                             </div>
@@ -393,10 +361,6 @@
                             <strong>TP2:</strong> ${ai.TAKE_PROFIT_2}<br>
                             <strong>SL:</strong> ${ai.STOP_LOSS}<br>
                             <strong>R/R:</strong> ${ai.RISK_REWARD_RATIO}
-                        </div>
-                        
-                        <div style="font-size: 0.9em; color: #7f8c8d;">
-                            Updated: ${analysis.timestamp}
                         </div>
                     </div>
                 `;
