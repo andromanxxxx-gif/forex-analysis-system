@@ -1,14 +1,20 @@
+# src/ai_analysis.py
 import requests
 from config.settings import DEEPSEEK_API_KEY
 
-def analyze_news(text):
-    url = "https://api.deepseek.ai/v1/analyze"
+def analyze_news(pair):
+    """
+    Mengirim request ke DeepSeek AI untuk analisis sentimen berita
+    """
+    url = "https://api.deepseek.ai/analyze"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}"}
-    payload = {"text": text}
-
+    payload = {"text": f"Latest news sentiment for {pair}"}
+    
     try:
         response = requests.post(url, json=payload, headers=headers)
-        data = response.json()
-        return data.get("recommendation", "No recommendation")
+        result = response.json()
+        # contoh: result['recommendation'] = "BUY" / "SELL" / "HOLD"
+        return result.get("recommendation", "HOLD")
     except Exception as e:
-        return f"Error: {e}"
+        print("❌ DeepSeek API error:", e)
+        return "HOLD"
