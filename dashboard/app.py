@@ -1,68 +1,63 @@
-import streamlit as st
+from flask import Flask, render_template, request
 import pandas as pd
-import yfinance as yf
-import plotly.graph_objects as go
-from pathlib import Path
-import sys
-
-# Tambahkan src ke path
-sys.path.append(str(Path(__file__).parent.parent))
+import plotly.graph_objs as go
 from src.trading_signals import calculate_indicators, generate_signal
+from src.drive_integration import authenticate_drive, download_file
+import threading, time, os
 
-st.set_page_config(page_title="Forex Analysis Dashboard", layout="wide")
-st.title("📈 Forex Analysis System")
+app = Flask(__name__)
 
-# Dropdown pair
-pair_map = {"EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "USDJPY=X"}
-selected_pair = st.selectbox("Select Forex Pair", list(pair_map.keys()))
-ticker = pair_map[selected_pair]
+pairs = ['EUR/USD', 'GBP/USD', 'USD/JPY']
+data_files = {
+    'EUR/USD': 'data/raw/EURUSD.csv',
+    'GBP/USD': 'data/raw/GBPUSD.csv',
+    'USD/JPY': 'data/raw/USDJPY.csv'
+}
+# Google Drive file IDs
+drive_file_ids = {
+    'EUR/USD': 'YOUR_FILE_ID_EURUSD',
+    'GBP/USD': 'YOUR_FILE_ID_GBPUSD',
+    'USD/JPY': 'YOUR_FILE_ID_USDJPY'
+}
 
-# Ambil data 6 bulan terakhir
-data = yf.download(ticker, period="6mo", interval="1d").reset_index()
-data = calculate_indicators(data)
-signals = generate_signal(data)
+# Fungsi auto-update data dari Drive
+def update_data():
+    service = authenticate_drive()
+    while True:
+        for pair, file_id in drive_file_ids.items():
+            download_file(service, file_id, data_files[pair])
+        time.sleep(10)  # update tiap 10 detik
 
-# Chart candlestick
-fig = go.Figure(data=[go.Candlestick(
-    x=data['Date'],
-    open=data['Open'], high=data['High'],
-    low=data['Low'], close=data['Close'],
-    name='Price'
-)])
+# Jalankan thread background untuk update data
+threading.Thread(target=update_data, daemon=True).start()
 
-# EMA200
-fig.add_trace(go.Scatter(
-    x=data['Date'], y=data['EMA200'],
-    line=dict(color='orange', width=2),
-    name='EMA 200'
-))
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    selected_pair = request.form.get('pair') or 'EUR/USD'
+    file_path = data_files[selected_pair]
+    
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        df = calculate_indicators(df)
+        signal, tp, sl = generate_signal(df)
+    else:
+        df = pd.DataFrame()
+        signal = tp = sl = None
 
-# MACD
-fig.add_trace(go.Scatter(
-    x=data['Date'], y=data['MACD'],
-    line=dict(color='blue', width=1),
-    name='MACD'
-))
-fig.add_trace(go.Scatter(
-    x=data['Date'], y=data['Signal_MACD'],
-    line=dict(color='red', width=1),
-    name='MACD Signal'
-))
+    fig = go.Figure()
+    if not df.empty:
+        fig.add_trace(go.Candlestick(
+            x=df.index,
+            open=df['Open'], high=df['High'],
+            low=df['Low'], close=df['Close'],
+            name='Candlestick'
+        ))
+        fig.add_trace(go.Scatter(x=df.index, y=df['EMA200'], mode='lines', name='EMA200'))
 
-# OBV
-fig.add_trace(go.Scatter(
-    x=data['Date'], y=data['OBV'],
-    line=dict(color='green', width=1),
-    name='On Balance Volume'
-))
+    graphJSON = fig.to_json()
 
-fig.update_layout(title=f"{selected_pair} Analysis", xaxis_title="Date", yaxis_title="Price")
-st.plotly_chart(fig, use_container_width=True)
+    return render_template('index.html', pairs=pairs, selected_pair=selected_pair,
+                           signal=signal, tp=tp, sl=sl, graphJSON=graphJSON)
 
-# Latest signal
-latest = signals.iloc[-1]
-st.subheader("Latest Trading Signal")
-signal_color = "green" if latest['Signal'] == "Buy" else "red" if latest['Signal'] == "Sell" else "gray"
-st.markdown(f"<span style='color:{signal_color}; font-size:24px'><b>{latest['Signal']}</b></span>", unsafe_allow_html=True)
-st.write(f"Take Profit: {latest['Take_Profit']}")
-st.write(f"Stop Loss: {latest['Stop_Loss']}")
+if __name__ == "__main__":
+    app.run(debug=True)
