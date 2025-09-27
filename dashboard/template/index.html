@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Forex Trading System</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -172,14 +173,52 @@
         }
         .chart-container {
             grid-column: 1 / -1;
-            height: 400px;
+            height: 500px;
             margin: 20px 0;
+            position: relative;
         }
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .chart-btn {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            background: #f8f9fa;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .chart-btn.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .trading-levels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .level-item {
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .level-buy { background: #d4edda; color: #155724; }
+        .level-sell { background: #f8d7da; color: #721c24; }
+        .level-neutral { background: #fff3cd; color: #856404; }
         @media (max-width: 768px) {
             .analysis-grid { grid-template-columns: 1fr; }
             .controls { flex-direction: column; align-items: stretch; }
             .control-group { justify-content: space-between; }
-            .chart-container { height: 300px; }
+            .chart-container { height: 350px; }
+            .trading-levels { flex-direction: column; }
         }
     </style>
 </head>
@@ -230,6 +269,8 @@
     <script>
         let autoRefreshInterval = null;
         let currentChart = null;
+        let currentChartType = 'candlestick';
+        let currentAnalysis = null;
         
         function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
@@ -245,6 +286,7 @@
                     if (data.error) {
                         showError('Analysis Error: ' + data.error);
                     } else {
+                        currentAnalysis = data;
                         displayAnalysis(data);
                     }
                 })
@@ -279,110 +321,209 @@
                 statusElement.textContent = 'OFF';
                 statusElement.style.color = '#e74c3c';
             } else {
-                autoRefreshInterval = setInterval(loadAnalysis, 300000); // 5 minutes
+                autoRefreshInterval = setInterval(loadAnalysis, 300000);
                 statusElement.textContent = 'ON (5min)';
                 statusElement.style.color = '#27ae60';
-                loadAnalysis(); // Immediate refresh
+                loadAnalysis();
             }
         }
 
-        function createPriceChart(chartData) {
+        function switchChartType(type) {
+            currentChartType = type;
+            if (currentAnalysis && currentAnalysis.chart_data) {
+                createChart(currentAnalysis.chart_data, currentAnalysis.ai_analysis);
+            }
+        }
+
+        function createCandlestickDataset(chartData) {
+            const candles = [];
+            for (let i = 0; i < chartData.dates.length; i++) {
+                candles.push({
+                    x: chartData.dates[i],
+                    o: chartData.open[i],
+                    h: chartData.high[i],
+                    l: chartData.low[i],
+                    c: chartData.close[i]
+                });
+            }
+            return candles;
+        }
+
+        function createChart(chartData, analysis) {
             if (currentChart) {
                 currentChart.destroy();
             }
             
             const ctx = document.getElementById('priceChart').getContext('2d');
+            const signal = analysis.SIGNAL.toLowerCase();
             
-            // Prepare datasets
-            const datasets = [
-                {
-                    label: 'Close Price',
-                    data: chartData.close,
-                    borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    borderWidth: 2,
-                    fill: false
-                },
-                {
-                    label: 'EMA 20',
-                    data: chartData.ema_20,
-                    borderColor: '#e74c3c',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    fill: false
-                },
-                {
-                    label: 'EMA 50',
-                    data: chartData.ema_50,
-                    borderColor: '#f39c12',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    fill: false
-                },
-                {
-                    label: 'EMA 200',
-                    data: chartData.ema_200,
-                    borderColor: '#27ae60',
-                    borderWidth: 2,
-                    fill: false
-                }
-            ];
-
-            currentChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.dates,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Price Chart with Moving Averages',
-                            font: { size: 16 }
-                        },
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
+            if (currentChartType === 'candlestick') {
+                // Candlestick Chart
+                const candleData = createCandlestickDataset(chartData);
+                
+                currentChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        datasets: [{
+                            label: 'Price',
+                            data: candleData,
+                            borderColor: '#000',
+                            borderWidth: 1,
+                            backgroundColor: candleData.map(d => 
+                                d.c >= d.o ? 'rgba(76, 175, 80, 0.8)' : 'rgba(244, 67, 54, 0.8)'
+                            )
+                        }, {
+                            label: 'EMA 20',
+                            data: chartData.ema_20.map((val, idx) => ({x: chartData.dates[idx], y: val})),
+                            borderColor: '#FF9800',
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 0
+                        }, {
+                            label: 'EMA 50',
+                            data: chartData.ema_50.map((val, idx) => ({x: chartData.dates[idx], y: val})),
+                            borderColor: '#2196F3',
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 0
+                        }, {
+                            label: 'EMA 200',
+                            data: chartData.ema_200.map((val, idx) => ({x: chartData.dates[idx], y: val})),
+                            borderColor: '#9C27B0',
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 0
+                        }]
                     },
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'Time'
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'category',
+                                title: { display: true, text: 'Time' },
+                                ticks: { maxTicksLimit: 8 }
                             },
-                            ticks: {
-                                maxTicksLimit: 10,
-                                autoSkip: true
+                            y: {
+                                title: { display: true, text: 'Price' },
+                                ticks: { callback: value => value.toFixed(3) }
                             }
                         },
-                        y: {
-                            display: true,
+                        plugins: {
                             title: {
                                 display: true,
-                                text: 'Price'
+                                text: 'Candlestick Chart with EMAs',
+                                font: { size: 16 }
                             },
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toFixed(3);
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const point = context.raw;
+                                        if (point.o !== undefined) {
+                                            return `O: ${point.o.toFixed(4)} H: ${point.h.toFixed(4)} L: ${point.l.toFixed(4)} C: ${point.c.toFixed(4)}`;
+                                        }
+                                        return `${context.dataset.label}: ${point.y.toFixed(4)}`;
+                                    }
                                 }
                             }
                         }
-                    },
-                    interaction: {
-                        mode: 'nearest',
-                        axis: 'x',
-                        intersect: false
                     }
-                }
-            });
+                });
+            } else {
+                // Line Chart
+                currentChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.dates,
+                        datasets: [{
+                            label: 'Close Price',
+                            data: chartData.close,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            borderWidth: 2,
+                            fill: true
+                        }, {
+                            label: 'EMA 20',
+                            data: chartData.ema_20,
+                            borderColor: '#e74c3c',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            fill: false
+                        }, {
+                            label: 'EMA 50',
+                            data: chartData.ema_50,
+                            borderColor: '#f39c12',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            fill: false
+                        }, {
+                            label: 'EMA 200',
+                            data: chartData.ema_200,
+                            borderColor: '#27ae60',
+                            borderWidth: 2,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Price Chart with Moving Averages',
+                                font: { size: 16 }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Time' },
+                                ticks: { maxTicksLimit: 8 }
+                            },
+                            y: {
+                                title: { display: true, text: 'Price' },
+                                ticks: { callback: value => value.toFixed(3) }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Add trading levels to chart
+            addTradingLevels(analysis, chartData.close[chartData.close.length - 1]);
+        }
+
+        function addTradingLevels(analysis, currentPrice) {
+            const levelsHtml = `
+                <div class="trading-levels">
+                    <div class="level-item ${analysis.SIGNAL.includes('BUY') ? 'level-buy' : analysis.SIGNAL.includes('SELL') ? 'level-sell' : 'level-neutral'}">
+                        <div>Entry: ${analysis.ENTRY_PRICE}</div>
+                        <div>${analysis.SIGNAL}</div>
+                    </div>
+                    <div class="level-item level-buy">
+                        <div>Take Profit 1</div>
+                        <div>${analysis.TAKE_PROFIT_1}</div>
+                    </div>
+                    <div class="level-item level-buy">
+                        <div>Take Profit 2</div>
+                        <div>${analysis.TAKE_PROFIT_2}</div>
+                    </div>
+                    <div class="level-item level-sell">
+                        <div>Stop Loss</div>
+                        <div>${analysis.STOP_LOSS}</div>
+                    </div>
+                    <div class="level-item level-neutral">
+                        <div>Current Price</div>
+                        <div>${currentPrice}</div>
+                    </div>
+                </div>
+            `;
+            
+            const chartContainer = document.querySelector('.chart-container');
+            const existingLevels = chartContainer.querySelector('.trading-levels');
+            if (existingLevels) {
+                existingLevels.remove();
+            }
+            chartContainer.insertAdjacentHTML('beforeend', levelsHtml);
         }
 
         function displayAnalysis(data) {
@@ -460,6 +601,12 @@
 
                     <div class="card" style="grid-column: 1 / -1;">
                         <h3>📈 Real-time Price Chart</h3>
+                        <div class="chart-controls">
+                            <button class="chart-btn ${currentChartType === 'candlestick' ? 'active' : ''}" 
+                                    onclick="switchChartType('candlestick')">Candlestick</button>
+                            <button class="chart-btn ${currentChartType === 'line' ? 'active' : ''}" 
+                                    onclick="switchChartType('line')">Line Chart</button>
+                        </div>
                         <div class="chart-container">
                             <canvas id="priceChart"></canvas>
                         </div>
@@ -471,7 +618,7 @@
             
             // Create chart after DOM is updated
             if (data.chart_data && data.chart_data.dates.length > 0) {
-                setTimeout(() => createPriceChart(data.chart_data), 100);
+                setTimeout(() => createChart(data.chart_data, data.ai_analysis), 100);
             }
         }
 
@@ -491,19 +638,20 @@
                 
                 const ai = analysis.ai_analysis;
                 const signalClass = `signal-${ai.SIGNAL.toLowerCase().split(' ')[0]}`;
+                const signalType = ai.SIGNAL.toLowerCase().split(' ')[0];
                 
                 html += `
                     <div class="card ${signalClass}">
                         <h3>${pair} - ${analysis.timeframe}</h3>
                         <div class="price-display">${analysis.current_price}</div>
                         
-                        <div class="signal-display signal-${ai.SIGNAL.toLowerCase().split(' ')[0]}-display">
+                        <div class="signal-display signal-${signalType}-display">
                             ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)
                         </div>
                         
                         <div style="margin: 10px 0;">
                             <strong>Entry:</strong> ${ai.ENTRY_PRICE}<br>
-                            <strong>TP1:</strong> ${ai.TAKE_PROFIT_1} | 
+                            <strong>TP1:</strong> ${ai.TAKE_PROFIT_1}<br>
                             <strong>TP2:</strong> ${ai.TAKE_PROFIT_2}<br>
                             <strong>SL:</strong> ${ai.STOP_LOSS}<br>
                             <strong>R/R:</strong> ${ai.RISK_REWARD_RATIO}
