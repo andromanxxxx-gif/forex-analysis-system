@@ -2,35 +2,29 @@
 <html>
 <head>
     <title>Forex Analysis Dashboard</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <h1>Forex Analysis Dashboard</h1>
-
-    <form method="POST">
+    <h1>Forex Analysis System</h1>
+    <form method="post">
         <label>Pilih Pair:</label>
-        <select name="pair" onchange="this.form.submit()">
+        <select name="pair">
             {% for p in pairs %}
-            <option value="{{p}}" {% if p==pair %}selected{% endif %}>{{p}}</option>
+            <option value="{{p}}" {% if p==selected_pair %}selected{% endif %}>{{p}}</option>
             {% endfor %}
         </select>
+        <br><br>
+        <label>News Text (optional):</label>
+        <textarea name="news_text" rows="4" cols="50"></textarea>
+        <br><br>
+        <input type="submit" value="Update">
     </form>
 
-    <h2>Pair: {{pair}}</h2>
-    <h3>Signal: {{signal}}</h3>
-    <p>Take Profit: {{tp}} | Stop Loss: {{sl}}</p>
+    <h2>Technical Signal: {{ signal }}</h2>
 
-    <div id="chart"></div>
-    <script>
-        var graphs = {{ graphJSON | safe }};
-        Plotly.newPlot('chart', graphs.data, graphs.layout);
-    </script>
+    <h2>AI Recommendation</h2>
+    <pre>{{ ai_recommendation }}</pre>
 
-    <h3>Berita Terkini</h3>
-    <ul>
-        {% for n in news %}
-        <li>{{n.headline}} - Sentimen: {{n.sentiment}}</li>
-        {% endfor %}
-    </ul>
+    <h2>Chart Data (Last 5 rows)</h2>
+    <pre>{{ chart_data[-5:] }}</pre>
 </body>
 </html>
