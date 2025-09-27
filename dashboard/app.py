@@ -1,69 +1,45 @@
-import sys
-import os
 from flask import Flask, render_template, request
 import pandas as pd
-import plotly.graph_objs as go
-
-# --- Tambahkan folder root ke sys.path ---
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
-
 from src.trading_signals import calculate_indicators, generate_signal
-from src.drive_integration import authenticate_drive, download_file
-
-import threading, time
+from src.news_analyzer import NewsAnalyzer
+import yfinance as yf
 
 app = Flask(__name__)
+news_analyzer = NewsAnalyzer()
 
-# --- kode lainnya tetap sama ---
-pairs = ['EUR/USD', 'GBP/USD', 'USD/JPY']
-data_files = {
-    'EUR/USD': 'data/raw/EURUSD.csv',
-    'GBP/USD': 'data/raw/GBPUSD.csv',
-    'USD/JPY': 'data/raw/USDJPY.csv'
-}
-drive_file_ids = {
-    'EUR/USD': 'YOUR_FILE_ID_EURUSD',
-    'GBP/USD': 'YOUR_FILE_ID_GBPUSD',
-    'USD/JPY': 'YOUR_FILE_ID_USDJPY'
+PAIRS = {
+    "EURUSD": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "USDJPY": "JPY=X"
 }
 
-def update_data():
-    service = authenticate_drive()
-    while True:
-        for pair, file_id in drive_file_ids.items():
-            download_file(service, file_id, data_files[pair])
-        time.sleep(10)
-
-threading.Thread(target=update_data, daemon=True).start()
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    selected_pair = request.form.get('pair') or 'EUR/USD'
-    file_path = data_files[selected_pair]
+    pair = request.form.get("pair") or "EURUSD"
+    ticker = PAIRS[pair]
 
-    if os.path.exists(file_path):
-        df = pd.read_csv(file_path)
-        df = calculate_indicators(df)
-        signal, tp, sl = generate_signal(df)
-    else:
-        df = pd.DataFrame()
-        signal = tp = sl = None
+    # Ambil data harga
+    data = yf.download(ticker, period="3mo", interval="1d")
+    if data.empty:
+        return "Data tidak tersedia"
 
-    fig = go.Figure()
-    if not df.empty:
-        fig.add_trace(go.Candlestick(
-            x=df.index,
-            open=df['Open'], high=df['High'],
-            low=df['Low'], close=df['Close'],
-            name='Candlestick'
-        ))
-        fig.add_trace(go.Scatter(x=df.index, y=df['EMA200'], mode='lines', name='EMA200'))
+    data = calculate_indicators(data)
+    signal, tp, sl = generate_signal(data)
 
-    graphJSON = fig.to_json()
-    return render_template('index.html', pairs=pairs, selected_pair=selected_pair,
-                           signal=signal, tp=tp, sl=sl, graphJSON=graphJSON)
+    # Contoh berita dummy
+    news = [
+        {"headline": "EUR/USD naik karena data ekonomi positif", "sentiment": news_analyzer.analyze_sentiment("EUR/USD naik karena data ekonomi positif")},
+        {"headline": "USD/JPY stabil menjelang keputusan bank sentral", "sentiment": news_analyzer.analyze_sentiment("USD/JPY stabil menjelang keputusan bank sentral")}
+    ]
+
+    return render_template("index.html",
+                           pair=pair,
+                           pairs=list(PAIRS.keys()),
+                           data=data.tail(10).to_dict(orient="records"),
+                           signal=signal,
+                           tp=round(tp,5),
+                           sl=round(sl,5),
+                           news=news)
 
 if __name__ == "__main__":
     app.run(debug=True)
