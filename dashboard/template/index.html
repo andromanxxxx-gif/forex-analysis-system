@@ -170,6 +170,17 @@
             border-radius: 5px;
             font-size: 0.9em;
         }
+        .chart-container {
+            grid-column: 1 / -1;
+            height: 400px;
+            margin: 20px 0;
+        }
+        @media (max-width: 768px) {
+            .analysis-grid { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .control-group { justify-content: space-between; }
+            .chart-container { height: 300px; }
+        }
     </style>
 </head>
 <body>
@@ -202,10 +213,14 @@
 
             <button onclick="loadAnalysis()">🔄 Refresh Analysis</button>
             <button onclick="loadAllAnalysis()">📊 Analyze All Pairs</button>
+            <button onclick="autoRefreshToggle()">⏰ Auto Refresh: <span id="autoRefreshStatus">OFF</span></button>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
             <div>🔄 Loading AI Analysis...</div>
+            <div style="font-size: 0.9em; margin-top: 10px; color: #95a5a6;">
+                Analyzing technical indicators and market news...
+            </div>
         </div>
         
         <div id="error" class="error" style="display: none;"></div>
@@ -213,6 +228,9 @@
     </div>
 
     <script>
+        let autoRefreshInterval = null;
+        let currentChart = null;
+        
         function loadAnalysis() {
             const pair = document.getElementById('pairSelect').value;
             const timeframe = document.getElementById('timeframeSelect').value;
@@ -252,10 +270,125 @@
                 });
         }
 
+        function autoRefreshToggle() {
+            const statusElement = document.getElementById('autoRefreshStatus');
+            
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                statusElement.textContent = 'OFF';
+                statusElement.style.color = '#e74c3c';
+            } else {
+                autoRefreshInterval = setInterval(loadAnalysis, 300000); // 5 minutes
+                statusElement.textContent = 'ON (5min)';
+                statusElement.style.color = '#27ae60';
+                loadAnalysis(); // Immediate refresh
+            }
+        }
+
+        function createPriceChart(chartData) {
+            if (currentChart) {
+                currentChart.destroy();
+            }
+            
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            // Prepare datasets
+            const datasets = [
+                {
+                    label: 'Close Price',
+                    data: chartData.close,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 2,
+                    fill: false
+                },
+                {
+                    label: 'EMA 20',
+                    data: chartData.ema_20,
+                    borderColor: '#e74c3c',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: false
+                },
+                {
+                    label: 'EMA 50',
+                    data: chartData.ema_50,
+                    borderColor: '#f39c12',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: false
+                },
+                {
+                    label: 'EMA 200',
+                    data: chartData.ema_200,
+                    borderColor: '#27ae60',
+                    borderWidth: 2,
+                    fill: false
+                }
+            ];
+
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.dates,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Price Chart with Moving Averages',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            ticks: {
+                                maxTicksLimit: 10,
+                                autoSkip: true
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Price'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(3);
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
         function displayAnalysis(data) {
             const analysis = data.ai_analysis;
-            const signalClass = `signal-${analysis.SIGNAL.toLowerCase()}`;
-            const signalDisplayClass = `signal-${analysis.SIGNAL.toLowerCase()}-display`;
+            const signalClass = `signal-${analysis.SIGNAL.toLowerCase().split(' ')[0]}`;
+            const signalDisplayClass = `signal-${analysis.SIGNAL.toLowerCase().split(' ')[0]}-display`;
             const priceChangeClass = data.price_change >= 0 ? 'positive' : 'negative';
             const priceChangeSymbol = data.price_change >= 0 ? '↗' : '↘';
             
@@ -297,6 +430,7 @@
                             <div class="tech-item"><strong>MACD:</strong> ${data.technical_indicators.MACD}</div>
                             <div class="tech-item"><strong>SMA 20:</strong> ${data.technical_indicators.SMA_20}</div>
                             <div class="tech-item"><strong>SMA 50:</strong> ${data.technical_indicators.SMA_50}</div>
+                            <div class="tech-item"><strong>EMA 200:</strong> ${data.technical_indicators.EMA_200}</div>
                             <div class="tech-item"><strong>ATR:</strong> ${data.technical_indicators.ATR}</div>
                             <div class="tech-item"><strong>Support:</strong> ${data.technical_indicators.Support}</div>
                             <div class="tech-item"><strong>Resistance:</strong> ${data.technical_indicators.Resistance}</div>
@@ -304,10 +438,10 @@
                     </div>
 
                     <div class="card">
-                        <h3>📰 Market News</h3>
+                        <h3>📰 Market News & Analysis</h3>
                         ${data.fundamental_news.map(news => `
                             <div class="news-item">
-                                <strong>${news.source}</strong> 
+                                <strong>📻 ${news.source}</strong> 
                                 <span style="float: right; color: #7f8c8d;">${news.timestamp}</span><br>
                                 ${news.headline}
                             </div>
@@ -323,10 +457,22 @@
                             <small>Last updated: ${data.timestamp}</small>
                         </div>
                     </div>
+
+                    <div class="card" style="grid-column: 1 / -1;">
+                        <h3>📈 Real-time Price Chart</h3>
+                        <div class="chart-container">
+                            <canvas id="priceChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             `;
             
             document.getElementById('results').innerHTML = html;
+            
+            // Create chart after DOM is updated
+            if (data.chart_data && data.chart_data.dates.length > 0) {
+                setTimeout(() => createPriceChart(data.chart_data), 100);
+            }
         }
 
         function displayAllAnalysis(data) {
@@ -344,14 +490,14 @@
                 }
                 
                 const ai = analysis.ai_analysis;
-                const signalClass = `signal-${ai.SIGNAL.toLowerCase()}`;
+                const signalClass = `signal-${ai.SIGNAL.toLowerCase().split(' ')[0]}`;
                 
                 html += `
                     <div class="card ${signalClass}">
                         <h3>${pair} - ${analysis.timeframe}</h3>
                         <div class="price-display">${analysis.current_price}</div>
                         
-                        <div class="signal-display signal-${ai.SIGNAL.toLowerCase()}-display">
+                        <div class="signal-display signal-${ai.SIGNAL.toLowerCase().split(' ')[0]}-display">
                             ${ai.SIGNAL} (${ai.CONFIDENCE_LEVEL}%)
                         </div>
                         
@@ -361,6 +507,10 @@
                             <strong>TP2:</strong> ${ai.TAKE_PROFIT_2}<br>
                             <strong>SL:</strong> ${ai.STOP_LOSS}<br>
                             <strong>R/R:</strong> ${ai.RISK_REWARD_RATIO}
+                        </div>
+                        
+                        <div style="font-size: 0.9em; color: #7f8c8d;">
+                            Updated: ${analysis.timestamp}
                         </div>
                     </div>
                 `;
