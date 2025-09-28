@@ -18,7 +18,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS untuk semua route
 
 # DeepSeek API Configuration - USING REAL API
-DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
+DEEPSEEK_API_KEY = "****************************************"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs dengan harga yang lebih realistis
