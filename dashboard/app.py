@@ -24,7 +24,7 @@ def after_request(response):
     return response
 
 # DeepSeek API Configuration - USING REAL API
-DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
+DEEPSEEK_API_KEY = "***********************8"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs dengan harga yang lebih realistis
