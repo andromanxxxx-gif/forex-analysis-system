@@ -24,7 +24,7 @@ def after_request(response):
     return response
 
 # DeepSeek API Configuration - USING REAL API
-DEEPSEEK_API_KEY = "sk-*****************"
+DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs dengan harga yang lebih realistis
@@ -37,7 +37,62 @@ pair_base_prices = {
     'CADJPY': 108.90
 }
 
-# ========== DEFINISI FUNGSI HARUS DITULIS SEBELUM DIGUNAKAN ==========
+class Database:
+    def __init__(self, db_path='forex_analysis.db'):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pair TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                timestamp DATETIME NOT NULL,
+                current_price REAL,
+                price_change REAL,
+                technical_indicators TEXT,
+                ai_analysis TEXT,
+                chart_data TEXT,
+                data_source TEXT
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+    
+    def save_analysis(self, analysis_data):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO analysis_results 
+                (pair, timeframe, timestamp, current_price, price_change, technical_indicators, ai_analysis, chart_data, data_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                analysis_data['pair'],
+                analysis_data['timeframe'],
+                analysis_data['timestamp'],
+                analysis_data['current_price'],
+                analysis_data['price_change'],
+                json.dumps(analysis_data['technical_indicators']),
+                json.dumps(analysis_data['ai_analysis']),
+                json.dumps(analysis_data.get('chart_data', {})),
+                analysis_data.get('data_source', 'Unknown')
+            ))
+            
+            conn.commit()
+            conn.close()
+            print(f"Analysis saved for {analysis_data['pair']}")
+            
+        except Exception as e:
+            print(f"Error saving analysis: {e}")
+
+db = Database()
 
 def get_real_forex_price(pair):
     """Get REAL forex prices from alternative sources"""
@@ -456,66 +511,6 @@ def get_real_market_news():
         print(f"News generation error: {e}")
         return []
 
-# ========== KELAS DATABASE ==========
-class Database:
-    def __init__(self, db_path='forex_analysis.db'):
-        self.db_path = db_path
-        self.init_database()
-    
-    def init_database(self):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS analysis_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pair TEXT NOT NULL,
-                timeframe TEXT NOT NULL,
-                timestamp DATETIME NOT NULL,
-                current_price REAL,
-                price_change REAL,
-                technical_indicators TEXT,
-                ai_analysis TEXT,
-                chart_data TEXT,
-                data_source TEXT
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-    
-    def save_analysis(self, analysis_data):
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO analysis_results 
-                (pair, timeframe, timestamp, current_price, price_change, technical_indicators, ai_analysis, chart_data, data_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                analysis_data['pair'],
-                analysis_data['timeframe'],
-                analysis_data['timestamp'],
-                analysis_data['current_price'],
-                analysis_data['price_change'],
-                json.dumps(analysis_data['technical_indicators']),
-                json.dumps(analysis_data['ai_analysis']),
-                json.dumps(analysis_data.get('chart_data', {})),
-                analysis_data.get('data_source', 'Unknown')
-            ))
-            
-            conn.commit()
-            conn.close()
-            print(f"Analysis saved for {analysis_data['pair']}")
-            
-        except Exception as e:
-            print(f"Error saving analysis: {e}")
-
-# Inisialisasi database
-db = Database()
-
-# ========== ROUTES ==========
 @app.route('/')
 def index():
     """Serve the main dashboard page"""
@@ -625,17 +620,21 @@ def health_check():
         'data_sources': 'realistic_simulation'
     })
 
-# ========== MAIN EXECUTION ==========
+# Tambahkan route untuk static files jika diperlukan
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
+
 if __name__ == '__main__':
     print("🚀 Starting REAL Forex Analysis System...")
     print("💹 Supported Pairs:", list(pair_base_prices.keys()))
     print("🤖 DeepSeek AI: Integrated")
     print("📊 Data Source: Realistic Market Simulation + Web Data")
     
-    # Test real price generation - SEKARANG FUNGSI SUDAH DIDEFINISIKAN
+    # Test real price generation
     print("🔌 Testing price generation...")
     for pair in ['GBPJPY', 'USDJPY', 'EURJPY']:
-        price = get_real_forex_price(pair)  # Fungsi ini sudah didefinisikan di atas
+        price = get_real_forex_price(pair)
         print(f"   {pair}: {price}")
     
     app.run(debug=True, host='127.0.0.1', port=5000, threaded=True)
