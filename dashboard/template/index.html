@@ -390,6 +390,92 @@
             margin-top: 15px;
             border-left: 4px solid #8b5cf6;
         }
+
+        /* NEW STYLES FOR TRADING RECOMMENDATIONS */
+        .trading-recommendations {
+            margin-top: 15px;
+        }
+
+        .recommendation-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .rec-item {
+            background: #334155;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #8b5cf6;
+            transition: all 0.3s ease;
+        }
+
+        .rec-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .rec-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+
+        .rec-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #f1f5f9;
+        }
+
+        .trade-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn-buy, .btn-sell {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+
+        .btn-buy {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-sell {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-buy:hover, .btn-sell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .pips-display {
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 5px;
+            background: #1e293b;
+        }
+
+        .trading-advice {
+            background: linear-gradient(135deg, #1e293b 0%, #2d3748 100%);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #f59e0b;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -476,6 +562,56 @@
                 
                 <div class="ai-summary">
                     <div id="aiSummary">DeepSeek AI is generating analysis...</div>
+                </div>
+            </div>
+
+            <!-- NEW TRADING RECOMMENDATIONS CARD -->
+            <div class="card">
+                <h3>🎯 Trading Recommendations</h3>
+                <div class="trading-recommendations">
+                    <div class="recommendation-grid">
+                        <div class="rec-item">
+                            <div class="rec-label">Signal Type</div>
+                            <div class="rec-value" id="signalType">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Entry Price</div>
+                            <div class="rec-value" id="entryPrice">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Stop Loss</div>
+                            <div class="rec-value" id="stopLoss">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Take Profit 1</div>
+                            <div class="rec-value" id="takeProfit1">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Take Profit 2</div>
+                            <div class="rec-value" id="takeProfit2">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Risk/Reward</div>
+                            <div class="rec-value" id="riskReward">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Time Horizon</div>
+                            <div class="rec-value" id="timeHorizon">-</div>
+                        </div>
+                        <div class="rec-item">
+                            <div class="rec-label">Pips Risk</div>
+                            <div class="rec-value" id="pipsRisk">-</div>
+                        </div>
+                    </div>
+                    
+                    <div class="trade-actions">
+                        <button class="btn-buy" onclick="simulateTrade('BUY')">📈 Simulate BUY</button>
+                        <button class="btn-sell" onclick="simulateTrade('SELL')">📉 Simulate SELL</button>
+                    </div>
+
+                    <div class="trading-advice" id="tradingAdvice">
+                        Waiting for AI trading advice...
+                    </div>
                 </div>
             </div>
 
@@ -634,6 +770,9 @@
             document.getElementById('aiSummary').textContent = 
                 data.ai_analysis.ANALYSIS_SUMMARY || 'AI analysis completed.';
             
+            // UPDATE TRADING RECOMMENDATIONS
+            updateTradingRecommendations(data.ai_analysis);
+            
             // Update technical indicators
             updateTechnicalIndicators(data.technical_indicators);
             
@@ -655,6 +794,46 @@
             
             // Show dashboard
             document.getElementById('dashboard').style.display = 'grid';
+        }
+
+        // NEW FUNCTION: Update Trading Recommendations
+        function updateTradingRecommendations(aiAnalysis) {
+            // Update trading recommendations
+            document.getElementById('signalType').textContent = aiAnalysis.SIGNAL;
+            document.getElementById('entryPrice').textContent = aiAnalysis.ENTRY_PRICE;
+            document.getElementById('stopLoss').textContent = aiAnalysis.STOP_LOSS;
+            document.getElementById('takeProfit1').textContent = aiAnalysis.TAKE_PROFIT_1;
+            document.getElementById('takeProfit2').textContent = aiAnalysis.TAKE_PROFIT_2;
+            document.getElementById('riskReward').textContent = aiAnalysis.RISK_REWARD_RATIO;
+            document.getElementById('timeHorizon').textContent = aiAnalysis.TIME_HORIZON;
+            document.getElementById('pipsRisk').textContent = aiAnalysis.PIPS_RISK + ' pips';
+            document.getElementById('tradingAdvice').textContent = aiAnalysis.TRADING_ADVICE || 'No specific advice available.';
+            
+            // Color code based on signal
+            const signal = aiAnalysis.SIGNAL;
+            const recItems = document.querySelectorAll('.rec-item');
+            recItems.forEach(item => {
+                item.style.borderLeftColor = signal.includes('BUY') ? '#10b981' : 
+                                           signal.includes('SELL') ? '#ef4444' : '#f59e0b';
+            });
+        }
+
+        // NEW FUNCTION: Simulate Trade
+        function simulateTrade(action) {
+            const currentSignal = document.getElementById('signalType').textContent;
+            const confidence = document.getElementById('confidenceLevel').textContent;
+            
+            if (action !== currentSignal && !currentSignal.includes('HOLD')) {
+                alert(`⚠️ Warning: Your action (${action}) contradicts AI signal (${currentSignal})\n${confidence}`);
+            }
+            
+            // Simulate trade execution
+            const entryPrice = document.getElementById('entryPrice').textContent;
+            const stopLoss = document.getElementById('stopLoss').textContent;
+            const takeProfit1 = document.getElementById('takeProfit1').textContent;
+            const pair = document.getElementById('pairTitle').textContent.split(' ')[0];
+            
+            alert(`✅ ${action} Trade Simulated for ${pair}:\n\nEntry: ${entryPrice}\nStop Loss: ${stopLoss}\nTake Profit 1: ${takeProfit1}\n\n📊 This is a simulation only!`);
         }
 
         function updateTechnicalIndicators(indicators) {
