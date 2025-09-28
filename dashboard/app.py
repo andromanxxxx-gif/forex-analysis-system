@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 app = Flask(__name__)
 
 # DeepSeek API Configuration - USING REAL API
-DEEPSEEK_API_KEY = "sk-7********"
+DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs with realistic base prices
@@ -276,7 +276,8 @@ def calculate_realistic_indicators(pair):
             'ema_26': round(current_price * (1 + np.random.normal(0, 0.015)), 4),
             'resistance': round(current_price * 1.005, 4),
             'support': round(current_price * 0.995, 4),
-            'volume': np.random.randint(10000, 50000)
+            'volume': np.random.randint(10000, 50000),
+            'pair': pair  # Add pair for volatility calculation
         }
         
     except Exception as e:
@@ -297,7 +298,8 @@ def create_default_indicators(pair):
         'ema_26': price,
         'resistance': price * 1.02,
         'support': price * 0.98,
-        'volume': 25000
+        'volume': 25000,
+        'pair': pair
     }
 
 def call_deepseek_api(technical_data, pair, timeframe):
@@ -350,25 +352,30 @@ def call_deepseek_api(technical_data, pair, timeframe):
             ai_response = result['choices'][0]['message']['content']
             
             # Parse AI response (simplified parsing)
-            return parse_ai_response(ai_response, technical_data)
+            return parse_ai_response(ai_response, technical_data, pair)
         else:
             print(f"DeepSeek API error: {response.status_code}")
-            return generate_fallback_analysis(technical_data)
+            return generate_fallback_analysis(technical_data, pair)
             
     except Exception as e:
         print(f"DeepSeek API call failed: {e}")
-        return generate_fallback_analysis(technical_data)
+        return generate_fallback_analysis(technical_data, pair)
 
-def parse_ai_response(ai_text, technical_data):
-    """Parse AI response and extract trading signals"""
+def parse_ai_response(ai_text, technical_data, pair):
+    """Parse AI response and extract trading signals with better recommendations"""
     try:
-        # Simple parsing logic (in production, you'd use more sophisticated NLP)
         ai_text_lower = ai_text.lower()
         
-        # Determine signal
-        if 'buy' in ai_text_lower and 'sell' not in ai_text_lower:
+        # Enhanced signal detection
+        if 'strong buy' in ai_text_lower or 'bullish' in ai_text_lower:
+            signal = "STRONG BUY"
+            confidence = 85
+        elif 'buy' in ai_text_lower and 'sell' not in ai_text_lower:
             signal = "BUY"
             confidence = 75
+        elif 'strong sell' in ai_text_lower or 'bearish' in ai_text_lower:
+            signal = "STRONG SELL"
+            confidence = 85
         elif 'sell' in ai_text_lower and 'buy' not in ai_text_lower:
             signal = "SELL" 
             confidence = 75
@@ -376,32 +383,50 @@ def parse_ai_response(ai_text, technical_data):
             signal = "HOLD"
             confidence = 50
         
-        # Extract numbers for confidence if available
+        # Extract confidence if available
         import re
         confidence_match = re.search(r'(\d+)%', ai_text)
         if confidence_match:
             confidence = int(confidence_match.group(1))
         
-        # Calculate risk levels based on volatility
+        # Enhanced risk management
         current_price = technical_data['current_price']
-        atr = current_price * 0.002  # Assume 0.2% volatility
         
-        if signal == "BUY":
+        # Dynamic volatility based on pair
+        volatility_multiplier = {
+            'GBPJPY': 0.003,  # Higher volatility
+            'USDJPY': 0.002,
+            'EURJPY': 0.0025,
+            'CHFJPY': 0.002,
+            'AUDJPY': 0.002,
+            'CADJPY': 0.002
+        }.get(pair, 0.002)
+        
+        atr = current_price * volatility_multiplier
+        
+        if signal in ["STRONG BUY", "BUY"]:
             tp1 = current_price + (atr * 2)
             tp2 = current_price + (atr * 3)
             sl = current_price - (atr * 1)
             rr_ratio = "1:2"
-        elif signal == "SELL":
+            signal_type = "LONG"
+        elif signal in ["STRONG SELL", "SELL"]:
             tp1 = current_price - (atr * 2)
             tp2 = current_price - (atr * 3)
             sl = current_price + (atr * 1)
             rr_ratio = "1:2"
+            signal_type = "SHORT"
         else:
             tp1 = tp2 = sl = current_price
             rr_ratio = "N/A"
+            signal_type = "NEUTRAL"
+        
+        # Calculate pips risk
+        pips_risk = abs(current_price - sl) * 100
         
         return {
             'SIGNAL': signal,
+            'SIGNAL_TYPE': signal_type,
             'CONFIDENCE_LEVEL': confidence,
             'ENTRY_PRICE': round(current_price, 4),
             'TAKE_PROFIT_1': round(tp1, 4),
@@ -409,15 +434,41 @@ def parse_ai_response(ai_text, technical_data):
             'STOP_LOSS': round(sl, 4),
             'RISK_REWARD_RATIO': rr_ratio,
             'TIME_HORIZON': '4-8 hours',
+            'VOLATILITY_LEVEL': 'High' if volatility_multiplier > 0.0025 else 'Medium',
+            'PIPS_RISK': round(pips_risk, 1),
             'ANALYSIS_SUMMARY': f"AI Analysis: {ai_text[:200]}...",
-            'RAW_AI_RESPONSE': ai_text
+            'RAW_AI_RESPONSE': ai_text,
+            'TRADING_ADVICE': generate_trading_advice(signal, confidence, technical_data)
         }
         
     except Exception as e:
         print(f"AI response parsing error: {e}")
-        return generate_fallback_analysis(technical_data)
+        return generate_fallback_analysis(technical_data, pair)
 
-def generate_fallback_analysis(technical_data):
+def generate_trading_advice(signal, confidence, technical_data):
+    """Generate specific trading advice based on signal and confidence"""
+    advice = []
+    
+    if signal in ["STRONG BUY", "BUY"]:
+        advice.append("Consider entering LONG position")
+        if confidence > 70:
+            advice.append("High confidence - suitable for position trading")
+        advice.append("Monitor key resistance levels for exit points")
+    elif signal in ["STRONG SELL", "SELL"]:
+        advice.append("Consider entering SHORT position")
+        if confidence > 70:
+            advice.append("High confidence - good risk/reward ratio")
+        advice.append("Watch for support levels and potential reversals")
+    else:
+        advice.append("Market conditions uncertain")
+        advice.append("Wait for clearer signals before entering")
+        advice.append("Consider smaller position sizes if trading")
+    
+    advice.append(f"RSI at {technical_data['rsi']} - {'Overbought' if technical_data['rsi'] > 70 else 'Oversold' if technical_data['rsi'] < 30 else 'Neutral'}")
+    
+    return " • ".join(advice)
+
+def generate_fallback_analysis(technical_data, pair):
     """Generate fallback analysis when AI fails"""
     current_price = technical_data['current_price']
     rsi = technical_data['rsi']
@@ -426,14 +477,25 @@ def generate_fallback_analysis(technical_data):
     if rsi < 30:
         signal = "BUY"
         confidence = 70
+        signal_type = "LONG"
     elif rsi > 70:
         signal = "SELL"
         confidence = 70
+        signal_type = "SHORT"
     else:
         signal = "HOLD"
         confidence = 50
+        signal_type = "NEUTRAL"
     
-    atr = current_price * 0.002
+    # Dynamic volatility based on pair
+    volatility_multiplier = {
+        'GBPJPY': 0.003,
+        'USDJPY': 0.002,
+        'EURJPY': 0.0025,
+        'CHFJPY': 0.002
+    }.get(pair, 0.002)
+    
+    atr = current_price * volatility_multiplier
     
     if signal == "BUY":
         tp1 = current_price + (atr * 2)
@@ -449,8 +511,12 @@ def generate_fallback_analysis(technical_data):
         tp1 = tp2 = sl = current_price
         rr_ratio = "N/A"
     
+    # Calculate pips risk
+    pips_risk = abs(current_price - sl) * 100
+    
     return {
         'SIGNAL': signal,
+        'SIGNAL_TYPE': signal_type,
         'CONFIDENCE_LEVEL': confidence,
         'ENTRY_PRICE': round(current_price, 4),
         'TAKE_PROFIT_1': round(tp1, 4),
@@ -458,8 +524,11 @@ def generate_fallback_analysis(technical_data):
         'STOP_LOSS': round(sl, 4),
         'RISK_REWARD_RATIO': rr_ratio,
         'TIME_HORIZON': '4-8 hours',
+        'VOLATILITY_LEVEL': 'High' if volatility_multiplier > 0.0025 else 'Medium',
+        'PIPS_RISK': round(pips_risk, 1),
         'ANALYSIS_SUMMARY': f'RSI-based analysis: RSI {rsi}, Price {current_price}',
-        'RAW_AI_RESPONSE': 'AI service temporarily unavailable. Using technical analysis.'
+        'RAW_AI_RESPONSE': 'AI service temporarily unavailable. Using technical analysis.',
+        'TRADING_ADVICE': generate_trading_advice(signal, confidence, technical_data)
     }
 
 def get_real_market_news():
@@ -583,7 +652,7 @@ def get_multiple_pairs():
         for pair in pairs:
             try:
                 technical_data = calculate_realistic_indicators(pair)
-                ai_analysis = generate_fallback_analysis(technical_data)  # Quick analysis
+                ai_analysis = generate_fallback_analysis(technical_data, pair)  # Quick analysis
                 
                 results[pair] = {
                     'price': technical_data['current_price'],
