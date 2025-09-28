@@ -21,7 +21,7 @@ import random
 app = Flask(__name__, static_folder='.', static_url_path='/static')
 
 # Optional: set your real key in environment variable
-DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', 'sk-73d83584fd614656926e1d8860eae9ca')  # keep empty for fallback
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '   ')  # keep empty for fallback
 DEEPSEEK_API_URL = os.environ.get('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions')
 
 # Basic pair base prices (fallback)
