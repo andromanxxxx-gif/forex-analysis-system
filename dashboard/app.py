@@ -18,7 +18,7 @@ app = Flask(__name__)
 # ==============================
 # CONFIGURASI SISTEM
 # ==============================
-DEEPSEEK_API_KEY = "sk-"  # ganti dengan API key kamu
+DEEPSEEK_API_KEY = "sk-820e07acdd9d4c94868b7fb95c9e8225"  # ganti dengan API key kamu
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Pair dengan konfigurasi realistis
