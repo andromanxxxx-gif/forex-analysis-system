@@ -3,392 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Forex Analysis</title>
+    <title>Forex Analysis System</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --primary: #2563eb;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --background: #0f172a;
-            --card-bg: #1e293b;
-            --text: #f1f5f9;
-        }
-        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            font-family: Arial, sans-serif;
         }
         
         body {
-            background: var(--background);
-            color: var(--text);
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            line-height: 1.6;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
         }
         
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             padding: 20px;
-            background: linear-gradient(135deg, #1e40af 0%, #3730a3 100%);
-            border-radius: 15px;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #60a5fa, #34d399);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .live-badge {
-            display: inline-block;
-            background: var(--danger);
+            background: #2c3e50;
             color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
+            border-radius: 10px;
         }
         
         .controls {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 15px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
             margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            align-items: center;
-        }
-        
-        .control-group {
             display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        label {
-            font-weight: 600;
-            color: #94a3b8;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         select, button {
-            padding: 12px 15px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            background: #334155;
-            color: var(--text);
-            border: 1px solid #475569;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
         }
         
         button {
-            background: var(--primary);
+            background: #3498db;
             color: white;
+            border: none;
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
         
         .dashboard {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 15px;
         }
         
-        @media (max-width: 1024px) {
+        @media (max-width: 768px) {
             .dashboard {
                 grid-template-columns: 1fr;
             }
         }
         
         .card {
-            background: var(--card-bg);
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            border: 1px solid #334155;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         
         .price-card {
             grid-column: 1 / -1;
             text-align: center;
-            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
         }
         
-        .price-display {
-            font-size: 3.5rem;
+        .price {
+            font-size: 2rem;
             font-weight: bold;
-            margin: 15px 0;
-            background: linear-gradient(45deg, #60a5fa, #34d399);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .signal-badge {
-            display: inline-block;
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-size: 1.3rem;
-            font-weight: bold;
-            margin: 15px 0;
-        }
-        
-        .signal-buy { background: var(--success); }
-        .signal-sell { background: var(--danger); }
-        .signal-hold { background: var(--warning); }
-        .signal-strong-buy { background: linear-gradient(45deg, var(--success), #059669); }
-        .signal-strong-sell { background: linear-gradient(45deg, var(--danger), #dc2626); }
-        
-        .confidence {
-            font-size: 1.1rem;
-            color: #94a3b8;
             margin: 10px 0;
         }
         
-        .indicators-grid {
+        .signal {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 15px;
+            color: white;
+            margin: 10px 0;
+        }
+        
+        .buy { background: #27ae60; }
+        .sell { background: #e74c3c; }
+        .hold { background: #f39c12; }
+        
+        .indicators {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
         }
         
         .indicator {
-            background: #334155;
-            padding: 15px;
-            border-radius: 10px;
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
             text-align: center;
-            border-left: 4px solid var(--primary);
-        }
-        
-        .indicator-value {
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: var(--text);
-        }
-        
-        .indicator-label {
-            font-size: 0.9rem;
-            color: #94a3b8;
-            margin-top: 5px;
-        }
-        
-        .news-item {
-            background: #334155;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 10px;
-            border-left: 4px solid var(--primary);
         }
         
         .chart-container {
-            position: relative;
-            height: 400px;
-            width: 100%;
+            height: 300px;
+            margin-top: 10px;
         }
         
-        .loading {
+        .loading, .error {
             text-align: center;
-            padding: 60px;
-            color: #94a3b8;
-        }
-        
-        .error {
-            background: #7f1d1d;
-            color: #fecaca;
             padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid var(--danger);
+            margin: 10px 0;
+            border-radius: 5px;
         }
         
-        .timestamp {
-            text-align: center;
-            color: #64748b;
-            font-size: 0.9rem;
-            margin-top: 20px;
-        }
-        
-        .quick-pairs {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .pair-card {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 1px solid #334155;
-        }
-        
-        .pair-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-2px);
-        }
+        .loading { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>💰 Real-Time Forex Analysis</h1>
-            <p>Live JPY Pairs Technical Analysis & Trading Signals</p>
-            <div class="live-badge">LIVE</div>
-        </div>
-
-        <!-- Quick Pairs Overview -->
-        <div class="quick-pairs" id="quickPairs">
-            <div class="pair-card" onclick="loadPair('GBPJPY')">
-                <div>GBP/JPY</div>
-                <div class="price-display" style="font-size: 1.5rem;" id="gbpjpyPrice">-</div>
-                <div>Loading...</div>
-            </div>
-            <div class="pair-card" onclick="loadPair('USDJPY')">
-                <div>USD/JPY</div>
-                <div class="price-display" style="font-size: 1.5rem;" id="usdjpyPrice">-</div>
-                <div>Loading...</div>
-            </div>
-            <div class="pair-card" onclick="loadPair('EURJPY')">
-                <div>EUR/JPY</div>
-                <div class="price-display" style="font-size: 1.5rem;" id="eurjpyPrice">-</div>
-                <div>Loading...</div>
-            </div>
+            <h1>Forex Analysis System</h1>
+            <p>Real-time Technical Analysis</p>
         </div>
 
         <div class="controls">
-            <div class="control-group">
-                <label>Currency Pair:</label>
-                <select id="pairSelect">
-                    <option value="GBPJPY">GBP/JPY</option>
-                    <option value="USDJPY">USD/JPY</option>
-                    <option value="EURJPY">EUR/JPY</option>
-                    <option value="CHFJPY">CHF/JPY</option>
-                    <option value="AUDJPY">AUD/JPY</option>
-                    <option value="CADJPY">CAD/JPY</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label>Timeframe:</label>
-                <select id="timeframeSelect">
-                    <option value="5M">5 Minutes</option>
-                    <option value="15M">15 Minutes</option>
-                    <option value="1H" selected>1 Hour</option>
-                    <option value="4H">4 Hours</option>
-                    <option value="1D">1 Day</option>
-                </select>
-            </div>
-
-            <button onclick="getRealTimeAnalysis()">🔄 Analyze Live</button>
-            <button onclick="refreshAllPairs()">📊 Refresh All Pairs</button>
-            <button onclick="startAutoRefresh()">⚡ Auto-Refresh (30s)</button>
+            <select id="pairSelect">
+                <option value="GBPJPY">GBP/JPY</option>
+                <option value="USDJPY">USD/JPY</option>
+                <option value="EURJPY">EUR/JPY</option>
+                <option value="CHFJPY">CHF/JPY</option>
+            </select>
+            
+            <select id="timeframeSelect">
+                <option value="1H">1 Hour</option>
+                <option value="4H">4 Hours</option>
+                <option value="1D">1 Day</option>
+            </select>
+            
+            <button onclick="getAnalysis()">Analyze</button>
+            <button onclick="refreshData()">Refresh</button>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
-            <h3>📡 Connecting to Live Market Data...</h3>
-            <p>Fetching real-time prices from Yahoo Finance</p>
+            <h3>Loading Market Data...</h3>
         </div>
 
-        <div id="errorContainer" style="display: none;"></div>
+        <div id="error" class="error" style="display: none;"></div>
 
         <div id="dashboard" class="dashboard" style="display: none;">
             <div class="card price-card">
-                <h2 id="pairTitle">GBP/JPY Live Analysis</h2>
-                <div class="price-display" id="currentPrice">-</div>
-                <div class="confidence" id="priceChange">Loading...</div>
-                <div id="signalBadge" class="signal-badge signal-hold">ANALYZING</div>
-                <div class="confidence" id="confidenceLevel">AI Confidence: -%</div>
+                <h2 id="pairTitle">Pair Analysis</h2>
+                <div class="price" id="currentPrice">-</div>
+                <div id="priceChange">Loading...</div>
+                <div id="signal" class="signal hold">ANALYZING</div>
+                <div id="confidence">Confidence: -%</div>
             </div>
 
             <div class="card">
-                <h3>📈 Technical Indicators</h3>
-                <div class="indicators-grid" id="technicalIndicators">
-                    <!-- Indicators will be populated -->
+                <h3>Technical Indicators</h3>
+                <div class="indicators" id="technicalIndicators">
+                    <!-- Indicators will be populated here -->
                 </div>
             </div>
 
             <div class="card">
-                <h3>📰 Market News</h3>
+                <h3>Market News</h3>
                 <div id="newsContainer">
-                    <div class="news-item">Loading live market news...</div>
+                    <div>Loading news...</div>
                 </div>
             </div>
 
             <div class="card" style="grid-column: 1 / -1;">
-                <h3>📊 Live Price Chart</h3>
+                <h3>Price Chart</h3>
                 <div class="chart-container">
                     <canvas id="priceChart"></canvas>
                 </div>
-            </div>
-
-            <div class="timestamp">
-                <div>Data Source: <strong>Yahoo Finance Real-time</strong></div>
-                <div>Last updated: <span id="timestamp">-</span></div>
             </div>
         </div>
     </div>
 
     <script>
         let priceChart = null;
-        let autoRefreshInterval = null;
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            loadQuickPairs();
-            getRealTimeAnalysis();
-        });
-
-        async function loadQuickPairs() {
-            try {
-                const response = await fetch('/get_multiple_pairs?timeframe=1H');
-                const data = await response.json();
-                
-                for (const [pair, info] of Object.entries(data)) {
-                    const element = document.getElementById(pair.toLowerCase() + 'Price');
-                    if (element && info.price) {
-                        element.textContent = info.price;
-                        element.parentElement.innerHTML = `
-                            <div>${pair}</div>
-                            <div class="price-display" style="font-size: 1.5rem;">${info.price}</div>
-                            <div style="color: ${info.change >= 0 ? '#10b981' : '#ef4444'}">
-                                ${info.change >= 0 ? '↗' : '↘'} ${Math.abs(info.change)}%
-                            </div>
-                        `;
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading quick pairs:', error);
-            }
-        }
-
-        async function getRealTimeAnalysis() {
+        async function getAnalysis() {
             showLoading(true);
             hideError();
             
@@ -397,15 +203,10 @@
             
             try {
                 const response = await fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
                 const data = await response.json();
                 
                 if (data.error) {
-                    showError('Market data error: ' + data.error);
+                    showError(data.error);
                     return;
                 }
                 
@@ -418,58 +219,31 @@
             }
         }
 
-        function loadPair(pair) {
-            document.getElementById('pairSelect').value = pair;
-            getRealTimeAnalysis();
-        }
-
-        function refreshAllPairs() {
-            loadQuickPairs();
-            getRealTimeAnalysis();
-        }
-
-        function startAutoRefresh() {
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-            }
-            autoRefreshInterval = setInterval(refreshAllPairs, 30000);
-            alert('Auto-refresh started every 30 seconds');
+        function refreshData() {
+            getAnalysis();
         }
 
         function updateDashboard(data) {
-            if (!data) {
-                showError('No data received from server');
-                return;
-            }
-
             // Update basic info
-            document.getElementById('pairTitle').textContent = 
-                `${data.pair} Live Analysis - ${data.timeframe}`;
+            document.getElementById('pairTitle').textContent = `${data.pair} Analysis`;
             document.getElementById('currentPrice').textContent = data.current_price;
-            document.getElementById('timestamp').textContent = data.timestamp;
             
             // Update price change
-            const changeElement = document.getElementById('priceChange');
             const change = data.price_change || 0;
-            changeElement.innerHTML = `
-                <span style="color: ${change >= 0 ? '#10b981' : '#ef4444'}">
-                    ${change >= 0 ? '↗' : '↘'} ${Math.abs(change)}%
-                </span>
-                | Data Points: ${data.data_points}
-            `;
+            document.getElementById('priceChange').textContent = 
+                `Change: ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
             
             // Update signal
-            const signal = data.ai_analysis.SIGNAL || 'HOLD';
-            const signalBadge = document.getElementById('signalBadge');
-            signalBadge.textContent = signal;
-            signalBadge.className = 'signal-badge signal-' + signal.toLowerCase().replace(' ', '-');
+            const signal = data.ai_analysis.SIGNAL;
+            const signalElement = document.getElementById('signal');
+            signalElement.textContent = signal;
+            signalElement.className = `signal ${signal.toLowerCase()}`;
             
-            // Update confidence
-            document.getElementById('confidenceLevel').textContent = 
-                `AI Confidence: ${data.ai_analysis.CONFIDENCE_LEVEL}%`;
+            document.getElementById('confidence').textContent = 
+                `Confidence: ${data.ai_analysis.CONFIDENCE_LEVEL}%`;
             
-            // Update technical indicators
-            updateTechnicalIndicators(data.technical_indicators);
+            // Update indicators
+            updateIndicators(data.technical_indicators);
             
             // Update news
             updateNews(data.fundamental_news);
@@ -481,48 +255,38 @@
             document.getElementById('dashboard').style.display = 'grid';
         }
 
-        function updateTechnicalIndicators(indicators) {
+        function updateIndicators(indicators) {
             const container = document.getElementById('technicalIndicators');
             container.innerHTML = '';
             
-            const indicatorConfig = [
-                { label: 'RSI', value: indicators.RSI, format: v => v.toFixed(2), color: v => v > 70 ? '#ef4444' : v < 30 ? '#10b981' : '#f59e0b' },
-                { label: 'MACD', value: indicators.MACD, format: v => v.toFixed(4), color: () => '#60a5fa' },
-                { label: 'SMA 20', value: indicators.SMA_20, format: v => v.toFixed(4), color: () => '#8b5cf6' },
-                { label: 'SMA 50', value: indicators.SMA_50, format: v => v.toFixed(4), color: () => '#8b5cf6' },
-                { label: 'Resistance', value: indicators.Resistance, format: v => v.toFixed(4), color: () => '#ef4444' },
-                { label: 'Support', value: indicators.Support, format: v => v.toFixed(4), color: () => '#10b981' }
+            const indicatorData = [
+                { label: 'RSI', value: indicators.RSI, format: v => v.toFixed(2) },
+                { label: 'SMA 20', value: indicators.SMA_20, format: v => v.toFixed(4) },
+                { label: 'SMA 50', value: indicators.SMA_50, format: v => v.toFixed(4) },
+                { label: 'Resistance', value: indicators.Resistance, format: v => v.toFixed(4) },
+                { label: 'Support', value: indicators.Support, format: v => v.toFixed(4) }
             ];
             
-            indicatorConfig.forEach(ind => {
+            indicatorData.forEach(ind => {
                 const div = document.createElement('div');
                 div.className = 'indicator';
                 div.innerHTML = `
-                    <div class="indicator-value" style="color: ${ind.color(ind.value)}">${ind.format(ind.value)}</div>
-                    <div class="indicator-label">${ind.label}</div>
+                    <div style="font-weight: bold;">${ind.format(ind.value)}</div>
+                    <div style="font-size: 0.8em;">${ind.label}</div>
                 `;
                 container.appendChild(div);
             });
         }
 
-        function updateNews(newsItems) {
+        function updateNews(news) {
             const container = document.getElementById('newsContainer');
             container.innerHTML = '';
             
-            if (!newsItems || newsItems.length === 0) {
-                container.innerHTML = '<div class="news-item">No market news available</div>';
-                return;
-            }
-            
-            newsItems.forEach(news => {
-                const newsDiv = document.createElement('div');
-                newsDiv.className = 'news-item';
-                newsDiv.innerHTML = `
-                    <strong>${news.source}</strong><br>
-                    ${news.headline}<br>
-                    <small>${news.timestamp}</small>
-                `;
-                container.appendChild(newsDiv);
+            news.forEach(item => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '10px';
+                div.innerHTML = `<strong>${item.source}</strong><br>${item.headline}`;
+                container.appendChild(div);
             });
         }
 
@@ -537,85 +301,42 @@
                 type: 'line',
                 data: {
                     labels: chartData.dates,
-                    datasets: [
-                        {
-                            label: `${pair} Price`,
-                            data: chartData.close,
-                            borderColor: '#60a5fa',
-                            backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'EMA 20',
-                            data: chartData.ema_20,
-                            borderColor: '#10b981',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
-                            fill: false
-                        }
-                    ]
+                    datasets: [{
+                        label: `${pair} Price`,
+                        data: chartData.close,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            ticks: { color: '#94a3b8' },
-                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
-                        },
-                        y: {
-                            ticks: { 
-                                color: '#94a3b8',
-                                callback: function(value) {
-                                    return value.toFixed(3);
-                                }
-                            },
-                            grid: { color: 'rgba(148, 163, 184, 0.1)' }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            labels: { color: '#94a3b8' }
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                            titleColor: '#f1f5f9',
-                            bodyColor: '#f1f5f9'
-                        }
-                    }
+                    maintainAspectRatio: false
                 }
             });
         }
 
         function showLoading(show) {
             document.getElementById('loading').style.display = show ? 'block' : 'none';
-            if (show) {
-                document.getElementById('dashboard').style.display = 'none';
-            }
+            document.getElementById('dashboard').style.display = show ? 'none' : 'grid';
         }
 
         function showError(message) {
-            const errorContainer = document.getElementById('errorContainer');
-            errorContainer.innerHTML = `
-                <div class="error">
-                    <strong>❌ Error:</strong> ${message}
-                    <button onclick="hideError()" style="float: right; background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
-                </div>
-            `;
-            errorContainer.style.display = 'block';
+            document.getElementById('error').innerHTML = message;
+            document.getElementById('error').style.display = 'block';
             document.getElementById('dashboard').style.display = 'none';
         }
 
         function hideError() {
-            document.getElementById('errorContainer').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
         }
 
+        // Initial load
+        getAnalysis();
+        
         // Auto-refresh every 60 seconds
-        setInterval(loadQuickPairs, 60000);
+        setInterval(refreshData, 60000);
     </script>
 </body>
 </html>
