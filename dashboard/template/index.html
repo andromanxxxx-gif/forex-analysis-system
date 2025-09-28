@@ -1,65 +1,329 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeepSeek AI Forex Analysis</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f0f0f0;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        .pair-card {
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        .loading {
-            display: none;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>DeepSeek AI Forex Analysis</h1>
-        <div>
-            <label for="pairSelect">Select Pair:</label>
-            <select id="pairSelect">
-                <option value="GBPJPY">GBP/JPY</option>
-                <option value="USDJPY">USD/JPY</option>
-                <option value="EURJPY">EUR/JPY</option>
-            </select>
-            <button onclick="getAnalysis()">Get Analysis</button>
-        </div>
-        <div id="loading" class="loading">Loading...</div>
-        <div id="results"></div>
-    </div>
+<script>
+    console.log('🤖 DeepSeek AI Forex System Initializing...');
+    
+    let priceChart = null;
+    let currentPair = 'GBPJPY';
 
-    <script>
-        async function getAnalysis() {
-            const pair = document.getElementById('pairSelect').value;
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('results').innerHTML = '';
+    // Initialize dengan error handling
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📄 DOM Loaded - Starting initialization');
+        try {
+            initializeQuickPairs();
+            loadQuickPairs();
+            getAnalysis();
+            console.log('✅ Initialization completed');
+        } catch (error) {
+            console.error('❌ Initialization error:', error);
+            showError('Initialization failed: ' + error.message);
+        }
+    });
 
-            try {
-                const response = await fetch(`/get_analysis?pair=${pair}`);
-                const data = await response.json();
-                document.getElementById('results').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (error) {
-                document.getElementById('results').innerHTML = `Error: ${error.message}`;
-            } finally {
-                document.getElementById('loading').style.display = 'none';
+    function initializeQuickPairs() {
+        const pairs = [
+            { code: 'GBPJPY', name: 'GBP/JPY' },
+            { code: 'USDJPY', name: 'USD/JPY' },
+            { code: 'EURJPY', name: 'EUR/JPY' },
+            { code: 'CHFJPY', name: 'CHF/JPY' }
+        ];
+
+        const container = document.getElementById('quickPairs');
+        if (!container) {
+            console.error('❌ Quick pairs container not found');
+            return;
+        }
+
+        container.innerHTML = pairs.map(pair => `
+            <div class="pair-card" onclick="loadPair('${pair.code}')" id="card-${pair.code}">
+                <div class="pair-name">${pair.name}</div>
+                <div class="pair-price" id="${pair.code.toLowerCase()}Price">-</div>
+                <div id="${pair.code.toLowerCase()}Change">Loading...</div>
+                <div class="pair-signal" id="${pair.code.toLowerCase()}Signal">-</div>
+            </div>
+        `).join('');
+        
+        console.log('✅ Quick pairs UI initialized');
+    }
+
+    async function loadQuickPairs() {
+        console.log('🔄 Loading quick pairs data...');
+        try {
+            const response = await fetch('/get_multiple_pairs');
+            console.log('📊 Quick pairs response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('📈 Quick pairs data received:', data);
+            
+            if (data.success && data.data) {
+                updateQuickPairs(data.data);
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('❌ Error loading quick pairs:', error);
+            // Fallback to simulated data
+            updateQuickPairsWithFallback();
+        }
+    }
+
+    function updateQuickPairs(data) {
+        console.log('🎯 Updating quick pairs UI...');
+        for (const [pair, info] of Object.entries(data)) {
+            const priceElement = document.getElementById(pair.toLowerCase() + 'Price');
+            const changeElement = document.getElementById(pair.toLowerCase() + 'Change');
+            const signalElement = document.getElementById(pair.toLowerCase() + 'Signal');
+            
+            if (priceElement && info && info.price) {
+                priceElement.textContent = info.price;
+                const change = info.change || 0;
+                changeElement.innerHTML = `
+                    <span style="color: ${change >= 0 ? '#10b981' : '#ef4444'}">
+                        ${change >= 0 ? '↗' : '↘'} ${Math.abs(change).toFixed(2)}%
+                    </span>
+                `;
+                
+                if (signalElement && info.signal) {
+                    signalElement.textContent = `${info.signal} (${info.confidence}%)`;
+                    signalElement.style.color = 
+                        info.signal === 'BUY' ? '#10b981' : 
+                        info.signal === 'SELL' ? '#ef4444' : '#f59e0b';
+                }
+                
+                // Update card style
+                const card = document.getElementById(`card-${pair}`);
+                if (card) {
+                    card.classList.toggle('active', pair === currentPair);
+                }
             }
         }
-    </script>
-</body>
-</html>
+    }
+
+    function updateQuickPairsWithFallback() {
+        console.log('🔄 Using fallback data for quick pairs');
+        const pairs = ['GBPJPY', 'USDJPY', 'EURJPY', 'CHFJPY'];
+        pairs.forEach(pair => {
+            const priceElement = document.getElementById(pair.toLowerCase() + 'Price');
+            if (priceElement) {
+                // Generate realistic fallback price
+                const basePrice = {
+                    'GBPJPY': 187.50,
+                    'USDJPY': 149.50, 
+                    'EURJPY': 174.80,
+                    'CHFJPY': 170.20
+                }[pair] || 150.0;
+                
+                const price = (basePrice * (1 + (Math.random() - 0.5) * 0.01)).toFixed(4);
+                priceElement.textContent = price;
+            }
+        });
+    }
+
+    async function getAnalysis() {
+        console.log('🧠 Starting AI analysis...');
+        showLoading(true);
+        hideError();
+        
+        const pair = document.getElementById('pairSelect').value;
+        const timeframe = document.getElementById('timeframeSelect').value;
+        currentPair = pair;
+        
+        console.log(`📊 Analysis request: ${pair} ${timeframe}`);
+        
+        try {
+            const response = await fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}`);
+            console.log('🤖 Analysis response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('📈 Analysis data received');
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Analysis failed');
+            }
+            
+            updateDashboard(data);
+            showLoading(false);
+            
+        } catch (error) {
+            console.error('❌ Analysis error:', error);
+            showError('Analysis failed: ' + error.message, 'getAnalysis');
+            showLoading(false);
+            showFallbackDashboard(pair);
+        }
+    }
+
+    function loadPair(pair) {
+        console.log(`🔄 Loading pair: ${pair}`);
+        document.getElementById('pairSelect').value = pair;
+        getAnalysis();
+    }
+
+    function refreshAllData() {
+        console.log('🔄 Refreshing all data...');
+        loadQuickPairs();
+        getAnalysis();
+    }
+
+    function updateDashboard(data) {
+        if (!data) {
+            showError('No data received from server');
+            return;
+        }
+
+        console.log('🎨 Updating dashboard...');
+        
+        // Basic info
+        document.getElementById('pairTitle').textContent = 
+            `${data.pair} Analysis - ${data.timeframe}`;
+        document.getElementById('currentPrice').textContent = data.current_price;
+        document.getElementById('timestamp').textContent = data.timestamp;
+        
+        // Price change
+        const change = data.price_change || 0;
+        document.getElementById('priceChange').innerHTML = `
+            <span style="color: ${change >= 0 ? '#10b981' : '#ef4444'}">
+                ${change >= 0 ? '↗' : '↘'} ${Math.abs(change).toFixed(2)}%
+            </span>
+        `;
+        
+        // AI Analysis
+        const aiData = data.ai_analysis || {};
+        const signal = aiData.SIGNAL || 'HOLD';
+        const confidence = aiData.CONFIDENCE_LEVEL || 50;
+        
+        const signalBadge = document.getElementById('signalBadge');
+        signalBadge.textContent = `${signal} (AI)`;
+        signalBadge.className = `signal-badge signal-${signal.toLowerCase()}`;
+        
+        document.getElementById('confidenceLevel').textContent = 
+            `AI Confidence: ${confidence}%`;
+        document.getElementById('confidenceFill').style.width = `${confidence}%`;
+        
+        document.getElementById('aiSummary').textContent = 
+            aiData.ANALYSIS_SUMMARY || 'AI analysis completed.';
+        
+        // Technical Indicators
+        updateTechnicalIndicators(data.technical_indicators || {});
+        
+        // News
+        updateNews(data.fundamental_news || []);
+        
+        // Chart
+        updateChart(data.chart_data || {}, data.pair);
+        
+        // Show dashboard
+        document.getElementById('dashboard').style.display = 'grid';
+        
+        console.log('✅ Dashboard updated successfully');
+    }
+
+    function showFallbackDashboard(pair) {
+        console.log('🔄 Showing fallback dashboard');
+        const fallbackData = {
+            pair: pair,
+            timeframe: '1H',
+            timestamp: new Date().toLocaleString(),
+            current_price: (187.50 * (1 + (Math.random() - 0.5) * 0.01)).toFixed(4),
+            price_change: (Math.random() - 0.5) * 0.5,
+            ai_analysis: {
+                SIGNAL: Math.random() > 0.5 ? 'BUY' : 'SELL',
+                CONFIDENCE_LEVEL: Math.floor(Math.random() * 30) + 60,
+                ANALYSIS_SUMMARY: 'Using fallback analysis - check server connection'
+            },
+            technical_indicators: {
+                RSI: Math.floor(Math.random() * 30) + 35,
+                MACD: (Math.random() - 0.5) * 0.1,
+                SMA_20: (187.50 * (1 + (Math.random() - 0.5) * 0.01)).toFixed(4),
+                SMA_50: (187.50 * (1 + (Math.random() - 0.5) * 0.02)).toFixed(4)
+            },
+            fundamental_news: [
+                {
+                    source: 'System',
+                    headline: 'Using simulated data - server may be unavailable',
+                    timestamp: new Date().toLocaleTimeString(),
+                    impact: 'Medium',
+                    sentiment: 'neutral'
+                }
+            ]
+        };
+        
+        updateDashboard(fallbackData);
+    }
+
+    function updateTechnicalIndicators(indicators) {
+        const container = document.getElementById('technicalIndicators');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        const indicatorConfig = [
+            { label: 'RSI', value: indicators.RSI, format: v => v?.toFixed(2) || 'N/A', 
+              color: v => v > 70 ? '#ef4444' : v < 30 ? '#10b981' : '#f59e0b' },
+            { label: 'MACD', value: indicators.MACD, format: v => v?.toFixed(4) || 'N/A' },
+            { label: 'SMA 20', value: indicators.SMA_20, format: v => v?.toFixed(4) || 'N/A' },
+            { label: 'SMA 50', value: indicators.SMA_50, format: v => v?.toFixed(4) || 'N/A' },
+            { label: 'Resistance', value: indicators.Resistance, format: v => v?.toFixed(4) || 'N/A' },
+            { label: 'Support', value: indicators.Support, format: v => v?.toFixed(4) || 'N/A' }
+        ];
+        
+        indicatorConfig.forEach(ind => {
+            const div = document.createElement('div');
+            div.className = 'indicator';
+            const value = ind.value || 0;
+            div.innerHTML = `
+                <div class="indicator-value" style="color: ${ind.color ? ind.color(value) : '#60a5fa'}">
+                    ${ind.format(value)}
+                </div>
+                <div class="indicator-label">${ind.label}</div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function showLoading(show) {
+        const loading = document.getElementById('loading');
+        const dashboard = document.getElementById('dashboard');
+        
+        if (loading) loading.style.display = show ? 'block' : 'none';
+        if (dashboard) dashboard.style.display = show ? 'none' : 'grid';
+    }
+
+    function showError(message, retryCallback = null) {
+        const errorContainer = document.getElementById('errorContainer');
+        if (!errorContainer) return;
+        
+        errorContainer.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>❌ Error:</strong> ${message}
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    ${retryCallback ? 
+                        `<button onclick="${retryCallback}()" style="background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Retry</button>` 
+                        : ''}
+                    <button onclick="hideError()" style="background: #64748b; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Dismiss</button>
+                </div>
+            </div>
+        `;
+        errorContainer.style.display = 'block';
+    }
+
+    function hideError() {
+        const errorContainer = document.getElementById('errorContainer');
+        if (errorContainer) errorContainer.style.display = 'none';
+    }
+
+    // Auto-refresh (reduced frequency)
+    setInterval(loadQuickPairs, 60000); // 1 minute
+    setInterval(() => {
+        if (currentPair) getAnalysis();
+    }, 120000); // 2 minutes
+
+    console.log('✅ JavaScript loaded successfully');
+</script>
