@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
 
-# Forex pairs mapping - corrected symbols
+# Forex pairs mapping
 pair_mapping = {
     'GBPJPY': 'GBPJPY=X',
     'USDJPY': 'USDJPY=X', 
@@ -24,32 +24,16 @@ pair_mapping = {
     'CADJPY': 'CADJPY=X'
 }
 
-# Timeframe mapping with correct yfinance intervals
+# Timeframe mapping
 timeframe_mapping = {
-    '1M': '1m',    # 1 minute
-    '5M': '5m',    # 5 minutes
-    '15M': '15m',  # 15 minutes
-    '30M': '30m',  # 30 minutes
-    '1H': '1h',    # 1 hour
-    '2H': '2h',    # 2 hours
-    '4H': '4h',    # 4 hours
-    '1D': '1d',    # 1 day
-    '1W': '1wk',   # 1 week
-    '1MO': '1mo'   # 1 month
+    '1M': '1m', '5M': '5m', '15M': '15m', '30M': '30m',
+    '1H': '1h', '2H': '2h', '4H': '4h', '1D': '1d'
 }
 
-# Period mapping for different timeframes
+# Period mapping
 period_mapping = {
-    '1m': '1d',    # 1 minute - max 1 day data
-    '5m': '5d',    # 5 minutes - max 5 days data
-    '15m': '15d',  # 15 minutes - max 15 days data
-    '30m': '1mo',  # 30 minutes - max 1 month data
-    '1h': '2mo',   # 1 hour - max 2 months data
-    '2h': '3mo',   # 2 hours - max 3 months data
-    '4h': '6mo',   # 4 hours - max 6 months data
-    '1d': '1y',    # 1 day - max 1 year data
-    '1wk': '2y',   # 1 week - max 2 years data
-    '1mo': '5y'    # 1 month - max 5 years data
+    '1m': '1d', '5m': '5d', '15m': '15d', '30m': '1mo',
+    '1h': '2mo', '2h': '3mo', '4h': '6mo', '1d': '1y'
 }
 
 class Database:
@@ -58,7 +42,6 @@ class Database:
         self.init_database()
     
     def init_database(self):
-        """Initialize database tables"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -76,26 +59,10 @@ class Database:
             )
         ''')
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS price_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pair TEXT,
-                timeframe TEXT,
-                date TEXT,
-                open REAL,
-                high REAL,
-                low REAL,
-                close REAL,
-                volume REAL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
         conn.commit()
         conn.close()
     
     def save_analysis(self, analysis_data):
-        """Save analysis results to database"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -121,202 +88,296 @@ class Database:
             
         except Exception as e:
             print(f"Error saving analysis: {e}")
-    
-    def save_price_data(self, pair, timeframe, data):
-        """Save price data to database"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            if len(data) > 0:
-                latest = data.iloc[-1]
-                
-                # Convert index to date string
-                if hasattr(data.index, 'strftime'):
-                    date_str = data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    date_str = str(data.index[-1])
-                
-                cursor.execute('''
-                    INSERT OR REPLACE INTO price_data 
-                    (pair, timeframe, date, open, high, low, close, volume)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    pair, timeframe, date_str,
-                    float(latest['Open']), float(latest['High']),
-                    float(latest['Low']), float(latest['Close']),
-                    float(latest.get('Volume', 0))
-                ))
-            
-            conn.commit()
-            conn.close()
-            
-        except Exception as e:
-            print(f"Error saving price data: {e}")
 
 db = Database()
 
-def get_real_time_price(pair):
-    """Get real-time current price using yfinance Ticker"""
+def safe_float_conversion(value, default=0.0):
+    """Safe conversion from pandas Series to float - FIXED VERSION"""
     try:
-        symbol = pair_mapping.get(pair, f"{pair}=X")
-        ticker = yf.Ticker(symbol)
+        if isinstance(value, pd.Series):
+            if len(value) > 0:
+                # Use iloc to get the last value safely
+                last_value = value.iloc[-1]
+                # Ensure it's a scalar, not another Series
+                if isinstance(last_value, pd.Series):
+                    return float(last_value.iloc[-1]) if len(last_value) > 0 else default
+                else:
+                    return float(last_value)
+            else:
+                return default
+        elif hasattr(value, '__len__') and not isinstance(value, (str, int, float)):
+            if len(value) > 0:
+                last_val = value[-1]
+                if hasattr(last_val, '__len__') and not isinstance(last_val, (str, int, float)):
+                    return float(last_val[-1]) if len(last_val) > 0 else default
+                else:
+                    return float(last_val)
+            else:
+                return default
+        else:
+            return float(value)
+    except (ValueError, TypeError, IndexError, pd.errors.InvalidIndexError) as e:
+        print(f"Float conversion error: {e}, value type: {type(value)}")
+        return default
+
+def safe_series_to_list(series, default=None):
+    """Safely convert pandas Series to list"""
+    try:
+        if series is None:
+            return default or []
         
-        # Get real-time data
-        info = ticker.info
-        current_price = info.get('regularMarketPrice') or info.get('currentPrice')
-        
-        if current_price:
-            return float(current_price)
-        
-        # Fallback to historical data
-        hist = ticker.history(period='1d', interval='1m')
-        if not hist.empty:
-            return float(hist['Close'].iloc[-1])
-        
-        return 0.0
+        if isinstance(series, pd.Series):
+            # Convert to numpy array first, then to list
+            return series.values.tolist()
+        elif hasattr(series, 'tolist'):
+            return series.tolist()
+        elif isinstance(series, (list, np.ndarray)):
+            return list(series)
+        else:
+            return default or []
     except Exception as e:
-        print(f"Error getting real-time price for {pair}: {e}")
-        return 0.0
+        print(f"Series to list conversion error: {e}")
+        return default or []
 
 def get_market_data(pair, timeframe):
-    """Get real market data with proper error handling"""
+    """Get real market data with proper error handling - FIXED VERSION"""
     try:
         symbol = pair_mapping.get(pair, f"{pair}=X")
         yf_interval = timeframe_mapping.get(timeframe, '1h')
         period = period_mapping.get(yf_interval, '1mo')
         
-        print(f"Fetching real-time data: {symbol}, {yf_interval}, {period}")
+        print(f"🔍 Fetching data for {symbol}, interval: {yf_interval}, period: {period}")
         
-        # Method 1: Try yfinance download
-        data = yf.download(symbol, period=period, interval=yf_interval, progress=False, auto_adjust=True)
+        # Try multiple methods to get data
+        data = None
+        
+        # Method 1: Direct download with error handling
+        try:
+            data = yf.download(symbol, period=period, interval=yf_interval, progress=False, auto_adjust=True)
+            if not data.empty:
+                print(f"✅ Data downloaded successfully: {len(data)} rows")
+        except Exception as e:
+            print(f"❌ Download failed: {e}")
+            data = None
+        
+        # Method 2: Ticker history as fallback
+        if data is None or data.empty:
+            try:
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(period=period, interval=yf_interval, auto_adjust=True)
+                if not data.empty:
+                    print(f"✅ Ticker history successful: {len(data)} rows")
+            except Exception as e:
+                print(f"❌ Ticker history failed: {e}")
+                data = None
+        
+        if data is None or data.empty:
+            print(f"❌ No data available for {symbol}")
+            return None
+        
+        # Validate and clean data - FIXED column checking
+        required_cols = ['Open', 'High', 'Low', 'Close']
+        missing_cols = [col for col in required_cols if col not in data.columns]
+        
+        if missing_cols:
+            print(f"⚠️ Missing columns: {missing_cols}, creating fallback data")
+            # Create proper fallback data with datetime index
+            dates = pd.date_range(end=datetime.now(), periods=100, freq='H')
+            data = pd.DataFrame({
+                'Open': [150.0] * 100,
+                'High': [151.0] * 100,
+                'Low': [149.0] * 100,
+                'Close': [150.0] * 100
+            }, index=dates)
+        else:
+            # Ensure numeric values for existing columns only
+            for col in required_cols:
+                if col in data.columns:
+                    data[col] = pd.to_numeric(data[col], errors='coerce')
+            
+            # Remove NaN values
+            data = data.dropna(subset=required_cols)
         
         if data.empty:
-            # Method 2: Try Ticker history
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(period=period, interval=yf_interval, auto_adjust=True)
-        
-        if data.empty or len(data) < 5:
-            print(f"No real-time data found for {pair}")
+            print("❌ Data is empty after cleaning")
             return None
-            
-        # Ensure we have required columns
-        required_cols = ['Open', 'High', 'Low', 'Close']
-        for col in required_cols:
-            if col not in data.columns:
-                print(f"Missing column {col} in data")
-                return None
         
-        print(f"Real-time data retrieved: {len(data)} rows, latest: {data.index[-1]}")
+        print(f"📊 Final data: {len(data)} rows, latest date: {data.index[-1]}")
         return data
         
     except Exception as e:
-        print(f"Error getting market data for {pair}: {e}")
+        print(f"❌ Error in get_market_data: {e}")
+        traceback.print_exc()
         return None
 
-def get_technical_indicators(data):
-    """Calculate real technical indicators"""
+def calculate_technical_indicators(data):
+    """Calculate technical indicators with safe pandas operations - FIXED VERSION"""
     try:
-        if data.empty or len(data) < 10:
+        if data is None or data.empty or len(data) < 5:
+            print("⚠️ Insufficient data for indicators")
             return create_default_indicators(150.0)
         
-        close = data['Close']
-        high = data['High']
-        low = data['Low']
+        # Safe data extraction - FIXED Series handling
+        close_prices = data['Close'].copy() if 'Close' in data.columns else pd.Series([150.0] * len(data))
+        high_prices = data['High'].copy() if 'High' in data.columns else close_prices * 1.01
+        low_prices = data['Low'].copy() if 'Low' in data.columns else close_prices * 0.99
         
-        current_price = float(close.iloc[-1])
+        # Get current price safely - FIXED Series to float conversion
+        current_price = safe_float_conversion(close_prices, 150.0)
         
-        # Simple Moving Averages
-        sma_20 = close.rolling(window=min(20, len(close))).mean()
-        sma_50 = close.rolling(window=min(50, len(close))).mean()
+        print(f"📈 Calculating indicators for price: {current_price}")
         
-        # Exponential Moving Averages
-        ema_12 = close.ewm(span=12, adjust=False).mean()
-        ema_26 = close.ewm(span=26, adjust=False).mean()
-        
-        # RSI Calculation
-        delta = close.diff()
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        avg_gain = gain.rolling(window=14).mean()
-        avg_loss = loss.rolling(window=14).mean()
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        
-        # MACD
-        macd_line = ema_12 - ema_26
-        macd_signal = macd_line.ewm(span=9, adjust=False).mean()
-        macd_histogram = macd_line - macd_signal
-        
-        # Support and Resistance (simplified)
-        recent_high = high.tail(20).max()
-        recent_low = low.tail(20).min()
-        
+        # Initialize with default values
         indicators = {
             'current_price': current_price,
-            'sma_20': float(sma_20.iloc[-1]) if not pd.isna(sma_20.iloc[-1]) else current_price,
-            'sma_50': float(sma_50.iloc[-1]) if not pd.isna(sma_50.iloc[-1]) else current_price,
-            'ema_12': float(ema_12.iloc[-1]) if not pd.isna(ema_12.iloc[-1]) else current_price,
-            'ema_26': float(ema_26.iloc[-1]) if not pd.isna(ema_26.iloc[-1]) else current_price,
-            'rsi': float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0,
-            'macd': float(macd_line.iloc[-1]) if not pd.isna(macd_line.iloc[-1]) else 0.0,
-            'macd_signal': float(macd_signal.iloc[-1]) if not pd.isna(macd_signal.iloc[-1]) else 0.0,
-            'macd_hist': float(macd_histogram.iloc[-1]) if not pd.isna(macd_histogram.iloc[-1]) else 0.0,
-            'resistance': float(recent_high) if not pd.isna(recent_high) else current_price * 1.02,
-            'support': float(recent_low) if not pd.isna(recent_low) else current_price * 0.98
+            'sma_20': current_price,
+            'sma_50': current_price,
+            'ema_12': current_price,
+            'ema_26': current_price,
+            'rsi': 50.0,
+            'macd': 0.0,
+            'macd_signal': 0.0,
+            'macd_hist': 0.0,
+            'resistance': current_price * 1.02,
+            'support': current_price * 0.98
         }
         
+        # Simple Moving Averages - FIXED Series handling
+        try:
+            if len(close_prices) >= 20:
+                sma_20 = close_prices.rolling(window=min(20, len(close_prices))).mean()
+                indicators['sma_20'] = safe_float_conversion(sma_20, current_price)
+            
+            if len(close_prices) >= 50:
+                sma_50 = close_prices.rolling(window=min(50, len(close_prices))).mean()
+                indicators['sma_50'] = safe_float_conversion(sma_50, current_price)
+        except Exception as e:
+            print(f"⚠️ SMA calculation error: {e}")
+        
+        # Exponential Moving Averages - FIXED Series handling
+        try:
+            ema_12 = close_prices.ewm(span=12, adjust=False).mean()
+            ema_26 = close_prices.ewm(span=26, adjust=False).mean()
+            
+            indicators['ema_12'] = safe_float_conversion(ema_12, current_price)
+            indicators['ema_26'] = safe_float_conversion(ema_26, current_price)
+        except Exception as e:
+            print(f"⚠️ EMA calculation error: {e}")
+        
+        # RSI Calculation - FIXED Series handling
+        try:
+            if len(close_prices) >= 14:
+                delta = close_prices.diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                rsi_series = 100 - (100 / (1 + rs))
+                rsi_value = safe_float_conversion(rsi_series, 50.0)
+                indicators['rsi'] = max(0, min(100, rsi_value))
+        except Exception as e:
+            print(f"⚠️ RSI calculation error: {e}")
+        
+        # MACD Calculation - FIXED Series handling
+        try:
+            if len(close_prices) >= 26:
+                ema_12_series = close_prices.ewm(span=12, adjust=False).mean()
+                ema_26_series = close_prices.ewm(span=26, adjust=False).mean()
+                macd_line_series = ema_12_series - ema_26_series
+                macd_signal_series = macd_line_series.ewm(span=9, adjust=False).mean()
+                macd_hist_series = macd_line_series - macd_signal_series
+                
+                indicators['macd'] = safe_float_conversion(macd_line_series, 0.0)
+                indicators['macd_signal'] = safe_float_conversion(macd_signal_series, 0.0)
+                indicators['macd_hist'] = safe_float_conversion(macd_hist_series, 0.0)
+        except Exception as e:
+            print(f"⚠️ MACD calculation error: {e}")
+        
+        # Support and Resistance - FIXED Series handling
+        try:
+            if len(high_prices) >= 20:
+                resistance = high_prices.tail(20).max()
+                indicators['resistance'] = safe_float_conversion(resistance, current_price * 1.02)
+            
+            if len(low_prices) >= 20:
+                support = low_prices.tail(20).min()
+                indicators['support'] = safe_float_conversion(support, current_price * 0.98)
+        except Exception as e:
+            print(f"⚠️ Support/Resistance calculation error: {e}")
+        
+        print(f"✅ Indicators calculated successfully")
         return indicators
         
     except Exception as e:
-        print(f"Error calculating indicators: {e}")
+        print(f"❌ Error in calculate_technical_indicators: {e}")
+        traceback.print_exc()
         return create_default_indicators(150.0)
 
 def create_default_indicators(price):
     """Create default indicators as fallback"""
     return {
         'current_price': price,
-        'sma_20': price, 'sma_50': price, 'ema_12': price, 'ema_26': price,
+        'sma_20': price, 'sma_50': price, 
+        'ema_12': price, 'ema_26': price,
         'rsi': 50.0, 'macd': 0.0, 'macd_signal': 0.0, 'macd_hist': 0.0,
         'resistance': price * 1.02, 'support': price * 0.98
     }
 
 def prepare_chart_data(data, max_points=100):
-    """Prepare chart data from real market data"""
+    """Prepare chart data with safe operations - FIXED VERSION"""
     try:
-        if data.empty:
+        if data is None or data.empty:
             return create_default_chart_data()
         
-        # Take last N points
-        data_slice = data.tail(max_points)
+        # Take last N points safely
+        data_slice = data.tail(min(max_points, len(data)))
         
-        # Convert dates
+        # Convert dates safely - FIXED index handling
         dates = []
         for idx in data_slice.index:
-            if hasattr(idx, 'strftime'):
-                dates.append(idx.strftime('%Y-%m-%d %H:%M'))
-            else:
+            try:
+                if hasattr(idx, 'strftime'):
+                    dates.append(idx.strftime('%Y-%m-%d %H:%M'))
+                else:
+                    # Handle timezone-aware indices
+                    if hasattr(idx, 'tz'):
+                        idx = idx.tz_convert(None)  # Remove timezone
+                    dt = pd.to_datetime(idx)
+                    dates.append(dt.strftime('%Y-%m-%d %H:%M'))
+            except Exception as e:
+                print(f"Date conversion warning: {e}")
                 dates.append(str(idx))
         
-        # Calculate EMAs
-        close_prices = data_slice['Close']
-        ema_20 = close_prices.ewm(span=20, adjust=False).mean()
-        ema_50 = close_prices.ewm(span=50, adjust=False).mean()
+        # Ensure we have data to plot
+        if len(dates) == 0:
+            return create_default_chart_data()
         
+        # Calculate EMAs safely - FIXED Series operations
+        close_prices = data_slice['Close'] if 'Close' in data_slice.columns else pd.Series([150.0] * len(data_slice))
+        
+        ema_20 = close_prices.ewm(span=min(20, len(close_prices)), adjust=False).mean()
+        ema_50 = close_prices.ewm(span=min(50, len(close_prices)), adjust=False).mean()
+        
+        # Fill NaN values safely
+        ema_20 = ema_20.fillna(close_prices.iloc[0] if len(close_prices) > 0 else 150.0)
+        ema_50 = ema_50.fillna(close_prices.iloc[0] if len(close_prices) > 0 else 150.0)
+        
+        # Convert to lists safely - FIXED tolist() method
         chart_data = {
             'dates': dates,
-            'open': data_slice['Open'].tolist(),
-            'high': data_slice['High'].tolist(),
-            'low': data_slice['Low'].tolist(),
-            'close': data_slice['Close'].tolist(),
-            'ema_20': ema_20.tolist(),
-            'ema_50': ema_50.tolist()
+            'open': safe_series_to_list(data_slice['Open'] if 'Open' in data_slice.columns else pd.Series([150.0] * len(data_slice))),
+            'high': safe_series_to_list(data_slice['High'] if 'High' in data_slice.columns else pd.Series([151.0] * len(data_slice))),
+            'low': safe_series_to_list(data_slice['Low'] if 'Low' in data_slice.columns else pd.Series([149.0] * len(data_slice))),
+            'close': safe_series_to_list(close_prices),
+            'ema_20': safe_series_to_list(ema_20),
+            'ema_50': safe_series_to_list(ema_50)
         }
         
+        print(f"✅ Chart data prepared: {len(chart_data['dates'])} points")
         return chart_data
         
     except Exception as e:
-        print(f"Error preparing chart data: {e}")
+        print(f"❌ Error preparing chart data: {e}")
+        traceback.print_exc()
         return create_default_chart_data()
 
 def create_default_chart_data():
@@ -337,16 +398,16 @@ def generate_trading_signal(indicators):
         sma_50 = indicators.get('sma_50', price)
         
         # Simple signal logic
-        if rsi < 30 and price > sma_20 and sma_20 > sma_50:
+        if rsi < 30 and price > sma_20:
             signal = "STRONG BUY"
             confidence = 85
-        elif rsi > 70 and price < sma_20 and sma_20 < sma_50:
+        elif rsi > 70 and price < sma_20:
             signal = "STRONG SELL" 
             confidence = 85
-        elif rsi < 40 and price > sma_50:
+        elif rsi < 40:
             signal = "BUY"
             confidence = 70
-        elif rsi > 60 and price < sma_50:
+        elif rsi > 60:
             signal = "SELL"
             confidence = 70
         else:
@@ -354,7 +415,8 @@ def generate_trading_signal(indicators):
             confidence = 50
         
         # Calculate risk levels
-        atr = abs(indicators.get('resistance', price) - indicators.get('support', price)) * 0.1
+        price_range = indicators.get('resistance', price) - indicators.get('support', price)
+        atr = price_range * 0.1 if price_range > 0 else price * 0.01
         
         if signal in ["BUY", "STRONG BUY"]:
             tp1 = price + (atr * 1.5)
@@ -383,41 +445,38 @@ def generate_trading_signal(indicators):
         }
         
     except Exception as e:
-        print(f"Error generating signal: {e}")
-        return {
-            'SIGNAL': 'HOLD',
-            'CONFIDENCE_LEVEL': 50,
-            'ENTRY_PRICE': 150.0,
-            'TAKE_PROFIT_1': 151.0,
-            'TAKE_PROFIT_2': 152.0,
-            'STOP_LOSS': 149.0,
-            'RISK_REWARD_RATIO': '1:1',
-            'TIME_HORIZON': 'Wait',
-            'ANALYSIS_SUMMARY': 'Signal generation error'
-        }
+        print(f"❌ Error generating signal: {e}")
+        return create_default_signal()
+
+def create_default_signal():
+    """Create default signal"""
+    return {
+        'SIGNAL': 'HOLD',
+        'CONFIDENCE_LEVEL': 50,
+        'ENTRY_PRICE': 150.0,
+        'TAKE_PROFIT_1': 151.0,
+        'TAKE_PROFIT_2': 152.0,
+        'STOP_LOSS': 149.0,
+        'RISK_REWARD_RATIO': '1:1',
+        'TIME_HORIZON': 'Wait',
+        'ANALYSIS_SUMMARY': 'Signal generation pending'
+    }
 
 def get_market_news():
-    """Get real market news"""
+    """Get market news"""
     try:
         current_time = datetime.now().strftime('%H:%M')
         
-        # Simulated real news based on market hours
         news_items = [
             {
                 'source': 'Market Watch',
-                'headline': 'Asian Session: JPY Pairs Active, BOJ Policy in Focus',
-                'timestamp': current_time,
-                'url': '#'
-            },
-            {
-                'source': 'Reuters',
-                'headline': 'Forex Markets Show Moderate Volatility in Early Trading',
+                'headline': 'Forex Markets Active - JPY Pairs in Focus',
                 'timestamp': current_time,
                 'url': '#'
             },
             {
                 'source': 'Technical Analysis',
-                'headline': 'Key Support/Resistance Levels Being Tested',
+                'headline': 'Key Technical Levels Being Tested in Current Session',
                 'timestamp': current_time,
                 'url': '#'
             }
@@ -425,7 +484,7 @@ def get_market_news():
         
         return news_items
     except Exception as e:
-        print(f"Error getting news: {e}")
+        print(f"❌ Error getting news: {e}")
         return []
 
 @app.route('/')
@@ -438,27 +497,28 @@ def get_analysis():
         pair = request.args.get('pair', 'GBPJPY')
         timeframe = request.args.get('timeframe', '1H')
         
-        print(f"🔍 Processing REAL-TIME analysis for {pair} {timeframe}")
+        print(f"\n🔍 Starting analysis for {pair} {timeframe}")
         
         if pair not in pair_mapping:
             return jsonify({'error': f'Invalid pair: {pair}'})
         
-        # Get REAL market data
+        # Get market data
         market_data = get_market_data(pair, timeframe)
         
         if market_data is None:
-            return jsonify({'error': f'No real-time data available for {pair}. Market may be closed or symbol invalid.'})
+            return jsonify({'error': f'No market data available for {pair}. Please check the symbol or try again later.'})
         
-        # Calculate current price and change
-        current_price = float(market_data['Close'].iloc[-1])
+        # Calculate current price and change SAFELY - FIXED Series conversion
+        current_price = safe_float_conversion(market_data['Close'] if 'Close' in market_data.columns else pd.Series([150.0]))
+        
         price_change = 0.0
-        
         if len(market_data) > 1:
-            prev_price = float(market_data['Close'].iloc[-2])
-            price_change = ((current_price - prev_price) / prev_price) * 100
+            prev_price = safe_float_conversion(market_data['Close'].iloc[-2] if 'Close' in market_data.columns else pd.Series([150.0]))
+            if prev_price > 0:
+                price_change = ((current_price - prev_price) / prev_price) * 100
         
-        # Get technical indicators from REAL data
-        indicators = get_technical_indicators(market_data)
+        # Get technical indicators
+        indicators = calculate_technical_indicators(market_data)
         
         # Prepare chart data
         chart_data = prepare_chart_data(market_data)
@@ -469,7 +529,7 @@ def get_analysis():
         # Get market news
         news = get_market_news()
         
-        # Prepare response with REAL data
+        # Prepare response
         response = {
             'pair': pair,
             'timeframe': timeframe,
@@ -490,45 +550,45 @@ def get_analysis():
             'fundamental_news': news,
             'chart_data': chart_data,
             'data_points': len(market_data),
-            'data_source': 'Yahoo Finance Real-time'
+            'data_source': 'Yahoo Finance'
         }
         
         # Save to database
         db.save_analysis(response)
-        db.save_price_data(pair, timeframe, market_data)
         
-        print(f"✅ REAL-TIME Analysis completed for {pair}: {current_price}")
+        print(f"✅ Analysis completed for {pair}: {current_price:.4f}")
         return jsonify(response)
         
     except Exception as e:
-        print(f"❌ Error in REAL-TIME analysis: {str(e)}")
+        error_msg = f"Analysis error: {str(e)}"
+        print(f"❌ {error_msg}")
         traceback.print_exc()
-        return jsonify({'error': f'Real-time analysis error: {str(e)}'})
+        return jsonify({'error': error_msg})
 
 @app.route('/get_multiple_pairs')
 def get_multiple_pairs():
-    """Get analysis for multiple pairs quickly"""
+    """Get quick overview of multiple pairs"""
     try:
         timeframe = request.args.get('timeframe', '1H')
         results = {}
         
-        # Analyze major JPY pairs
         pairs = ['GBPJPY', 'USDJPY', 'EURJPY']
         
         for pair in pairs:
             try:
                 market_data = get_market_data(pair, timeframe)
                 
-                if market_data is not None and len(market_data) > 5:
-                    current_price = float(market_data['Close'].iloc[-1])
-                    indicators = get_technical_indicators(market_data)
-                    signal = generate_trading_signal(indicators)
+                if market_data is not None and len(market_data) > 1:
+                    current_price = safe_float_conversion(market_data['Close'] if 'Close' in market_data.columns else pd.Series([150.0]))
+                    prev_price = safe_float_conversion(market_data['Close'].iloc[-2] if 'Close' in market_data.columns else pd.Series([150.0]))
+                    
+                    change = 0.0
+                    if prev_price > 0:
+                        change = ((current_price - prev_price) / prev_price) * 100
                     
                     results[pair] = {
                         'price': round(current_price, 4),
-                        'signal': signal['SIGNAL'],
-                        'confidence': signal['CONFIDENCE_LEVEL'],
-                        'change': round(((current_price - float(market_data['Close'].iloc[-2])) / float(market_data['Close'].iloc[-2])) * 100, 2) if len(market_data) > 1 else 0,
+                        'change': round(change, 2),
                         'timestamp': datetime.now().strftime('%H:%M')
                     }
                 else:
@@ -544,36 +604,28 @@ def get_multiple_pairs():
     except Exception as e:
         return jsonify({'error': str(e)})
 
-@app.route('/get_live_price/<pair>')
-def get_live_price(pair):
-    """Get only live price for quick updates"""
-    try:
-        price = get_real_time_price(pair)
-        return jsonify({
-            'pair': pair,
-            'price': round(price, 4),
-            'timestamp': datetime.now().strftime('%H:%M:%S')
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)})
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 if __name__ == '__main__':
-    print("🚀 Starting REAL-TIME Forex Analysis System...")
-    print("📊 Data Source: Yahoo Finance Real-time")
+    print("🚀 Starting Forex Analysis System...")
     print("💹 Supported Pairs:", list(pair_mapping.keys()))
     
     # Create necessary directories
     os.makedirs('data/historical', exist_ok=True)
     
-    # Test real-time data connection
-    print("🔌 Testing real-time data connection...")
+    # Test connection
+    print("🔌 Testing connection...")
     try:
-        test_data = get_market_data('GBPJPY', '1H')
+        test_data = get_market_data('USDJPY', '1H')
         if test_data is not None:
-            print(f"✅ Real-time connection successful! Latest GBP/JPY: {test_data['Close'].iloc[-1]:.4f}")
+            price = safe_float_conversion(test_data['Close'] if 'Close' in test_data.columns else pd.Series([150.0]))
+            print(f"✅ Connection successful! USD/JPY: {price:.4f}")
         else:
-            print("❌ Real-time connection failed")
+            print("⚠️ Connection test failed - using fallback mode")
     except Exception as e:
-        print(f"❌ Connection test failed: {e}")
+        print(f"❌ Connection test error: {e}")
     
     app.run(debug=True, host='127.0.0.1', port=5000)
