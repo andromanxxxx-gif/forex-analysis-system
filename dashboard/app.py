@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import numpy as np
 import warnings
@@ -15,19 +15,11 @@ warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
 
-# Tambahkan CORS headers manually
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
-
 # DeepSeek API Configuration - USING REAL API
-DEEPSEEK_API_KEY = "***********************8"
+DEEPSEEK_API_KEY = "sk-73d83584fd614656926e1d8860eae9ca"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
-# Forex pairs dengan harga yang lebih realistis
+# Forex pairs with realistic base prices
 pair_base_prices = {
     'GBPJPY': 187.50,
     'USDJPY': 149.50,
@@ -35,6 +27,12 @@ pair_base_prices = {
     'CHFJPY': 170.20,
     'AUDJPY': 105.30,
     'CADJPY': 108.90
+}
+
+# Real forex data sources
+FOREX_DATA_SOURCES = {
+    'primary': 'https://www.investing.com/currencies/streaming-forex-rates-majors',
+    'secondary': 'https://www.xe.com/currencyconverter/convert/'
 }
 
 class Database:
@@ -126,7 +124,7 @@ def scrape_investing_price(pair):
         }
         
         # Simulate realistic price movement based on pair
-        base_price = pair_base_prices.get(pair.upper().replace('-', ''), 150.0)
+        base_price = pair_base_prices.get(pair, 150.0)
         
         # Add realistic price fluctuations (0.1% to 0.5%)
         import random
@@ -513,11 +511,7 @@ def get_real_market_news():
 
 @app.route('/')
 def index():
-    """Serve the main dashboard page"""
-    try:
-        return render_template('index.html')
-    except Exception as e:
-        return f"Error loading template: {str(e)}", 500
+    return render_template('index.html')
 
 @app.route('/get_analysis')
 def get_analysis():
@@ -542,7 +536,6 @@ def get_analysis():
         
         # Prepare response
         response = {
-            'success': True,
             'pair': pair,
             'timeframe': timeframe,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -578,7 +571,7 @@ def get_analysis():
         error_msg = f"Analysis error: {str(e)}"
         print(f"❌ {error_msg}")
         traceback.print_exc()
-        return jsonify({'success': False, 'error': error_msg})
+        return jsonify({'error': error_msg})
 
 @app.route('/get_multiple_pairs')
 def get_multiple_pairs():
@@ -603,12 +596,12 @@ def get_multiple_pairs():
             except Exception as e:
                 results[pair] = {'error': str(e)}
             
-            time.sleep(0.1)  # Reduce sleep time
+            time.sleep(0.5)
         
-        return jsonify({'success': True, 'data': results})
+        return jsonify(results)
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'error': str(e)})
 
 @app.route('/health')
 def health_check():
@@ -619,11 +612,6 @@ def health_check():
         'deepseek_api': 'active' if DEEPSEEK_API_KEY else 'inactive',
         'data_sources': 'realistic_simulation'
     })
-
-# Tambahkan route untuk static files jika diperlukan
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory('static', path)
 
 if __name__ == '__main__':
     print("🚀 Starting REAL Forex Analysis System...")
@@ -637,4 +625,4 @@ if __name__ == '__main__':
         price = get_real_forex_price(pair)
         print(f"   {pair}: {price}")
     
-    app.run(debug=True, host='127.0.0.1', port=5000, threaded=True)
+    app.run(debug=True, host='127.0.0.1', port=5000)
