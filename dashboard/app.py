@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 app = Flask(__name__)
 
 # DeepSeek API Configuration - USING REAL API
-DEEPSEEK_API_KEY = "sk-820e07acdd9d4c94868b7fb95c9e8225"
+DEEPSEEK_API_KEY = "************"
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Forex pairs with realistic base prices
