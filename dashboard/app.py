@@ -8,6 +8,7 @@ import random
 app = Flask(__name__, static_folder='.', static_url_path='/static')
 
 DB_PATH = 'forex_analysis.db'
+HISTORICAL = {}
 
 PAIR_MAP = {
     "USDJPY": "USD/JPY",
@@ -16,19 +17,13 @@ PAIR_MAP = {
     "CHFJPY": "CHF/JPY",
 }
 
-HISTORICAL = {}
-
-# Twelve Data API
-TWELVE_API_KEY = ""
+# API Keys
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
-
-# DeepSeek API (opsional)
-DEEPSEEK_API_KEY = os.environ.get("", "")
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-
-# Alpha Vantage API (fundamental news)
-ALPHA_API_KEY = ""
+ALPHA_API_KEY = "G8588U1ISMGM8GZB"
 ALPHA_API_URL = "https://www.alphavantage.co/query"
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-820e07acdd9d4c94868b7fb95c9e8225")
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 
 # ---------------- DB INIT ----------------
@@ -46,16 +41,23 @@ def init_db():
 
 # ---------------- CSV HISTORICAL ----------------
 def load_csv_data():
-    files = [f for f in os.listdir('.') if f.endswith('_1D.csv')]
-    for f in files:
-        try:
-            df = pd.read_csv(f)
-            df.columns = [c.lower() for c in df.columns]
-            if 'date' in df.columns: df['date'] = pd.to_datetime(df['date'])
-            pair = os.path.basename(f).split('_')[0].upper()
-            HISTORICAL[pair] = df.sort_values('date')
-        except Exception as e:
-            print("CSV load error:", f, e)
+    search_dirs = [".", "data"]
+    for d in search_dirs:
+        if not os.path.exists(d): 
+            continue
+        for f in os.listdir(d):
+            if f.endswith("_1D.csv"):
+                path = os.path.join(d, f)
+                try:
+                    df = pd.read_csv(path)
+                    df.columns = [c.lower() for c in df.columns]
+                    if "date" in df.columns:
+                        df["date"] = pd.to_datetime(df["date"])
+                    pair = os.path.basename(f).split("_")[0].upper()
+                    HISTORICAL[pair] = df.sort_values("date")
+                    print(f"✅ Loaded {pair} from {path}, {len(df)} rows")
+                except Exception as e:
+                    print(f"⚠️ Error loading {path}: {e}")
 
 
 # ---------------- TWELVE DATA ----------------
@@ -73,10 +75,10 @@ def get_price_twelvedata(pair):
         return None
 
 
-# ---------------- FUNDAMENTAL NEWS (Alpha Vantage) ----------------
+# ---------------- FUNDAMENTAL NEWS ----------------
 def get_fundamental_news(pair="USDJPY"):
     try:
-        ticker = pair[-3:]  # ambil JPY dari USDJPY
+        ticker = pair[-3:]
         url = f"{ALPHA_API_URL}?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_API_KEY}"
         r = requests.get(url, timeout=10)
         data = r.json()
@@ -120,20 +122,11 @@ def ai_fallback(tech, news_summary=""):
     atr = cp*0.005
 
     if rsi < 30:
-        signal = "BUY"
-        sl = cp - atr
-        tp1 = cp + 2*atr
-        tp2 = cp + 3*atr
+        signal = "BUY"; sl = cp - atr; tp1 = cp + 2*atr; tp2 = cp + 3*atr
     elif rsi > 70:
-        signal = "SELL"
-        sl = cp + atr
-        tp1 = cp - 2*atr
-        tp2 = cp - 3*atr
+        signal = "SELL"; sl = cp + atr; tp1 = cp - 2*atr; tp2 = cp - 3*atr
     else:
-        signal = "HOLD"
-        sl = cp - atr
-        tp1 = cp + atr
-        tp2 = cp + 2*atr
+        signal = "HOLD"; sl = cp - atr; tp1 = cp + atr; tp2 = cp + 2*atr
 
     return {
         "SIGNAL": signal,
@@ -163,27 +156,15 @@ SMA20: {tech['SMA20']}, SMA50: {tech['SMA50']}
 Support: {tech['Support']}, Resistance: {tech['Resistance']}
 Fundamentals: {fundamentals}
 """
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [{"role":"user","content": prompt}],
-            "temperature": 0.2
-        }
+        payload = {"model": "deepseek-chat","messages": [{"role":"user","content": prompt}],"temperature": 0.2}
         r = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=20)
         resp = r.json()
-
         print("DeepSeek raw response:", resp)
 
         if "choices" not in resp:
-            return {
-                "SIGNAL": "HOLD",
-                "ENTRY_PRICE": tech["current_price"],
-                "STOP_LOSS": tech["current_price"],
-                "TAKE_PROFIT_1": tech["current_price"],
-                "TAKE_PROFIT_2": tech["current_price"],
-                "CONFIDENCE_LEVEL": 0,
-                "TRADING_ADVICE": f"DeepSeek API error: {resp.get('error','Unknown error')}"
-            }
-
+            return {"SIGNAL": "HOLD","ENTRY_PRICE": tech["current_price"],"STOP_LOSS": tech["current_price"],
+                    "TAKE_PROFIT_1": tech["current_price"],"TAKE_PROFIT_2": tech["current_price"],
+                    "CONFIDENCE_LEVEL": 0,"TRADING_ADVICE": f"DeepSeek API error: {resp.get('error','Unknown error')}"}
         txt = resp["choices"][0]["message"]["content"]
         return json.loads(txt)
     except Exception as e:
@@ -203,22 +184,24 @@ def get_analysis():
     use_history = request.args.get("use_history","0")=="1"
     try:
         cp = get_price_twelvedata(pair)
-        if cp is None:
-            if pair in HISTORICAL:
-                cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
-            else:
-                cp = 150 + random.uniform(-1, 1)
+        if cp is None and pair in HISTORICAL:
+            cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
+        elif cp is None:
+            cp = 150 + random.uniform(-1, 1)
 
-        if use_history and pair in HISTORICAL:
-            df = HISTORICAL[pair].tail(100)
-            closes = df["close"].tolist()+[cp]
-            dates = df["date"].dt.strftime("%Y-%m-%d").tolist()+[datetime.now().strftime("%Y-%m-%d %H:%M")]
+        if use_history:
+            if pair in HISTORICAL:
+                df = HISTORICAL[pair].tail(100)
+                closes = df["close"].tolist()+[cp]
+                dates = df["date"].dt.strftime("%Y-%m-%d").tolist()+[datetime.now().strftime("%Y-%m-%d %H:%M")]
+            else:
+                return jsonify({"error": f"Historical data for {pair} not found."}), 400
         else:
             closes = [cp+random.uniform(-0.1,0.1) for _ in range(50)]+[cp]
             dates = [(datetime.now()-timedelta(minutes=i)).strftime("%H:%M") for i in range(50)]+[datetime.now().strftime("%H:%M")]
 
         tech = calc_indicators(closes)
-        fundamentals = get_fundamental_news(pair)  # 🔥 berita real dari Alpha Vantage
+        fundamentals = get_fundamental_news(pair)
         ai = ai_deepseek_analysis(pair, tech, fundamentals)
 
         return jsonify({
@@ -233,9 +216,9 @@ def get_analysis():
             "data_source": "Twelve Data API + Alpha Vantage + DeepSeek"
         })
     except Exception as e:
+        print("Backend error:", e)
         traceback.print_exc()
         return jsonify({"error":str(e)}),500
-
 
 @app.route("/quick_overview")
 def quick_overview():
@@ -251,5 +234,6 @@ def quick_overview():
 
 
 if __name__=="__main__":
-    init_db(); load_csv_data()
+    init_db()
+    load_csv_data()
     app.run(debug=True)
