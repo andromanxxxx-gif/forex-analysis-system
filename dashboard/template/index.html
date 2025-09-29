@@ -1,488 +1,151 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AI Forex Dashboard — Improved</title>
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <style>
-        :root{
-            --bg: #071029;
-            --card: #0f1724;
-            --muted: #94a3b8;
-            --accent: #38bdf8;
-            --accent-2: #60a5fa;
-            --success: #10b981;
-            --danger: #ef4444;
-            --glass: rgba(255,255,255,0.03);
-            --radius: 12px;
-            --txt: #e6eef8;
-        }
-        *{box-sizing:border-box;font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
-        body{margin:0;background:linear-gradient(180deg,#031022 0%,var(--bg) 100%);color:var(--txt);padding:18px;}
-        .container{max-width:1200px;margin:0 auto;}
-        header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
-        .brand{display:flex;gap:12px;align-items:center}
-        .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#022140;box-shadow:0 8px 30px rgba(0,0,0,0.4)}
-        h1{font-size:20px;margin:0}
-        .sub{color:var(--muted);font-size:13px}
-        .header-actions{display:flex;gap:10px;align-items:center}
-
-        .controls{display:flex;gap:10px;background:var(--card);padding:12px;border-radius:12px;align-items:center}
-        select,input[type="number"],.btn{background:var(--glass);border:1px solid rgba(255,255,255,0.03);color:var(--txt);padding:10px;border-radius:8px}
-        .btn{cursor:pointer;padding:10px 14px;font-weight:600}
-        .btn.primary{background:linear-gradient(90deg,var(--accent-2),#34d399);color:#022140}
-        .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04)}
-        .toggle{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
-
-        .grid{display:grid;grid-template-columns: 1fr 340px;gap:16px;margin-top:16px}
-        @media (max-width:1000px){ .grid{grid-template-columns:1fr} }
-
-        .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:var(--radius);padding:16px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 8px 30px rgba(2,8,23,0.6)}
-        .pair-list{display:flex;gap:10px;flex-wrap:wrap}
-        .pair{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer;border:1px solid rgba(255,255,255,0.02);min-width:110px;text-align:center}
-        .pair.active{background:linear-gradient(90deg,var(--accent-2),#34d399);color:#022140;border-color:transparent;box-shadow:0 10px 30px rgba(52,211,153,0.08)}
-        .price{font-size:18px;font-weight:700}
-        .small{font-size:12px;color:var(--muted)}
-
-        .price-big{font-size:44px;font-weight:800;letter-spacing:0.6px}
-        .badge{display:inline-block;padding:8px 14px;border-radius:999px;font-weight:700}
-        .badge.buy{background:linear-gradient(90deg,var(--success),#059669);color:#04260f}
-        .badge.sell{background:linear-gradient(90deg,var(--danger),#dc2626);color:#fff}
-        .conf{height:8px;background:rgba(255,255,255,0.04);border-radius:999px;overflow:hidden;margin-top:8px}
-        .conf > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent));}
-
-        .indicators{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-        @media (max-width:700px){ .indicators{grid-template-columns:repeat(2,1fr)} }
-
-        .ind-item{background:rgba(255,255,255,0.015);padding:10px;border-radius:8px;text-align:center}
-        .ind-label{font-size:12px;color:var(--muted)}
-        .ind-value{font-weight:700;font-size:16px;margin-top:6px}
-
-        .news-list{display:flex;flex-direction:column;gap:8px}
-        .news-item{padding:10px;background:rgba(255,255,255,0.01);border-radius:8px;border-left:4px solid rgba(255,255,255,0.02)}
-        .chart-wrap{height:420px}
-
-        footer{margin-top:16px;color:var(--muted);font-size:13px;text-align:center}
-    </style>
+  <meta charset="UTF-8">
+  <title>AI Forex Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#0f172a; color:#e2e8f0; margin:0; padding:0;}
+    header { background:#1e293b; padding:15px; text-align:center; font-size:20px; font-weight:bold; color:#38bdf8;}
+    .container{max-width:1200px;margin:20px auto;padding:0 20px;}
+    .controls{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
+    select,button,input[type="checkbox"]{padding:8px 12px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;}
+    button{cursor:pointer;font-weight:bold;}
+    button.primary{background:linear-gradient(90deg,#38bdf8,#34d399);color:#022140;border:none;}
+    .card{background:#1e293b;border-radius:10px;padding:15px;margin-bottom:20px;}
+    .grid{display:grid;grid-template-columns:2fr 1fr;gap:20px;}
+    @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+    .big-price{font-size:32px;font-weight:bold;margin-top:10px;}
+    .badge{display:inline-block;padding:6px 12px;border-radius:20px;font-weight:bold;}
+    .buy{background:#10b981;color:#022c22;}
+    .sell{background:#ef4444;color:#fff;}
+    .hold{background:#475569;color:#fff;}
+    .indicators{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+    .ind-item{background:#334155;padding:8px;border-radius:6px;text-align:center;}
+    footer{text-align:center;padding:15px;background:#1e293b;color:#94a3b8;font-size:14px;}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="brand">
-                <div class="logo">AI</div>
-                <div>
-                    <h1>AI Forex Dashboard</h1>
-                    <div class="sub">Realtime + Historical | DeepSeek style analysis (fallback built-in)</div>
-                </div>
-            </div>
-
-            <div class="header-actions">
-                <div class="controls">
-                    <select id="pairSelect" onchange="onPairChange()">
-                        <option>GBPJPY</option>
-                        <option>USDJPY</option>
-                        <option>EURJPY</option>
-                        <option>CHFJPY</option>
-                        <option>AUDJPY</option>
-                        <option>CADJPY</option>
-                    </select>
-
-                    <select id="timeframeSelect">
-                        <option value="1H">1H</option>
-                        <option value="4H">4H</option>
-                        <option value="1D">1D</option>
-                    </select>
-
-                    <button class="btn primary" onclick="getAnalysis()">Analyze</button>
-                    <button class="btn ghost" onclick="refreshAll()">Refresh</button>
-                </div>
-                <div style="width:12px"></div>
-                <div class="toggle">
-                    <label style="display:flex;align-items:center;gap:8px;">
-                        <input type="checkbox" id="useHistory" style="width:18px;height:18px">
-                        <span class="small">Use Historical Data</span>
-                    </label>
-                </div>
-            </div>
-        </header>
-
-        <div class="grid">
-            <!-- main column -->
-            <div>
-                <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-                    <div>
-                        <div id="pairTitle" style="font-weight:700">GBPJPY — 1H</div>
-                        <div class="small" id="dataSource">Data source: </div>
-                    </div>
-                    <div style="text-align:center">
-                        <div class="price-big" id="currentPrice">-</div>
-                        <div id="priceChange" class="small">-</div>
-                        <div style="margin-top:10px">
-                            <span id="signalBadge" class="badge" style="background:transparent;color:var(--muted)">—</span>
-                        </div>
-                        <div class="conf" style="width:220px;margin:auto"><i id="confFill" style="width:20%"></i></div>
-                        <div class="small" id="confidenceText">Confidence: -</div>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
-                    <div style="flex:1" class="card">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <div style="font-weight:700">Price Chart</div>
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <label class="small">Points:
-                                    <input id="historyPoints" type="number" value="200" min="50" max="2000" style="width:80px;margin-left:6px;padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.03)">
-                                </label>
-                                <button class="btn ghost" onclick="downloadChartPNG()">Download</button>
-                            </div>
-                        </div>
-                        <div class="chart-wrap" style="margin-top:12px">
-                            <canvas id="priceChart"></canvas>
-                        </div>
-                    </div>
-
-                    <div style="width:320px" class="card">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <div style="font-weight:700">Trading Recommendations</div>
-                            <div class="small">AI</div>
-                        </div>
-
-                        <div style="margin-top:10px">
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                                <div class="ind-item"><div class="ind-label">Signal</div><div id="signalType" class="ind-value">-</div></div>
-                                <div class="ind-item"><div class="ind-label">Entry</div><div id="entryPrice" class="ind-value">-</div></div>
-                                <div class="ind-item"><div class="ind-label">Stop Loss</div><div id="stopLoss" class="ind-value">-</div></div>
-                                <div class="ind-item"><div class="ind-label">TP1</div><div id="takeProfit1" class="ind-value">-</div></div>
-                                <div class="ind-item"><div class="ind-label">TP2</div><div id="takeProfit2" class="ind-value">-</div></div>
-                                <div class="ind-item"><div class="ind-label">R/R</div><div id="riskReward" class="ind-value">-</div></div>
-                            </div>
-
-                            <div style="margin-top:12px">
-                                <button class="btn primary" style="width:100%" onclick="simulateTrade('BUY')">Simulate BUY</button>
-                                <button class="btn" style="width:100%;margin-top:8px" onclick="simulateTrade('SELL')">Simulate SELL</button>
-                            </div>
-
-                            <div style="margin-top:12px;background:rgba(255,255,255,0.01);padding:10px;border-radius:8px">
-                                <div class="small">Advice</div>
-                                <div id="tradingAdvice" style="margin-top:6px;font-size:14px;color:var(--muted)">Waiting for AI...</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
-                    <div class="card" style="flex:1">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <div style="font-weight:700">Technical Indicators</div>
-                            <div class="small">live</div>
-                        </div>
-                        <div class="indicators" id="technicalIndicators" style="margin-top:12px">
-                            <!-- indicators -->
-                        </div>
-                    </div>
-
-                    <div class="card" style="width:320px">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <div style="font-weight:700">Market News</div>
-                            <div class="small">simulated</div>
-                        </div>
-                        <div class="news-list" id="newsContainer" style="margin-top:10px">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- right column: quick pairs, history -->
-            <div>
-                <div class="card">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <div style="font-weight:700">Quick Pairs</div>
-                        <div class="small">Auto refresh</div>
-                    </div>
-                    <div class="pair-list" id="quickPairs" style="margin-top:12px">
-                        <div class="pair" onclick="loadPair('GBPJPY')" id="card-GBPJPY">
-                            <div>GBP/JPY</div>
-                            <div class="price" id="gbpjpyPrice">-</div>
-                            <div class="small" id="gbpjpyChange">-</div>
-                        </div>
-                        <div class="pair" onclick="loadPair('USDJPY')" id="card-USDJPY">
-                            <div>USD/JPY</div>
-                            <div class="price" id="usdjpyPrice">-</div>
-                            <div class="small" id="usdjpyChange">-</div>
-                        </div>
-                        <div class="pair" onclick="loadPair('EURJPY')" id="card-EURJPY">
-                            <div>EUR/JPY</div>
-                            <div class="price" id="eurjpyPrice">-</div>
-                            <div class="small" id="eurjpyChange">-</div>
-                        </div>
-                        <div class="pair" onclick="loadPair('CHFJPY')" id="card-CHFJPY">
-                            <div>CHF/JPY</div>
-                            <div class="price" id="chfjpyPrice">-</div>
-                            <div class="small" id="chfjpyChange">-</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card" style="margin-top:12px">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <div style="font-weight:700">Settings</div>
-                        <div class="small">Customize</div>
-                    </div>
-                    <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
-                        <label class="small">Auto-refresh (sec)
-                            <input id="autoInterval" type="number" value="120" min="20" style="width:110px;margin-left:6px">
-                        </label>
-                        <label class="small">Quick pairs points
-                            <input id="quickPoints" type="number" value="60" min="20" style="width:110px;margin-left:6px">
-                        </label>
-                        <button class="btn" onclick="refreshAll()">Apply</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <footer>
-            Built for you · Put CSVs next to this app (USDJPY_1D.csv, etc.). Last updated: <span id="lastUpdate">-</span>
-        </footer>
+  <header>📊 AI Forex Dashboard</header>
+  <div class="container">
+    <div class="controls">
+      <select id="pairSelect"><option>USDJPY</option><option>GBPJPY</option><option>EURJPY</option><option>CHFJPY</option></select>
+      <select id="timeframeSelect"><option>1H</option><option>4H</option><option>1D</option></select>
+      <label><input type="checkbox" id="useHistory"> Use Historical Data</label>
+      <button class="primary" onclick="getAnalysis()">Analyze</button>
     </div>
 
-    <script>
-        // Main JS for frontend interactions
-        let priceChart = null;
-        let currentPair = 'GBPJPY';
-        let currentTimeframe = '1H';
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div id="pairTitle" style="font-weight:bold">-</div>
+              <div id="dataSource" style="font-size:13px;color:#94a3b8">-</div>
+            </div>
+            <div style="text-align:right">
+              <div id="currentPrice" class="big-price">-</div>
+              <div id="signalBadge" class="badge hold">-</div>
+            </div>
+          </div>
+        </div>
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // set selects
-            document.getElementById('pairSelect').value = currentPair;
-            document.getElementById('timeframeSelect').value = currentTimeframe;
-            loadQuickPairs();
-            getAnalysis();
-            setupAutoRefresh();
-        });
+        <div class="card">
+          <h3>Price Chart</h3>
+          <canvas id="priceChart" style="height:350px"></canvas>
+        </div>
 
-        function onPairChange() {
-            const sel = document.getElementById('pairSelect');
-            currentPair = sel.value;
-        }
+        <div class="card">
+          <h3>Technical Indicators</h3>
+          <div class="indicators" id="technicalIndicators"></div>
+        </div>
+      </div>
 
-        async function loadQuickPairs(){
-            try {
-                const res = await fetch('/get_multiple_pairs');
-                const data = await res.json();
-                for (const [pair, info] of Object.entries(data)) {
-                    const pEl = document.getElementById(pair.toLowerCase() + 'Price');
-                    const cEl = document.getElementById(pair.toLowerCase() + 'Change');
-                    const card = document.getElementById('card-' + pair);
-                    if (pEl) pEl.textContent = info.price || '-';
-                    if (cEl) cEl.innerHTML = info.change ? `${info.change.toFixed(2)}%` : '-';
-                    if (card) {
-                        if (pair === currentPair) card.classList.add('active'); else card.classList.remove('active');
-                    }
-                }
-            } catch (e) {
-                console.log('quick pairs fetch error', e);
-            }
-        }
+      <div>
+        <div class="card">
+          <h3>Trading Recommendations (AI)</h3>
+          <div><b>Signal:</b> <span id="signalType">-</span></div>
+          <div><b>Entry:</b> <span id="entryPrice">-</span></div>
+          <div><b>Stop Loss:</b> <span id="stopLoss">-</span></div>
+          <div><b>Take Profit 1:</b> <span id="takeProfit1">-</span></div>
+          <div><b>Take Profit 2:</b> <span id="takeProfit2">-</span></div>
+          <div><b>Confidence:</b> <span id="confidenceText">-</span></div>
+          <p id="tradingAdvice" style="margin-top:10px;font-size:14px;color:#94a3b8">-</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        function loadPair(pair){
-            currentPair = pair;
-            document.getElementById('pairSelect').value = pair;
-            getAnalysis();
-        }
+  <footer>Data source: Investing.com + DeepSeek AI</footer>
 
-        async function getAnalysis(){
-            // show loading skeleton (light)
-            document.getElementById('pairTitle').textContent = `${currentPair} — ${document.getElementById('timeframeSelect').value}`;
-            const useHistory = document.getElementById('useHistory').checked;
-            const points = parseInt(document.getElementById('historyPoints').value || '200');
+  <script>
+    let priceChart;
 
-            let url = `/get_analysis?pair=${currentPair}&timeframe=${document.getElementById('timeframeSelect').value}`;
-            if (useHistory) url += `&use_history=1&history_points=${points}`;
+    async function getAnalysis(){
+      const pair=document.getElementById("pairSelect").value;
+      const tf=document.getElementById("timeframeSelect").value;
+      const useHist=document.getElementById("useHistory").checked;
+      let url=`/get_analysis?pair=${pair}&timeframe=${tf}`;
+      if(useHist) url+="&use_history=1";
+      try{
+        const res=await fetch(url); const data=await res.json();
+        if(data.error){alert(data.error);return;}
+        updateUI(data);
+      }catch(e){alert("Error: "+e.message);}
+    }
 
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data.error) { alert('Server error: ' + data.error); return;}
-                updateDashboard(data);
-            } catch (e) {
-                alert('Network/Server error: ' + e.message);
-            }
-        }
+    function updateUI(data){
+      document.getElementById("pairTitle").textContent=`${data.pair} — ${data.timeframe}`;
+      document.getElementById("dataSource").textContent="Data source: "+data.data_source;
+      document.getElementById("currentPrice").textContent=data.current_price;
 
-        function updateDashboard(data){
-            currentPair = data.pair;
-            document.getElementById('currentPrice').textContent = data.current_price;
-            document.getElementById('priceChange').textContent = (data.price_change>=0 ? '▲ ' : '▼ ') + Math.abs(data.price_change).toFixed(2) + '%';
-            document.getElementById('dataSource').textContent = 'Data source: ' + (data.data_source || 'simulated');
-            document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleString();
+      const ai=data.ai_analysis;
+      const sig=ai.SIGNAL;
+      const badge=document.getElementById("signalBadge");
+      badge.textContent=sig;
+      badge.className="badge "+(sig==="BUY"?"buy":sig==="SELL"?"sell":"hold");
 
-            // signal & confidence
-            const signal = data.ai_analysis.SIGNAL || 'HOLD';
-            const conf = data.ai_analysis.CONFIDENCE_LEVEL || 50;
-            const badge = document.getElementById('signalBadge');
-            badge.textContent = `${signal} (${conf}%)`;
-            badge.className = 'badge ' + (signal.includes('BUY')? 'buy' : signal.includes('SELL')? 'sell' : '');
+      document.getElementById("signalType").textContent=sig;
+      document.getElementById("entryPrice").textContent=ai.ENTRY_PRICE;
+      document.getElementById("stopLoss").textContent=ai.STOP_LOSS;
+      document.getElementById("takeProfit1").textContent=ai.TAKE_PROFIT_1;
+      document.getElementById("takeProfit2").textContent=ai.TAKE_PROFIT_2;
+      document.getElementById("confidenceText").textContent=ai.CONFIDENCE_LEVEL+"%";
+      document.getElementById("tradingAdvice").textContent=ai.TRADING_ADVICE;
 
-            document.getElementById('confidenceText').textContent = 'Confidence: ' + conf + '%';
-            document.getElementById('confFill').style.width = `${conf}%`;
+      updateIndicators(data.technical_indicators);
+      updateChart(data.chart_data,data.pair);
+    }
 
-            // trading recs
-            document.getElementById('signalType').textContent = data.ai_analysis.SIGNAL;
-            document.getElementById('entryPrice').textContent = data.ai_analysis.ENTRY_PRICE;
-            document.getElementById('stopLoss').textContent = data.ai_analysis.STOP_LOSS;
-            document.getElementById('takeProfit1').textContent = data.ai_analysis.TAKE_PROFIT_1;
-            document.getElementById('takeProfit2').textContent = data.ai_analysis.TAKE_PROFIT_2;
-            document.getElementById('riskReward').textContent = data.ai_analysis.RISK_REWARD_RATIO;
-            document.getElementById('tradingAdvice').textContent = data.ai_analysis.TRADING_ADVICE || data.ai_analysis.ANALYSIS_SUMMARY;
+    function updateIndicators(ind){
+      const container=document.getElementById("technicalIndicators");
+      container.innerHTML="";
+      for(const [k,v] of Object.entries(ind)){
+        const div=document.createElement("div");
+        div.className="ind-item";
+        div.innerHTML=`<div>${k}</div><div><b>${v}</b></div>`;
+        container.appendChild(div);
+      }
+    }
 
-            // technical indicators
-            updateTechnicalIndicators(data.technical_indicators);
+    function updateChart(chartData,pair){
+      const ctx=document.getElementById("priceChart").getContext("2d");
+      if(priceChart) priceChart.destroy();
+      priceChart=new Chart(ctx,{
+        type:"line",
+        data:{labels:chartData.dates,datasets:[{
+          label:pair+" Close",
+          data:chartData.close,
+          borderColor:"#38bdf8",
+          backgroundColor:"rgba(56,189,248,0.1)",
+          fill:true,tension:0.2}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{labels:{color:"#e2e8f0"}}},
+          scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#94a3b8"}}}}
+      });
+    }
 
-            // news
-            updateNews(data.fundamental_news);
-
-            // chart
-            updateChart(data.chart_data, data.pair);
-
-            // quick pairs small update
-            updateQuickPairs({[data.pair]: { price: data.current_price, change: data.price_change, signal: data.ai_analysis.SIGNAL, confidence: data.ai_analysis.CONFIDENCE_LEVEL }});
-        }
-
-        function updateTechnicalIndicators(ind){
-            const container = document.getElementById('technicalIndicators');
-            container.innerHTML = '';
-            const list = [
-                {label:'RSI', value: ind.RSI},
-                {label:'MACD', value: ind.MACD},
-                {label:'SMA20', value: ind.SMA_20},
-                {label:'SMA50', value: ind.SMA_50},
-                {label:'Resistance', value: ind.Resistance},
-                {label:'Support', value: ind.Support}
-            ];
-            list.forEach(it => {
-                const div = document.createElement('div');
-                div.className = 'ind-item';
-                div.innerHTML = `<div class="ind-label">${it.label}</div><div class="ind-value">${(typeof it.value==='number')? it.value.toFixed(4):it.value}</div>`;
-                container.appendChild(div);
-            });
-        }
-
-        function updateNews(items){
-            const c = document.getElementById('newsContainer');
-            c.innerHTML = '';
-            if (!items || items.length===0) {
-                c.innerHTML = '<div class="news-item small">No news</div>';
-                return;
-            }
-            items.forEach(n=>{
-                const d = document.createElement('div');
-                d.className = 'news-item';
-                d.innerHTML = `<div style="font-weight:700">${n.source} <span style="float:right;font-size:12px;color:var(--muted)">${n.impact||''}</span></div>
-                               <div style="margin-top:6px">${n.headline}</div>
-                               <div class="small" style="margin-top:8px;color:var(--muted)">${n.timestamp} | Sentiment: ${n.sentiment||'neutral'}</div>`;
-                c.appendChild(d);
-            });
-        }
-
-        function updateChart(chartData, pair) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            if (priceChart) priceChart.destroy();
-            const labels = chartData.dates || [];
-            const closes = chartData.close || [];
-            const ema20 = chartData.ema_20 || [];
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: pair + ' Close',
-                            data: closes,
-                            borderWidth: 2,
-                            tension: 0.12,
-                            pointRadius: 0,
-                            fill: true,
-                            backgroundColor: 'rgba(56,189,248,0.06)',
-                            borderColor: 'rgba(56,189,248,0.95)',
-                        },
-                        {
-                            label: 'EMA 20',
-                            data: ema20,
-                            borderWidth: 1.5,
-                            borderDash: [6,4],
-                            pointRadius: 0,
-                            fill: false,
-                            borderColor: 'rgba(99,102,241,0.9)'
-                        }
-                    ]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    plugins: {
-                        tooltip: {mode:'index',intersect:false},
-                        legend: {labels:{color:'#cbd5e1'}}
-                    },
-                    scales: {
-                        x: { ticks: { color:'#9aa8bd', maxTicksLimit:10 }, grid:{color:'rgba(255,255,255,0.02)'} },
-                        y: { ticks: { color:'#9aa8bd' }, grid:{color:'rgba(255,255,255,0.02)'} }
-                    }
-                }
-            });
-        }
-
-        function simulateTrade(action){
-            const sig = document.getElementById('signalType').textContent;
-            const entry = document.getElementById('entryPrice').textContent;
-            const sl = document.getElementById('stopLoss').textContent;
-            const tp = document.getElementById('takeProfit1').textContent;
-            if (!entry || entry==='-') { alert('No trade data'); return; }
-            if (action !== sig && sig!=='HOLD') {
-                if (!confirm(`Action ${action} contradicts AI signal (${sig}). Proceed?`)) return;
-            }
-            alert(`Simulated ${action} on ${currentPair}\nEntry: ${entry}\nSL: ${sl}\nTP: ${tp}`);
-        }
-
-        function refreshAll(){
-            loadQuickPairs();
-            getAnalysis();
-            setupAutoRefresh();
-        }
-
-        function setupAutoRefresh(){
-            const sec = parseInt(document.getElementById('autoInterval').value || '120');
-            if (window._autoIntervalId) clearInterval(window._autoIntervalId);
-            window._autoIntervalId = setInterval(()=>{
-                loadQuickPairs();
-                getAnalysis();
-            }, Math.max(20,sec)*1000);
-        }
-
-        function downloadChartPNG(){
-            if (!priceChart) return alert('No chart ready');
-            const a = document.createElement('a');
-            a.href = document.getElementById('priceChart').toDataURL('image/png',1.0);
-            a.download = currentPair + '_chart.png';
-            a.click();
-        }
-
-        // small helper: update quick pairs with partial data (object)
-        function updateQuickPairs(partial){
-            for (const [p, info] of Object.entries(partial)) {
-                const priceEl = document.getElementById(p.toLowerCase() + 'Price');
-                const changeEl = document.getElementById(p.toLowerCase() + 'Change');
-                const card = document.getElementById('card-' + p);
-                if (priceEl) priceEl.textContent = info.price || '-';
-                if (changeEl) changeEl.textContent = info.change ? (info.change.toFixed(2)+'%') : '-';
-                if (card) {
-                    if (p===currentPair) card.classList.add('active'); else card.classList.remove('active');
-                }
-            }
-        }
-    </script>
+    document.addEventListener("DOMContentLoaded",()=>getAnalysis());
+  </script>
 </body>
 </html>
