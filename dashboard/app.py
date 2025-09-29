@@ -18,10 +18,12 @@ PAIR_MAP = {
 }
 
 # API Keys
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
-ALPHA_API_KEY = ""
+ALPHA_API_KEY = "G8588U1ISMGM8GZB"
 ALPHA_API_URL = "https://www.alphavantage.co/query"
+NEWS_API_KEY = "b90862d072ce41e4b0505cbd7b710b66"
+NEWS_API_URL = "https://newsapi.org/v2/everything"
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
@@ -52,7 +54,6 @@ def load_csv_data():
                     df = pd.read_csv(path)
                     df.columns = [c.lower() for c in df.columns]
 
-                    # kalau ada kolom "price" tapi tidak ada "close" → pakai price sebagai close
                     if "close" not in df.columns and "price" in df.columns:
                         df["close"] = df["price"]
 
@@ -84,41 +85,68 @@ def get_price_twelvedata(pair):
 
 # ---------------- FUNDAMENTAL NEWS ----------------
 def get_fundamental_news(pair="USDJPY"):
+    ticker = pair[-3:]
+
+    # 1. Coba Alpha Vantage dulu
     try:
-        ticker = pair[-3:]
         url = f"{ALPHA_API_URL}?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_API_KEY}"
         r = requests.get(url, timeout=10)
         data = r.json()
 
-        if "feed" in data:
+        if "feed" in data and data["feed"]:
             headlines = [f"{item['title']} ({item.get('source','')})" for item in data["feed"][:2]]
             return " | ".join(headlines)
-        else:
-            return "No recent fundamental news."
-
     except Exception as e:
         print("AlphaVantage news error:", e)
-        return "Error fetching fundamental news."
+
+    # 2. Kalau gagal → fallback ke NewsAPI
+    try:
+        query = pair[:3] + " " + pair[3:] + " forex"
+        url = f"{NEWS_API_URL}?q={query}&language=en&apiKey={NEWS_API_KEY}"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        if "articles" in data and data["articles"]:
+            headlines = [f"{a['title']} ({a['source']['name']})" for a in data["articles"][:3]]
+            return " | ".join(headlines)
+    except Exception as e:
+        print("NewsAPI error:", e)
+
+    return "No recent fundamental news."
 
 
 # ---------------- INDICATORS ----------------
-def calc_indicators(series):
+def calc_indicators(series, volumes=None):
     close = pd.Series(series)
     cp = close.iloc[-1]
+
     delta = close.diff().fillna(0)
     up = delta.clip(lower=0).rolling(14).mean()
     down = -delta.clip(upper=0).rolling(14).mean()
     rs = (up/(down.replace(0,np.nan))).fillna(0)
     rsi = (100-(100/(1+rs))).iloc[-1]
+
     sma20 = close.rolling(20).mean().iloc[-1]
     sma50 = close.rolling(50).mean().iloc[-1]
+    ema200 = close.ewm(span=200).mean().iloc[-1]
+
     macd = (close.ewm(span=12).mean()-close.ewm(span=26).mean()).iloc[-1]
+
+    # OBV
+    obv = None
+    if volumes is not None:
+        vol = pd.Series(volumes)
+        direction = np.sign(delta.fillna(0))
+        obv_series = (direction * vol).cumsum()
+        obv = obv_series.iloc[-1]
+
     return {
         "current_price": round(cp,4),
         "RSI": round(rsi,2),
         "SMA20": round(sma20,4),
         "SMA50": round(sma50,4),
+        "EMA200": round(ema200,4),
         "MACD": round(macd,4),
+        "OBV": round(obv,2) if obv is not None else "N/A",
         "Resistance": round(cp*1.003,4),
         "Support": round(cp*0.997,4),
     }
@@ -159,7 +187,7 @@ SIGNAL, ENTRY_PRICE, STOP_LOSS, TAKE_PROFIT_1, TAKE_PROFIT_2, CONFIDENCE_LEVEL, 
 
 Pair: {pair}
 Price: {tech['current_price']}
-RSI: {tech['RSI']}, MACD: {tech['MACD']}
+RSI: {tech['RSI']}, MACD: {tech['MACD']}, EMA200: {tech['EMA200']}, OBV: {tech['OBV']}
 SMA20: {tech['SMA20']}, SMA50: {tech['SMA50']}
 Support: {tech['Support']}, Resistance: {tech['Resistance']}
 Fundamentals: {fundamentals}
@@ -170,9 +198,7 @@ Fundamentals: {fundamentals}
         print("DeepSeek raw response:", resp)
 
         if "choices" not in resp:
-            return {"SIGNAL": "HOLD","ENTRY_PRICE": tech["current_price"],"STOP_LOSS": tech["current_price"],
-                    "TAKE_PROFIT_1": tech["current_price"],"TAKE_PROFIT_2": tech["current_price"],
-                    "CONFIDENCE_LEVEL": 0,"TRADING_ADVICE": f"DeepSeek API error: {resp.get('error','Unknown error')}"}
+            return ai_fallback(tech, f"DeepSeek API error: {resp.get('error','Unknown error')}")
         txt = resp["choices"][0]["message"]["content"]
         return json.loads(txt)
     except Exception as e:
@@ -201,14 +227,16 @@ def get_analysis():
             if pair in HISTORICAL:
                 df = HISTORICAL[pair].tail(100)
                 closes = df["close"].tolist()+[cp]
+                volumes = df["vol."].fillna(0).tolist()+[0] if "vol." in df.columns else None
                 dates = df["date"].dt.strftime("%Y-%m-%d").tolist()+[datetime.now().strftime("%Y-%m-%d %H:%M")]
             else:
                 return jsonify({"error": f"Historical data for {pair} not found."}), 400
         else:
             closes = [cp+random.uniform(-0.1,0.1) for _ in range(50)]+[cp]
+            volumes = None
             dates = [(datetime.now()-timedelta(minutes=i)).strftime("%H:%M") for i in range(50)]+[datetime.now().strftime("%H:%M")]
 
-        tech = calc_indicators(closes)
+        tech = calc_indicators(closes, volumes)
         fundamentals = get_fundamental_news(pair)
         ai = ai_deepseek_analysis(pair, tech, fundamentals)
 
@@ -221,7 +249,7 @@ def get_analysis():
             "ai_analysis": ai,
             "fundamental_news": fundamentals,
             "chart_data": {"dates":dates,"close":closes},
-            "data_source": "Twelve Data API + Alpha Vantage + DeepSeek"
+            "data_source": "Twelve Data + Alpha Vantage + NewsAPI + DeepSeek"
         })
     except Exception as e:
         print("Backend error:", e)
