@@ -17,7 +17,7 @@ PAIR_MAP = {
 }
 
 # API Keys
-TWELVE_API_KEY = ""1a5a4b69dae6419c951a4fb62e4ad7b2
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
 ALPHA_API_KEY = "G8588U1ISMGM8GZB"
 ALPHA_API_URL = "https://www.alphavantage.co/query"
