@@ -1,25 +1,27 @@
-# Forex Analysis System
+# Forex Trading Analysis Dashboard
 
-Sistem analisis forex yang menggabungkan analisis teknikal (EMA200, MACD timeframe 4 jam) dan analisis fundamental melalui scraping berita. Sistem ini dilengkapi dengan prediksi machine learning untuk memberikan sinyal trading yang akurat.
+A comprehensive Forex trading analysis application that provides real-time technical and fundamental analysis for JPY currency pairs.
 
-## Fitur
+## Features
 
-- **Analisis Teknikal**: Menggunakan EMA200 dan MACD pada timeframe 4 jam
-- **Analisis Fundamental**: Scraping berita forex dan analisis sentimen
-- **Prediksi Machine Learning**: Model LSTM untuk prediksi harga
-- **Sinyal Trading**: Rekomendasi Buy/Sell dengan Stop Loss dan Take Profit
-- **Dashboard Interaktif**: Tampilan visual yang informatif dan mudah digunakan
-- **Multi-Platform**: Dapat dijalankan di Google Colab, GitHub, dan laptop lokal
+- **Real-time Price Data**: Multiple data sources with fallback
+- **Technical Analysis**: RSI, MACD, Moving Averages, Bollinger Bands, etc.
+- **AI-Powered Signals**: DeepSeek AI integration for trading signals
+- **Fundamental Analysis**: News and sentiment analysis
+- **Interactive Charts**: Price visualization with Chart.js
+- **Performance Tracking**: Database storage for analysis history
+- **Responsive Design**: Mobile-friendly Bootstrap interface
 
-## Pasangan Forex yang Didukung
+## Supported Currency Pairs
 
-- **Major Pairs**: EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD
-- **JPY Crosses**: EURJPY, GBPJPY, CHFJPY, AUDJPY, CADJPY, NZDJPY
-- **EUR Crosses**: EURGBP, EURCHF, EURAUD, EURCAD, EURNZD
-- **GBP Crosses**: GBPCHF, GBPAUD, GBPCAD, GBPNZD
-- **AUD Crosses**: AUDCHF, AUDCAD, AUDNZD
-- **CAD Crosses**: CADCHF
-- **CHF Crosses**: CHFCAD
-- **Exotic Pairs**: USDHKD, USDSGD, USDTRY, USDZAR, USDSEK, USDDKK, USDNOK, USDMXN
+- USD/JPY
+- GBP/JPY  
+- EUR/JPY
+- CHF/JPY
 
-## Struktur Proyek
+## Installation
+
+1. Clone or download the project files
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
