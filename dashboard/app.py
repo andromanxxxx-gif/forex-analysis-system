@@ -7,8 +7,8 @@ from flask import Flask, request, jsonify, render_template
 app = Flask(__name__, template_folder=".")
 
 # ================== KONFIG ==================
-TWELVE_API_KEY = "b90862d072ce41e4b0505cbd7b710b66"   # ganti dengan key Anda
-ALPHA_API_KEY   = "G8588U1ISMGM8GZB"
+TWELVE_API_KEY = ""   # ganti dengan key Anda
+ALPHA_API_KEY   = ""
 TWELVE_API_URL  = "https://api.twelvedata.com"
 ALPHA_API_URL   = "https://www.alphavantage.co/query"
 
