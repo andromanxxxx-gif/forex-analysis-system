@@ -1,199 +1,214 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AI Forex Dashboard</title>
+  <title>Forex Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;}
-    header{background:#1e293b;padding:15px;text-align:center;font-size:20px;font-weight:bold;color:#38bdf8;}
-    .container{max-width:1300px;margin:20px auto;padding:0 20px;}
-    .controls{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
-    select,button,input[type="checkbox"]{padding:8px 12px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;}
-    button{cursor:pointer;font-weight:bold;}
-    button.primary{background:linear-gradient(90deg,#38bdf8,#34d399);color:#022140;border:none;}
-    .card{background:#1e293b;border-radius:10px;padding:15px;margin-bottom:20px;}
-    .grid{display:grid;grid-template-columns:2fr 1fr;gap:20px;}
-    @media(max-width:900px){.grid{grid-template-columns:1fr;}}
-    .big-price{font-size:28px;font-weight:bold;margin-top:10px;}
-    .badge{display:inline-block;padding:6px 12px;border-radius:20px;font-weight:bold;}
-    .buy{background:#10b981;color:#022c22;}
-    .sell{background:#ef4444;color:#fff;}
-    .hold{background:#475569;color:#fff;}
-    .indicators{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
-    .ind-item{background:#334155;padding:8px;border-radius:6px;text-align:center;}
-    .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-    .quick-card{background:#334155;border-radius:8px;padding:10px;text-align:center;}
-    .chart-wrapper{position:relative;height:180px;max-height:180px;}
-    footer{text-align:center;padding:15px;background:#1e293b;color:#94a3b8;font-size:14px;}
-    .advice-normal{color:#94a3b8;}
-    .advice-error{color:#ef4444;font-weight:bold;}
-    #fundamentalNews{margin-top:12px;font-size:13px;color:#cbd5e1;background:#334155;padding:8px;border-radius:6px}
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f6fa;
+      margin: 0; padding: 0;
+    }
+    header {
+      background: #273c75;
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+    main {
+      display: flex;
+      gap: 20px;
+      padding: 20px;
+    }
+    .left, .right {
+      flex: 1;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.1em;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 8px;
+    }
+    .chart-container {
+      height: 300px;
+    }
+    .analysis-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .analysis-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .signal-buy { color: green; font-weight: bold; }
+    .signal-sell { color: red; font-weight: bold; }
+    .signal-hold { color: orange; font-weight: bold; }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .overview-item {
+      background: #f1f2f6;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    select, button {
+      padding: 6px 10px;
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
-  <header>📊 AI Forex Dashboard</header>
-  <div class="container">
+  <header>
+    <h1>📊 Forex Dashboard</h1>
+  </header>
 
-    <div class="quick-grid" id="quickOverview"></div>
-
-    <div class="controls">
-      <select id="pairSelect">
-        <option>USDJPY</option>
-        <option>GBPJPY</option>
-        <option>EURJPY</option>
-        <option>CHFJPY</option>
-      </select>
-      <select id="timeframeSelect">
-        <option>1H</option>
-        <option>4H</option>
-        <option>1D</option>
-      </select>
-      <label><input type="checkbox" id="useHistory"> Use Historical Data</label>
-      <button class="primary" onclick="getAnalysis()">Analyze</button>
-    </div>
-
-    <div class="grid">
-      <div>
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div id="pairTitle" style="font-weight:bold">-</div>
-              <div id="dataSource" style="font-size:13px;color:#94a3b8">-</div>
-            </div>
-            <div style="text-align:right">
-              <div id="currentPrice" class="big-price">-</div>
-              <div id="signalBadge" class="badge hold">-</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card chart-card">
-          <h3>Price Chart</h3>
-          <div class="chart-wrapper">
-            <canvas id="priceChart"></canvas>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>Technical Indicators</h3>
-          <div class="indicators" id="technicalIndicators"></div>
-        </div>
+  <main>
+    <!-- LEFT SIDE -->
+    <div class="left">
+      <div class="card">
+        <h2>Settings</h2>
+        <label>Pair:
+          <select id="pair">
+            <option value="USDJPY">USDJPY</option>
+            <option value="EURJPY">EURJPY</option>
+            <option value="GBPJPY">GBPJPY</option>
+            <option value="CHFJPY">CHFJPY</option>
+          </select>
+        </label>
+        <br>
+        <label>Timeframe:
+          <select id="timeframe">
+            <option value="1H">1H</option>
+            <option value="4H">4H</option>
+            <option value="1D">1D</option>
+          </select>
+        </label>
+        <br>
+        <label><input type="checkbox" id="use_history"> Use Historical Data</label>
+        <br>
+        <button onclick="loadAnalysis()">🔍 Analyze</button>
       </div>
 
-      <div>
-        <div class="card">
-          <h3>Trading Recommendations (AI)</h3>
-          <div><b>Signal:</b> <span id="signalType">-</span></div>
-          <div><b>Entry:</b> <span id="entryPrice">-</span></div>
-          <div><b>Stop Loss:</b> <span id="stopLoss">-</span></div>
-          <div><b>Take Profit 1:</b> <span id="takeProfit1">-</span></div>
-          <div><b>Take Profit 2:</b> <span id="takeProfit2">-</span></div>
-          <div><b>Confidence:</b> <span id="confidenceText">-</span></div>
-          <p id="tradingAdvice" class="advice-normal" style="margin-top:10px;font-size:14px">-</p>
-          <div id="fundamentalNews">-</div>
+      <div class="card">
+        <h2>Chart</h2>
+        <div class="chart-container">
+          <canvas id="chart"></canvas>
         </div>
       </div>
     </div>
-  </div>
 
-  <footer>Data source: Twelve Data + Alpha Vantage + DeepSeek AI</footer>
+    <!-- RIGHT SIDE -->
+    <div class="right">
+      <div class="card">
+        <h2>AI Analysis</h2>
+        <table class="analysis-table" id="aiAnalysis"></table>
+      </div>
+
+      <div class="card">
+        <h2>Fundamental News</h2>
+        <div id="news">Loading...</div>
+      </div>
+
+      <div class="card">
+        <h2>Quick Overview</h2>
+        <div class="overview-grid" id="overview"></div>
+      </div>
+    </div>
+  </main>
 
   <script>
-    let priceChart;
+    let chart;
 
-    async function getQuickOverview(){
-      const res=await fetch("/quick_overview"); 
-      const data=await res.json();
-      const container=document.getElementById("quickOverview");
-      container.innerHTML="";
-      for(const [pair,info] of Object.entries(data)){
-        const div=document.createElement("div");
-        div.className="quick-card";
-        div.innerHTML=`<div style="font-weight:bold">${pair}</div><div>${info.price.toFixed(3)}</div>`;
-        container.appendChild(div);
+    async function loadAnalysis() {
+      const pair = document.getElementById("pair").value;
+      const timeframe = document.getElementById("timeframe").value;
+      const useHistory = document.getElementById("use_history").checked ? "1" : "0";
+
+      try {
+        const res = await fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}&use_history=${useHistory}`);
+        const data = await res.json();
+        if (data.error) {
+          alert("Error: " + data.error);
+          return;
+        }
+
+        // === Update Chart ===
+        const ctx = document.getElementById("chart").getContext("2d");
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: data.chart_data.dates,
+            datasets: [{
+              label: pair,
+              data: data.chart_data.close,
+              borderColor: "#273c75",
+              backgroundColor: "rgba(39,60,117,0.2)",
+              fill: true,
+              tension: 0.2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { display: false } }
+          }
+        });
+
+        // === Update AI Analysis ===
+        const ai = data.ai_analysis;
+        const table = document.getElementById("aiAnalysis");
+        let signalClass = "signal-hold";
+        if (ai.SIGNAL === "BUY") signalClass = "signal-buy";
+        else if (ai.SIGNAL === "SELL") signalClass = "signal-sell";
+
+        table.innerHTML = `
+          <tr><td>Signal</td><td class="${signalClass}">${ai.SIGNAL}</td></tr>
+          <tr><td>Entry</td><td>${ai.ENTRY_PRICE}</td></tr>
+          <tr><td>Stop Loss</td><td>${ai.STOP_LOSS}</td></tr>
+          <tr><td>Take Profit 1</td><td>${ai.TAKE_PROFIT_1}</td></tr>
+          <tr><td>Take Profit 2</td><td>${ai.TAKE_PROFIT_2}</td></tr>
+          <tr><td>Confidence</td><td>${ai.CONFIDENCE_LEVEL}%</td></tr>
+          <tr><td colspan="2"><em>${ai.TRADING_ADVICE}</em></td></tr>
+        `;
+
+        // === Update News ===
+        document.getElementById("news").innerText = data.fundamental_news;
+
+      } catch (err) {
+        alert("Failed to fetch data: " + err);
       }
     }
 
-    async function getAnalysis(){
-      const pair=document.getElementById("pairSelect").value;
-      const tf=document.getElementById("timeframeSelect").value;
-      const useHist=document.getElementById("useHistory").checked;
-      let url=`/get_analysis?pair=${pair}&timeframe=${tf}`;
-      if(useHist) url+="&use_history=1";
-      try{
-        const res=await fetch(url); 
-        const data=await res.json();
-        if(data.error){alert(data.error);return;}
-        updateUI(data);
-      }catch(e){alert("Error: "+e.message);}
-    }
-
-    function updateUI(data){
-      document.getElementById("pairTitle").textContent=`${data.pair} — ${data.timeframe}`;
-      document.getElementById("dataSource").textContent="Data source: "+data.data_source;
-      document.getElementById("currentPrice").textContent=data.current_price;
-
-      const ai=data.ai_analysis;
-      const sig=ai.SIGNAL;
-      const badge=document.getElementById("signalBadge");
-      badge.textContent=sig;
-      badge.className="badge "+(sig==="BUY"?"buy":sig==="SELL"?"sell":"hold");
-
-      document.getElementById("signalType").textContent=sig;
-      document.getElementById("entryPrice").textContent=ai.ENTRY_PRICE;
-      document.getElementById("stopLoss").textContent=ai.STOP_LOSS;
-      document.getElementById("takeProfit1").textContent=ai.TAKE_PROFIT_1;
-      document.getElementById("takeProfit2").textContent=ai.TAKE_PROFIT_2;
-      document.getElementById("confidenceText").textContent=ai.CONFIDENCE_LEVEL+"%";
-
-      const adviceElem=document.getElementById("tradingAdvice");
-      if(ai.TRADING_ADVICE && ai.TRADING_ADVICE.toLowerCase().includes("error")){
-        adviceElem.className="advice-error";
-      } else {
-        adviceElem.className="advice-normal";
-      }
-      adviceElem.textContent=ai.TRADING_ADVICE;
-
-      document.getElementById("fundamentalNews").textContent = "Fundamental: " + data.fundamental_news;
-
-      updateIndicators(data.technical_indicators);
-      updateChart(data.chart_data,data.pair);
-    }
-
-    function updateIndicators(ind){
-      const container=document.getElementById("technicalIndicators");
-      container.innerHTML="";
-      for(const [k,v] of Object.entries(ind)){
-        const div=document.createElement("div");
-        div.className="ind-item";
-        div.innerHTML=`<div>${k}</div><div><b>${v}</b></div>`;
-        container.appendChild(div);
+    async function loadOverview() {
+      try {
+        const res = await fetch("/quick_overview");
+        const data = await res.json();
+        const container = document.getElementById("overview");
+        container.innerHTML = "";
+        for (const pair in data) {
+          const price = data[pair].price.toFixed(4);
+          container.innerHTML += `<div class="overview-item"><b>${pair}</b><br>${price}</div>`;
+        }
+      } catch (err) {
+        console.error("Overview error:", err);
       }
     }
 
-    function updateChart(chartData,pair){
-      const ctx=document.getElementById("priceChart").getContext("2d");
-      if(priceChart) priceChart.destroy();
-      priceChart=new Chart(ctx,{
-        type:"line",
-        data:{labels:chartData.dates,datasets:[{
-          label:pair+" Close",
-          data:chartData.close,
-          borderColor:"#38bdf8",
-          backgroundColor:"rgba(56,189,248,0.1)",
-          fill:true,tension:0.2}]},
-        options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{labels:{color:"#e2e8f0"}}},
-          scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#94a3b8"}}}}
-      });
-    }
-
-    document.addEventListener("DOMContentLoaded",()=>{
-      getQuickOverview();
-      getAnalysis();
-      setInterval(getQuickOverview,60000);
-    });
+    loadOverview();
+    setInterval(loadOverview, 10000);
   </script>
 </body>
 </html>
