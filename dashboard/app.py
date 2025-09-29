@@ -19,15 +19,15 @@ PAIR_MAP = {
 HISTORICAL = {}
 
 # Twelve Data API
-TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
+TWELVE_API_KEY = ""
 TWELVE_API_URL = "https://api.twelvedata.com"
 
 # DeepSeek API (opsional)
-DEEPSEEK_API_KEY = os.environ.get("sk-820e07acdd9d4c94868b7fb95c9e8225", "")
+DEEPSEEK_API_KEY = os.environ.get("", "")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # Alpha Vantage API (fundamental news)
-ALPHA_API_KEY = "G8588U1ISMGM8GZB"
+ALPHA_API_KEY = ""
 ALPHA_API_URL = "https://www.alphavantage.co/query"
 
 
