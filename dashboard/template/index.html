@@ -127,6 +127,12 @@
             margin: 20px 0;
         }
         
+        .macd-chart-container {
+            position: relative;
+            height: 200px;
+            margin: 20px 0;
+        }
+        
         .risk-high { color: var(--loss-color); font-weight: bold; }
         .risk-medium { color: var(--warning-color); font-weight: bold; }
         .risk-low { color: var(--profit-color); font-weight: bold; }
@@ -143,10 +149,21 @@
             transition: width 0.5s ease;
         }
         
-        .tooltip-icon {
-            cursor: help;
-            color: var(--accent-color);
-            margin-left: 5px;
+        .chart-controls {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .indicator-toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .indicator-toggle.active {
+            background-color: #007bff;
+            color: white;
         }
     </style>
 </head>
@@ -251,6 +268,11 @@
 
     <script>
         let priceChart = null;
+        let macdChart = null;
+        let chartIndicators = {
+            ema200: true,
+            macd: true
+        };
         
         // Initialize the dashboard
         document.addEventListener('DOMContentLoaded', function() {
@@ -376,13 +398,38 @@
                                 <small class="text-muted">Expected movement: ${ai.EXPECTED_MOVEMENT}</small>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Chart -->
-                    <div class="col-lg-8">
+
+                        <!-- Technical Indicators -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Price Chart</h6>
+                                <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Technical Indicators</h6>
+                            </div>
+                            <div class="card-body">
+                                ${createIndicatorHTML('RSI', tech.RSI, 30, 70)}
+                                ${createIndicatorHTML('MACD', tech.MACD, -0.001, 0.001)}
+                                ${createIndicatorHTML('MACD Signal', tech.MACD_Signal, -0.001, 0.001)}
+                                ${createIndicatorHTML('MACD Histogram', tech.MACD_Histogram, -0.001, 0.001)}
+                                ${createIndicatorHTML('SMA 20', tech.SMA20, data.current_price * 0.99, data.current_price * 1.01, true)}
+                                ${createIndicatorHTML('SMA 50', tech.SMA50, data.current_price * 0.98, data.current_price * 1.02, true)}
+                                ${createIndicatorHTML('EMA 200', tech.EMA200, data.current_price * 0.95, data.current_price * 1.05, true)}
+                                ${createIndicatorHTML('Volatility', tech.Volatility + '%', 0, 5)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Charts -->
+                    <div class="col-lg-8">
+                        <!-- Price Chart with EMA200 -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Price Chart with EMA200</h6>
+                                <div class="chart-controls">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input indicator-toggle" type="checkbox" id="toggleEMA200" checked 
+                                               onchange="toggleIndicator('ema200', this.checked)">
+                                        <label class="form-check-label" for="toggleEMA200">EMA200</label>
+                                    </div>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="chart-container">
@@ -391,81 +438,71 @@
                             </div>
                         </div>
                         
-                        <!-- Technical Indicators -->
+                        <!-- MACD Chart -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>MACD Indicator</h6>
+                                <div class="chart-controls">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input indicator-toggle" type="checkbox" id="toggleMACD" checked 
+                                               onchange="toggleIndicator('macd', this.checked)">
+                                        <label class="form-check-label" for="toggleMACD">MACD</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="macd-chart-container">
+                                    <canvas id="macdChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Support & Resistance and News -->
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="card mb-4">
+                                <div class="card">
                                     <div class="card-header">
-                                        <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Oscillators</h6>
+                                        <h6 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Support & Resistance</h6>
                                     </div>
                                     <div class="card-body">
-                                        ${createIndicatorHTML('RSI', tech.RSI, 30, 70)}
-                                        ${createIndicatorHTML('MACD', tech.MACD, -0.001, 0.001)}
-                                        ${createIndicatorHTML('MACD Signal', tech.MACD_Signal, -0.001, 0.001)}
-                                        ${createIndicatorHTML('MACD Histogram', tech.MACD_Histogram, -0.001, 0.001)}
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <h5 class="text-danger">${tech.Resistance}</h5>
+                                                <small class="text-muted">Resistance</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <h5 class="text-primary">${data.current_price.toFixed(4)}</h5>
+                                                <small class="text-muted">Current</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <h5 class="text-success">${tech.Support}</h5>
+                                                <small class="text-muted">Support</small>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="card mb-4">
+                                <div class="card">
                                     <div class="card-header">
-                                        <h6 class="mb-0"><i class="fas fa-wave-square me-2"></i>Moving Averages</h6>
+                                        <h6 class="mb-0"><i class="fas fa-newspaper me-2"></i>Fundamental News</h6>
                                     </div>
                                     <div class="card-body">
-                                        ${createIndicatorHTML('SMA 20', tech.SMA20, data.current_price * 0.99, data.current_price * 1.01, true)}
-                                        ${createIndicatorHTML('SMA 50', tech.SMA50, data.current_price * 0.98, data.current_price * 1.02, true)}
-                                        ${createIndicatorHTML('EMA 200', tech.EMA200, data.current_price * 0.95, data.current_price * 1.05, true)}
-                                        ${createIndicatorHTML('Volatility', tech.Volatility + '%', 0, 5)}
+                                        <div class="news-item">
+                                            <p class="mb-0">${data.fundamental_news}</p>
+                                        </div>
+                                        <small class="text-muted">Data Source: ${data.data_source} | Processed in ${data.processing_time}s</small>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Support & Resistance -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Support & Resistance</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row text-center">
-                                    <div class="col-4">
-                                        <h5 class="text-danger">${tech.Resistance}</h5>
-                                        <small class="text-muted">Resistance</small>
-                                    </div>
-                                    <div class="col-4">
-                                        <h5 class="text-primary">${data.current_price.toFixed(4)}</h5>
-                                        <small class="text-muted">Current</small>
-                                    </div>
-                                    <div class="col-4">
-                                        <h5 class="text-success">${tech.Support}</h5>
-                                        <small class="text-muted">Support</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-newspaper me-2"></i>Fundamental News</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="news-item">
-                                    <p class="mb-0">${data.fundamental_news}</p>
-                                </div>
-                                <small class="text-muted">Data Source: ${data.data_source} | Processed in ${data.processing_time}s</small>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
             
-            // Create chart
+            // Create charts
             createPriceChart(chartData);
+            createMACDChart(chartData);
             
             resultsDiv.style.display = 'block';
         }
@@ -507,7 +544,7 @@
             `;
         }
         
-        // Create price chart
+        // Create price chart with EMA200
         function createPriceChart(chartData) {
             const ctx = document.getElementById('priceChart').getContext('2d');
             
@@ -518,32 +555,57 @@
             // Prepare data
             const labels = chartData.dates;
             const prices = chartData.close;
+            const ema200 = chartData.ema200;
             
             // Determine trend color
             const firstPrice = prices[0];
             const lastPrice = prices[prices.length - 1];
             const trendColor = lastPrice >= firstPrice ? 'rgba(39, 174, 96, 0.8)' : 'rgba(231, 76, 60, 0.8)';
             
+            const datasets = [
+                {
+                    label: 'Price',
+                    data: prices,
+                    borderColor: trendColor,
+                    backgroundColor: trendColor.replace('0.8', '0.1'),
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1,
+                    yAxisID: 'y'
+                }
+            ];
+            
+            // Add EMA200 if available and enabled
+            if (ema200 && ema200.length > 0 && chartIndicators.ema200) {
+                datasets.push({
+                    label: 'EMA 200',
+                    data: ema200,
+                    borderColor: 'rgba(155, 89, 182, 0.8)',
+                    backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1,
+                    yAxisID: 'y'
+                });
+            }
+            
             priceChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: 'Price',
-                        data: prices,
-                        borderColor: trendColor,
-                        backgroundColor: trendColor.replace('0.8', '0.1'),
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.1
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: {
                         legend: {
-                            display: false
+                            display: true,
+                            position: 'top'
                         },
                         tooltip: {
                             mode: 'index',
@@ -556,6 +618,9 @@
                             title: {
                                 display: true,
                                 text: 'Time'
+                            },
+                            grid: {
+                                display: false
                             }
                         },
                         y: {
@@ -563,11 +628,146 @@
                             title: {
                                 display: true,
                                 text: 'Price'
-                            }
+                            },
+                            position: 'left'
                         }
                     }
                 }
             });
+        }
+        
+        // Create MACD chart
+        function createMACDChart(chartData) {
+            const ctx = document.getElementById('macdChart').getContext('2d');
+            
+            if (macdChart) {
+                macdChart.destroy();
+            }
+            
+            const labels = chartData.dates;
+            const macdLine = chartData.macd_line;
+            const macdSignal = chartData.macd_signal;
+            const macdHistogram = chartData.macd_histogram;
+            
+            // Only create MACD chart if data is available and enabled
+            if (!macdLine || macdLine.length === 0 || !chartIndicators.macd) {
+                document.getElementById('macdChart').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('macdChart').style.display = 'block';
+            
+            const datasets = [
+                {
+                    label: 'MACD Line',
+                    data: macdLine,
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1
+                },
+                {
+                    label: 'Signal Line',
+                    data: macdSignal,
+                    borderColor: 'rgba(231, 76, 60, 1)',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1
+                },
+                {
+                    label: 'MACD Histogram',
+                    data: macdHistogram,
+                    type: 'bar',
+                    backgroundColor: macdHistogram.map(value => 
+                        value >= 0 ? 'rgba(39, 174, 96, 0.7)' : 'rgba(231, 76, 60, 0.7)'
+                    ),
+                    borderColor: macdHistogram.map(value => 
+                        value >= 0 ? 'rgba(39, 174, 96, 1)' : 'rgba(231, 76, 60, 1)'
+                    ),
+                    borderWidth: 1,
+                    order: 3
+                }
+            ];
+            
+            macdChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'MACD Value'
+                            },
+                            position: 'left'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Toggle indicators on/off
+        function toggleIndicator(indicator, isVisible) {
+            chartIndicators[indicator] = isVisible;
+            
+            // Recreate charts with updated visibility
+            const analysisResults = document.getElementById('analysisResults');
+            if (analysisResults.style.display !== 'none') {
+                // We need to get the current chart data again
+                // For simplicity, we'll just recreate the charts
+                // In a real app, you might want to store the chart data
+                setTimeout(() => {
+                    if (priceChart) {
+                        priceChart.destroy();
+                        priceChart = null;
+                    }
+                    if (macdChart) {
+                        macdChart.destroy();
+                        macdChart = null;
+                    }
+                    
+                    // Get the current analysis data from the displayed results
+                    // This is a simplified approach - you might need to store the data
+                    const currentPair = document.getElementById('pairSelect').value;
+                    const currentTimeframe = document.getElementById('timeframeSelect').value;
+                    const useHistory = document.getElementById('useHistorySwitch').checked;
+                    
+                    // Re-fetch analysis to get fresh data
+                    getAnalysis();
+                }, 100);
+            }
         }
         
         // Show performance metrics
