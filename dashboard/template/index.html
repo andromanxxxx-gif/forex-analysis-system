@@ -26,6 +26,9 @@
     .quick-card{background:#334155;border-radius:8px;padding:10px;text-align:center;}
     .chart-wrapper{position:relative;height:180px;max-height:180px;}
     footer{text-align:center;padding:15px;background:#1e293b;color:#94a3b8;font-size:14px;}
+    /* 🔴 Tambahan styling trading advice */
+    .advice-normal{color:#94a3b8;}
+    .advice-error{color:#ef4444;font-weight:bold;}
   </style>
 </head>
 <body>
@@ -78,7 +81,7 @@
           <div><b>Take Profit 1:</b> <span id="takeProfit1">-</span></div>
           <div><b>Take Profit 2:</b> <span id="takeProfit2">-</span></div>
           <div><b>Confidence:</b> <span id="confidenceText">-</span></div>
-          <p id="tradingAdvice" style="margin-top:10px;font-size:14px;color:#94a3b8">-</p>
+          <p id="tradingAdvice" class="advice-normal" style="margin-top:10px;font-size:14px">-</p>
         </div>
       </div>
     </div>
@@ -131,7 +134,15 @@
       document.getElementById("takeProfit1").textContent=ai.TAKE_PROFIT_1;
       document.getElementById("takeProfit2").textContent=ai.TAKE_PROFIT_2;
       document.getElementById("confidenceText").textContent=ai.CONFIDENCE_LEVEL+"%";
-      document.getElementById("tradingAdvice").textContent=ai.TRADING_ADVICE;
+
+      // 🔴 cek kalau Trading Advice mengandung error
+      const adviceElem=document.getElementById("tradingAdvice");
+      if(ai.TRADING_ADVICE && ai.TRADING_ADVICE.toLowerCase().includes("error")){
+        adviceElem.className="advice-error";
+      } else {
+        adviceElem.className="advice-normal";
+      }
+      adviceElem.textContent=ai.TRADING_ADVICE;
 
       updateIndicators(data.technical_indicators);
       updateChart(data.chart_data,data.pair);
