@@ -29,9 +29,17 @@ class Config:
     CACHE_DURATION = 300
     
     # Trading parameters
-    DEFAULT_TIMEFRAME = "1H"
+    DEFAULT_TIMEFRAME = "4H"
     SUPPORTED_PAIRS = ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY"]
     SUPPORTED_TIMEFRAMES = ["1H", "4H", "1D", "1W"]
+    
+    # Data periods
+    DATA_PERIODS = {
+        "1H": 30 * 24,   # 30 hari * 24 jam
+        "4H": 30 * 6,    # 30 hari * 6 interval 4 jam
+        "1D": 120,       # 120 hari
+        "1W": 52         # 52 minggu
+    }
     
     # Risk management
     DEFAULT_STOP_LOSS_PCT = 0.01
@@ -131,7 +139,7 @@ def save_analysis_result(data: Dict):
 
 # ---------------- DATA LOADING ----------------
 def load_csv_data():
-    """Load historical CSV data with enhanced error handling"""
+    """Load historical CSV data with enhanced error handling and support for longer periods"""
     search_dirs = [".", "data", "historical_data"]
     loaded_count = 0
     
@@ -166,6 +174,8 @@ def load_csv_data():
                     if date_column:
                         df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
                         df = df.dropna(subset=[date_column])
+                        # Sort by date ascending
+                        df = df.sort_values(date_column)
                     else:
                         logger.warning(f"No date column found in {filename}")
                         continue
@@ -184,12 +194,18 @@ def load_csv_data():
                     if pair not in HISTORICAL:
                         HISTORICAL[pair] = {}
                     
-                    HISTORICAL[pair][timeframe] = df.sort_values(date_column)
+                    HISTORICAL[pair][timeframe] = df
                     loaded_count += 1
                     logger.info(f"✅ Loaded {pair}-{timeframe} from {file_path}, {len(df)} rows")
                     
                 except Exception as e:
                     logger.error(f"⚠️ Error loading {file_path}: {e}")
+    
+    # Log summary of loaded data
+    for pair in HISTORICAL:
+        for timeframe in HISTORICAL[pair]:
+            data_points = len(HISTORICAL[pair][timeframe])
+            logger.info(f"📊 {pair}-{timeframe}: {data_points} data points available")
     
     logger.info(f"Total loaded datasets: {loaded_count}")
 
@@ -458,7 +474,7 @@ Sebagai analis trading forex profesional, berikan rekomendasi trading dalam form
 
 DATA TRADING:
 Pair: {pair} ({PAIR_MAP.get(pair, pair)})
-Timeframe: {request.args.get('timeframe', '1H')}
+Timeframe: {request.args.get('timeframe', '4H')}
 
 INDIKATOR TEKNIKAL:
 - Harga Saat Ini: {tech['current_price']}
@@ -538,12 +554,12 @@ def serve_static(path):
 
 @app.route('/get_analysis')
 def get_analysis():
-    """Main analysis endpoint"""
+    """Main analysis endpoint with extended data periods"""
     start_time = datetime.now()
     
     try:
         pair = request.args.get("pair", "USDJPY").upper()
-        timeframe = request.args.get("timeframe", "1H").upper()
+        timeframe = request.args.get("timeframe", "4H").upper()
         use_history = request.args.get("use_history", "0") == "1"
         
         logger.info(f"Analysis request: {pair}-{timeframe}, use_history: {use_history}")
@@ -571,12 +587,28 @@ def get_analysis():
                 data_source = "Synthetic"
                 logger.info(f"Using synthetic price for {pair}: {current_price}")
         
+        # Determine required bars based on timeframe
+        required_bars = Config.DATA_PERIODS.get(timeframe, 100)
+        
         # Get historical data for indicators
         if use_history and pair in HISTORICAL and timeframe in HISTORICAL[pair]:
-            df = HISTORICAL[pair][timeframe].tail(200)
+            df = HISTORICAL[pair][timeframe].tail(required_bars)
+            
+            # Jika data tidak cukup, ambil sebanyak yang tersedia
+            if len(df) < required_bars:
+                logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(df)} bars, needed {required_bars}")
+                df = HISTORICAL[pair][timeframe]  # Ambil semua data yang tersedia
+            
             closes = df["close"].tolist()
             volumes = df["vol."].fillna(0).tolist() if "vol." in df.columns else None
-            dates = df["date"].dt.strftime("%Y-%m-%d %H:%M").tolist()
+            
+            # Format dates berdasarkan timeframe
+            if timeframe == '1D':
+                dates = df["date"].dt.strftime("%d/%m/%Y").tolist()
+            elif timeframe == '1W':
+                dates = df["date"].dt.strftime("%d/%m/%y").tolist()
+            else:
+                dates = df["date"].dt.strftime("%d/%m %H:%M").tolist()
             
             # Calculate EMA200 and MACD series for chart
             close_series = pd.Series(closes)
@@ -589,13 +621,40 @@ def get_analysis():
             macd_histogram_values = [round(x, 4) for x in macd_histogram.tolist()]
             
         else:
-            # Generate synthetic data for demonstration
-            closes = [current_price + random.uniform(-0.2, 0.2) for _ in range(100)] + [current_price]
-            volumes = [random.randint(1000, 10000) for _ in range(101)]
-            dates = [(datetime.now() - timedelta(hours=i)).strftime("%Y-%m-%d %H:%M") 
-                    for i in range(100, -1, -1)]
+            # Generate synthetic data dengan jumlah yang sesuai
+            num_points = required_bars
             
-            # Calculate EMA200 and MACD for synthetic data
+            # Generate realistic price data dengan trend
+            base_price = current_price
+            trend_direction = random.choice([-1, 1])
+            volatility = 0.5 if timeframe == '1H' else 1.0 if timeframe == '4H' else 2.0 if timeframe == '1D' else 5.0
+            
+            closes = []
+            for i in range(num_points):
+                # Add trend and random movement
+                trend = trend_direction * volatility * 0.1 * (i / num_points)
+                random_move = random.uniform(-volatility, volatility) * 0.01
+                price = base_price + trend + random_move
+                closes.append(price)
+            
+            volumes = [random.randint(1000, 10000) for _ in range(num_points)]
+            
+            # Generate dates yang sesuai
+            base_date = datetime.now()
+            if timeframe == '1D':
+                dates = [(base_date - timedelta(days=i)).strftime("%d/%m/%Y") 
+                        for i in range(num_points-1, -1, -1)]
+            elif timeframe == '4H':
+                dates = [(base_date - timedelta(hours=4*i)).strftime("%d/%m %H:%M") 
+                        for i in range(num_points-1, -1, -1)]
+            elif timeframe == '1W':
+                dates = [(base_date - timedelta(weeks=i)).strftime("%d/%m/%y") 
+                        for i in range(num_points-1, -1, -1)]
+            else:  # 1H
+                dates = [(base_date - timedelta(hours=i)).strftime("%d/%m %H:%M") 
+                        for i in range(num_points-1, -1, -1)]
+            
+            # Calculate EMA200 and MACD untuk synthetic data
             close_series = pd.Series(closes)
             ema200_series = calculate_ema_series(close_series, 200)
             ema200_values = [round(x, 4) for x in ema200_series.tolist()]
@@ -634,13 +693,14 @@ def get_analysis():
             },
             "data_source": data_source,
             "processing_time": round((datetime.now() - start_time).total_seconds(), 2),
-            "ai_provider": ai_analysis.get("AI_PROVIDER", "Fallback System")
+            "ai_provider": ai_analysis.get("AI_PROVIDER", "Fallback System"),
+            "data_points": len(dates)
         }
         
         # Save to database
         save_analysis_result(response_data)
         
-        logger.info(f"Analysis completed for {pair}-{timeframe} in {response_data['processing_time']}s")
+        logger.info(f"Analysis completed for {pair}-{timeframe} in {response_data['processing_time']}s, {len(dates)} data points")
         return jsonify(response_data)
         
     except Exception as e:
@@ -753,6 +813,11 @@ if __name__ == "__main__":
         logger.info("✅ DeepSeek AI integration ENABLED")
     else:
         logger.info("⚠️ DeepSeek AI integration DISABLED - using fallback system")
+    
+    # Log data periods
+    logger.info("📅 Data periods configured:")
+    for tf, bars in Config.DATA_PERIODS.items():
+        logger.info(f"   {tf}: {bars} bars")
     
     # Start Flask application
     logger.info("Application initialized successfully")
