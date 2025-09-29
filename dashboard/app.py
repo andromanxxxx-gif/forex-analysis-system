@@ -17,11 +17,11 @@ PAIR_MAP = {
 }
 
 # API Keys
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = ""1a5a4b69dae6419c951a4fb62e4ad7b2
 TWELVE_API_URL = "https://api.twelvedata.com"
-ALPHA_API_KEY = ""
+ALPHA_API_KEY = "G8588U1ISMGM8GZB"
 ALPHA_API_URL = "https://www.alphavantage.co/query"
-NEWS_API_KEY = ""
+NEWS_API_KEY = "b90862d072ce41e4b0505cbd7b710b66"
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
@@ -41,6 +41,7 @@ def init_db():
 
 
 # ---------------- CSV HISTORICAL ----------------
+# ---------------- CSV HISTORICAL ----------------
 def load_csv_data():
     search_dirs = [".", "data"]
     for d in search_dirs:
@@ -50,15 +51,28 @@ def load_csv_data():
             if f.endswith(".csv"):
                 path = os.path.join(d, f)
                 try:
-                    df = pd.read_csv(path)
+                    # --- coba baca dengan koma dulu
+                    try:
+                        df = pd.read_csv(path)
+                    except Exception:
+                        # kalau gagal, coba pakai tab
+                        df = pd.read_csv(path, delimiter="\t", header=None)
+
+                        # rename kolom kalau belum ada header
+                        if df.shape[1] == 6:
+                            df.columns = ["date", "open", "high", "low", "close", "volume"]
+
                     df.columns = [c.lower() for c in df.columns]
 
+                    # kalau "close" tidak ada tapi ada "price"
                     if "close" not in df.columns and "price" in df.columns:
                         df["close"] = df["price"]
 
+                    # konversi kolom date
                     if "date" in df.columns:
                         df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
+                    # deteksi pair & timeframe dari nama file
                     parts = os.path.basename(f).replace(".csv","").split("_")
                     pair = parts[0].upper()
                     timeframe = parts[1].upper() if len(parts) > 1 else "1D"
@@ -67,12 +81,11 @@ def load_csv_data():
                         HISTORICAL[pair] = {}
                     HISTORICAL[pair][timeframe] = df.sort_values("date")
 
-                    print(f"✅ Loaded {pair}-{timeframe} from {path}, {len(df)} rows")
+                    print(f"✅ Loaded {pair}-{timeframe} from {path}, {len(df)} rows, columns: {list(df.columns)}")
                 except Exception as e:
                     print(f"⚠️ Error loading {path}: {e}")
 
     print("Pairs available in HISTORICAL:", {k:list(v.keys()) for k,v in HISTORICAL.items()})
-
 
 # ---------------- DATA PROVIDERS ----------------
 def get_price_twelvedata(pair):
