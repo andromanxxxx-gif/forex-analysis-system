@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, request, jsonify, send_from_directory
 import pandas as pd, numpy as np
 import requests, os, json, sqlite3, traceback
@@ -18,11 +17,11 @@ PAIR_MAP = {
 }
 
 # API Keys
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
-ALPHA_API_KEY = ""
+ALPHA_API_KEY = "G8588U1ISMGM8GZB"
 ALPHA_API_URL = "https://www.alphavantage.co/query"
-NEWS_API_KEY = ""
+NEWS_API_KEY = "b90862d072ce41e4b0505cbd7b710b66"
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
@@ -48,7 +47,7 @@ def load_csv_data():
         if not os.path.exists(d): 
             continue
         for f in os.listdir(d):
-            if f.endswith("_1D.csv"):
+            if f.endswith(".csv"):
                 path = os.path.join(d, f)
                 try:
                     df = pd.read_csv(path)
@@ -60,15 +59,22 @@ def load_csv_data():
                     if "date" in df.columns:
                         df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-                    pair = os.path.basename(f).split("_")[0].upper()
-                    HISTORICAL[pair] = df.sort_values("date")
-                    print(f"✅ Loaded {pair} from {path}, {len(df)} rows")
+                    parts = os.path.basename(f).replace(".csv","").split("_")
+                    pair = parts[0].upper()
+                    timeframe = parts[1].upper() if len(parts) > 1 else "1D"
+
+                    if pair not in HISTORICAL:
+                        HISTORICAL[pair] = {}
+                    HISTORICAL[pair][timeframe] = df.sort_values("date")
+
+                    print(f"✅ Loaded {pair}-{timeframe} from {path}, {len(df)} rows")
                 except Exception as e:
                     print(f"⚠️ Error loading {path}: {e}")
-    print("Pairs available in HISTORICAL:", list(HISTORICAL.keys()))
+
+    print("Pairs available in HISTORICAL:", {k:list(v.keys()) for k,v in HISTORICAL.items()})
 
 
-# ---------------- TWELVE DATA ----------------
+# ---------------- DATA PROVIDERS ----------------
 def get_price_twelvedata(pair):
     try:
         symbol = f"{pair[:3]}/{pair[3:]}"
@@ -83,23 +89,21 @@ def get_price_twelvedata(pair):
         return None
 
 
-# ---------------- FUNDAMENTAL NEWS ----------------
 def get_fundamental_news(pair="USDJPY"):
     ticker = pair[-3:]
 
-    # 1. Coba Alpha Vantage dulu
+    # Alpha Vantage
     try:
         url = f"{ALPHA_API_URL}?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_API_KEY}"
         r = requests.get(url, timeout=10)
         data = r.json()
-
         if "feed" in data and data["feed"]:
             headlines = [f"{item['title']} ({item.get('source','')})" for item in data["feed"][:2]]
             return " | ".join(headlines)
     except Exception as e:
         print("AlphaVantage news error:", e)
 
-    # 2. Kalau gagal → fallback ke NewsAPI
+    # Fallback ke NewsAPI
     try:
         query = pair[:3] + " " + pair[3:] + " forex"
         url = f"{NEWS_API_URL}?q={query}&language=en&apiKey={NEWS_API_KEY}"
@@ -128,10 +132,8 @@ def calc_indicators(series, volumes=None):
     sma20 = close.rolling(20).mean().iloc[-1]
     sma50 = close.rolling(50).mean().iloc[-1]
     ema200 = close.ewm(span=200).mean().iloc[-1]
-
     macd = (close.ewm(span=12).mean()-close.ewm(span=26).mean()).iloc[-1]
 
-    # OBV
     obv = None
     if volumes is not None:
         vol = pd.Series(volumes)
@@ -152,7 +154,7 @@ def calc_indicators(series, volumes=None):
     }
 
 
-# ---------------- AI FALLBACK ----------------
+# ---------------- AI ----------------
 def ai_fallback(tech, news_summary=""):
     cp = tech["current_price"]; rsi = tech["RSI"]
     atr = cp*0.005
@@ -175,16 +177,14 @@ def ai_fallback(tech, news_summary=""):
     }
 
 
-# ---------------- AI DEEPSEEK ----------------
 def ai_deepseek_analysis(pair, tech, fundamentals):
     if not DEEPSEEK_API_KEY:
         return ai_fallback(tech, fundamentals)
     try:
         headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type":"application/json"}
         prompt = f"""
-Return ONLY a valid JSON object with keys:
+Return ONLY JSON with keys:
 SIGNAL, ENTRY_PRICE, STOP_LOSS, TAKE_PROFIT_1, TAKE_PROFIT_2, CONFIDENCE_LEVEL, TRADING_ADVICE.
-
 Pair: {pair}
 Price: {tech['current_price']}
 RSI: {tech['RSI']}, MACD: {tech['MACD']}, EMA200: {tech['EMA200']}, OBV: {tech['OBV']}
@@ -198,7 +198,7 @@ Fundamentals: {fundamentals}
         print("DeepSeek raw response:", resp)
 
         if "choices" not in resp:
-            return ai_fallback(tech, f"DeepSeek API error: {resp.get('error','Unknown error')}")
+            return ai_fallback(tech, f"DeepSeek error: {resp.get('error','Unknown error')}")
         txt = resp["choices"][0]["message"]["content"]
         return json.loads(txt)
     except Exception as e:
@@ -214,23 +214,24 @@ def index():
 @app.route("/get_analysis")
 def get_analysis():
     pair = request.args.get("pair","USDJPY").upper()
-    timeframe = request.args.get("timeframe","1H")
+    timeframe = request.args.get("timeframe","1H").upper()
     use_history = request.args.get("use_history","0")=="1"
+
     try:
         cp = get_price_twelvedata(pair)
-        if cp is None and pair in HISTORICAL:
-            cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
+        if cp is None and pair in HISTORICAL and timeframe in HISTORICAL[pair]:
+            cp = float(HISTORICAL[pair][timeframe].tail(1)["close"].iloc[0])
         elif cp is None:
             cp = 150 + random.uniform(-1, 1)
 
         if use_history:
-            if pair in HISTORICAL:
-                df = HISTORICAL[pair].tail(100)
-                closes = df["close"].tolist()+[cp]
-                volumes = df["vol."].fillna(0).tolist()+[0] if "vol." in df.columns else None
-                dates = df["date"].dt.strftime("%Y-%m-%d").tolist()+[datetime.now().strftime("%Y-%m-%d %H:%M")]
+            if pair in HISTORICAL and timeframe in HISTORICAL[pair]:
+                df = HISTORICAL[pair][timeframe].tail(200)
+                closes = df["close"].tolist()
+                volumes = df["vol."].fillna(0).tolist() if "vol." in df.columns else None
+                dates = df["date"].dt.strftime("%Y-%m-%d %H:%M").tolist()
             else:
-                return jsonify({"error": f"Historical data for {pair} not found."}), 400
+                return jsonify({"error": f"Historical data for {pair}-{timeframe} not found."}), 400
         else:
             closes = [cp+random.uniform(-0.1,0.1) for _ in range(50)]+[cp]
             volumes = None
@@ -249,7 +250,7 @@ def get_analysis():
             "ai_analysis": ai,
             "fundamental_news": fundamentals,
             "chart_data": {"dates":dates,"close":closes},
-            "data_source": "Twelve Data + Alpha Vantage + NewsAPI + DeepSeek"
+            "data_source": "Twelve Data + Historical CSV + DeepSeek + NewsAPI"
         })
     except Exception as e:
         print("Backend error:", e)
@@ -261,8 +262,8 @@ def quick_overview():
     overview = {}
     for pair in PAIR_MAP.keys():
         cp = get_price_twelvedata(pair)
-        if cp is None and pair in HISTORICAL:
-            cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
+        if cp is None and pair in HISTORICAL and "1D" in HISTORICAL[pair]:
+            cp = float(HISTORICAL[pair]["1D"].tail(1)["close"].iloc[0])
         elif cp is None:
             cp = 150 + random.uniform(-1, 1)
         overview[pair] = {"price": cp}
