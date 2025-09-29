@@ -19,7 +19,7 @@ PAIR_MAP = {
 HISTORICAL = {}
 
 # Twelve Data API
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
 
 # DeepSeek API (opsional)
@@ -126,25 +126,26 @@ SMA20: {tech['SMA20']}, SMA50: {tech['SMA50']}
 Support: {tech['Support']}, Resistance: {tech['Resistance']}
 Fundamentals: {fundamentals}
 
-Give: SIGNAL (BUY/SELL/HOLD), Entry, Stop Loss, Take Profit 1 & 2, Confidence %, short analysis.
+Give me only a valid JSON with these keys:
+SIGNAL, ENTRY_PRICE, STOP_LOSS, TAKE_PROFIT_1, TAKE_PROFIT_2, CONFIDENCE_LEVEL, TRADING_ADVICE
 """
         payload = {
             "model": "deepseek-chat",
             "messages": [{"role":"user","content": prompt}],
-            "temperature":0.7
+            "temperature":0.5
         }
         r = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=20)
         resp = r.json()
         txt = resp["choices"][0]["message"]["content"]
-        return {
-            "SIGNAL": "AI",
-            "ENTRY_PRICE": tech['current_price'],
-            "STOP_LOSS": tech['Support'],
-            "TAKE_PROFIT_1": tech['Resistance'],
-            "TAKE_PROFIT_2": tech['Resistance']*1.002,
-            "CONFIDENCE_LEVEL": 80,
-            "TRADING_ADVICE": txt[:400]
-        }
+
+        # coba parse JSON dari respons AI
+        try:
+            ai_json = json.loads(txt)
+            return ai_json
+        except:
+            print("AI JSON parse error, using fallback")
+            return ai_fallback(tech, fundamentals)
+
     except Exception as e:
         print("AI error:", e)
         return ai_fallback(tech, fundamentals)
