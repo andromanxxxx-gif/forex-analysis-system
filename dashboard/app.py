@@ -19,12 +19,16 @@ PAIR_MAP = {
 HISTORICAL = {}
 
 # Twelve Data API
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
 
-# DeepSeek API
-DEEPSEEK_API_KEY = os.environ.get("")
+# DeepSeek API (opsional)
+DEEPSEEK_API_KEY = os.environ.get("sk-820e07acdd9d4c94868b7fb95c9e8225", "")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+
+# Alpha Vantage API (fundamental news)
+ALPHA_API_KEY = "G8588U1ISMGM8GZB"
+ALPHA_API_URL = "https://www.alphavantage.co/query"
 
 
 # ---------------- DB INIT ----------------
@@ -69,6 +73,24 @@ def get_price_twelvedata(pair):
         return None
 
 
+# ---------------- FUNDAMENTAL NEWS (Alpha Vantage) ----------------
+def get_fundamental_news(pair="USDJPY"):
+    try:
+        ticker = pair[-3:]  # ambil JPY dari USDJPY
+        url = f"{ALPHA_API_URL}?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_API_KEY}"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+
+        if "feed" in data:
+            headlines = [f"{item['title']} ({item.get('source','')})" for item in data["feed"][:2]]
+            return " | ".join(headlines)
+        else:
+            return "No recent fundamental news."
+    except Exception as e:
+        print("AlphaVantage news error:", e)
+        return "Error fetching fundamental news."
+
+
 # ---------------- INDICATORS ----------------
 def calc_indicators(series):
     close = pd.Series(series)
@@ -95,19 +117,19 @@ def calc_indicators(series):
 # ---------------- AI FALLBACK ----------------
 def ai_fallback(tech, news_summary=""):
     cp = tech["current_price"]; rsi = tech["RSI"]
-    atr = cp*0.005  # 0.5% range
+    atr = cp*0.005
 
-    if rsi < 30:  # oversold
+    if rsi < 30:
         signal = "BUY"
         sl = cp - atr
         tp1 = cp + 2*atr
         tp2 = cp + 3*atr
-    elif rsi > 70:  # overbought
+    elif rsi > 70:
         signal = "SELL"
         sl = cp + atr
         tp1 = cp - 2*atr
         tp2 = cp - 3*atr
-    else:  # netral tapi tetap kasih angka berbeda
+    else:
         signal = "HOLD"
         sl = cp - atr
         tp1 = cp + atr
@@ -149,7 +171,6 @@ Fundamentals: {fundamentals}
         r = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=20)
         resp = r.json()
 
-        # 🔍 tampilkan respons asli di terminal
         print("DeepSeek raw response:", resp)
 
         if "choices" not in resp:
@@ -164,7 +185,7 @@ Fundamentals: {fundamentals}
             }
 
         txt = resp["choices"][0]["message"]["content"]
-        return json.loads(txt)  # parse JSON dari AI
+        return json.loads(txt)
     except Exception as e:
         print("AI error:", e)
         return ai_fallback(tech, fundamentals)
@@ -197,7 +218,7 @@ def get_analysis():
             dates = [(datetime.now()-timedelta(minutes=i)).strftime("%H:%M") for i in range(50)]+[datetime.now().strftime("%H:%M")]
 
         tech = calc_indicators(closes)
-        fundamentals = "Global market sentiment mixed; BoJ monitoring yen."
+        fundamentals = get_fundamental_news(pair)  # 🔥 berita real dari Alpha Vantage
         ai = ai_deepseek_analysis(pair, tech, fundamentals)
 
         return jsonify({
@@ -209,7 +230,7 @@ def get_analysis():
             "ai_analysis": ai,
             "fundamental_news": fundamentals,
             "chart_data": {"dates":dates,"close":closes},
-            "data_source": "Twelve Data API + DeepSeek"
+            "data_source": "Twelve Data API + Alpha Vantage + DeepSeek"
         })
     except Exception as e:
         traceback.print_exc()
