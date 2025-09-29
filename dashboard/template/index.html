@@ -24,6 +24,7 @@
     .ind-item{background:#334155;padding:8px;border-radius:6px;text-align:center;}
     .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
     .quick-card{background:#334155;border-radius:8px;padding:10px;text-align:center;}
+    .chart-wrapper{position:relative;height:180px;max-height:180px;}
     footer{text-align:center;padding:15px;background:#1e293b;color:#94a3b8;font-size:14px;}
   </style>
 </head>
@@ -55,9 +56,11 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card chart-card">
           <h3>Price Chart</h3>
-          <canvas id="priceChart" style="height:220px"></canvas>
+          <div class="chart-wrapper">
+            <canvas id="priceChart"></canvas>
+          </div>
         </div>
 
         <div class="card">
@@ -165,7 +168,7 @@
     document.addEventListener("DOMContentLoaded",()=>{
       getQuickOverview();
       getAnalysis();
-      setInterval(getQuickOverview,60000); // update tiap 1 menit
+      setInterval(getQuickOverview,60000);
     });
   </script>
 </body>
