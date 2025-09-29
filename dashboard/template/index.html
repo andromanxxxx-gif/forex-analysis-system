@@ -5,19 +5,87 @@
   <title>📊 AI Forex Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f3f6fa; color: #333; }
-    header { background: #2c3e50; color: white; padding: 12px; font-size: 20px; text-align: center; }
-    .container { display: flex; flex-wrap: wrap; padding: 15px; gap: 15px; }
-    .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; flex: 1; }
-    .half { flex: 0 0 48%; }
-    h3 { margin-top: 0; color: #2c3e50; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    td, th { border: 1px solid #ddd; padding: 6px; font-size: 13px; }
-    th { background: #f0f0f0; text-align: left; }
-    .btn { padding: 6px 12px; margin-top: 5px; border: none; background: #3498db; color: white; border-radius: 5px; cursor: pointer; }
-    .btn:hover { background: #2980b9; }
-    .settings label { display: block; margin-top: 5px; }
-    .highlight { font-weight: bold; color: #e67e22; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      margin: 0;
+      background: #0d1117;
+      color: #e6edf3;
+    }
+    header {
+      background: #161b22;
+      color: #58a6ff;
+      padding: 15px;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      border-bottom: 1px solid #21262d;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
+    .card {
+      background: #161b22;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+      padding: 15px;
+    }
+    h3 {
+      margin-top: 0;
+      color: #58a6ff;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    td, th {
+      border: 1px solid #30363d;
+      padding: 6px;
+      font-size: 13px;
+    }
+    th {
+      background: #21262d;
+      text-align: left;
+      color: #58a6ff;
+    }
+    .btn {
+      padding: 8px 14px;
+      margin-top: 10px;
+      border: none;
+      background: #238636;
+      color: white;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn:hover { background: #2ea043; }
+    select, input[type="checkbox"] {
+      margin-top: 5px;
+      background: #0d1117;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 4px;
+    }
+    .highlight { font-weight: bold; color: #f39c12; }
+    #priceChart { max-height: 450px; }
+    footer {
+      text-align: center;
+      color: #8b949e;
+      padding: 10px;
+      font-size: 12px;
+      border-top: 1px solid #21262d;
+      margin-top: 20px;
+    }
+    .ai-buy { color: #2ecc71; font-weight: bold; }
+    .ai-sell { color: #e74c3c; font-weight: bold; }
+    .ai-hold { color: #f1c40f; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -25,34 +93,32 @@
 
   <div class="container">
     <!-- Settings -->
-    <div class="card half settings">
-      <h3>Settings</h3>
-      <label>
-        Pair:
+    <div class="card">
+      <h3>⚙️ Settings</h3>
+      <label>Pair:
         <select id="pair">
           <option value="USDJPY">USDJPY</option>
           <option value="GBPJPY">GBPJPY</option>
           <option value="EURJPY">EURJPY</option>
           <option value="CHFJPY">CHFJPY</option>
         </select>
-      </label>
-      <label>
-        Timeframe:
+      </label><br>
+      <label>Timeframe:
         <select id="timeframe">
           <option value="1H">1H</option>
           <option value="4H">4H</option>
           <option value="1D">1D</option>
         </select>
-      </label>
+      </label><br>
       <label>
         <input type="checkbox" id="useHistory"> Use Historical Data
-      </label>
+      </label><br>
       <button class="btn" onclick="analyze()">Analyze</button>
     </div>
 
     <!-- AI Analysis -->
-    <div class="card half">
-      <h3>AI Analysis (DeepSeek)</h3>
+    <div class="card">
+      <h3>🤖 AI Analysis (DeepSeek)</h3>
       <table>
         <tr><th>Signal</th><td id="ai_signal"></td></tr>
         <tr><th>Entry</th><td id="ai_entry"></td></tr>
@@ -61,18 +127,18 @@
         <tr><th>Take Profit 2</th><td id="ai_tp2"></td></tr>
         <tr><th>Confidence</th><td id="ai_conf"></td></tr>
       </table>
-      <p id="ai_advice" style="font-size: 13px; margin-top: 8px; color: #555;"></p>
+      <p id="ai_advice" style="font-size: 13px; margin-top: 8px; color: #9da7b3;"></p>
     </div>
 
     <!-- Chart -->
-    <div class="card half">
-      <h3>Price Chart</h3>
+    <div class="card" style="grid-column: span 2;">
+      <h3>📈 Price Chart + EMA</h3>
       <canvas id="priceChart"></canvas>
     </div>
 
     <!-- Technical Indicators -->
-    <div class="card half">
-      <h3>Technical Indicators</h3>
+    <div class="card">
+      <h3>📊 Technical Indicators</h3>
       <table>
         <tr><th>RSI</th><td id="ind_rsi"></td></tr>
         <tr><th>MACD</th><td id="ind_macd"></td></tr>
@@ -86,17 +152,21 @@
     </div>
 
     <!-- Fundamental News -->
-    <div class="card half">
-      <h3>Fundamental News</h3>
+    <div class="card">
+      <h3>📰 Fundamental News</h3>
       <p id="fundamental_news">Loading...</p>
     </div>
 
     <!-- Quick Overview -->
-    <div class="card half">
-      <h3>Quick Overview</h3>
+    <div class="card" style="grid-column: span 2;">
+      <h3>🌍 Quick Overview</h3>
       <div id="quick_overview"></div>
     </div>
   </div>
+
+  <footer>
+    📊 Forex Dashboard | Data: TwelveData + AlphaVantage + NewsAPI + DeepSeek AI
+  </footer>
 
   <script>
     let chart;
@@ -113,7 +183,9 @@
       if (data.error) { alert(data.error); return; }
 
       // AI Analysis
-      document.getElementById("ai_signal").innerText = data.ai_analysis.SIGNAL;
+      const sig = data.ai_analysis.SIGNAL;
+      const sigClass = sig === "BUY" ? "ai-buy" : sig === "SELL" ? "ai-sell" : "ai-hold";
+      document.getElementById("ai_signal").innerHTML = `<span class="${sigClass}">${sig}</span>`;
       document.getElementById("ai_entry").innerText = data.ai_analysis.ENTRY_PRICE;
       document.getElementById("ai_sl").innerText = data.ai_analysis.STOP_LOSS;
       document.getElementById("ai_tp1").innerText = data.ai_analysis.TAKE_PROFIT_1;
@@ -142,19 +214,55 @@
         type: "line",
         data: {
           labels: data.chart_data.dates,
-          datasets: [{
-            label: pair + " Close",
-            data: data.chart_data.close,
-            borderColor: "#2980b9",
-            fill: false,
-            tension: 0.2
-          }]
+          datasets: [
+            {
+              label: pair + " Close",
+              data: data.chart_data.close,
+              borderColor: "#58a6ff",
+              backgroundColor: "rgba(88,166,255,0.1)",
+              fill: true,
+              tension: 0.25
+            },
+            {
+              label: "EMA20",
+              data: movingAverage(data.chart_data.close, 20),
+              borderColor: "#2ecc71",
+              fill: false,
+              tension: 0.25
+            },
+            {
+              label: "EMA200",
+              data: movingAverage(data.chart_data.close, 200),
+              borderColor: "#e74c3c",
+              fill: false,
+              tension: 0.25
+            }
+          ]
         },
         options: {
           responsive: true,
-          scales: { x: { display: true }, y: { display: true } }
+          plugins: { legend: { labels: { color: "#e6edf3" } } },
+          scales: {
+            x: { ticks: { color: "#9da7b3" }, grid: { color: "#21262d" } },
+            y: { ticks: { color: "#9da7b3" }, grid: { color: "#21262d" } }
+          }
         }
       });
+    }
+
+    // Helper function for EMA
+    function movingAverage(values, period) {
+      let k = 2 / (period + 1);
+      let emaArray = [];
+      let emaPrev = values[0];
+      values.forEach((val, i) => {
+        if (i === 0) emaArray.push(val);
+        else {
+          emaPrev = val * k + emaPrev * (1 - k);
+          emaArray.push(emaPrev);
+        }
+      });
+      return emaArray;
     }
 
     async function quickOverview() {
