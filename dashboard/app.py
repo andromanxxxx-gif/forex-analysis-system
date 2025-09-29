@@ -19,11 +19,11 @@ PAIR_MAP = {
 HISTORICAL = {}
 
 # Twelve Data API
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
 
-# DeepSeek API (opsional)
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+# DeepSeek API
+DEEPSEEK_API_KEY = os.environ.get("sk-73d83584fd614656926e1d8860eae9ca")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 
@@ -57,7 +57,7 @@ def load_csv_data():
 # ---------------- TWELVE DATA ----------------
 def get_price_twelvedata(pair):
     try:
-        symbol = f"{pair[:3]}/{pair[3:]}"  # e.g. "USDJPY" → "USD/JPY"
+        symbol = f"{pair[:3]}/{pair[3:]}"
         url = f"{TWELVE_API_URL}/exchange_rate?symbol={symbol}&apikey={TWELVE_API_KEY}"
         r = requests.get(url, timeout=10)
         data = r.json()
@@ -95,7 +95,7 @@ def calc_indicators(series):
 # ---------------- AI FALLBACK ----------------
 def ai_fallback(tech, news_summary=""):
     cp = tech["current_price"]; rsi = tech["RSI"]
-    atr = cp*0.005  # gunakan 0.5% harga sebagai range
+    atr = cp*0.005  # 0.5% range
 
     if rsi < 30:  # oversold
         signal = "BUY"
@@ -107,11 +107,11 @@ def ai_fallback(tech, news_summary=""):
         sl = cp + atr
         tp1 = cp - 2*atr
         tp2 = cp - 3*atr
-    else:  # netral
+    else:  # netral tapi tetap kasih angka berbeda
         signal = "HOLD"
-        sl = cp
-        tp1 = cp
-        tp2 = cp
+        sl = cp - atr
+        tp1 = cp + atr
+        tp2 = cp + 2*atr
 
     return {
         "SIGNAL": signal,
@@ -148,9 +148,23 @@ Fundamentals: {fundamentals}
         }
         r = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=20)
         resp = r.json()
-        txt = resp["choices"][0]["message"]["content"]
 
-        return json.loads(txt)  # langsung parse JSON
+        # 🔍 tampilkan respons asli di terminal
+        print("DeepSeek raw response:", resp)
+
+        if "choices" not in resp:
+            return {
+                "SIGNAL": "HOLD",
+                "ENTRY_PRICE": tech["current_price"],
+                "STOP_LOSS": tech["current_price"],
+                "TAKE_PROFIT_1": tech["current_price"],
+                "TAKE_PROFIT_2": tech["current_price"],
+                "CONFIDENCE_LEVEL": 0,
+                "TRADING_ADVICE": f"DeepSeek API error: {resp.get('error','Unknown error')}"
+            }
+
+        txt = resp["choices"][0]["message"]["content"]
+        return json.loads(txt)  # parse JSON dari AI
     except Exception as e:
         print("AI error:", e)
         return ai_fallback(tech, fundamentals)
