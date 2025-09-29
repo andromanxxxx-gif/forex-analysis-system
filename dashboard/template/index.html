@@ -2,213 +2,174 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Forex Dashboard</title>
+  <title>📊 AI Forex Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f6fa;
-      margin: 0; padding: 0;
-    }
-    header {
-      background: #273c75;
-      color: white;
-      padding: 15px;
-      text-align: center;
-    }
-    main {
-      display: flex;
-      gap: 20px;
-      padding: 20px;
-    }
-    .left, .right {
-      flex: 1;
-    }
-    .card {
-      background: white;
-      border-radius: 10px;
-      padding: 15px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .card h2 {
-      margin-top: 0;
-      font-size: 1.1em;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 8px;
-    }
-    .chart-container {
-      height: 300px;
-    }
-    .analysis-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .analysis-table td {
-      padding: 6px 10px;
-      border-bottom: 1px solid #eee;
-    }
-    .signal-buy { color: green; font-weight: bold; }
-    .signal-sell { color: red; font-weight: bold; }
-    .signal-hold { color: orange; font-weight: bold; }
-    .overview-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-    .overview-item {
-      background: #f1f2f6;
-      padding: 10px;
-      border-radius: 6px;
-      text-align: center;
-    }
-    select, button {
-      padding: 6px 10px;
-      margin: 4px 0;
-    }
+    body { font-family: Arial, sans-serif; margin: 0; background: #f3f6fa; color: #333; }
+    header { background: #2c3e50; color: white; padding: 12px; font-size: 20px; text-align: center; }
+    .container { display: flex; flex-wrap: wrap; padding: 15px; gap: 15px; }
+    .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; flex: 1; }
+    .half { flex: 0 0 48%; }
+    h3 { margin-top: 0; color: #2c3e50; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    td, th { border: 1px solid #ddd; padding: 6px; font-size: 13px; }
+    th { background: #f0f0f0; text-align: left; }
+    .btn { padding: 6px 12px; margin-top: 5px; border: none; background: #3498db; color: white; border-radius: 5px; cursor: pointer; }
+    .btn:hover { background: #2980b9; }
+    .settings label { display: block; margin-top: 5px; }
+    .highlight { font-weight: bold; color: #e67e22; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>📊 Forex Dashboard</h1>
-  </header>
+  <header>📊 AI Forex Dashboard</header>
 
-  <main>
-    <!-- LEFT SIDE -->
-    <div class="left">
-      <div class="card">
-        <h2>Settings</h2>
-        <label>Pair:
-          <select id="pair">
-            <option value="USDJPY">USDJPY</option>
-            <option value="EURJPY">EURJPY</option>
-            <option value="GBPJPY">GBPJPY</option>
-            <option value="CHFJPY">CHFJPY</option>
-          </select>
-        </label>
-        <br>
-        <label>Timeframe:
-          <select id="timeframe">
-            <option value="1H">1H</option>
-            <option value="4H">4H</option>
-            <option value="1D">1D</option>
-          </select>
-        </label>
-        <br>
-        <label><input type="checkbox" id="use_history"> Use Historical Data</label>
-        <br>
-        <button onclick="loadAnalysis()">🔍 Analyze</button>
-      </div>
-
-      <div class="card">
-        <h2>Chart</h2>
-        <div class="chart-container">
-          <canvas id="chart"></canvas>
-        </div>
-      </div>
+  <div class="container">
+    <!-- Settings -->
+    <div class="card half settings">
+      <h3>Settings</h3>
+      <label>
+        Pair:
+        <select id="pair">
+          <option value="USDJPY">USDJPY</option>
+          <option value="GBPJPY">GBPJPY</option>
+          <option value="EURJPY">EURJPY</option>
+          <option value="CHFJPY">CHFJPY</option>
+        </select>
+      </label>
+      <label>
+        Timeframe:
+        <select id="timeframe">
+          <option value="1H">1H</option>
+          <option value="4H">4H</option>
+          <option value="1D">1D</option>
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" id="useHistory"> Use Historical Data
+      </label>
+      <button class="btn" onclick="analyze()">Analyze</button>
     </div>
 
-    <!-- RIGHT SIDE -->
-    <div class="right">
-      <div class="card">
-        <h2>AI Analysis</h2>
-        <table class="analysis-table" id="aiAnalysis"></table>
-      </div>
-
-      <div class="card">
-        <h2>Fundamental News</h2>
-        <div id="news">Loading...</div>
-      </div>
-
-      <div class="card">
-        <h2>Quick Overview</h2>
-        <div class="overview-grid" id="overview"></div>
-      </div>
+    <!-- AI Analysis -->
+    <div class="card half">
+      <h3>AI Analysis (DeepSeek)</h3>
+      <table>
+        <tr><th>Signal</th><td id="ai_signal"></td></tr>
+        <tr><th>Entry</th><td id="ai_entry"></td></tr>
+        <tr><th>Stop Loss</th><td id="ai_sl"></td></tr>
+        <tr><th>Take Profit 1</th><td id="ai_tp1"></td></tr>
+        <tr><th>Take Profit 2</th><td id="ai_tp2"></td></tr>
+        <tr><th>Confidence</th><td id="ai_conf"></td></tr>
+      </table>
+      <p id="ai_advice" style="font-size: 13px; margin-top: 8px; color: #555;"></p>
     </div>
-  </main>
+
+    <!-- Chart -->
+    <div class="card half">
+      <h3>Price Chart</h3>
+      <canvas id="priceChart"></canvas>
+    </div>
+
+    <!-- Technical Indicators -->
+    <div class="card half">
+      <h3>Technical Indicators</h3>
+      <table>
+        <tr><th>RSI</th><td id="ind_rsi"></td></tr>
+        <tr><th>MACD</th><td id="ind_macd"></td></tr>
+        <tr><th>SMA20</th><td id="ind_sma20"></td></tr>
+        <tr><th>SMA50</th><td id="ind_sma50"></td></tr>
+        <tr><th>EMA200</th><td id="ind_ema200"></td></tr>
+        <tr><th>OBV</th><td id="ind_obv"></td></tr>
+        <tr><th>Support</th><td id="ind_support"></td></tr>
+        <tr><th>Resistance</th><td id="ind_resistance"></td></tr>
+      </table>
+    </div>
+
+    <!-- Fundamental News -->
+    <div class="card half">
+      <h3>Fundamental News</h3>
+      <p id="fundamental_news">Loading...</p>
+    </div>
+
+    <!-- Quick Overview -->
+    <div class="card half">
+      <h3>Quick Overview</h3>
+      <div id="quick_overview"></div>
+    </div>
+  </div>
 
   <script>
     let chart;
 
-    async function loadAnalysis() {
+    async function analyze() {
       const pair = document.getElementById("pair").value;
-      const timeframe = document.getElementById("timeframe").value;
-      const useHistory = document.getElementById("use_history").checked ? "1" : "0";
+      const tf = document.getElementById("timeframe").value;
+      const useHist = document.getElementById("useHistory").checked ? "1" : "0";
 
-      try {
-        const res = await fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}&use_history=${useHistory}`);
-        const data = await res.json();
-        if (data.error) {
-          alert("Error: " + data.error);
-          return;
+      const res = await fetch(`/get_analysis?pair=${pair}&timeframe=${tf}&use_history=${useHist}`);
+      const data = await res.json();
+      console.log("Analysis data:", data);
+
+      if (data.error) { alert(data.error); return; }
+
+      // AI Analysis
+      document.getElementById("ai_signal").innerText = data.ai_analysis.SIGNAL;
+      document.getElementById("ai_entry").innerText = data.ai_analysis.ENTRY_PRICE;
+      document.getElementById("ai_sl").innerText = data.ai_analysis.STOP_LOSS;
+      document.getElementById("ai_tp1").innerText = data.ai_analysis.TAKE_PROFIT_1;
+      document.getElementById("ai_tp2").innerText = data.ai_analysis.TAKE_PROFIT_2;
+      document.getElementById("ai_conf").innerText = data.ai_analysis.CONFIDENCE_LEVEL + "%";
+      document.getElementById("ai_advice").innerText = data.ai_analysis.TRADING_ADVICE;
+
+      // Technical Indicators
+      const ind = data.technical_indicators;
+      document.getElementById("ind_rsi").innerText = ind.RSI;
+      document.getElementById("ind_macd").innerText = ind.MACD;
+      document.getElementById("ind_sma20").innerText = ind.SMA20;
+      document.getElementById("ind_sma50").innerText = ind.SMA50;
+      document.getElementById("ind_ema200").innerText = ind.EMA200;
+      document.getElementById("ind_obv").innerText = ind.OBV;
+      document.getElementById("ind_support").innerText = ind.Support;
+      document.getElementById("ind_resistance").innerText = ind.Resistance;
+
+      // Fundamental News
+      document.getElementById("fundamental_news").innerText = data.fundamental_news;
+
+      // Chart
+      const ctx = document.getElementById("priceChart").getContext("2d");
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: data.chart_data.dates,
+          datasets: [{
+            label: pair + " Close",
+            data: data.chart_data.close,
+            borderColor: "#2980b9",
+            fill: false,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { x: { display: true }, y: { display: true } }
         }
-
-        // === Update Chart ===
-        const ctx = document.getElementById("chart").getContext("2d");
-        if (chart) chart.destroy();
-        chart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: data.chart_data.dates,
-            datasets: [{
-              label: pair,
-              data: data.chart_data.close,
-              borderColor: "#273c75",
-              backgroundColor: "rgba(39,60,117,0.2)",
-              fill: true,
-              tension: 0.2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { x: { display: false } }
-          }
-        });
-
-        // === Update AI Analysis ===
-        const ai = data.ai_analysis;
-        const table = document.getElementById("aiAnalysis");
-        let signalClass = "signal-hold";
-        if (ai.SIGNAL === "BUY") signalClass = "signal-buy";
-        else if (ai.SIGNAL === "SELL") signalClass = "signal-sell";
-
-        table.innerHTML = `
-          <tr><td>Signal</td><td class="${signalClass}">${ai.SIGNAL}</td></tr>
-          <tr><td>Entry</td><td>${ai.ENTRY_PRICE}</td></tr>
-          <tr><td>Stop Loss</td><td>${ai.STOP_LOSS}</td></tr>
-          <tr><td>Take Profit 1</td><td>${ai.TAKE_PROFIT_1}</td></tr>
-          <tr><td>Take Profit 2</td><td>${ai.TAKE_PROFIT_2}</td></tr>
-          <tr><td>Confidence</td><td>${ai.CONFIDENCE_LEVEL}%</td></tr>
-          <tr><td colspan="2"><em>${ai.TRADING_ADVICE}</em></td></tr>
-        `;
-
-        // === Update News ===
-        document.getElementById("news").innerText = data.fundamental_news;
-
-      } catch (err) {
-        alert("Failed to fetch data: " + err);
-      }
+      });
     }
 
-    async function loadOverview() {
-      try {
-        const res = await fetch("/quick_overview");
-        const data = await res.json();
-        const container = document.getElementById("overview");
-        container.innerHTML = "";
-        for (const pair in data) {
-          const price = data[pair].price.toFixed(4);
-          container.innerHTML += `<div class="overview-item"><b>${pair}</b><br>${price}</div>`;
-        }
-      } catch (err) {
-        console.error("Overview error:", err);
+    async function quickOverview() {
+      const res = await fetch("/quick_overview");
+      const data = await res.json();
+      let html = "<table>";
+      for (const [pair, val] of Object.entries(data)) {
+        html += `<tr><td><b>${pair}</b></td><td>${val.price}</td></tr>`;
       }
+      html += "</table>";
+      document.getElementById("quick_overview").innerHTML = html;
     }
 
-    loadOverview();
-    setInterval(loadOverview, 10000);
+    quickOverview();
+    analyze();
   </script>
 </body>
 </html>
