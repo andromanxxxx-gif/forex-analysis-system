@@ -165,6 +165,12 @@
             font-size: 0.9em;
             opacity: 0.9;
         }
+        
+        .data-info {
+            font-size: 0.8em;
+            color: #6c757d;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -201,7 +207,7 @@
 
                     <!-- Controls -->
                     <div class="row mb-4">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">Pair Mata Uang</label>
                             <select class="form-select" id="pairSelect">
                                 <option value="USDJPY">USD/JPY</option>
@@ -210,18 +216,28 @@
                                 <option value="CHFJPY">CHF/JPY</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">Timeframe</label>
                             <select class="form-select" id="timeframeSelect">
                                 <option value="1H">1 Jam</option>
-                                <option value="4H">4 Jam</option>
+                                <option value="4H" selected>4 Jam</option>
                                 <option value="1D">Harian</option>
                                 <option value="1W">Mingguan</option>
                             </select>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Data Period</label>
+                            <select class="form-select" id="dataPeriodSelect">
+                                <option value="auto">Auto (Rekomendasi)</option>
+                                <option value="7">7 Hari</option>
+                                <option value="30">30 Hari</option>
+                                <option value="90">90 Hari</option>
+                                <option value="180">180 Hari</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
                             <div class="form-check form-switch me-3">
-                                <input class="form-check-input" type="checkbox" id="useHistorySwitch">
+                                <input class="form-check-input" type="checkbox" id="useHistorySwitch" checked>
                                 <label class="form-check-label" for="useHistorySwitch">Gunakan Data Historis</label>
                             </div>
                             <button class="btn btn-primary w-100" onclick="getAnalysis()">
@@ -348,6 +364,7 @@
             const pair = document.getElementById('pairSelect').value;
             const timeframe = document.getElementById('timeframeSelect').value;
             const useHistory = document.getElementById('useHistorySwitch').checked;
+            const dataPeriod = document.getElementById('dataPeriodSelect').value;
             
             // Show loading
             document.getElementById('loadingIndicator').style.display = 'block';
@@ -355,7 +372,12 @@
             document.getElementById('performanceMetrics').style.display = 'none';
             
             try {
-                const response = await fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}&use_history=${useHistory ? '1' : '0'}`);
+                let url = `/get_analysis?pair=${pair}&timeframe=${timeframe}&use_history=${useHistory ? '1' : '0'}`;
+                if (dataPeriod !== 'auto') {
+                    url += `&days=${dataPeriod}`;
+                }
+                
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.error) {
@@ -449,6 +471,21 @@
                     
                     <!-- Charts -->
                     <div class="col-lg-8">
+                        <!-- Data Info -->
+                        <div class="alert alert-info d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Data:</strong> ${data.data_source} | 
+                                <strong>Points:</strong> ${data.data_points || chartData.dates.length} | 
+                                <strong>Processed in:</strong> ${data.processing_time}s
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="toggleDataDensity()">
+                                    <i class="fas fa-chart-line me-1"></i>Toggle Density
+                                </button>
+                            </div>
+                        </div>
+                        
                         <!-- Price Chart with EMA200 -->
                         <div class="card mb-4">
                             <div class="card-header d-flex justify-content-between align-items-center">
@@ -521,7 +558,7 @@
                                         <div class="news-item">
                                             <p class="mb-0">${data.fundamental_news}</p>
                                         </div>
-                                        <small class="text-muted">Sumber: ${data.data_source} | Diproses dalam ${data.processing_time}s</small>
+                                        <small class="text-muted">Sumber: ${data.data_source}</small>
                                     </div>
                                 </div>
                             </div>
@@ -586,108 +623,189 @@
             `;
         }
         
+        // Optimize chart data for performance
+        let currentDataDensity = 'normal'; // 'normal' or 'high'
+        
+        function optimizeChartData(chartData, maxPoints = 200) {
+            // If data points are less than maxPoints, return original
+            if (chartData.dates.length <= maxPoints || currentDataDensity === 'high') {
+                return chartData;
+            }
+            
+            // Reduce data points for performance
+            const step = Math.ceil(chartData.dates.length / maxPoints);
+            const reducedDates = [];
+            const reducedClose = [];
+            const reducedEma200 = [];
+            const reducedMacdLine = [];
+            const reducedMacdSignal = [];
+            const reducedMacdHistogram = [];
+            
+            for (let i = 0; i < chartData.dates.length; i += step) {
+                reducedDates.push(chartData.dates[i]);
+                reducedClose.push(chartData.close[i]);
+                reducedEma200.push(chartData.ema200[i]);
+                reducedMacdLine.push(chartData.macd_line[i]);
+                reducedMacdSignal.push(chartData.macd_signal[i]);
+                reducedMacdHistogram.push(chartData.macd_histogram[i]);
+            }
+            
+            console.log(`Reduced data from ${chartData.dates.length} to ${reducedDates.length} points`);
+            
+            return {
+                dates: reducedDates,
+                close: reducedClose,
+                ema200: reducedEma200,
+                macd_line: reducedMacdLine,
+                macd_signal: reducedMacdSignal,
+                macd_histogram: reducedMacdHistogram
+            };
+        }
+        
+        // Toggle data density
+        function toggleDataDensity() {
+            currentDataDensity = currentDataDensity === 'normal' ? 'high' : 'normal';
+            
+            // Recreate charts with new density
+            const analysisResults = document.getElementById('analysisResults');
+            if (analysisResults.style.display !== 'none') {
+                // Re-fetch analysis to get fresh data
+                getAnalysis();
+            }
+        }
+        
         // Create price chart with EMA200
         function createPriceChart(chartData) {
+            console.log('Creating price chart with:', chartData.dates.length, 'data points');
+            
             const ctx = document.getElementById('priceChart').getContext('2d');
             
             if (priceChart) {
                 priceChart.destroy();
             }
             
-            // Prepare data
-            const labels = chartData.dates;
-            const prices = chartData.close;
-            const ema200 = chartData.ema200;
+            // Optimize data if too many points
+            const displayData = optimizeChartData(chartData, 200);
             
-            // Determine trend color
-            const firstPrice = prices[0];
-            const lastPrice = prices[prices.length - 1];
-            const trendColor = lastPrice >= firstPrice ? 'rgba(39, 174, 96, 0.8)' : 'rgba(231, 76, 60, 0.8)';
-            
-            const datasets = [
-                {
-                    label: 'Harga',
-                    data: prices,
-                    borderColor: trendColor,
-                    backgroundColor: trendColor.replace('0.8', '0.1'),
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1,
-                    yAxisID: 'y'
-                }
-            ];
-            
-            // Add EMA200 if available and enabled
-            if (ema200 && ema200.length > 0 && chartIndicators.ema200) {
-                datasets.push({
-                    label: 'EMA 200',
-                    data: ema200,
-                    borderColor: 'rgba(155, 89, 182, 0.8)',
-                    backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1,
-                    yAxisID: 'y'
-                });
+            // Validate data
+            if (!displayData.dates || !displayData.close) {
+                console.error('❌ Missing required chart data');
+                return;
             }
             
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
+            try {
+                const labels = displayData.dates;
+                const prices = displayData.close;
+                const ema200 = displayData.ema200;
+                
+                // Determine trend color
+                const firstPrice = prices[0];
+                const lastPrice = prices[prices.length - 1];
+                const trendColor = lastPrice >= firstPrice ? 'rgba(39, 174, 96, 0.8)' : 'rgba(231, 76, 60, 0.8)';
+                
+                const datasets = [
+                    {
+                        label: 'Harga',
+                        data: prices,
+                        borderColor: trendColor,
+                        backgroundColor: trendColor.replace('0.8', '0.1'),
+                        borderWidth: 1.2,
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: currentDataDensity === 'high' ? 1 : 0,
+                        pointHoverRadius: 3,
+                        yAxisID: 'y'
+                    }
+                ];
+                
+                // Add EMA200 if available and enabled
+                if (ema200 && ema200.length > 0 && chartIndicators.ema200) {
+                    datasets.push({
+                        label: 'EMA 200',
+                        data: ema200,
+                        borderColor: 'rgba(155, 89, 182, 0.8)',
+                        backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                        borderWidth: 1.2,
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: currentDataDensity === 'high' ? 1 : 0,
+                        pointHoverRadius: 3,
+                        yAxisID: 'y'
+                    });
+                }
+                
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
                     },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        tooltip: {
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
                             mode: 'index',
-                            intersect: false,
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y.toFixed(4);
+                                        }
+                                        return label;
                                     }
-                                    if (context.parsed.y !== null) {
-                                        label += context.parsed.y.toFixed(4);
-                                    }
-                                    return label;
                                 }
                             }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'Waktu'
-                            },
-                            grid: {
-                                display: false
-                            }
                         },
-                        y: {
-                            display: true,
-                            title: {
+                        scales: {
+                            x: {
                                 display: true,
-                                text: 'Harga'
+                                title: {
+                                    display: true,
+                                    text: 'Waktu'
+                                },
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxTicksLimit: 10,
+                                    callback: function(value, index, values) {
+                                        // Show only some labels to avoid overcrowding
+                                        if (index % Math.ceil(values.length / 8) === 0) {
+                                            return this.getLabelForValue(value);
+                                        }
+                                        return '';
+                                    }
+                                }
                             },
-                            position: 'left'
+                            y: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Harga'
+                                },
+                                position: 'left'
+                            }
                         }
                     }
-                }
-            });
+                });
+                
+                console.log('✅ Price chart created with', labels.length, 'data points');
+            } catch (error) {
+                console.error('❌ Error creating price chart:', error);
+            }
         }
         
         // Create MACD chart
@@ -698,10 +816,12 @@
                 macdChart.destroy();
             }
             
-            const labels = chartData.dates;
-            const macdLine = chartData.macd_line;
-            const macdSignal = chartData.macd_signal;
-            const macdHistogram = chartData.macd_histogram;
+            // Optimize data for MACD too
+            const displayData = optimizeChartData(chartData, 200);
+            
+            const macdLine = displayData.macd_line;
+            const macdSignal = displayData.macd_signal;
+            const macdHistogram = displayData.macd_histogram;
             
             // Only create MACD chart if data is available and enabled
             if (!macdLine || macdLine.length === 0 || !chartIndicators.macd) {
@@ -711,85 +831,102 @@
             
             document.getElementById('macdChart').style.display = 'block';
             
-            const datasets = [
-                {
-                    label: 'MACD Line',
-                    data: macdLine,
-                    borderColor: 'rgba(52, 152, 219, 1)',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1
-                },
-                {
-                    label: 'Signal Line',
-                    data: macdSignal,
-                    borderColor: 'rgba(231, 76, 60, 1)',
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1
-                },
-                {
-                    label: 'MACD Histogram',
-                    data: macdHistogram,
-                    type: 'bar',
-                    backgroundColor: macdHistogram.map(value => 
-                        value >= 0 ? 'rgba(39, 174, 96, 0.7)' : 'rgba(231, 76, 60, 0.7)'
-                    ),
-                    borderColor: macdHistogram.map(value => 
-                        value >= 0 ? 'rgba(39, 174, 96, 1)' : 'rgba(231, 76, 60, 1)'
-                    ),
-                    borderWidth: 1,
-                    order: 3
-                }
-            ];
-            
-            macdChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
+            try {
+                const datasets = [
+                    {
+                        label: 'MACD Line',
+                        data: macdLine,
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 1.2,
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: currentDataDensity === 'high' ? 1 : 0
                     },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        tooltip: {
+                    {
+                        label: 'Signal Line',
+                        data: macdSignal,
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 1.2,
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: currentDataDensity === 'high' ? 1 : 0
+                    },
+                    {
+                        label: 'MACD Histogram',
+                        data: macdHistogram,
+                        type: 'bar',
+                        backgroundColor: macdHistogram.map(value => 
+                            value >= 0 ? 'rgba(39, 174, 96, 0.7)' : 'rgba(231, 76, 60, 0.7)'
+                        ),
+                        borderColor: macdHistogram.map(value => 
+                            value >= 0 ? 'rgba(39, 174, 96, 1)' : 'rgba(231, 76, 60, 1)'
+                        ),
+                        borderWidth: 0.5,
+                        order: 3
+                    }
+                ];
+                
+                macdChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: displayData.dates,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
                             mode: 'index',
                             intersect: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
+                        },
+                        plugins: {
+                            legend: {
                                 display: true,
-                                text: 'Waktu'
+                                position: 'top'
                             },
-                            grid: {
-                                display: false
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
                             }
                         },
-                        y: {
-                            display: true,
-                            title: {
+                        scales: {
+                            x: {
                                 display: true,
-                                text: 'Nilai MACD'
+                                title: {
+                                    display: true,
+                                    text: 'Waktu'
+                                },
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    maxTicksLimit: 10,
+                                    callback: function(value, index, values) {
+                                        if (index % Math.ceil(values.length / 8) === 0) {
+                                            return this.getLabelForValue(value);
+                                        }
+                                        return '';
+                                    }
+                                }
                             },
-                            position: 'left'
+                            y: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Nilai MACD'
+                                },
+                                position: 'left'
+                            }
                         }
                     }
-                }
-            });
+                });
+                
+                console.log('✅ MACD chart created with', displayData.dates.length, 'data points');
+            } catch (error) {
+                console.error('❌ Error creating MACD chart:', error);
+            }
         }
         
         // Toggle indicators on/off
