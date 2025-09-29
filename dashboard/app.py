@@ -2,7 +2,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 import pandas as pd, numpy as np
 import requests, os, json, sqlite3, traceback
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import random
 
@@ -19,22 +18,29 @@ PAIR_MAP = {
 
 HISTORICAL = {}
 
-# API DeepSeek
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", " ")
+# Twelve Data API
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
+TWELVE_API_URL = "https://api.twelvedata.com"
+
+# DeepSeek API (opsional)
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-73d83584fd614656926e1d8860eae9ca")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
+
+# ---------------- DB INIT ----------------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS analysis_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         pair TEXT, timeframe TEXT, timestamp TEXT,
-        current_price REAL, price_change REAL,
-        technical_indicators TEXT, ai_analysis TEXT,
-        chart_data TEXT, data_source TEXT
+        current_price REAL, technical_indicators TEXT,
+        ai_analysis TEXT, chart_data TEXT, data_source TEXT
     )''')
     conn.commit(); conn.close()
 
+
+# ---------------- CSV HISTORICAL ----------------
 def load_csv_data():
     files = [f for f in os.listdir('.') if f.endswith('_1D.csv')]
     for f in files:
@@ -47,24 +53,23 @@ def load_csv_data():
         except Exception as e:
             print("CSV load error:", f, e)
 
-def scrape_investing_prices():
-    url = "https://id.investing.com/webmaster-tools/live-currency-cross-rates"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    resp = requests.get(url, headers=headers, timeout=10)
-    soup = BeautifulSoup(resp.text, "html.parser")
-    table = soup.find("table", {"id": "cr1"})
-    data = {}
-    if not table: return data
-    for row in table.find_all("tr"):
-        cols = [c.get_text(strip=True) for c in row.find_all("td")]
-        if len(cols) >= 3:
-            pair = cols[0]; price = cols[1].replace(",", "")
-            try: price = float(price)
-            except: continue
-            for k,v in PAIR_MAP.items():
-                if v == pair: data[k] = price
-    return data
 
+# ---------------- TWELVE DATA ----------------
+def get_price_twelvedata(pair):
+    try:
+        symbol = f"{pair[:3]}/{pair[3:]}"  # e.g. "USDJPY" → "USD/JPY"
+        url = f"{TWELVE_API_URL}/exchange_rate?symbol={symbol}&apikey={TWELVE_API_KEY}"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        if "rate" in data:
+            return float(data["rate"])
+        return None
+    except Exception as e:
+        print("TwelveData error:", e)
+        return None
+
+
+# ---------------- INDICATORS ----------------
 def calc_indicators(series):
     close = pd.Series(series)
     cp = close.iloc[-1]
@@ -86,6 +91,8 @@ def calc_indicators(series):
         "Support": round(cp*0.997,4),
     }
 
+
+# ---------------- AI FALLBACK ----------------
 def ai_fallback(tech, news_summary=""):
     cp = tech["current_price"]; rsi = tech["RSI"]; atr = cp*0.002
     if rsi<30:
@@ -104,26 +111,22 @@ def ai_fallback(tech, news_summary=""):
         "TRADING_ADVICE": f"Fallback RSI-based. News: {news_summary}"
     }
 
+
+# ---------------- AI DEEPSEEK ----------------
 def ai_deepseek_analysis(pair, tech, fundamentals):
     if not DEEPSEEK_API_KEY:
         return ai_fallback(tech, fundamentals)
     try:
         headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type":"application/json"}
         prompt = f"""
-Anda adalah analis forex. Berdasarkan indikator teknikal dan fundamental berikut:
-
 Pair: {pair}
-Harga sekarang: {tech['current_price']}
+Price: {tech['current_price']}
 RSI: {tech['RSI']}, MACD: {tech['MACD']}
 SMA20: {tech['SMA20']}, SMA50: {tech['SMA50']}
 Support: {tech['Support']}, Resistance: {tech['Resistance']}
-Berita/Fundamental: {fundamentals}
+Fundamentals: {fundamentals}
 
-Berikan rekomendasi:
-- SIGNAL (BUY/SELL/HOLD)
-- ENTRY, STOP LOSS, TAKE PROFIT 1 & 2
-- Confidence %
-- Ringkasan analisis singkat
+Give: SIGNAL (BUY/SELL/HOLD), Entry, Stop Loss, Take Profit 1 & 2, Confidence %, short analysis.
 """
         payload = {
             "model": "deepseek-chat",
@@ -146,6 +149,8 @@ Berikan rekomendasi:
         print("AI error:", e)
         return ai_fallback(tech, fundamentals)
 
+
+# ---------------- ROUTES ----------------
 @app.route("/")
 def index():
     return send_from_directory(".", "index.html")
@@ -156,9 +161,13 @@ def get_analysis():
     timeframe = request.args.get("timeframe","1H")
     use_history = request.args.get("use_history","0")=="1"
     try:
-        prices = scrape_investing_prices()
-        if pair not in prices: return jsonify({"error":"no live price"}),400
-        cp = prices[pair]
+        cp = get_price_twelvedata(pair)
+        if cp is None:
+            # fallback harga
+            if pair in HISTORICAL:
+                cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
+            else:
+                cp = 150 + random.uniform(-1, 1)
 
         if use_history and pair in HISTORICAL:
             df = HISTORICAL[pair].tail(100)
@@ -169,7 +178,7 @@ def get_analysis():
             dates = [(datetime.now()-timedelta(minutes=i)).strftime("%H:%M") for i in range(50)]+[datetime.now().strftime("%H:%M")]
 
         tech = calc_indicators(closes)
-        fundamentals = "Bank of Japan monitoring yen, mixed risk sentiment."
+        fundamentals = "Global market sentiment mixed; BoJ monitoring yen."
         ai = ai_deepseek_analysis(pair, tech, fundamentals)
 
         return jsonify({
@@ -181,11 +190,26 @@ def get_analysis():
             "ai_analysis": ai,
             "fundamental_news": fundamentals,
             "chart_data": {"dates":dates,"close":closes},
-            "data_source": "Investing.com + DeepSeek"
+            "data_source": "Twelve Data API + DeepSeek"
         })
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error":str(e)}),500
+
+
+@app.route("/quick_overview")
+def quick_overview():
+    """Ringkasan cepat untuk semua pair"""
+    overview = {}
+    for pair in PAIR_MAP.keys():
+        cp = get_price_twelvedata(pair)
+        if cp is None and pair in HISTORICAL:
+            cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
+        elif cp is None:
+            cp = 150 + random.uniform(-1, 1)
+        overview[pair] = {"price": cp}
+    return jsonify(overview)
+
 
 if __name__=="__main__":
     init_db(); load_csv_data()
