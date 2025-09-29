@@ -5,16 +5,16 @@
   <title>AI Forex Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background:#0f172a; color:#e2e8f0; margin:0; padding:0;}
-    header { background:#1e293b; padding:15px; text-align:center; font-size:20px; font-weight:bold; color:#38bdf8;}
-    .container{max-width:1200px;margin:20px auto;padding:0 20px;}
+    body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;}
+    header{background:#1e293b;padding:15px;text-align:center;font-size:20px;font-weight:bold;color:#38bdf8;}
+    .container{max-width:1300px;margin:20px auto;padding:0 20px;}
     .controls{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
     select,button,input[type="checkbox"]{padding:8px 12px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;}
     button{cursor:pointer;font-weight:bold;}
     button.primary{background:linear-gradient(90deg,#38bdf8,#34d399);color:#022140;border:none;}
     .card{background:#1e293b;border-radius:10px;padding:15px;margin-bottom:20px;}
     .grid{display:grid;grid-template-columns:2fr 1fr;gap:20px;}
-    @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+    @media(max-width:900px){.grid{grid-template-columns:1fr;}}
     .big-price{font-size:32px;font-weight:bold;margin-top:10px;}
     .badge{display:inline-block;padding:6px 12px;border-radius:20px;font-weight:bold;}
     .buy{background:#10b981;color:#022c22;}
@@ -22,12 +22,17 @@
     .hold{background:#475569;color:#fff;}
     .indicators{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
     .ind-item{background:#334155;padding:8px;border-radius:6px;text-align:center;}
+    .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+    .quick-card{background:#334155;border-radius:8px;padding:10px;text-align:center;}
     footer{text-align:center;padding:15px;background:#1e293b;color:#94a3b8;font-size:14px;}
   </style>
 </head>
 <body>
   <header>📊 AI Forex Dashboard</header>
   <div class="container">
+
+    <div class="quick-grid" id="quickOverview"></div>
+
     <div class="controls">
       <select id="pairSelect"><option>USDJPY</option><option>GBPJPY</option><option>EURJPY</option><option>CHFJPY</option></select>
       <select id="timeframeSelect"><option>1H</option><option>4H</option><option>1D</option></select>
@@ -76,10 +81,22 @@
     </div>
   </div>
 
-  <footer>Data source: Investing.com + DeepSeek AI</footer>
+  <footer>Data source: Twelve Data API + DeepSeek AI</footer>
 
   <script>
     let priceChart;
+
+    async function getQuickOverview(){
+      const res=await fetch("/quick_overview"); const data=await res.json();
+      const container=document.getElementById("quickOverview");
+      container.innerHTML="";
+      for(const [pair,info] of Object.entries(data)){
+        const div=document.createElement("div");
+        div.className="quick-card";
+        div.innerHTML=`<div style="font-weight:bold">${pair}</div><div>${info.price.toFixed(3)}</div>`;
+        container.appendChild(div);
+      }
+    }
 
     async function getAnalysis(){
       const pair=document.getElementById("pairSelect").value;
@@ -145,7 +162,11 @@
       });
     }
 
-    document.addEventListener("DOMContentLoaded",()=>getAnalysis());
+    document.addEventListener("DOMContentLoaded",()=>{
+      getQuickOverview();
+      getAnalysis();
+      setInterval(getQuickOverview,60000); // update tiap 1 menit
+    });
   </script>
 </body>
 </html>
