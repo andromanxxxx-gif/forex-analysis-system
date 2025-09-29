@@ -19,11 +19,11 @@ PAIR_MAP = {
 HISTORICAL = {}
 
 # Twelve Data API
-TWELVE_API_KEY = ""
+TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
 TWELVE_API_URL = "https://api.twelvedata.com"
 
 # DeepSeek API (opsional)
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-73d83584fd614656926e1d8860eae9ca")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 
@@ -94,13 +94,25 @@ def calc_indicators(series):
 
 # ---------------- AI FALLBACK ----------------
 def ai_fallback(tech, news_summary=""):
-    cp = tech["current_price"]; rsi = tech["RSI"]; atr = cp*0.002
-    if rsi<30:
-        signal="BUY"; sl=cp-atr; tp1=cp+2*atr; tp2=cp+3*atr
-    elif rsi>70:
-        signal="SELL"; sl=cp+atr; tp1=cp-2*atr; tp2=cp-3*atr
-    else:
-        signal="HOLD"; sl=tp1=tp2=cp
+    cp = tech["current_price"]; rsi = tech["RSI"]
+    atr = cp*0.005  # gunakan 0.5% harga sebagai range
+
+    if rsi < 30:  # oversold
+        signal = "BUY"
+        sl = cp - atr
+        tp1 = cp + 2*atr
+        tp2 = cp + 3*atr
+    elif rsi > 70:  # overbought
+        signal = "SELL"
+        sl = cp + atr
+        tp1 = cp - 2*atr
+        tp2 = cp - 3*atr
+    else:  # netral
+        signal = "HOLD"
+        sl = cp
+        tp1 = cp
+        tp2 = cp
+
     return {
         "SIGNAL": signal,
         "ENTRY_PRICE": round(cp,4),
@@ -108,7 +120,7 @@ def ai_fallback(tech, news_summary=""):
         "TAKE_PROFIT_1": round(tp1,4),
         "TAKE_PROFIT_2": round(tp2,4),
         "CONFIDENCE_LEVEL": 75 if signal!="HOLD" else 50,
-        "TRADING_ADVICE": f"Fallback RSI-based. News: {news_summary}"
+        "TRADING_ADVICE": f"RSI-based fallback. News: {news_summary}"
     }
 
 
@@ -119,33 +131,26 @@ def ai_deepseek_analysis(pair, tech, fundamentals):
     try:
         headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type":"application/json"}
         prompt = f"""
+Return ONLY a valid JSON object with keys:
+SIGNAL, ENTRY_PRICE, STOP_LOSS, TAKE_PROFIT_1, TAKE_PROFIT_2, CONFIDENCE_LEVEL, TRADING_ADVICE.
+
 Pair: {pair}
 Price: {tech['current_price']}
 RSI: {tech['RSI']}, MACD: {tech['MACD']}
 SMA20: {tech['SMA20']}, SMA50: {tech['SMA50']}
 Support: {tech['Support']}, Resistance: {tech['Resistance']}
 Fundamentals: {fundamentals}
-
-Give me only a valid JSON with these keys:
-SIGNAL, ENTRY_PRICE, STOP_LOSS, TAKE_PROFIT_1, TAKE_PROFIT_2, CONFIDENCE_LEVEL, TRADING_ADVICE
 """
         payload = {
             "model": "deepseek-chat",
             "messages": [{"role":"user","content": prompt}],
-            "temperature":0.5
+            "temperature": 0.2
         }
         r = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=20)
         resp = r.json()
         txt = resp["choices"][0]["message"]["content"]
 
-        # coba parse JSON dari respons AI
-        try:
-            ai_json = json.loads(txt)
-            return ai_json
-        except:
-            print("AI JSON parse error, using fallback")
-            return ai_fallback(tech, fundamentals)
-
+        return json.loads(txt)  # langsung parse JSON
     except Exception as e:
         print("AI error:", e)
         return ai_fallback(tech, fundamentals)
@@ -164,7 +169,6 @@ def get_analysis():
     try:
         cp = get_price_twelvedata(pair)
         if cp is None:
-            # fallback harga
             if pair in HISTORICAL:
                 cp = float(HISTORICAL[pair].tail(1)["close"].iloc[0])
             else:
@@ -200,7 +204,6 @@ def get_analysis():
 
 @app.route("/quick_overview")
 def quick_overview():
-    """Ringkasan cepat untuk semua pair"""
     overview = {}
     for pair in PAIR_MAP.keys():
         cp = get_price_twelvedata(pair)
