@@ -1,171 +1,132 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>📊 AI Forex Dashboard</title>
+  <meta charset="utf-8">
+  <title>Forex Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
-    header { background: #161b22; color: #58a6ff; padding: 15px; font-size: 22px; font-weight: bold; text-align: center; border-bottom: 1px solid #21262d; }
-    .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; }
-    .card { background: #161b22; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.6); padding: 15px; }
-    h3 { margin-top: 0; color: #58a6ff; border-bottom: 1px solid #21262d; padding-bottom: 5px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    td, th { border: 1px solid #30363d; padding: 6px; font-size: 13px; }
-    th { background: #21262d; text-align: left; color: #58a6ff; }
-    .btn { padding: 8px 14px; margin-top: 10px; border: none; background: #238636; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
-    .btn:hover { background: #2ea043; }
-    select, input[type="checkbox"] { margin-top: 5px; background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 4px; }
-    .ai-buy { color: #2ecc71; font-weight: bold; }
-    .ai-sell { color: #e74c3c; font-weight: bold; }
-    .ai-hold { color: #f1c40f; font-weight: bold; }
-    #priceChart { max-height: 450px; }
-    footer { text-align: center; color: #8b949e; padding: 10px; font-size: 12px; border-top: 1px solid #21262d; margin-top: 20px; }
+    body { font-family: Arial; background:#0d1117; color:#e6edf3; margin:0; }
+    header { padding:15px; background:#161b22; text-align:center; font-size:22px; }
+    .container { padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .card { background:#161b22; padding:15px; border-radius:10px; }
+    h3 { margin-top:0; }
+    canvas { background:#0d1117; border-radius:8px; }
+    .ai-buy{color:#2ecc71;font-weight:bold}
+    .ai-sell{color:#e74c3c;font-weight:bold}
+    .ai-hold{color:#f1c40f;font-weight:bold}
+    footer { text-align:center; padding:10px; font-size:13px; background:#161b22; }
+    select,button,input{padding:5px;margin:5px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:5px}
   </style>
 </head>
 <body>
-  <header>📊 AI Forex Dashboard</header>
-
-  <div class="container">
-    <div class="card">
-      <h3>⚙️ Settings</h3>
-      <label>Pair:
-        <select id="pair">
-          <option value="USDJPY">USDJPY</option>
-          <option value="GBPJPY">GBPJPY</option>
-          <option value="EURJPY">EURJPY</option>
-          <option value="CHFJPY">CHFJPY</option>
-        </select>
-      </label><br>
-      <label>Timeframe:
-        <select id="timeframe">
-          <option value="1H">1H</option>
-          <option value="4H">4H</option>
-          <option value="1D">1D</option>
-        </select>
-      </label><br>
-      <label><input type="checkbox" id="useHistory"> Use Historical Data</label><br>
-      <button class="btn" onclick="analyze()">Analyze</button>
-    </div>
-
-    <div class="card">
-      <h3>🤖 AI Analysis (DeepSeek)</h3>
-      <table>
-        <tr><th>Signal</th><td id="ai_signal"></td></tr>
-        <tr><th>Entry</th><td id="ai_entry"></td></tr>
-        <tr><th>Stop Loss</th><td id="ai_sl"></td></tr>
-        <tr><th>Take Profit 1</th><td id="ai_tp1"></td></tr>
-        <tr><th>Take Profit 2</th><td id="ai_tp2"></td></tr>
-        <tr><th>Confidence</th><td id="ai_conf"></td></tr>
-      </table>
-      <p id="ai_advice" style="font-size: 13px; margin-top: 8px; color: #9da7b3;"></p>
-    </div>
-
-    <div class="card" style="grid-column: span 2;">
-      <h3>📈 Price Chart + EMA</h3>
-      <canvas id="priceChart"></canvas>
-    </div>
-
-    <div class="card">
-      <h3>📊 Technical Indicators</h3>
-      <table>
-        <tr><th>RSI</th><td id="ind_rsi"></td></tr>
-        <tr><th>MACD</th><td id="ind_macd"></td></tr>
-        <tr><th>SMA20</th><td id="ind_sma20"></td></tr>
-        <tr><th>SMA50</th><td id="ind_sma50"></td></tr>
-        <tr><th>EMA200</th><td id="ind_ema200"></td></tr>
-        <tr><th>OBV</th><td id="ind_obv"></td></tr>
-        <tr><th>Support</th><td id="ind_support"></td></tr>
-        <tr><th>Resistance</th><td id="ind_resistance"></td></tr>
-      </table>
-    </div>
-
-    <div class="card">
-      <h3>📰 Fundamental News</h3>
-      <p id="fundamental_news">Loading...</p>
-    </div>
-
-    <div class="card" style="grid-column: span 2;">
-      <h3>🌍 Quick Overview</h3>
-      <div id="quick_overview"></div>
-    </div>
+<header>📊 Forex Dashboard (Dark Mode)</header>
+<div class="container">
+  <div class="card" style="grid-column:span 2;">
+    <label>Pair:</label><select id="pair"></select>
+    <label>Timeframe:</label><select id="timeframe"></select>
+    <label><input type="checkbox" id="useHistory"> Use Historical Data</label>
+    <button onclick="analyze()">Analyze</button>
   </div>
+  
+  <div class="card" style="grid-column:span 2;">
+    <canvas id="priceChart" height="120"></canvas>
+  </div>
+  
+  <div class="card">
+    <h3>🤖 AI Analysis</h3>
+    <p>Signal: <span id="ai_signal"></span></p>
+    <p>Entry: <span id="ai_entry"></span></p>
+    <p>Stop Loss: <span id="ai_sl"></span></p>
+    <p>TP1: <span id="ai_tp1"></span> | TP2: <span id="ai_tp2"></span></p>
+    <p>Confidence: <span id="ai_conf"></span></p>
+    <p id="ai_advice"></p>
+  </div>
+  
+  <div class="card">
+    <h3>📈 Indicators</h3>
+    <p>RSI: <span id="ind_rsi"></span></p>
+    <p>MACD: <span id="ind_macd"></span> | Signal: <span id="ind_macdsig"></span></p>
+    <p>SMA20: <span id="ind_sma20"></span> | SMA50: <span id="ind_sma50"></span></p>
+    <p>EMA200: <span id="ind_ema200"></span></p>
+    <p>OBV: <span id="ind_obv"></span></p>
+    <p>Support: <span id="ind_support"></span> | Resistance: <span id="ind_resistance"></span></p>
+  </div>
+  
+  <div class="card">
+    <h3>📰 News</h3>
+    <p id="fundamental_news"></p>
+  </div>
+  
+  <div class="card" style="grid-column:span 2;">
+    <h3>🌍 Quick Overview</h3>
+    <div id="quick_overview"></div>
+  </div>
+</div>
+<footer>Data: TwelveData + Historical CSV + DeepSeek + AlphaVantage</footer>
 
-  <footer>
-    📊 Forex Dashboard | Data: TwelveData + Historical CSV + DeepSeek + NewsAPI
-  </footer>
-
-  <script>
-    let chart;
-
-    async function analyze() {
-      const pair = document.getElementById("pair").value;
-      const tf = document.getElementById("timeframe").value;
-      const useHist = document.getElementById("useHistory").checked ? "1" : "0";
-
-      const res = await fetch(`/get_analysis?pair=${pair}&timeframe=${tf}&use_history=${useHist}`);
-      const data = await res.json();
-      if (data.error) { alert(data.error); return; }
-
-      const sig = data.ai_analysis.SIGNAL;
-      const sigClass = sig === "BUY" ? "ai-buy" : sig === "SELL" ? "ai-sell" : "ai-hold";
-      document.getElementById("ai_signal").innerHTML = `<span class="${sigClass}">${sig}</span>`;
-      document.getElementById("ai_entry").innerText = data.ai_analysis.ENTRY_PRICE;
-      document.getElementById("ai_sl").innerText = data.ai_analysis.STOP_LOSS;
-      document.getElementById("ai_tp1").innerText = data.ai_analysis.TAKE_PROFIT_1;
-      document.getElementById("ai_tp2").innerText = data.ai_analysis.TAKE_PROFIT_2;
-      document.getElementById("ai_conf").innerText = data.ai_analysis.CONFIDENCE_LEVEL + "%";
-      document.getElementById("ai_advice").innerText = data.ai_analysis.TRADING_ADVICE;
-
-      const ind = data.technical_indicators;
-      document.getElementById("ind_rsi").innerText = ind.RSI;
-      document.getElementById("ind_macd").innerText = ind.MACD;
-      document.getElementById("ind_sma20").innerText = ind.SMA20;
-      document.getElementById("ind_sma50").innerText = ind.SMA50;
-      document.getElementById("ind_ema200").innerText = ind.EMA200;
-      document.getElementById("ind_obv").innerText = ind.OBV;
-      document.getElementById("ind_support").innerText = ind.Support;
-      document.getElementById("ind_resistance").innerText = ind.Resistance;
-
-      document.getElementById("fundamental_news").innerText = data.fundamental_news;
-
-      const ctx = document.getElementById("priceChart").getContext("2d");
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: data.chart_data.dates,
-          datasets: [
-            { label: pair+" Close", data: data.chart_data.close, borderColor: "#58a6ff", fill: false, tension: 0.25 },
-            { label: "EMA20", data: movingAverage(data.chart_data.close, 20), borderColor: "#2ecc71", fill: false, tension: 0.25 },
-            { label: "EMA200", data: movingAverage(data.chart_data.close, 200), borderColor: "#e74c3c", fill: false, tension: 0.25 }
-          ]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { labels: { color: "#e6edf3" } } },
-          scales: { x: { ticks: { color: "#9da7b3" }, grid: { color: "#21262d" } },
-                    y: { ticks: { color: "#9da7b3" }, grid: { color: "#21262d" } } }
-        }
-      });
+<script>
+let chart;
+async function loadPairs(){
+  const r=await fetch("/get_pairs");const data=await r.json();
+  const pairSel=document.getElementById("pair");
+  pairSel.innerHTML="";
+  for(const p of Object.keys(data)){ 
+    const opt=document.createElement("option"); opt.value=p; opt.text=p; pairSel.appendChild(opt);
+  }
+  pairSel.onchange=()=>{ 
+    const tfSel=document.getElementById("timeframe"); tfSel.innerHTML="";
+    const tfs=data[pairSel.value]; for(const tf of tfs){ 
+      const o=document.createElement("option"); o.value=tf; o.text=tf; tfSel.appendChild(o);
     }
-
-    function movingAverage(values, period) {
-      let k = 2 / (period + 1), emaArray = [], emaPrev = values[0];
-      values.forEach((val, i) => { emaPrev = i===0?val:val*k+emaPrev*(1-k); emaArray.push(emaPrev); });
-      return emaArray;
-    }
-
-    async function quickOverview() {
-      const res = await fetch("/quick_overview");
-      const data = await res.json();
-      let html = "<table>";
-      for (const [pair, val] of Object.entries(data)) { html += `<tr><td><b>${pair}</b></td><td>${val.price}</td></tr>`; }
-      html += "</table>";
-      document.getElementById("quick_overview").innerHTML = html;
-    }
-
-    quickOverview(); analyze();
-  </script>
+  }
+  pairSel.onchange(); // trigger initial
+}
+async function analyze(){
+  const pair=document.getElementById("pair").value;
+  const tf=document.getElementById("timeframe").value;
+  const useHist=document.getElementById("useHistory").checked?"1":"0";
+  const r=await fetch(`/get_analysis?pair=${pair}&timeframe=${tf}&use_history=${useHist}`);
+  const data=await r.json(); if(data.error){alert(data.error);return;}
+  
+  const sig=data.ai_analysis.SIGNAL;
+  const sigClass=sig==="BUY"?"ai-buy":sig==="SELL"?"ai-sell":"ai-hold";
+  document.getElementById("ai_signal").innerHTML=`<span class="${sigClass}">${sig}</span>`;
+  document.getElementById("ai_entry").innerText=data.ai_analysis.ENTRY_PRICE;
+  document.getElementById("ai_sl").innerText=data.ai_analysis.STOP_LOSS;
+  document.getElementById("ai_tp1").innerText=data.ai_analysis.TAKE_PROFIT_1;
+  document.getElementById("ai_tp2").innerText=data.ai_analysis.TAKE_PROFIT_2;
+  document.getElementById("ai_conf").innerText=data.ai_analysis.CONFIDENCE_LEVEL+"%";
+  document.getElementById("ai_advice").innerText=data.ai_analysis.TRADING_ADVICE;
+  
+  const ind=data.technical_indicators;
+  document.getElementById("ind_rsi").innerText=ind.RSI;
+  document.getElementById("ind_macd").innerText=ind.MACD;
+  document.getElementById("ind_macdsig").innerText=ind.MACD_SIGNAL;
+  document.getElementById("ind_sma20").innerText=ind.SMA20;
+  document.getElementById("ind_sma50").innerText=ind.SMA50;
+  document.getElementById("ind_ema200").innerText=ind.EMA200;
+  document.getElementById("ind_obv").innerText=ind.OBV;
+  document.getElementById("ind_support").innerText=ind.Support;
+  document.getElementById("ind_resistance").innerText=ind.Resistance;
+  document.getElementById("fundamental_news").innerText=data.fundamental_news;
+  
+  const ctx=document.getElementById("priceChart").getContext("2d");
+  if(chart) chart.destroy();
+  chart=new Chart(ctx,{
+    type:"line",
+    data:{labels:data.chart_data.dates,datasets:[
+      {label:pair+" Close",data:data.chart_data.close,borderColor:"#58a6ff",fill:false,tension:0.25},
+      {label:"EMA20",data:movingAverage(data.chart_data.close,20),borderColor:"#2ecc71",fill:false,tension:0.25},
+      {label:"EMA200",data:movingAverage(data.chart_data.close,200),borderColor:"#e74c3c",fill:false,tension:0.25}
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:"#e6edf3"}}},
+      scales:{x:{ticks:{color:"#9da7b3"},grid:{color:"#21262d"}},
+              y:{ticks:{color:"#9da7b3"},grid:{color:"#21262d"}}}}
+  });
+}
+function movingAverage(vals,period){let k=2/(period+1),ema=[],prev=vals[0];vals.forEach((v,i)=>{prev=i===0?v:v*k+prev*(1-k);ema.push(prev);});return ema;}
+async function quickOverview(){const r=await fetch("/quick_overview");const data=await r.json();let h="<table>";for(const [p,v] of Object.entries(data)){h+=`<tr><td><b>${p}</b></td><td>${v.price}</td></tr>`;}h+="</table>";document.getElementById("quick_overview").innerHTML=h;}
+loadPairs(); quickOverview();
+</script>
 </body>
 </html>
