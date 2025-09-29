@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -61,31 +61,31 @@
             border-left-color: var(--loss-color);
         }
         
-        .signal-buy {
-            background: linear-gradient(135deg, #27ae60, #2ecc71);
-            color: white;
-        }
-        
-        .signal-sell {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: white;
-        }
-        
-        .signal-hold {
-            background: linear-gradient(135deg, #f39c12, #e67e22);
-            color: white;
-        }
-        
-        .signal-strong-buy {
+        .signal-beli-kuat {
             background: linear-gradient(135deg, #27ae60, #16a085);
             color: white;
             animation: pulse 2s infinite;
         }
         
-        .signal-strong-sell {
+        .signal-beli {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+        }
+        
+        .signal-jual-kuat {
             background: linear-gradient(135deg, #e74c3c, #c0392b);
             color: white;
             animation: pulse 2s infinite;
+        }
+        
+        .signal-jual {
+            background: linear-gradient(135deg, #e74c3c, #d35400);
+            color: white;
+        }
+        
+        .signal-tunggu {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
         }
         
         @keyframes pulse {
@@ -133,9 +133,9 @@
             margin: 20px 0;
         }
         
-        .risk-high { color: var(--loss-color); font-weight: bold; }
-        .risk-medium { color: var(--warning-color); font-weight: bold; }
-        .risk-low { color: var(--profit-color); font-weight: bold; }
+        .risk-tinggi { color: var(--loss-color); font-weight: bold; }
+        .risk-sedang { color: var(--warning-color); font-weight: bold; }
+        .risk-rendah { color: var(--profit-color); font-weight: bold; }
         
         .confidence-bar {
             height: 20px;
@@ -156,14 +156,14 @@
             margin-bottom: 10px;
         }
         
-        .indicator-toggle {
-            cursor: pointer;
-            user-select: none;
+        .ai-badge {
+            font-size: 0.7em;
+            vertical-align: super;
         }
         
-        .indicator-toggle.active {
-            background-color: #007bff;
-            color: white;
+        .signal-explanation {
+            font-size: 0.9em;
+            opacity: 0.9;
         }
     </style>
 </head>
@@ -180,7 +180,11 @@
                                     <i class="fas fa-chart-line me-2"></i>
                                     Forex Trading Analysis
                                 </h1>
-                                <p class="text-muted">Real-time technical & fundamental analysis for JPY pairs</p>
+                                <p class="text-muted">Analisis teknikal & fundamental real-time untuk pair JPY</p>
+                                <div id="aiStatusBadge" class="badge bg-info">
+                                    <i class="fas fa-robot me-1"></i>
+                                    <span id="aiStatusText">Checking AI Status...</span>
+                                </div>
                             </div>
                             <div class="col-md-6 text-end">
                                 <div class="btn-group" role="group">
@@ -198,7 +202,7 @@
                     <!-- Controls -->
                     <div class="row mb-4">
                         <div class="col-md-4">
-                            <label class="form-label">Currency Pair</label>
+                            <label class="form-label">Pair Mata Uang</label>
                             <select class="form-select" id="pairSelect">
                                 <option value="USDJPY">USD/JPY</option>
                                 <option value="GBPJPY">GBP/JPY</option>
@@ -209,19 +213,19 @@
                         <div class="col-md-4">
                             <label class="form-label">Timeframe</label>
                             <select class="form-select" id="timeframeSelect">
-                                <option value="1H">1 Hour</option>
-                                <option value="4H">4 Hours</option>
-                                <option value="1D">Daily</option>
-                                <option value="1W">Weekly</option>
+                                <option value="1H">1 Jam</option>
+                                <option value="4H">4 Jam</option>
+                                <option value="1D">Harian</option>
+                                <option value="1W">Mingguan</option>
                             </select>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
                             <div class="form-check form-switch me-3">
                                 <input class="form-check-input" type="checkbox" id="useHistorySwitch">
-                                <label class="form-check-label" for="useHistorySwitch">Use Historical Data</label>
+                                <label class="form-check-label" for="useHistorySwitch">Gunakan Data Historis</label>
                             </div>
                             <button class="btn btn-primary w-100" onclick="getAnalysis()">
-                                <i class="fas fa-analytics me-2"></i>Analyze
+                                <i class="fas fa-analytics me-2"></i>Analisis
                             </button>
                         </div>
                     </div>
@@ -241,7 +245,7 @@
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-2">Analyzing market data...</p>
+                        <p class="mt-2">Menganalisis data market...</p>
                     </div>
 
                     <!-- Analysis Results -->
@@ -256,7 +260,7 @@
                                 <h5><i class="fas fa-tachometer-alt me-2"></i>Performance Metrics</h5>
                                 <div id="performanceContent"></div>
                                 <button class="btn btn-secondary mt-3" onclick="hidePerformance()">
-                                    <i class="fas fa-arrow-left me-2"></i>Back to Analysis
+                                    <i class="fas fa-arrow-left me-2"></i>Kembali ke Analisis
                                 </button>
                             </div>
                         </div>
@@ -277,7 +281,29 @@
         // Initialize the dashboard
         document.addEventListener('DOMContentLoaded', function() {
             loadQuickOverview();
+            checkAIStatus();
         });
+        
+        // Check AI Status
+        async function checkAIStatus() {
+            try {
+                const response = await fetch('/ai_status');
+                const data = await response.json();
+                
+                const badge = document.getElementById('aiStatusBadge');
+                const text = document.getElementById('aiStatusText');
+                
+                if (data.ai_available) {
+                    badge.className = 'badge bg-success';
+                    text.textContent = 'AI DeepSeek Active';
+                } else {
+                    badge.className = 'badge bg-warning';
+                    text.textContent = 'AI Fallback Mode';
+                }
+            } catch (error) {
+                console.error('Error checking AI status:', error);
+            }
+        }
         
         // Load quick overview of all pairs
         async function loadQuickOverview() {
@@ -306,7 +332,7 @@
                                         <small class="d-block ${changeClass}">${info.change > 0 ? '+' : ''}${info.change.toFixed(2)}%</small>
                                     </div>
                                 </div>
-                                <small class="text-muted">Source: ${info.source}</small>
+                                <small class="text-muted">Sumber: ${info.source}</small>
                             </div>
                         </div>
                     `;
@@ -361,7 +387,10 @@
                     <div class="col-lg-4">
                         <div class="card ${signalClass} mb-4">
                             <div class="card-body text-center">
-                                <h2 class="card-title"><i class="fas fa-bullhorn me-2"></i>${ai.SIGNAL}</h2>
+                                <h2 class="card-title">
+                                    <i class="fas fa-bullhorn me-2"></i>${ai.SIGNAL}
+                                    <span class="ai-badge badge bg-dark">${data.ai_provider}</span>
+                                </h2>
                                 <h1 class="display-4 fw-bold">${data.current_price.toFixed(4)}</h1>
                                 <p class="mb-2">${data.pair} • ${data.timeframe}</p>
                                 
@@ -385,13 +414,14 @@
                                     <i class="fas fa-exclamation-triangle me-1"></i>
                                     Risk: <span class="risk-${ai.RISK_LEVEL.toLowerCase()}">${ai.RISK_LEVEL}</span>
                                 </p>
+                                <p class="signal-explanation">${getSignalExplanation(ai.SIGNAL)}</p>
                             </div>
                         </div>
                         
                         <!-- Trading Advice -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-comment-dots me-2"></i>Trading Advice</h6>
+                                <h6 class="mb-0"><i class="fas fa-comment-dots me-2"></i>Rekomendasi Trading</h6>
                             </div>
                             <div class="card-body">
                                 <p class="card-text">${ai.TRADING_ADVICE}</p>
@@ -402,7 +432,7 @@
                         <!-- Technical Indicators -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Technical Indicators</h6>
+                                <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Indikator Teknikal</h6>
                             </div>
                             <div class="card-body">
                                 ${createIndicatorHTML('RSI', tech.RSI, 30, 70)}
@@ -422,7 +452,7 @@
                         <!-- Price Chart with EMA200 -->
                         <div class="card mb-4">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Price Chart with EMA200</h6>
+                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Price Chart dengan EMA200</h6>
                                 <div class="chart-controls">
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input indicator-toggle" type="checkbox" id="toggleEMA200" checked 
@@ -485,13 +515,13 @@
                             <div class="col-md-6">
                                 <div class="card">
                                     <div class="card-header">
-                                        <h6 class="mb-0"><i class="fas fa-newspaper me-2"></i>Fundamental News</h6>
+                                        <h6 class="mb-0"><i class="fas fa-newspaper me-2"></i>Berita Fundamental</h6>
                                     </div>
                                     <div class="card-body">
                                         <div class="news-item">
                                             <p class="mb-0">${data.fundamental_news}</p>
                                         </div>
-                                        <small class="text-muted">Data Source: ${data.data_source} | Processed in ${data.processing_time}s</small>
+                                        <small class="text-muted">Sumber: ${data.data_source} | Diproses dalam ${data.processing_time}s</small>
                                     </div>
                                 </div>
                             </div>
@@ -505,6 +535,18 @@
             createMACDChart(chartData);
             
             resultsDiv.style.display = 'block';
+        }
+        
+        // Get signal explanation
+        function getSignalExplanation(signal) {
+            const explanations = {
+                "BELI KUAT": "Kondisi oversold dengan momentum bullish kuat",
+                "BELI": "Signal beli dengan konfirmasi teknikal",
+                "JUAL KUAT": "Kondisi overbought dengan momentum bearish kuat", 
+                "JUAL": "Signal jual dengan konfirmasi teknikal",
+                "TUNGGU": "Market konsolidasi, tunggu konfirmasi breakout"
+            };
+            return explanations[signal] || "Analisis berdasarkan indikator teknikal dan fundamental";
         }
         
         // Create indicator HTML with visual representation
@@ -564,7 +606,7 @@
             
             const datasets = [
                 {
-                    label: 'Price',
+                    label: 'Harga',
                     data: prices,
                     borderColor: trendColor,
                     backgroundColor: trendColor.replace('0.8', '0.1'),
@@ -609,7 +651,19 @@
                         },
                         tooltip: {
                             mode: 'index',
-                            intersect: false
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(4);
+                                    }
+                                    return label;
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -617,7 +671,7 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Time'
+                                text: 'Waktu'
                             },
                             grid: {
                                 display: false
@@ -627,7 +681,7 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Price'
+                                text: 'Harga'
                             },
                             position: 'left'
                         }
@@ -719,7 +773,7 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Time'
+                                text: 'Waktu'
                             },
                             grid: {
                                 display: false
@@ -729,7 +783,7 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'MACD Value'
+                                text: 'Nilai MACD'
                             },
                             position: 'left'
                         }
@@ -745,28 +799,8 @@
             // Recreate charts with updated visibility
             const analysisResults = document.getElementById('analysisResults');
             if (analysisResults.style.display !== 'none') {
-                // We need to get the current chart data again
-                // For simplicity, we'll just recreate the charts
-                // In a real app, you might want to store the chart data
-                setTimeout(() => {
-                    if (priceChart) {
-                        priceChart.destroy();
-                        priceChart = null;
-                    }
-                    if (macdChart) {
-                        macdChart.destroy();
-                        macdChart = null;
-                    }
-                    
-                    // Get the current analysis data from the displayed results
-                    // This is a simplified approach - you might need to store the data
-                    const currentPair = document.getElementById('pairSelect').value;
-                    const currentTimeframe = document.getElementById('timeframeSelect').value;
-                    const useHistory = document.getElementById('useHistorySwitch').checked;
-                    
-                    // Re-fetch analysis to get fresh data
-                    getAnalysis();
-                }, 100);
+                // Re-fetch analysis to get fresh data
+                getAnalysis();
             }
         }
         
@@ -784,7 +818,7 @@
                 if (data.error) {
                     html = `<div class="alert alert-warning">${data.error}</div>`;
                 } else if (data.length === 0) {
-                    html = `<div class="alert alert-info">No performance data available yet. Run some analyses first.</div>`;
+                    html = `<div class="alert alert-info">Belum ada data performa. Lakukan analisis terlebih dahulu.</div>`;
                 } else {
                     data.forEach(item => {
                         html += `
@@ -793,13 +827,15 @@
                                     <div class="card-body text-center">
                                         <h5>${item.pair}</h5>
                                         <div class="display-6 fw-bold text-primary">${item.analysis_count}</div>
-                                        <small>Analyses (24h)</small>
+                                        <small>Analisis (24h)</small>
                                         <div class="mt-2">
                                             <span class="badge bg-${item.avg_confidence > 70 ? 'success' : item.avg_confidence > 50 ? 'warning' : 'danger'}">
                                                 ${item.avg_confidence}% Confidence
                                             </span>
                                         </div>
-                                        <small class="text-muted">Last: ${new Date(item.last_analysis).toLocaleTimeString()}</small>
+                                        <small class="text-muted">AI: ${item.ai_provider}</small>
+                                        <br>
+                                        <small class="text-muted">Terakhir: ${new Date(item.last_analysis).toLocaleTimeString()}</small>
                                     </div>
                                 </div>
                             </div>
