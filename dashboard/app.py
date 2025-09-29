@@ -18,11 +18,11 @@ PAIR_MAP = {
 }
 
 # API Keys
-TWELVE_API_KEY = "1a5a4b69dae6419c951a4fb62e4ad7b2"
+TWELVE_API_KEY = ""
 TWELVE_API_URL = "https://api.twelvedata.com"
-ALPHA_API_KEY = "G8588U1ISMGM8GZB"
+ALPHA_API_KEY = ""
 ALPHA_API_URL = "https://www.alphavantage.co/query"
-NEWS_API_KEY = "b90862d072ce41e4b0505cbd7b710b66"
+NEWS_API_KEY = ""
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
