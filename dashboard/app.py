@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, send_from_directory, render_template, session
 import pandas as pd
 import numpy as np
 import requests
@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = os.environ.get('SECRET_KEY', 'forex-analysis-backtest-secret-key-2024')
 
 # Configuration
 class Config:
@@ -45,6 +46,10 @@ class Config:
     DEFAULT_STOP_LOSS_PCT = 0.01
     DEFAULT_TAKE_PROFIT_PCT = 0.02
 
+    # Backtesting
+    INITIAL_BALANCE = 10000
+    DEFAULT_LOT_SIZE = 0.1
+
 # API Keys from environment variables
 TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
 ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
@@ -65,6 +70,249 @@ PAIR_MAP = {
     "EURJPY": "EUR/JPY",
     "CHFJPY": "CHF/JPY",
 }
+
+# ---------------- BACKTESTING MODULE ----------------
+class ForexBacktester:
+    def __init__(self, initial_balance=10000):
+        self.initial_balance = initial_balance
+        self.balance = initial_balance
+        self.positions = []
+        self.trade_history = []
+        self.equity_curve = []
+        self.data = {}
+        self.pairs = []
+        
+    def load_historical_data(self, historical_data):
+        """Load historical data from main application"""
+        self.data = historical_data
+        self.pairs = list(historical_data.keys())
+        return self.data
+    
+    def calculate_pip_value(self, pair, lot_size=0.1):
+        """Calculate pip value per lot"""
+        jpy_pairs = ['GBPJPY', 'USDJPY', 'EURJPY', 'CHFJPY']
+        if any(p in pair for p in jpy_pairs):
+            return lot_size * 1000  # 1 pip = 0.01 JPY
+        else:
+            return lot_size * 10    # 1 pip = 0.0001 untuk non-JPY
+    
+    def execute_trade(self, signal, current_price):
+        """Execute trade based on signal"""
+        pip_value = self.calculate_pip_value(signal['pair'], signal.get('lot_size', 0.1))
+        
+        if signal['action'].upper() == 'BUY':
+            entry_price = current_price
+            stop_loss = entry_price - signal['sl'] * 0.01
+            take_profit = entry_price + signal['tp'] * 0.01
+            direction = 1
+        else:  # SELL
+            entry_price = current_price
+            stop_loss = entry_price + signal['sl'] * 0.01
+            take_profit = entry_price - signal['tp'] * 0.01
+            direction = -1
+            
+        position = {
+            'entry_date': signal['date'],
+            'pair': signal['pair'],
+            'direction': direction,
+            'entry_price': entry_price,
+            'stop_loss': stop_loss,
+            'take_profit': take_profit,
+            'lot_size': signal.get('lot_size', 0.1),
+            'pip_value': pip_value,
+            'status': 'open'
+        }
+        
+        self.positions.append(position)
+    
+    def check_positions(self, current_prices):
+        """Check open positions for TP/SL"""
+        for position in self.positions[:]:
+            if position['status'] == 'open':
+                pair = position['pair']
+                current_price = current_prices.get(pair)
+                
+                if current_price is None:
+                    continue
+                    
+                if position['direction'] == 1:  # Buy
+                    if current_price >= position['take_profit']:
+                        pips = (position['take_profit'] - position['entry_price']) / 0.01
+                        profit = pips * position['pip_value']
+                        self.close_position(position, profit, 'TP')
+                    elif current_price <= position['stop_loss']:
+                        pips = (position['stop_loss'] - position['entry_price']) / 0.01
+                        profit = pips * position['pip_value']
+                        self.close_position(position, profit, 'SL')
+                else:  # Sell
+                    if current_price <= position['take_profit']:
+                        pips = (position['entry_price'] - position['take_profit']) / 0.01
+                        profit = pips * position['pip_value']
+                        self.close_position(position, profit, 'TP')
+                    elif current_price >= position['stop_loss']:
+                        pips = (position['entry_price'] - position['stop_loss']) / 0.01
+                        profit = pips * position['pip_value']
+                        self.close_position(position, profit, 'SL')
+    
+    def close_position(self, position, profit, close_reason):
+        """Close position and record trade"""
+        position['status'] = 'closed'
+        position['close_reason'] = close_reason
+        position['profit'] = profit
+        position['close_date'] = datetime.now()
+        
+        self.balance += profit
+        self.trade_history.append(position.copy())
+        
+        # Remove from open positions
+        self.positions = [p for p in self.positions if p['status'] == 'open']
+    
+    def run_backtest(self, signals, timeframe="4H"):
+        """Run backtesting with signals"""
+        logger.info("Starting backtesting...")
+        
+        # Reset state
+        self.balance = self.initial_balance
+        self.positions = []
+        self.trade_history = []
+        self.equity_curve = []
+        
+        # Sort signals by date
+        signals.sort(key=lambda x: x['date'])
+        
+        # Get date range from signals
+        if not signals:
+            return {"error": "No signals provided for backtesting"}
+            
+        start_date = min([s['date'] for s in signals])
+        end_date = max([s['date'] for s in signals])
+        
+        current_date = start_date
+        
+        while current_date <= end_date:
+            # Execute signals for current date
+            daily_signals = [s for s in signals if s['date'].date() == current_date.date()]
+            
+            for signal in daily_signals:
+                pair = signal['pair']
+                if pair in self.data and timeframe in self.data[pair]:
+                    df_pair = self.data[pair][timeframe]
+                    date_data = df_pair[df_pair['date'] == current_date]
+                    if not date_data.empty:
+                        current_price = date_data['open'].values[0]
+                        self.execute_trade(signal, current_price)
+            
+            # Check open positions
+            current_prices = {}
+            for pair in self.pairs:
+                if pair in self.data and timeframe in self.data[pair]:
+                    df_pair = self.data[pair][timeframe]
+                    date_data = df_pair[df_pair['date'] == current_date]
+                    if not date_data.empty:
+                        current_prices[pair] = date_data['close'].values[0]
+            
+            self.check_positions(current_prices)
+            
+            # Record equity
+            self.equity_curve.append({
+                'date': current_date,
+                'balance': self.balance,
+                'open_positions': len(self.positions)
+            })
+            
+            current_date += timedelta(days=1)
+        
+        logger.info(f"Backtesting completed: {len(self.trade_history)} trades executed")
+        return self.generate_report()
+    
+    def generate_report(self):
+        """Generate comprehensive backtesting report"""
+        if not self.trade_history:
+            return {
+                'status': 'error',
+                'message': 'No trades executed during backtesting period'
+            }
+        
+        df_trades = pd.DataFrame(self.trade_history)
+        df_equity = pd.DataFrame(self.equity_curve)
+        
+        # Calculate performance metrics
+        total_trades = len(df_trades)
+        winning_trades = len(df_trades[df_trades['profit'] > 0])
+        losing_trades = len(df_trades[df_trades['profit'] < 0])
+        win_rate = winning_trades / total_trades * 100 if total_trades > 0 else 0
+        
+        total_profit = df_trades['profit'].sum()
+        average_profit = df_trades['profit'].mean()
+        average_win = df_trades[df_trades['profit'] > 0]['profit'].mean() if winning_trades > 0 else 0
+        average_loss = df_trades[df_trades['profit'] < 0]['profit'].mean() if losing_trades > 0 else 0
+        
+        # Risk Reward Ratio
+        avg_risk_reward = abs(average_win / average_loss) if average_loss != 0 else 0
+        
+        # Maximum drawdown
+        df_equity['peak'] = df_equity['balance'].expanding().max()
+        df_equity['drawdown'] = (df_equity['balance'] - df_equity['peak']) / df_equity['peak'] * 100
+        max_drawdown = df_equity['drawdown'].min()
+        
+        # Profit Factor
+        gross_profit = df_trades[df_trades['profit'] > 0]['profit'].sum()
+        gross_loss = abs(df_trades[df_trades['profit'] < 0]['profit'].sum())
+        profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
+        
+        # Expectancy
+        expectancy = (win_rate/100 * average_win) - ((100-win_rate)/100 * abs(average_loss))
+        
+        # Compile report
+        report = {
+            'status': 'success',
+            'summary': {
+                'total_trades': total_trades,
+                'winning_trades': winning_trades,
+                'losing_trades': losing_trades,
+                'win_rate': round(win_rate, 2),
+                'total_profit': round(total_profit, 2),
+                'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2),
+                'average_profit': round(average_profit, 2),
+                'average_win': round(average_win, 2),
+                'average_loss': round(average_loss, 2),
+                'risk_reward_ratio': round(avg_risk_reward, 2),
+                'profit_factor': round(profit_factor, 2),
+                'expectancy': round(expectancy, 2),
+                'max_drawdown': round(max_drawdown, 2),
+                'final_balance': round(self.balance, 2),
+                'initial_balance': self.initial_balance
+            },
+            'performance_by_pair': {},
+            'trade_history': [
+                {
+                    'entry_date': trade['entry_date'].strftime('%Y-%m-%d'),
+                    'pair': trade['pair'],
+                    'direction': 'BUY' if trade['direction'] == 1 else 'SELL',
+                    'entry_price': round(trade['entry_price'], 4),
+                    'profit': round(trade.get('profit', 0), 2),
+                    'close_reason': trade.get('close_reason', 'Open')
+                }
+                for trade in self.trade_history[-20:]  # Last 20 trades
+            ]
+        }
+        
+        # Performance by pair
+        for pair in self.pairs:
+            pair_trades = df_trades[df_trades['pair'] == pair]
+            if len(pair_trades) > 0:
+                pair_profit = pair_trades['profit'].sum()
+                pair_win_rate = len(pair_trades[pair_trades['profit'] > 0]) / len(pair_trades) * 100
+                report['performance_by_pair'][pair] = {
+                    'trades': len(pair_trades),
+                    'profit': round(pair_profit, 2),
+                    'win_rate': round(pair_win_rate, 2)
+                }
+        
+        return report
+
+# Initialize backtester
+backtester = ForexBacktester(initial_balance=Config.INITIAL_BALANCE)
 
 # ---------------- DATABASE FUNCTIONS ----------------
 def init_db():
@@ -105,6 +353,23 @@ def init_db():
             duration_hours INTEGER,
             confidence_level INTEGER
         )''')
+
+        # Backtesting results table
+        c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            pair TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            period_days INTEGER,
+            total_trades INTEGER,
+            winning_trades INTEGER,
+            win_rate REAL,
+            total_profit REAL,
+            final_balance REAL,
+            max_drawdown REAL,
+            profit_factor REAL,
+            report_data TEXT
+        )''')
         
         conn.commit()
         logger.info("Database initialized successfully")
@@ -134,6 +399,35 @@ def save_analysis_result(data: Dict):
         logger.info(f"Analysis saved for {data['pair']}-{data['timeframe']}")
     except Exception as e:
         logger.error(f"Error saving analysis: {e}")
+    finally:
+        conn.close()
+
+def save_backtest_result(report_data: Dict):
+    """Save backtesting result to database"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        c.execute('''INSERT INTO backtesting_results 
+                    (pair, timeframe, period_days, total_trades, winning_trades, 
+                     win_rate, total_profit, final_balance, max_drawdown, profit_factor, report_data)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                 (report_data.get('pair', 'MULTI'),
+                  report_data.get('timeframe', '4H'),
+                  report_data.get('period_days', 30),
+                  report_data['summary']['total_trades'],
+                  report_data['summary']['winning_trades'],
+                  report_data['summary']['win_rate'],
+                  report_data['summary']['total_profit'],
+                  report_data['summary']['final_balance'],
+                  report_data['summary']['max_drawdown'],
+                  report_data['summary']['profit_factor'],
+                  json.dumps(report_data)))
+        
+        conn.commit()
+        logger.info("Backtesting result saved to database")
+    except Exception as e:
+        logger.error(f"Error saving backtest result: {e}")
     finally:
         conn.close()
 
@@ -208,6 +502,9 @@ def load_csv_data():
             logger.info(f"📊 {pair}-{timeframe}: {data_points} data points available")
     
     logger.info(f"Total loaded datasets: {loaded_count}")
+
+    # Load data to backtester
+    backtester.load_historical_data(HISTORICAL)
 
 # ---------------- TECHNICAL INDICATORS CALCULATION ----------------
 def calculate_ema_series(series: pd.Series, period: int) -> pd.Series:
@@ -538,6 +835,74 @@ Berikan analisis yang profesional dan realistis dalam Bahasa Indonesia. Pertimba
         logger.error(f"DeepSeek unexpected error: {e}")
         return ai_fallback(tech, fundamentals)
 
+# ---------------- BACKTESTING SIGNAL GENERATION ----------------
+def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int = 30) -> List[Dict]:
+    """Generate trading signals for backtesting from historical analysis"""
+    signals = []
+    
+    try:
+        if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
+            logger.error(f"No historical data found for {pair}-{timeframe}")
+            return signals
+        
+        df = HISTORICAL[pair][timeframe].tail(days * 3)  # Get more data for indicator calculation
+        
+        for i in range(20, len(df)):  # Start from 20 to have enough data for indicators
+            current_data = df.iloc[:i+1]
+            current_price = current_data.iloc[-1]['close']
+            
+            # Calculate technical indicators for current point
+            closes = current_data['close'].tolist()
+            volumes = current_data['vol.'].fillna(0).tolist() if 'vol.' in current_data.columns else None
+            
+            tech_indicators = calc_indicators(closes, volumes)
+            
+            # Simple signal generation based on technical indicators
+            signal = generate_simple_signal(tech_indicators, current_price)
+            
+            if signal['action'] != 'HOLD':
+                signals.append({
+                    'date': current_data.iloc[-1]['date'],
+                    'pair': pair,
+                    'action': signal['action'],
+                    'tp': signal['tp'],
+                    'sl': signal['sl'],
+                    'lot_size': Config.DEFAULT_LOT_SIZE
+                })
+        
+        logger.info(f"Generated {len(signals)} backtest signals for {pair}-{timeframe}")
+        return signals
+        
+    except Exception as e:
+        logger.error(f"Error generating backtest signals: {e}")
+        return signals
+
+def generate_simple_signal(tech: Dict, current_price: float) -> Dict:
+    """Generate simple trading signal based on technical indicators"""
+    rsi = tech['RSI']
+    macd = tech['MACD']
+    macd_signal = tech['MACD_Signal']
+    
+    # Simple signal logic
+    if rsi < 30 and macd > macd_signal:
+        return {
+            'action': 'BUY',
+            'tp': 50,  # 50 pips
+            'sl': 25   # 25 pips
+        }
+    elif rsi > 70 and macd < macd_signal:
+        return {
+            'action': 'SELL', 
+            'tp': 50,
+            'sl': 25
+        }
+    else:
+        return {
+            'action': 'HOLD',
+            'tp': 0,
+            'sl': 0
+        }
+
 # ---------------- ROUTES ----------------
 @app.route('/')
 def index():
@@ -708,6 +1073,106 @@ def get_analysis():
         traceback.print_exc()
         return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
+# ---------------- BACKTESTING ROUTES ----------------
+@app.route('/api/run_backtest', methods=['POST'])
+def api_run_backtest():
+    """API endpoint untuk menjalankan backtesting"""
+    try:
+        data = request.get_json()
+        pair = data.get('pair', 'USDJPY')
+        timeframe = data.get('timeframe', '4H')
+        days = data.get('days', 30)
+        
+        logger.info(f"Backtest request: {pair}-{timeframe} for {days} days")
+        
+        # Validate inputs
+        if pair not in Config.SUPPORTED_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        if timeframe not in Config.SUPPORTED_TIMEFRAMES:
+            return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
+        
+        # Generate signals for backtesting
+        signals = generate_backtest_signals_from_analysis(pair, timeframe, days)
+        
+        if not signals:
+            return jsonify({'error': 'No signals generated for backtesting'}), 400
+        
+        # Run backtest
+        report = backtester.run_backtest(signals, timeframe)
+        
+        # Add metadata to report
+        report['metadata'] = {
+            'pair': pair,
+            'timeframe': timeframe,
+            'period_days': days,
+            'signals_generated': len(signals),
+            'initial_balance': Config.INITIAL_BALANCE
+        }
+        
+        # Save to database
+        save_backtest_result(report)
+        
+        return jsonify(report)
+        
+    except Exception as e:
+        logger.error(f"Backtesting error: {e}")
+        return jsonify({'error': f'Backtesting failed: {str(e)}'}), 500
+
+@app.route('/api/backtest_status')
+def api_backtest_status():
+    """API endpoint untuk mengecek status backtesting"""
+    status = {
+        'historical_data_loaded': len(HISTORICAL) > 0,
+        'available_pairs': list(HISTORICAL.keys()),
+        'initial_balance': Config.INITIAL_BALANCE,
+        'supported_timeframes': Config.SUPPORTED_TIMEFRAMES
+    }
+    
+    # Add data points info
+    for pair in HISTORICAL:
+        status[f'{pair}_data'] = {}
+        for tf in HISTORICAL[pair]:
+            status[f'{pair}_data'][tf] = len(HISTORICAL[pair][tf])
+    
+    return jsonify(status)
+
+@app.route('/api/backtest_history')
+def api_backtest_history():
+    """API endpoint untuk mendapatkan history backtesting"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        c.execute('''SELECT pair, timeframe, period_days, total_trades, win_rate, 
+                    total_profit, final_balance, max_drawdown, profit_factor, timestamp
+                    FROM backtesting_results 
+                    ORDER BY timestamp DESC LIMIT 10''')
+        
+        results = c.fetchall()
+        history = []
+        
+        for row in results:
+            history.append({
+                'pair': row[0],
+                'timeframe': row[1],
+                'period_days': row[2],
+                'total_trades': row[3],
+                'win_rate': row[4],
+                'total_profit': row[5],
+                'final_balance': row[6],
+                'max_drawdown': row[7],
+                'profit_factor': row[8],
+                'timestamp': row[9]
+            })
+        
+        conn.close()
+        return jsonify(history)
+        
+    except Exception as e:
+        logger.error(f"Error fetching backtest history: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/quick_overview')
 def quick_overview():
     """Quick overview of all supported pairs"""
@@ -802,7 +1267,7 @@ def performance_metrics():
 
 # ---------------- INITIALIZATION ----------------
 if __name__ == "__main__":
-    logger.info("Starting Forex Analysis Application...")
+    logger.info("Starting Forex Analysis Application with Backtesting...")
     
     # Initialize components
     init_db()
@@ -813,6 +1278,10 @@ if __name__ == "__main__":
         logger.info("✅ DeepSeek AI integration ENABLED")
     else:
         logger.info("⚠️ DeepSeek AI integration DISABLED - using fallback system")
+    
+    # Log backtesting status
+    logger.info(f"✅ Backtesting module INITIALIZED with initial balance: ${Config.INITIAL_BALANCE}")
+    logger.info(f"📊 Historical data loaded for {len(HISTORICAL)} pairs")
     
     # Log data periods
     logger.info("📅 Data periods configured:")
