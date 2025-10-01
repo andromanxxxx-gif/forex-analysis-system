@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Trading Analysis Dashboard</title>
+    <title>Forex Trading Analysis & Backtesting Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,6 +15,7 @@
             --profit-color: #27ae60;
             --loss-color: #e74c3c;
             --warning-color: #f39c12;
+            --backtest-color: #9b59b6;
         }
         
         body {
@@ -87,6 +88,11 @@
             background: linear-gradient(135deg, #f39c12, #e67e22);
             color: white;
         }
+
+        .backtest-card {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+        }
         
         @keyframes pulse {
             0% { transform: scale(1); }
@@ -132,6 +138,12 @@
             height: 200px;
             margin: 20px 0;
         }
+
+        .backtest-chart-container {
+            position: relative;
+            height: 250px;
+            margin: 20px 0;
+        }
         
         .risk-tinggi { color: var(--loss-color); font-weight: bold; }
         .risk-sedang { color: var(--warning-color); font-weight: bold; }
@@ -171,6 +183,56 @@
             color: #6c757d;
             text-align: right;
         }
+
+        .nav-tabs .nav-link {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--accent-color);
+            font-weight: 600;
+            border-bottom: 3px solid var(--accent-color);
+        }
+
+        .tab-pane {
+            padding: 20px 0;
+        }
+
+        .backtest-metric {
+            text-align: center;
+            padding: 15px;
+        }
+
+        .backtest-metric .value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .backtest-metric .label {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        .performance-positive {
+            color: var(--profit-color);
+        }
+
+        .performance-negative {
+            color: var(--loss-color);
+        }
+
+        .trade-history-table {
+            font-size: 0.85em;
+        }
+
+        .backtest-controls {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -184,9 +246,9 @@
                             <div class="col-md-6">
                                 <h1 class="display-5 fw-bold text-primary">
                                     <i class="fas fa-chart-line me-2"></i>
-                                    Forex Trading Analysis
+                                    Forex Analysis & Backtesting
                                 </h1>
-                                <p class="text-muted">Analisis teknikal & fundamental real-time untuk pair JPY</p>
+                                <p class="text-muted">Analisis teknikal & fundamental real-time dengan sistem backtesting terintegrasi</p>
                                 <div id="aiStatusBadge" class="badge bg-info">
                                     <i class="fas fa-robot me-1"></i>
                                     <span id="aiStatusText">Checking AI Status...</span>
@@ -197,87 +259,199 @@
                                     <button class="btn btn-outline-primary" onclick="loadQuickOverview()">
                                         <i class="fas fa-sync-alt"></i> Refresh
                                     </button>
-                                    <button class="btn btn-outline-info" onclick="showPerformance()">
-                                        <i class="fas fa-chart-bar"></i> Performance
+                                    <button class="btn btn-outline-info" onclick="checkBacktestStatus()">
+                                        <i class="fas fa-database"></i> Data Status
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Controls -->
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <label class="form-label">Pair Mata Uang</label>
-                            <select class="form-select" id="pairSelect">
-                                <option value="USDJPY">USD/JPY</option>
-                                <option value="GBPJPY">GBP/JPY</option>
-                                <option value="EURJPY">EUR/JPY</option>
-                                <option value="CHFJPY">CHF/JPY</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Timeframe</label>
-                            <select class="form-select" id="timeframeSelect">
-                                <option value="1H">1 Jam</option>
-                                <option value="4H" selected>4 Jam</option>
-                                <option value="1D">Harian</option>
-                                <option value="1W">Mingguan</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Data Period</label>
-                            <select class="form-select" id="dataPeriodSelect">
-                                <option value="auto">Auto (Rekomendasi)</option>
-                                <option value="7">7 Hari</option>
-                                <option value="30">30 Hari</option>
-                                <option value="90">90 Hari</option>
-                                <option value="180">180 Hari</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 d-flex align-items-end">
-                            <div class="form-check form-switch me-3">
-                                <input class="form-check-input" type="checkbox" id="useHistorySwitch" checked>
-                                <label class="form-check-label" for="useHistorySwitch">Gunakan Data Historis</label>
-                            </div>
-                            <button class="btn btn-primary w-100" onclick="getAnalysis()">
-                                <i class="fas fa-analytics me-2"></i>Analisis
+                    <!-- Navigation Tabs -->
+                    <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab" aria-controls="analysis" aria-selected="true">
+                                <i class="fas fa-analytics me-2"></i>Market Analysis
                             </button>
-                        </div>
-                    </div>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="backtesting-tab" data-bs-toggle="tab" data-bs-target="#backtesting" type="button" role="tab" aria-controls="backtesting" aria-selected="false">
+                                <i class="fas fa-history me-2"></i>Backtesting
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab" aria-controls="performance" aria-selected="false">
+                                <i class="fas fa-tachometer-alt me-2"></i>Performance
+                            </button>
+                        </li>
+                    </ul>
 
-                    <!-- Quick Overview -->
-                    <div class="row mb-4" id="quickOverview">
-                        <div class="col-12">
-                            <h5><i class="fas fa-globe me-2"></i>Market Overview</h5>
-                            <div class="row" id="overviewCards">
-                                <!-- Overview cards will be loaded here -->
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="mainTabContent">
+                        <!-- Analysis Tab -->
+                        <div class="tab-pane fade show active" id="analysis" role="tabpanel" aria-labelledby="analysis-tab">
+                            <!-- Controls -->
+                            <div class="row mb-4">
+                                <div class="col-md-3">
+                                    <label class="form-label">Pair Mata Uang</label>
+                                    <select class="form-select" id="pairSelect">
+                                        <option value="USDJPY">USD/JPY</option>
+                                        <option value="GBPJPY">GBP/JPY</option>
+                                        <option value="EURJPY">EUR/JPY</option>
+                                        <option value="CHFJPY">CHF/JPY</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Timeframe</label>
+                                    <select class="form-select" id="timeframeSelect">
+                                        <option value="1H">1 Jam</option>
+                                        <option value="4H" selected>4 Jam</option>
+                                        <option value="1D">Harian</option>
+                                        <option value="1W">Mingguan</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Data Period</label>
+                                    <select class="form-select" id="dataPeriodSelect">
+                                        <option value="auto">Auto (Rekomendasi)</option>
+                                        <option value="7">7 Hari</option>
+                                        <option value="30">30 Hari</option>
+                                        <option value="90">90 Hari</option>
+                                        <option value="180">180 Hari</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <div class="form-check form-switch me-3">
+                                        <input class="form-check-input" type="checkbox" id="useHistorySwitch" checked>
+                                        <label class="form-check-label" for="useHistorySwitch">Gunakan Data Historis</label>
+                                    </div>
+                                    <button class="btn btn-primary w-100" onclick="getAnalysis()">
+                                        <i class="fas fa-analytics me-2"></i>Analisis
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Quick Overview -->
+                            <div class="row mb-4" id="quickOverview">
+                                <div class="col-12">
+                                    <h5><i class="fas fa-globe me-2"></i>Market Overview</h5>
+                                    <div class="row" id="overviewCards">
+                                        <!-- Overview cards will be loaded here -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Loading Indicator -->
+                            <div class="loading" id="loadingIndicator">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Menganalisis data market...</p>
+                            </div>
+
+                            <!-- Analysis Results -->
+                            <div id="analysisResults" style="display: none;">
+                                <!-- Results will be populated here -->
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Loading Indicator -->
-                    <div class="loading" id="loadingIndicator">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                        <!-- Backtesting Tab -->
+                        <div class="tab-pane fade" id="backtesting" role="tabpanel" aria-labelledby="backtesting-tab">
+                            <div class="backtest-controls">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Pair Mata Uang</label>
+                                        <select class="form-select" id="backtestPairSelect">
+                                            <option value="USDJPY">USD/JPY</option>
+                                            <option value="GBPJPY">GBP/JPY</option>
+                                            <option value="EURJPY">EUR/JPY</option>
+                                            <option value="CHFJPY">CHF/JPY</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Timeframe</label>
+                                        <select class="form-select" id="backtestTimeframeSelect">
+                                            <option value="1H">1 Jam</option>
+                                            <option value="4H" selected>4 Jam</option>
+                                            <option value="1D">Harian</option>
+                                            <option value="1W">Mingguan</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Periode Testing (Hari)</label>
+                                        <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
+                                    </div>
+                                    <div class="col-md-3 d-flex align-items-end">
+                                        <button class="btn btn-success w-100" onclick="runBacktest()">
+                                            <i class="fas fa-play me-2"></i>Run Backtest
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Initial Balance: $10,000 | Lot Size: 0.1 | Pairs: JPY Crosses
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Backtest Status -->
+                            <div class="alert alert-info" id="backtestStatusAlert">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <span id="backtestStatusText">Sistem backtesting siap. Pilih parameter dan jalankan backtest.</span>
+                            </div>
+
+                            <!-- Backtest Loading -->
+                            <div class="loading" id="backtestLoadingIndicator" style="display: none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Menjalankan backtesting... Ini mungkin memerlukan beberapa saat.</p>
+                            </div>
+
+                            <!-- Backtest Results -->
+                            <div id="backtestResults" style="display: none;">
+                                <!-- Backtest results will be populated here -->
+                            </div>
+
+                            <!-- Backtest History -->
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-history me-2"></i>Backtest History
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="backtestHistoryContent">
+                                        <div class="text-center text-muted py-3">
+                                            <i class="fas fa-clock fa-2x mb-2"></i>
+                                            <p>Belum ada history backtesting</p>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="loadBacktestHistory()">
+                                                <i class="fas fa-sync-alt me-1"></i>Load History
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <p class="mt-2">Menganalisis data market...</p>
-                    </div>
 
-                    <!-- Analysis Results -->
-                    <div id="analysisResults" style="display: none;">
-                        <!-- Results will be populated here -->
-                    </div>
-
-                    <!-- Performance Metrics -->
-                    <div id="performanceMetrics" style="display: none;">
-                        <div class="row">
-                            <div class="col-12">
-                                <h5><i class="fas fa-tachometer-alt me-2"></i>Performance Metrics</h5>
-                                <div id="performanceContent"></div>
-                                <button class="btn btn-secondary mt-3" onclick="hidePerformance()">
-                                    <i class="fas fa-arrow-left me-2"></i>Kembali ke Analisis
-                                </button>
+                        <!-- Performance Tab -->
+                        <div class="tab-pane fade" id="performance" role="tabpanel" aria-labelledby="performance-tab">
+                            <div class="row">
+                                <div class="col-12">
+                                    <h5><i class="fas fa-tachometer-alt me-2"></i>Performance Metrics</h5>
+                                    <div id="performanceContent">
+                                        <div class="text-center text-muted py-5">
+                                            <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                                            <p>Data performance akan ditampilkan di sini</p>
+                                            <button class="btn btn-primary" onclick="loadPerformanceData()">
+                                                <i class="fas fa-sync-alt me-2"></i>Load Performance Data
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -286,9 +460,24 @@
         </div>
     </div>
 
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p id="loading-message">Processing...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Global variables
         let priceChart = null;
         let macdChart = null;
+        let backtestChart = null;
         let chartIndicators = {
             ema200: true,
             macd: true
@@ -298,6 +487,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadQuickOverview();
             checkAIStatus();
+            checkBacktestStatus();
+            loadBacktestHistory();
         });
         
         // Check AI Status
@@ -318,6 +509,27 @@
                 }
             } catch (error) {
                 console.error('Error checking AI status:', error);
+            }
+        }
+
+        // Check Backtest Status
+        async function checkBacktestStatus() {
+            try {
+                const response = await fetch('/api/backtest_status');
+                const data = await response.json();
+                
+                const statusText = document.getElementById('backtestStatusText');
+                
+                if (data.historical_data_loaded) {
+                    let statusHTML = `✅ Data historis tersedia: ${data.available_pairs.join(', ')}<br>`;
+                    statusHTML += `<small>Initial Balance: $${data.initial_balance} | Timeframes: ${data.supported_timeframes.join(', ')}</small>`;
+                    statusText.innerHTML = statusHTML;
+                } else {
+                    statusText.textContent = '⚠️ Data historis belum dimuat. Pastikan file CSV tersedia di folder data.';
+                }
+            } catch (error) {
+                console.error('Error checking backtest status:', error);
+                document.getElementById('backtestStatusText').textContent = 'Error checking backtest status';
             }
         }
         
@@ -369,7 +581,6 @@
             // Show loading
             document.getElementById('loadingIndicator').style.display = 'block';
             document.getElementById('analysisResults').style.display = 'none';
-            document.getElementById('performanceMetrics').style.display = 'none';
             
             try {
                 let url = `/get_analysis?pair=${pair}&timeframe=${timeframe}&use_history=${useHistory ? '1' : '0'}`;
@@ -622,17 +833,358 @@
                 </div>
             `;
         }
+
+        // Run Backtest
+        async function runBacktest() {
+            const pair = document.getElementById('backtestPairSelect').value;
+            const timeframe = document.getElementById('backtestTimeframeSelect').value;
+            const days = document.getElementById('backtestDays').value;
+
+            // Validate inputs
+            if (days < 7 || days > 365) {
+                alert('Periode testing harus antara 7 dan 365 hari');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('backtestLoadingIndicator').style.display = 'block';
+            document.getElementById('backtestResults').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/run_backtest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        pair: pair,
+                        timeframe: timeframe,
+                        days: parseInt(days)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                displayBacktestResults(data);
+            } catch (error) {
+                alert('Error: ' + error.message);
+                console.error('Backtest error:', error);
+            } finally {
+                document.getElementById('backtestLoadingIndicator').style.display = 'none';
+            }
+        }
+
+        // Display Backtest Results
+        function displayBacktestResults(data) {
+            const resultsDiv = document.getElementById('backtestResults');
+            const summary = data.summary;
+            const performanceByPair = data.performance_by_pair;
+            const tradeHistory = data.trade_history;
+
+            let html = `
+                <div class="card backtest-card mb-4">
+                    <div class="card-body text-center">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-bar me-2"></i>Backtesting Results
+                        </h3>
+                        <p class="mb-0">${data.metadata.pair} • ${data.metadata.timeframe} • ${data.metadata.period_days} Days</p>
+                    </div>
+                </div>
+
+                <!-- Key Metrics -->
+                <div class="row mb-4">
+                    <div class="col-md-2">
+                        <div class="backtest-metric">
+                            <div class="value ${summary.total_profit >= 0 ? 'performance-positive' : 'performance-negative'}">
+                                $${summary.total_profit}
+                            </div>
+                            <div class="label">Total Profit</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="backtest-metric">
+                            <div class="value ${summary.win_rate >= 50 ? 'performance-positive' : 'performance-negative'}">
+                                ${summary.win_rate}%
+                            </div>
+                            <div class="label">Win Rate</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="backtest-metric">
+                            <div class="value">${summary.total_trades}</div>
+                            <div class="label">Total Trades</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="backtest-metric">
+                            <div class="value ${summary.profit_factor >= 1 ? 'performance-positive' : 'performance-negative'}">
+                                ${summary.profit_factor}
+                            </div>
+                            <div class="label">Profit Factor</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="backtest-metric">
+                            <div class="value performance-negative">
+                                ${summary.max_drawdown}%
+                            </div>
+                            <div class="label">Max Drawdown</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="backtest-metric">
+                            <div class="value ${summary.expectancy >= 0 ? 'performance-positive' : 'performance-negative'}">
+                                $${summary.expectancy}
+                            </div>
+                            <div class="label">Expectancy</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Summary -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Performance Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>Initial Balance</td>
+                                        <td class="text-end">$${summary.initial_balance}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Final Balance</td>
+                                        <td class="text-end">$${summary.final_balance}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Return</td>
+                                        <td class="text-end ${summary.return_percentage >= 0 ? 'performance-positive' : 'performance-negative'}">
+                                            ${summary.return_percentage}%
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Winning Trades</td>
+                                        <td class="text-end">${summary.winning_trades}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Losing Trades</td>
+                                        <td class="text-end">${summary.losing_trades}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Average Win</td>
+                                        <td class="text-end performance-positive">$${summary.average_win}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Average Loss</td>
+                                        <td class="text-end performance-negative">$${summary.average_loss}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Risk/Reward Ratio</td>
+                                        <td class="text-end">${summary.risk_reward_ratio}:1</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Trade History (Latest 20 Trades)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped trade-history-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Pair</th>
+                                                <th>Action</th>
+                                                <th>Price</th>
+                                                <th>Profit</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+            `;
+
+            tradeHistory.forEach(trade => {
+                html += `
+                    <tr>
+                        <td>${trade.entry_date}</td>
+                        <td><strong>${trade.pair}</strong></td>
+                        <td>
+                            <span class="badge ${trade.direction === 'BUY' ? 'bg-success' : 'bg-danger'}">
+                                ${trade.direction}
+                            </span>
+                        </td>
+                        <td>${trade.entry_price}</td>
+                        <td class="${trade.profit >= 0 ? 'performance-positive' : 'performance-negative'}">
+                            $${trade.profit}
+                        </td>
+                        <td>
+                            <span class="badge ${trade.close_reason === 'TP' ? 'bg-success' : trade.close_reason === 'SL' ? 'bg-danger' : 'bg-warning'}">
+                                ${trade.close_reason}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+
+            // Load updated history
+            loadBacktestHistory();
+        }
+
+        // Load Backtest History
+        async function loadBacktestHistory() {
+            try {
+                const response = await fetch('/api/backtest_history');
+                const data = await response.json();
+
+                const historyContent = document.getElementById('backtestHistoryContent');
+
+                if (data.error) {
+                    historyContent.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+                    return;
+                }
+
+                if (data.length === 0) {
+                    historyContent.innerHTML = `
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-clock fa-2x mb-2"></i>
+                            <p>Belum ada history backtesting</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let historyHTML = `
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Pair</th>
+                                    <th>Timeframe</th>
+                                    <th>Period</th>
+                                    <th>Trades</th>
+                                    <th>Win Rate</th>
+                                    <th>Profit</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                data.forEach(item => {
+                    historyHTML += `
+                        <tr>
+                            <td><strong>${item.pair}</strong></td>
+                            <td>${item.timeframe}</td>
+                            <td>${item.period_days}d</td>
+                            <td>${item.total_trades}</td>
+                            <td>
+                                <span class="badge ${item.win_rate > 50 ? 'bg-success' : 'bg-warning'}">
+                                    ${item.win_rate}%
+                                </span>
+                            </td>
+                            <td class="${item.total_profit >= 0 ? 'performance-positive' : 'performance-negative'}">
+                                $${item.total_profit}
+                            </td>
+                            <td><small>${new Date(item.timestamp).toLocaleDateString()}</small></td>
+                        </tr>
+                    `;
+                });
+
+                historyHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <small class="text-muted">Menampilkan ${data.length} hasil backtesting terbaru</small>
+                `;
+
+                historyContent.innerHTML = historyHTML;
+            } catch (error) {
+                console.error('Error loading backtest history:', error);
+                document.getElementById('backtestHistoryContent').innerHTML = `
+                    <div class="alert alert-danger">Error loading backtest history</div>
+                `;
+            }
+        }
+
+        // Load Performance Data
+        async function loadPerformanceData() {
+            try {
+                const response = await fetch('/performance');
+                const data = await response.json();
+
+                let html = '<div class="row">';
+
+                if (data.error) {
+                    html = `<div class="alert alert-warning">${data.error}</div>`;
+                } else if (data.length === 0) {
+                    html = `<div class="alert alert-info">Belum ada data performa. Lakukan analisis terlebih dahulu.</div>`;
+                } else {
+                    data.forEach(item => {
+                        html += `
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h5>${item.pair}</h5>
+                                        <div class="display-6 fw-bold text-primary">${item.analysis_count}</div>
+                                        <small>Analisis (24h)</small>
+                                        <div class="mt-2">
+                                            <span class="badge bg-${item.avg_confidence > 70 ? 'success' : item.avg_confidence > 50 ? 'warning' : 'danger'}">
+                                                ${item.avg_confidence}% Confidence
+                                            </span>
+                                        </div>
+                                        <small class="text-muted">AI: ${item.ai_provider}</small>
+                                        <br>
+                                        <small class="text-muted">Terakhir: ${new Date(item.last_analysis).toLocaleTimeString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += '</div>';
+                document.getElementById('performanceContent').innerHTML = html;
+
+            } catch (error) {
+                console.error('Error loading performance:', error);
+                document.getElementById('performanceContent').innerHTML = '<div class="alert alert-danger">Error loading performance data</div>';
+            }
+        }
+        
+        // Chart functions (createPriceChart, createMACDChart, etc.) remain the same as in your original code
+        // ... [all the existing chart functions from your original code] ...
         
         // Optimize chart data for performance
-        let currentDataDensity = 'normal'; // 'normal' or 'high'
+        let currentDataDensity = 'normal';
         
         function optimizeChartData(chartData, maxPoints = 200) {
-            // If data points are less than maxPoints, return original
             if (chartData.dates.length <= maxPoints || currentDataDensity === 'high') {
                 return chartData;
             }
             
-            // Reduce data points for performance
             const step = Math.ceil(chartData.dates.length / maxPoints);
             const reducedDates = [];
             const reducedClose = [];
@@ -666,10 +1218,8 @@
         function toggleDataDensity() {
             currentDataDensity = currentDataDensity === 'normal' ? 'high' : 'normal';
             
-            // Recreate charts with new density
             const analysisResults = document.getElementById('analysisResults');
             if (analysisResults.style.display !== 'none') {
-                // Re-fetch analysis to get fresh data
                 getAnalysis();
             }
         }
@@ -684,10 +1234,8 @@
                 priceChart.destroy();
             }
             
-            // Optimize data if too many points
             const displayData = optimizeChartData(chartData, 200);
             
-            // Validate data
             if (!displayData.dates || !displayData.close) {
                 console.error('❌ Missing required chart data');
                 return;
@@ -698,7 +1246,6 @@
                 const prices = displayData.close;
                 const ema200 = displayData.ema200;
                 
-                // Determine trend color
                 const firstPrice = prices[0];
                 const lastPrice = prices[prices.length - 1];
                 const trendColor = lastPrice >= firstPrice ? 'rgba(39, 174, 96, 0.8)' : 'rgba(231, 76, 60, 0.8)';
@@ -718,7 +1265,6 @@
                     }
                 ];
                 
-                // Add EMA200 if available and enabled
                 if (ema200 && ema200.length > 0 && chartIndicators.ema200) {
                     datasets.push({
                         label: 'EMA 200',
@@ -782,7 +1328,6 @@
                                 ticks: {
                                     maxTicksLimit: 10,
                                     callback: function(value, index, values) {
-                                        // Show only some labels to avoid overcrowding
                                         if (index % Math.ceil(values.length / 8) === 0) {
                                             return this.getLabelForValue(value);
                                         }
@@ -816,14 +1361,12 @@
                 macdChart.destroy();
             }
             
-            // Optimize data for MACD too
             const displayData = optimizeChartData(chartData, 200);
             
             const macdLine = displayData.macd_line;
             const macdSignal = displayData.macd_signal;
             const macdHistogram = displayData.macd_histogram;
             
-            // Only create MACD chart if data is available and enabled
             if (!macdLine || macdLine.length === 0 || !chartIndicators.macd) {
                 document.getElementById('macdChart').style.display = 'none';
                 return;
@@ -933,72 +1476,25 @@
         function toggleIndicator(indicator, isVisible) {
             chartIndicators[indicator] = isVisible;
             
-            // Recreate charts with updated visibility
             const analysisResults = document.getElementById('analysisResults');
             if (analysisResults.style.display !== 'none') {
-                // Re-fetch analysis to get fresh data
                 getAnalysis();
             }
         }
         
-        // Show performance metrics
-        async function showPerformance() {
-            document.getElementById('analysisResults').style.display = 'none';
-            document.getElementById('quickOverview').style.display = 'none';
-            
-            try {
-                const response = await fetch('/performance');
-                const data = await response.json();
-                
-                let html = '<div class="row">';
-                
-                if (data.error) {
-                    html = `<div class="alert alert-warning">${data.error}</div>`;
-                } else if (data.length === 0) {
-                    html = `<div class="alert alert-info">Belum ada data performa. Lakukan analisis terlebih dahulu.</div>`;
-                } else {
-                    data.forEach(item => {
-                        html += `
-                            <div class="col-md-6 col-lg-3 mb-3">
-                                <div class="card">
-                                    <div class="card-body text-center">
-                                        <h5>${item.pair}</h5>
-                                        <div class="display-6 fw-bold text-primary">${item.analysis_count}</div>
-                                        <small>Analisis (24h)</small>
-                                        <div class="mt-2">
-                                            <span class="badge bg-${item.avg_confidence > 70 ? 'success' : item.avg_confidence > 50 ? 'warning' : 'danger'}">
-                                                ${item.avg_confidence}% Confidence
-                                            </span>
-                                        </div>
-                                        <small class="text-muted">AI: ${item.ai_provider}</small>
-                                        <br>
-                                        <small class="text-muted">Terakhir: ${new Date(item.last_analysis).toLocaleTimeString()}</small>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-                
-                html += '</div>';
-                document.getElementById('performanceContent').innerHTML = html;
-                document.getElementById('performanceMetrics').style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error loading performance:', error);
-                document.getElementById('performanceContent').innerHTML = '<div class="alert alert-danger">Error loading performance data</div>';
-            }
-        }
-        
-        // Hide performance metrics
-        function hidePerformance() {
-            document.getElementById('performanceMetrics').style.display = 'none';
-            document.getElementById('analysisResults').style.display = 'block';
-            document.getElementById('quickOverview').style.display = 'block';
-        }
-        
         // Auto-refresh overview every 30 seconds
         setInterval(loadQuickOverview, 30000);
+
+        // Load performance data when performance tab is clicked
+        document.getElementById('performance-tab').addEventListener('click', function() {
+            loadPerformanceData();
+        });
+
+        // Load backtest history when backtesting tab is clicked
+        document.getElementById('backtesting-tab').addEventListener('click', function() {
+            loadBacktestHistory();
+            checkBacktestStatus();
+        });
     </script>
 </body>
 </html>
