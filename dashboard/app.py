@@ -1,5 +1,3 @@
-[file name]: app_enhanced.py
-[file content begin]
 from flask import Flask, request, jsonify, send_from_directory, render_template, session
 import pandas as pd
 import numpy as np
@@ -34,8 +32,7 @@ class Config:
     # Trading parameters
     DEFAULT_TIMEFRAME = "4H"
     SUPPORTED_PAIRS = ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY"]
-    SUPPORTED_TIMEFRAMES = ["1H", "4H", "1D", "1W"]
-    
+    SUPPORTED_TIMEFRAMES = ["1H", "4H", "1D", "1W"]    
     # Data periods
     DATA_PERIODS = {
         "1H": 30 * 24,   # 30 hari * 24 jam
@@ -68,9 +65,9 @@ class Config:
     MIN_TREND_STRENGTH = 0.1  # Minimum trend strength percentage
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "b90862d072ce41e4b0505cbd7b710b66")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # API URLs
