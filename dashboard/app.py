@@ -32,13 +32,14 @@ class Config:
     # Trading parameters
     DEFAULT_TIMEFRAME = "4H"
     SUPPORTED_PAIRS = ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY"]
-    SUPPORTED_TIMEFRAMES = ["1H", "4H", "1D", "1W"]    
+    SUPPORTED_TIMEFRAMES = ["1H", "4H", "1D", "1W"]
+    
     # Data periods
     DATA_PERIODS = {
-        "1H": 30 * 24,   # 30 hari * 24 jam
-        "4H": 30 * 6,    # 30 hari * 6 interval 4 jam
-        "1D": 120,       # 120 hari
-        "1W": 52         # 52 minggu
+        "1H": 30 * 24,   # 30 days * 24 hours
+        "4H": 30 * 6,    # 30 days * 6 four-hour intervals
+        "1D": 120,       # 120 days
+        "1W": 52         # 52 weeks
     }
     
     # Enhanced Risk management
@@ -65,9 +66,9 @@ class Config:
     MIN_TREND_STRENGTH = 0.1  # Minimum trend strength percentage
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "b90862d072ce41e4b0505cbd7b710b66")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # API URLs
@@ -963,7 +964,7 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
         logger.error(f"Error generating backtest signals: {e}")
         return signals
 
-# ---------------- DATA PROVIDERS & AI ANALYSIS (tetap sama) ----------------
+# ---------------- DATA PROVIDERS & AI ANALYSIS ----------------
 def get_price_twelvedata(pair: str) -> Optional[float]:
     """Get real-time price from Twelve Data API"""
     try:
@@ -1621,4 +1622,3 @@ if __name__ == "__main__":
     # Start Flask application
     logger.info("🎯 Enhanced Application initialized successfully")
     app.run(debug=True, host='0.0.0.0', port=5000)
-[file content end]
