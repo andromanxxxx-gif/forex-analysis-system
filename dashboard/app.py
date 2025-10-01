@@ -54,21 +54,56 @@ class Config:
     
     # Enhanced Trading Parameters
     PAIR_PRIORITY = {
-        'GBPJPY': 1,  # Highest priority - good trends
-        'USDJPY': 2,  
-        'EURJPY': 3,
-        'CHFJPY': 4   # Lowest priority - unpredictable
+        'GBPJPY': 1,  
+        'USDJPY': 1,  # Increased priority
+        'EURJPY': 1,  # Increased priority - EURJPY good for long-term
+        'CHFJPY': 2   # Lower priority
     }
     
-    OPTIMAL_TRADING_HOURS = list(range(0, 9))  # 00:00-08:00 GMT (Asian/London overlap)
-    MIN_VOLATILITY = 0.3
-    MAX_VOLATILITY = 5.0
-    MIN_TREND_STRENGTH = 0.1  # Minimum trend strength percentage
+    # Timeframe-specific parameters
+    TIMEFRAME_PARAMS = {
+        "1H": {
+            "min_volatility": 0.1,
+            "max_volatility": 3.0,
+            "min_trend_strength": 0.05,
+            "optimal_hours": list(range(0, 9)),  # Asian/London overlap
+            "required_bars": 30 * 24,
+            "confidence_threshold": 40,
+            "start_index": 50
+        },
+        "4H": {
+            "min_volatility": 0.2,
+            "max_volatility": 4.0,
+            "min_trend_strength": 0.08,
+            "optimal_hours": list(range(0, 9)),
+            "required_bars": 30 * 6,
+            "confidence_threshold": 40,
+            "start_index": 50
+        },
+        "1D": {
+            "min_volatility": 0.05,    # MUCH LOWER for daily
+            "max_volatility": 8.0,     # HIGHER for daily
+            "min_trend_strength": 0.02, # MUCH LOWER for daily
+            "optimal_hours": list(range(0, 24)),  # ALL hours for daily
+            "required_bars": 120,
+            "confidence_threshold": 35,  # Lower threshold for daily
+            "start_index": 100  # More data for indicator stability
+        },
+        "1W": {
+            "min_volatility": 0.03,
+            "max_volatility": 12.0,
+            "min_trend_strength": 0.01,
+            "optimal_hours": list(range(0, 24)),
+            "required_bars": 52,
+            "confidence_threshold": 35,
+            "start_index": 100
+        }
+    }
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "b90862d072ce41e4b0505cbd7b710b66")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # API URLs
@@ -785,8 +820,8 @@ def calculate_signal_confidence(signal: Dict, tech: Dict) -> float:
     
     return min(95, max(5, confidence))  # Cap between 5-95%
 
-def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
-    """Generate enhanced trading signal dengan kondisi yang lebih ketat"""
+def generate_enhanced_signal(tech: Dict, current_price: float, timeframe: str = "4H") -> Dict:
+    """Generate enhanced trading signal dengan kondisi yang disesuaikan timeframe"""
     rsi = tech['RSI']
     macd = tech['MACD']
     macd_signal = tech['MACD_Signal']
@@ -795,7 +830,12 @@ def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
     sma50 = tech['SMA50']
     volatility = tech.get('Volatility', 1.0)
     trend_strength = tech.get('Trend_Strength', 0)
-    bb_width = tech.get('Bollinger_Width', 0)
+    
+    # Get timeframe-specific parameters
+    timeframe_params = Config.TIMEFRAME_PARAMS.get(timeframe, Config.TIMEFRAME_PARAMS["4H"])
+    min_volatility = timeframe_params["min_volatility"]
+    max_volatility = timeframe_params["max_volatility"]
+    min_trend_strength = timeframe_params["min_trend_strength"]
     
     # Enhanced signal logic dengan filter trend dan volatility
     trend_bullish = sma20 > sma50 and current_price > sma20
@@ -803,8 +843,17 @@ def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
     
     # Dynamic SL/TP based on volatility and ATR
     atr = tech.get('ATR', 0.5)
-    base_sl = max(20, min(50, atr * 100 * 1.5))  # 1.5 x ATR in pips
-    base_tp = base_sl * 2  # 2:1 risk-reward
+    
+    # Adjust SL/TP berdasarkan timeframe
+    if timeframe == "1D":
+        base_sl = max(40, min(80, atr * 100 * 2.0))  # Larger SL untuk daily
+        base_tp = base_sl * 2.5  # Better risk-reward untuk daily
+    elif timeframe == "1W":
+        base_sl = max(60, min(120, atr * 100 * 2.5))
+        base_tp = base_sl * 3.0
+    else:
+        base_sl = max(20, min(50, atr * 100 * 1.5))
+        base_tp = base_sl * 2.0
     
     # Adjust for volatility
     volatility_multiplier = max(0.5, min(2.0, volatility / 2.0))
@@ -812,43 +861,75 @@ def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
     sl_pips = int(base_sl * volatility_multiplier)
     tp_pips = int(base_tp * volatility_multiplier)
     
-    # Strong buy conditions (multiple confirmations)
-    strong_buy_conditions = (
-        rsi < 35 and 
-        macd > macd_signal and 
-        macd_histogram > 0 and
-        trend_bullish and
-        current_price > tech['Bollinger_Lower'] and
-        trend_strength > Config.MIN_TREND_STRENGTH and
-        Config.MIN_VOLATILITY <= volatility <= Config.MAX_VOLATILITY
-    )
-    
-    # Strong sell conditions
-    strong_sell_conditions = (
-        rsi > 65 and 
-        macd < macd_signal and 
-        macd_histogram < 0 and
-        trend_bearish and
-        current_price < tech['Bollinger_Upper'] and
-        trend_strength > Config.MIN_TREND_STRENGTH and
-        Config.MIN_VOLATILITY <= volatility <= Config.MAX_VOLATILITY
-    )
-    
-    # Moderate buy conditions
-    moderate_buy_conditions = (
-        rsi < 45 and 
-        macd > macd_signal and
-        current_price > sma20 and
-        rsi > 25  # Avoid extreme oversold
-    )
-    
-    # Moderate sell conditions
-    moderate_sell_conditions = (
-        rsi > 55 and 
-        macd < macd_signal and
-        current_price < sma20 and
-        rsi < 75  # Avoid extreme overbought
-    )
+    # Different conditions for different timeframes
+    if timeframe in ["1D", "1W"]:
+        # LONG TERM CONDITIONS (lebih longgar)
+        strong_buy_conditions = (
+            rsi < 40 and  # Lebih longgar dari 35
+            macd > macd_signal and 
+            trend_bullish and
+            current_price > tech['Bollinger_Lower'] and
+            trend_strength > min_trend_strength and
+            min_volatility <= volatility <= max_volatility
+        )
+        
+        strong_sell_conditions = (
+            rsi > 60 and  # Lebih longgar dari 65
+            macd < macd_signal and 
+            trend_bearish and
+            current_price < tech['Bollinger_Upper'] and
+            trend_strength > min_trend_strength and
+            min_volatility <= volatility <= max_volatility
+        )
+        
+        moderate_buy_conditions = (
+            rsi < 50 and  # Lebih longgar
+            macd > macd_signal and
+            current_price > sma20 and
+            rsi > 20  # Lebih longgar
+        )
+        
+        moderate_sell_conditions = (
+            rsi > 50 and  # Lebih longgar
+            macd < macd_signal and
+            current_price < sma20 and
+            rsi < 80  # Lebih longgar
+        )
+    else:
+        # SHORT TERM CONDITIONS (original tighter conditions)
+        strong_buy_conditions = (
+            rsi < 35 and 
+            macd > macd_signal and 
+            macd_histogram > 0 and
+            trend_bullish and
+            current_price > tech['Bollinger_Lower'] and
+            trend_strength > min_trend_strength and
+            min_volatility <= volatility <= max_volatility
+        )
+        
+        strong_sell_conditions = (
+            rsi > 65 and 
+            macd < macd_signal and 
+            macd_histogram < 0 and
+            trend_bearish and
+            current_price < tech['Bollinger_Upper'] and
+            trend_strength > min_trend_strength and
+            min_volatility <= volatility <= max_volatility
+        )
+        
+        moderate_buy_conditions = (
+            rsi < 45 and 
+            macd > macd_signal and
+            current_price > sma20 and
+            rsi > 25
+        )
+        
+        moderate_sell_conditions = (
+            rsi > 55 and 
+            macd < macd_signal and
+            current_price < sma20 and
+            rsi < 75
+        )
     
     if strong_buy_conditions:
         return {
@@ -867,8 +948,8 @@ def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
     elif moderate_buy_conditions:
         return {
             'action': 'BUY',
-            'tp': int(tp_pips * 0.8),  # Smaller TP for moderate signals
-            'sl': int(sl_pips * 1.2),  # Larger SL for safety
+            'tp': int(tp_pips * 0.8),
+            'sl': int(sl_pips * 1.2),
             'strength': 'MODERATE'
         }
     elif moderate_sell_conditions:
@@ -887,38 +968,59 @@ def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
         }
 
 def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int = 30) -> List[Dict]:
-    """Generate enhanced trading signals untuk backtesting"""
+    """Generate enhanced trading signals untuk backtesting dengan timeframe awareness"""
     signals = []
     
     try:
-        # Pair priority filtering
-        pair_priority = Config.PAIR_PRIORITY.get(pair, 5)
+        # Get timeframe-specific parameters
+        timeframe_params = Config.TIMEFRAME_PARAMS.get(timeframe, Config.TIMEFRAME_PARAMS["4H"])
+        min_volatility = timeframe_params["min_volatility"]
+        max_volatility = timeframe_params["max_volatility"]
+        min_trend_strength = timeframe_params["min_trend_strength"]
+        optimal_hours = timeframe_params["optimal_hours"]
+        confidence_threshold = timeframe_params["confidence_threshold"]
+        start_index = timeframe_params["start_index"]
         
-        # Skip low priority pairs untuk short-term backtest
-        if pair_priority > 3 and days < 60:
-            logger.info(f"Skipping {pair} for short-term backtest due to low priority")
-            return signals
+        # Adjust pair priority untuk timeframe daily
+        pair_priority = Config.PAIR_PRIORITY.get(pair, 5)
+        if timeframe in ["1D", "1W"]:
+            # Untuk long-term, semua pair sama pentingnya
+            pair_priority = 1
         
         if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
             logger.error(f"No historical data found for {pair}-{timeframe}")
             return signals
         
-        df = HISTORICAL[pair][timeframe].tail(days * 5)  # More data for better indicators
+        # Adjust data points based on timeframe
+        if timeframe in ["1D", "1W"]:
+            data_multiplier = 2  # More data untuk long-term analysis
+        else:
+            data_multiplier = 5
+            
+        df = HISTORICAL[pair][timeframe].tail(days * data_multiplier)
         
-        # Hanya generate signals untuk data yang cukup
-        min_data_points = 50
+        # Minimum data points based on timeframe
+        if timeframe in ["1D", "1W"]:
+            min_data_points = 100  # More data needed untuk long-term
+        else:
+            min_data_points = 50
+            
         if len(df) < min_data_points:
-            logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(df)} points")
+            logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(df)} points, needed {min_data_points}")
             return signals
         
-        for i in range(50, len(df)):  # Start from 50 untuk indicator yang stabil
+        signal_count = 0
+        skip_count = 0
+        
+        for i in range(start_index, len(df)):
             current_data = df.iloc[:i+1]
             current_date = current_data.iloc[-1]['date']
             current_price = current_data.iloc[-1]['close']
             
-            # Session time filtering - focus on optimal trading hours
+            # Session time filtering - relaxed untuk daily/weekly
             hour = current_date.hour
-            if hour not in Config.OPTIMAL_TRADING_HOURS:
+            if hour not in optimal_hours:
+                skip_count += 1
                 continue
                 
             # Calculate technical indicators
@@ -927,23 +1029,24 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
             
             tech_indicators = calc_indicators(closes, volumes)
             
-            # Filter berdasarkan volatility
+            # Filter berdasarkan volatility - relaxed untuk daily
             volatility = tech_indicators.get('Volatility', 0)
-            if volatility < Config.MIN_VOLATILITY or volatility > Config.MAX_VOLATILITY:
+            if volatility < min_volatility or volatility > max_volatility:
+                skip_count += 1
                 continue
                 
-            # Filter berdasarkan trend strength
+            # Filter berdasarkan trend strength - relaxed untuk daily
             trend_strength = tech_indicators.get('Trend_Strength', 0)
-            if trend_strength < Config.MIN_TREND_STRENGTH:
+            if trend_strength < min_trend_strength:
+                skip_count += 1
                 continue
             
-            signal = generate_enhanced_signal(tech_indicators, current_price)
+            signal = generate_enhanced_signal(tech_indicators, current_price, timeframe)
             
             if signal['action'] != 'HOLD':
                 confidence = calculate_signal_confidence(signal, tech_indicators)
                 
-                # Only take signals with decent confidence
-                if confidence > 40:  
+                if confidence > confidence_threshold:
                     signals.append({
                         'date': current_date,
                         'pair': pair,
@@ -956,8 +1059,9 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
                         'volatility': volatility,
                         'trend_strength': trend_strength
                     })
+                    signal_count += 1
         
-        logger.info(f"Generated {len(signals)} filtered backtest signals for {pair}-{timeframe}")
+        logger.info(f"Generated {signal_count} signals for {pair}-{timeframe} ({skip_count} points skipped)")
         return signals
         
     except Exception as e:
@@ -1441,8 +1545,7 @@ def api_backtest_status():
         'supported_timeframes': Config.SUPPORTED_TIMEFRAMES,
         'enhanced_features': {
             'pair_priority': Config.PAIR_PRIORITY,
-            'optimal_hours': Config.OPTIMAL_TRADING_HOURS,
-            'volatility_filters': f"{Config.MIN_VOLATILITY}-{Config.MAX_VOLATILITY}%",
+            'timeframe_specific_params': Config.TIMEFRAME_PARAMS,
             'max_positions': 3,
             'max_drawdown': f"{Config.MAX_DRAWDOWN_PCT * 100}%",
             'daily_loss_limit': f"{Config.DAILY_LOSS_LIMIT * 100}%"
@@ -1599,8 +1702,12 @@ if __name__ == "__main__":
     # Log enhanced features status
     logger.info("🚀 ENHANCED FEATURES ENABLED:")
     logger.info(f"   Pair Priority: {Config.PAIR_PRIORITY}")
-    logger.info(f"   Optimal Trading Hours: {Config.OPTIMAL_TRADING_HOURS}")
-    logger.info(f"   Volatility Filters: {Config.MIN_VOLATILITY}-{Config.MAX_VOLATILITY}%")
+    logger.info(f"   Timeframe-Specific Parameters: Activated")
+    for tf, params in Config.TIMEFRAME_PARAMS.items():
+        logger.info(f"     {tf}: Volatility {params['min_volatility']}-{params['max_volatility']}%, "
+                   f"Trend Strength {params['min_trend_strength']}%, "
+                   f"Confidence {params['confidence_threshold']}%")
+    
     logger.info(f"   Max Drawdown: {Config.MAX_DRAWDOWN_PCT * 100}%")
     logger.info(f"   Daily Loss Limit: {Config.DAILY_LOSS_LIMIT * 100}%")
     
