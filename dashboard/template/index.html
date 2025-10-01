@@ -1,124 +1,119 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Trading Analysis & Backtesting Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Forex Analysis & Backtesting System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary-color: #2c3e50;
-            --secondary-color: #34495e;
-            --accent-color: #3498db;
-            --profit-color: #27ae60;
-            --loss-color: #e74c3c;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
             --warning-color: #f39c12;
-            --backtest-color: #9b59b6;
+            --light-bg: #f8f9fa;
+            --dark-text: #2c3e50;
         }
         
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
+            background-color: #f5f7fa;
+            color: var(--dark-text);
         }
         
-        .dashboard-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            margin: 20px auto;
-            padding: 25px;
+        .navbar-brand {
+            font-weight: 700;
         }
         
-        .header {
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 15px;
-            margin-bottom: 25px;
-        }
-        
-        .currency-card {
-            background: white;
+        .card {
             border-radius: 10px;
-            padding: 15px;
-            margin: 10px 0;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border-left: 4px solid var(--accent-color);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
         }
         
-        .currency-card:hover {
+        .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
         
-        .currency-card.up {
-            border-left-color: var(--profit-color);
+        .card-header {
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
         }
         
-        .currency-card.down {
-            border-left-color: var(--loss-color);
+        .btn-primary {
+            background-color: var(--secondary-color);
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
         }
         
-        .signal-beli-kuat {
-            background: linear-gradient(135deg, #27ae60, #16a085);
-            color: white;
-            animation: pulse 2s infinite;
+        .btn-primary:hover {
+            background-color: #2980b9;
         }
         
-        .signal-beli {
-            background: linear-gradient(135deg, #27ae60, #2ecc71);
-            color: white;
+        .btn-success {
+            background-color: var(--success-color);
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
         }
         
-        .signal-jual-kuat {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: white;
-            animation: pulse 2s infinite;
+        .btn-warning {
+            background-color: var(--warning-color);
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
         }
         
-        .signal-jual {
-            background: linear-gradient(135deg, #e74c3c, #d35400);
-            color: white;
+        .price-up {
+            color: var(--success-color);
+            font-weight: 600;
         }
         
-        .signal-tunggu {
-            background: linear-gradient(135deg, #f39c12, #e67e22);
-            color: white;
-        }
-
-        .backtest-card {
-            background: linear-gradient(135deg, #9b59b6, #8e44ad);
-            color: white;
+        .price-down {
+            color: var(--accent-color);
+            font-weight: 600;
         }
         
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
+        .signal-buy {
+            background-color: rgba(39, 174, 96, 0.1);
+            border-left: 4px solid var(--success-color);
+            padding: 10px;
+            border-radius: 0 4px 4px 0;
         }
         
-        .indicator-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        .signal-sell {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid var(--accent-color);
+            padding: 10px;
+            border-radius: 0 4px 4px 0;
         }
         
-        .progress {
-            height: 8px;
-            margin: 5px 0;
+        .signal-hold {
+            background-color: rgba(243, 156, 18, 0.1);
+            border-left: 4px solid var(--warning-color);
+            padding: 10px;
+            border-radius: 0 4px 4px 0;
         }
         
-        .news-item {
-            background: #f8f9fa;
-            border-left: 3px solid var(--accent-color);
-            padding: 10px 15px;
-            margin: 8px 0;
-            border-radius: 5px;
+        .confidence-high {
+            color: var(--success-color);
+            font-weight: 700;
+        }
+        
+        .confidence-medium {
+            color: var(--warning-color);
+            font-weight: 700;
+        }
+        
+        .confidence-low {
+            color: var(--accent-color);
+            font-weight: 700;
         }
         
         .loading {
@@ -127,332 +122,302 @@
             padding: 20px;
         }
         
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        
+        .performance-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .overview-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .overview-card:hover {
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .priority-1 {
+            border-top: 4px solid var(--success-color);
+        }
+        
+        .priority-2 {
+            border-top: 4px solid var(--warning-color);
+        }
+        
+        .priority-other {
+            border-top: 4px solid #95a5a6;
+        }
+        
         .chart-container {
             position: relative;
             height: 300px;
-            margin: 20px 0;
+            width: 100%;
         }
         
-        .macd-chart-container {
-            position: relative;
-            height: 200px;
-            margin: 20px 0;
-        }
-
-        .backtest-chart-container {
-            position: relative;
-            height: 250px;
-            margin: 20px 0;
+        .backtest-result {
+            background-color: var(--light-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
         }
         
-        .risk-tinggi { color: var(--loss-color); font-weight: bold; }
-        .risk-sedang { color: var(--warning-color); font-weight: bold; }
-        .risk-rendah { color: var(--profit-color); font-weight: bold; }
-        
-        .confidence-bar {
-            height: 20px;
-            border-radius: 10px;
-            overflow: hidden;
-            background: #ecf0f1;
+        .result-good {
+            border-left: 4px solid var(--success-color);
         }
         
-        .confidence-fill {
-            height: 100%;
-            transition: width 0.5s ease;
+        .result-poor {
+            border-left: 4px solid var(--accent-color);
         }
         
-        .chart-controls {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 10px;
+        .result-moderate {
+            border-left: 4px solid var(--warning-color);
         }
         
-        .ai-badge {
-            font-size: 0.7em;
-            vertical-align: super;
+        .stats-value {
+            font-size: 1.5rem;
+            font-weight: 700;
         }
         
-        .signal-explanation {
-            font-size: 0.9em;
-            opacity: 0.9;
+        .ai-status-online {
+            color: var(--success-color);
         }
         
-        .data-info {
-            font-size: 0.8em;
-            color: #6c757d;
-            text-align: right;
-        }
-
-        .nav-tabs .nav-link {
-            color: var(--primary-color);
-            font-weight: 500;
-        }
-
-        .nav-tabs .nav-link.active {
+        .ai-status-offline {
             color: var(--accent-color);
-            font-weight: 600;
-            border-bottom: 3px solid var(--accent-color);
         }
-
-        .tab-pane {
-            padding: 20px 0;
+        
+        .risk-low {
+            color: var(--success-color);
+            font-weight: 700;
         }
-
-        .backtest-metric {
-            text-align: center;
-            padding: 15px;
+        
+        .risk-medium {
+            color: var(--warning-color);
+            font-weight: 700;
         }
-
-        .backtest-metric .value {
-            font-size: 1.8em;
-            font-weight: bold;
-            margin: 5px 0;
-        }
-
-        .backtest-metric .label {
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-
-        .performance-positive {
-            color: var(--profit-color);
-        }
-
-        .performance-negative {
-            color: var(--loss-color);
-        }
-
-        .trade-history-table {
-            font-size: 0.85em;
-        }
-
-        .backtest-controls {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        
+        .risk-high {
+            color: var(--accent-color);
+            font-weight: 700;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row justify-content-center">
-            <div class="col-12 col-xl-10">
-                <div class="dashboard-container">
-                    <!-- Header -->
-                    <div class="header">
-                        <div class="row align-items-center">
-                            <div class="col-md-6">
-                                <h1 class="display-5 fw-bold text-primary">
-                                    <i class="fas fa-chart-line me-2"></i>
-                                    Forex Analysis & Backtesting
-                                </h1>
-                                <p class="text-muted">Analisis teknikal & fundamental real-time dengan sistem backtesting terintegrasi</p>
-                                <div id="aiStatusBadge" class="badge bg-info">
-                                    <i class="fas fa-robot me-1"></i>
-                                    <span id="aiStatusText">Checking AI Status...</span>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--primary-color);">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-chart-line me-2"></i>Forex Analysis & Backtesting
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#analysis-section">Analysis</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#backtesting-section">Backtesting</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#overview-section">Overview</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#performance-section">Performance</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container mt-4">
+        <!-- Overview Section -->
+        <div class="row mb-4" id="overview-section">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Market Overview</span>
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadQuickOverview()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="overview-content">
+                            <!-- Overview content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left Column - Analysis -->
+            <div class="col-lg-8">
+                <!-- Analysis Section -->
+                <div class="card" id="analysis-section">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-chart-bar me-2"></i>Forex Analysis
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="pair-select" class="form-label">Currency Pair</label>
+                                <select class="form-select" id="pair-select">
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="GBPJPY">GBP/JPY</option>
+                                    <option value="EURJPY">EUR/JPY</option>
+                                    <option value="CHFJPY">CHF/JPY</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="timeframe-select" class="form-label">Timeframe</label>
+                                <select class="form-select" id="timeframe-select">
+                                    <option value="1H">1 Hour</option>
+                                    <option value="4H" selected>4 Hours</option>
+                                    <option value="1D">Daily</option>
+                                    <option value="1W">Weekly</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button class="btn btn-primary" onclick="getAnalysis()">
+                                        <i class="fas fa-search me-2"></i>Get Analysis
+                                    </button>
                                 </div>
                             </div>
-                            <div class="col-md-6 text-end">
-                                <div class="btn-group" role="group">
-                                    <button class="btn btn-outline-primary" onclick="loadQuickOverview()">
-                                        <i class="fas fa-sync-alt"></i> Refresh
-                                    </button>
-                                    <button class="btn btn-outline-info" onclick="checkBacktestStatus()">
-                                        <i class="fas fa-database"></i> Data Status
-                                    </button>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="use-history-check">
+                            <label class="form-check-label" for="use-history-check">
+                                Use Historical Data (if available)
+                            </label>
+                        </div>
+                        
+                        <!-- Loading Indicator -->
+                        <div class="loading" id="analysis-loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Analyzing market data...</p>
+                        </div>
+                        
+                        <!-- Analysis Results -->
+                        <div id="analysis-results"></div>
+                    </div>
+                </div>
+                
+                <!-- Backtesting Section -->
+                <div class="card" id="backtesting-section">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="fas fa-history me-2"></i>Backtesting
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="backtest-pair" class="form-label">Currency Pair</label>
+                                <select class="form-select" id="backtest-pair">
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="GBPJPY">GBP/JPY</option>
+                                    <option value="EURJPY">EUR/JPY</option>
+                                    <option value="CHFJPY">CHF/JPY</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="backtest-timeframe" class="form-label">Timeframe</label>
+                                <select class="form-select" id="backtest-timeframe">
+                                    <option value="1H">1 Hour</option>
+                                    <option value="4H" selected>4 Hours</option>
+                                    <option value="1D">Daily</option>
+                                    <option value="1W">Weekly</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="backtest-days" class="form-label">Period (Days)</label>
+                                <select class="form-select" id="backtest-days">
+                                    <option value="7">7 Days</option>
+                                    <option value="30" selected>30 Days</option>
+                                    <option value="60">60 Days</option>
+                                    <option value="90">90 Days</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid mb-3">
+                            <button class="btn btn-warning" onclick="runBacktest()">
+                                <i class="fas fa-play-circle me-2"></i>Run Backtest
+                            </button>
+                        </div>
+                        
+                        <!-- Backtest Loading -->
+                        <div class="loading" id="backtest-loading">
+                            <div class="spinner-border text-warning" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Running backtest simulation...</p>
+                        </div>
+                        
+                        <!-- Backtest Results -->
+                        <div id="backtest-results"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column - Info & Performance -->
+            <div class="col-lg-4">
+                <!-- AI Status -->
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="fas fa-robot me-2"></i>AI Status
+                    </div>
+                    <div class="card-body text-center">
+                        <div id="ai-status-content">
+                            <div class="spinner-border text-info" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Checking AI status...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Performance Metrics -->
+                <div class="card" id="performance-section">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-tachometer-alt me-2"></i>Performance Metrics
+                    </div>
+                    <div class="card-body">
+                        <div id="performance-content">
+                            <div class="text-center">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Loading...</span>
                                 </div>
+                                <p class="mt-2">Loading performance data...</p>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Navigation Tabs -->
-                    <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab" aria-controls="analysis" aria-selected="true">
-                                <i class="fas fa-analytics me-2"></i>Market Analysis
+                </div>
+                
+                <!-- Backtest History -->
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="fas fa-list-alt me-2"></i>Backtest History
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid mb-3">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadBacktestHistory()">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh History
                             </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="backtesting-tab" data-bs-toggle="tab" data-bs-target="#backtesting" type="button" role="tab" aria-controls="backtesting" aria-selected="false">
-                                <i class="fas fa-history me-2"></i>Backtesting
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab" aria-controls="performance" aria-selected="false">
-                                <i class="fas fa-tachometer-alt me-2"></i>Performance
-                            </button>
-                        </li>
-                    </ul>
-
-                    <!-- Tab Content -->
-                    <div class="tab-content" id="mainTabContent">
-                        <!-- Analysis Tab -->
-                        <div class="tab-pane fade show active" id="analysis" role="tabpanel" aria-labelledby="analysis-tab">
-                            <!-- Controls -->
-                            <div class="row mb-4">
-                                <div class="col-md-3">
-                                    <label class="form-label">Pair Mata Uang</label>
-                                    <select class="form-select" id="pairSelect">
-                                        <option value="USDJPY">USD/JPY</option>
-                                        <option value="GBPJPY">GBP/JPY</option>
-                                        <option value="EURJPY">EUR/JPY</option>
-                                        <option value="CHFJPY">CHF/JPY</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Timeframe</label>
-                                    <select class="form-select" id="timeframeSelect">
-                                        <option value="1H">1 Jam</option>
-                                        <option value="4H" selected>4 Jam</option>
-                                        <option value="1D">Harian</option>
-                                        <option value="1W">Mingguan</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Data Period</label>
-                                    <select class="form-select" id="dataPeriodSelect">
-                                        <option value="auto">Auto (Rekomendasi)</option>
-                                        <option value="7">7 Hari</option>
-                                        <option value="30">30 Hari</option>
-                                        <option value="90">90 Hari</option>
-                                        <option value="180">180 Hari</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 d-flex align-items-end">
-                                    <div class="form-check form-switch me-3">
-                                        <input class="form-check-input" type="checkbox" id="useHistorySwitch" checked>
-                                        <label class="form-check-label" for="useHistorySwitch">Gunakan Data Historis</label>
-                                    </div>
-                                    <button class="btn btn-primary w-100" onclick="getAnalysis()">
-                                        <i class="fas fa-analytics me-2"></i>Analisis
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Quick Overview -->
-                            <div class="row mb-4" id="quickOverview">
-                                <div class="col-12">
-                                    <h5><i class="fas fa-globe me-2"></i>Market Overview</h5>
-                                    <div class="row" id="overviewCards">
-                                        <!-- Overview cards will be loaded here -->
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Loading Indicator -->
-                            <div class="loading" id="loadingIndicator">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="mt-2">Menganalisis data market...</p>
-                            </div>
-
-                            <!-- Analysis Results -->
-                            <div id="analysisResults" style="display: none;">
-                                <!-- Results will be populated here -->
-                            </div>
                         </div>
-
-                        <!-- Backtesting Tab -->
-                        <div class="tab-pane fade" id="backtesting" role="tabpanel" aria-labelledby="backtesting-tab">
-                            <div class="backtest-controls">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <label class="form-label">Pair Mata Uang</label>
-                                        <select class="form-select" id="backtestPairSelect">
-                                            <option value="USDJPY">USD/JPY</option>
-                                            <option value="GBPJPY">GBP/JPY</option>
-                                            <option value="EURJPY">EUR/JPY</option>
-                                            <option value="CHFJPY">CHF/JPY</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Timeframe</label>
-                                        <select class="form-select" id="backtestTimeframeSelect">
-                                            <option value="1H">1 Jam</option>
-                                            <option value="4H" selected>4 Jam</option>
-                                            <option value="1D">Harian</option>
-                                            <option value="1W">Mingguan</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">Periode Testing (Hari)</label>
-                                        <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
-                                    </div>
-                                    <div class="col-md-3 d-flex align-items-end">
-                                        <button class="btn btn-success w-100" onclick="runBacktest()">
-                                            <i class="fas fa-play me-2"></i>Run Backtest
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="row mt-2">
-                                    <div class="col-12">
-                                        <small class="text-muted">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Initial Balance: $10,000 | Lot Size: 0.1 | Pairs: JPY Crosses
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Backtest Status -->
-                            <div class="alert alert-info" id="backtestStatusAlert">
-                                <i class="fas fa-info-circle me-2"></i>
-                                <span id="backtestStatusText">Sistem backtesting siap. Pilih parameter dan jalankan backtest.</span>
-                            </div>
-
-                            <!-- Backtest Loading -->
-                            <div class="loading" id="backtestLoadingIndicator" style="display: none;">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="mt-2">Menjalankan backtesting... Ini mungkin memerlukan beberapa saat.</p>
-                            </div>
-
-                            <!-- Backtest Results -->
-                            <div id="backtestResults" style="display: none;">
-                                <!-- Backtest results will be populated here -->
-                            </div>
-
-                            <!-- Backtest History -->
-                            <div class="card mt-4">
-                                <div class="card-header">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-history me-2"></i>Backtest History
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div id="backtestHistoryContent">
-                                        <div class="text-center text-muted py-3">
-                                            <i class="fas fa-clock fa-2x mb-2"></i>
-                                            <p>Belum ada history backtesting</p>
-                                            <button class="btn btn-sm btn-outline-primary" onclick="loadBacktestHistory()">
-                                                <i class="fas fa-sync-alt me-1"></i>Load History
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Performance Tab -->
-                        <div class="tab-pane fade" id="performance" role="tabpanel" aria-labelledby="performance-tab">
-                            <div class="row">
-                                <div class="col-12">
-                                    <h5><i class="fas fa-tachometer-alt me-2"></i>Performance Metrics</h5>
-                                    <div id="performanceContent">
-                                        <div class="text-center text-muted py-5">
-                                            <i class="fas fa-chart-bar fa-3x mb-3"></i>
-                                            <p>Data performance akan ditampilkan di sini</p>
-                                            <button class="btn btn-primary" onclick="loadPerformanceData()">
-                                                <i class="fas fa-sync-alt me-2"></i>Load Performance Data
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div id="backtest-history">
+                            <p class="text-muted text-center">No history available</p>
                         </div>
                     </div>
                 </div>
@@ -460,1041 +425,857 @@
         </div>
     </div>
 
-    <!-- Loading Modal -->
-    <div class="modal fade" id="loadingModal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-body text-center">
-                    <div class="spinner-border text-primary mb-3" role="status"></div>
-                    <p id="loading-message">Processing...</p>
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Forex Analysis & Backtesting System</h5>
+                    <p>Advanced technical analysis with AI-powered insights and comprehensive backtesting capabilities.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>&copy; 2024 Forex Analysis System. All rights reserved.</p>
+                    <p class="text-muted">For educational purposes only.</p>
                 </div>
             </div>
         </div>
-    </div>
+    </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap & jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         // Global variables
         let priceChart = null;
         let macdChart = null;
-        let backtestChart = null;
-        let chartIndicators = {
-            ema200: true,
-            macd: true
-        };
         
-        // Initialize the dashboard
-        document.addEventListener('DOMContentLoaded', function() {
+        // Initialize on page load
+        $(document).ready(function() {
             loadQuickOverview();
             checkAIStatus();
-            checkBacktestStatus();
+            loadPerformanceMetrics();
             loadBacktestHistory();
         });
         
-        // Check AI Status
-        async function checkAIStatus() {
-            try {
-                const response = await fetch('/ai_status');
-                const data = await response.json();
-                
-                const badge = document.getElementById('aiStatusBadge');
-                const text = document.getElementById('aiStatusText');
-                
-                if (data.ai_available) {
-                    badge.className = 'badge bg-success';
-                    text.textContent = 'AI DeepSeek Active';
-                } else {
-                    badge.className = 'badge bg-warning';
-                    text.textContent = 'AI Fallback Mode';
-                }
-            } catch (error) {
-                console.error('Error checking AI status:', error);
-            }
-        }
-
-        // Check Backtest Status
-        async function checkBacktestStatus() {
-            try {
-                const response = await fetch('/api/backtest_status');
-                const data = await response.json();
-                
-                const statusText = document.getElementById('backtestStatusText');
-                
-                if (data.historical_data_loaded) {
-                    let statusHTML = `✅ Data historis tersedia: ${data.available_pairs.join(', ')}<br>`;
-                    statusHTML += `<small>Initial Balance: $${data.initial_balance} | Timeframes: ${data.supported_timeframes.join(', ')}</small>`;
-                    statusText.innerHTML = statusHTML;
-                } else {
-                    statusText.textContent = '⚠️ Data historis belum dimuat. Pastikan file CSV tersedia di folder data.';
-                }
-            } catch (error) {
-                console.error('Error checking backtest status:', error);
-                document.getElementById('backtestStatusText').textContent = 'Error checking backtest status';
-            }
-        }
-        
         // Load quick overview of all pairs
-        async function loadQuickOverview() {
-            try {
-                const response = await fetch('/quick_overview');
-                const data = await response.json();
-                
-                const overviewCards = document.getElementById('overviewCards');
-                overviewCards.innerHTML = '';
-                
-                Object.entries(data).forEach(([pair, info]) => {
-                    const changeClass = info.change > 0 ? 'text-success' : info.change < 0 ? 'text-danger' : 'text-muted';
-                    const trendClass = info.change > 0 ? 'up' : info.change < 0 ? 'down' : '';
-                    const changeIcon = info.change > 0 ? 'fa-arrow-up' : info.change < 0 ? 'fa-arrow-down' : 'fa-minus';
+        function loadQuickOverview() {
+            $('#overview-content').html(`
+                <div class="col-12 text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading market data...</p>
+                </div>
+            `);
+            
+            $.get('/quick_overview', function(data) {
+                let html = '';
+                for (const [pair, info] of Object.entries(data)) {
+                    const changeClass = info.change > 0 ? 'price-up' : (info.change < 0 ? 'price-down' : '');
+                    const trendIcon = info.change > 0 ? 'fa-arrow-up' : (info.change < 0 ? 'fa-arrow-down' : 'fa-minus');
+                    const priorityClass = `priority-${info.priority || 'other'}`;
                     
-                    const card = `
-                        <div class="col-sm-6 col-md-3">
-                            <div class="currency-card ${trendClass}">
-                                <div class="row align-items-center">
-                                    <div class="col-8">
-                                        <h6 class="mb-1">${pair}</h6>
-                                        <h4 class="mb-0">${info.price ? info.price.toFixed(4) : 'N/A'}</h4>
-                                    </div>
-                                    <div class="col-4 text-end">
-                                        <i class="fas ${changeIcon} ${changeClass} fa-2x"></i>
-                                        <small class="d-block ${changeClass}">${info.change > 0 ? '+' : ''}${info.change.toFixed(2)}%</small>
-                                    </div>
-                                </div>
-                                <small class="text-muted">Sumber: ${info.source}</small>
+                    html += `
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card overview-card ${priorityClass}" onclick="selectPair('${pair}')">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">${pair}</h5>
+                                <h4 class="card-text ${changeClass}">${info.price ? info.price.toFixed(4) : 'N/A'}</h4>
+                                <p class="card-text ${changeClass}">
+                                    <i class="fas ${trendIcon} me-1"></i> ${info.change ? info.change.toFixed(2) + '%' : '0%'}
+                                </p>
+                                <small class="text-muted">Source: ${info.source}</small>
                             </div>
                         </div>
+                    </div>
                     `;
-                    overviewCards.innerHTML += card;
-                });
-            } catch (error) {
-                console.error('Error loading overview:', error);
-            }
+                }
+                $('#overview-content').html(html);
+            }).fail(function() {
+                $('#overview-content').html('<div class="col-12 text-center text-danger">Failed to load market data</div>');
+            });
         }
         
-        // Get detailed analysis
-        async function getAnalysis() {
-            const pair = document.getElementById('pairSelect').value;
-            const timeframe = document.getElementById('timeframeSelect').value;
-            const useHistory = document.getElementById('useHistorySwitch').checked;
-            const dataPeriod = document.getElementById('dataPeriodSelect').value;
-            
-            // Show loading
-            document.getElementById('loadingIndicator').style.display = 'block';
-            document.getElementById('analysisResults').style.display = 'none';
-            
-            try {
-                let url = `/get_analysis?pair=${pair}&timeframe=${timeframe}&use_history=${useHistory ? '1' : '0'}`;
-                if (dataPeriod !== 'auto') {
-                    url += `&days=${dataPeriod}`;
-                }
+        // Select pair from overview
+        function selectPair(pair) {
+            $('#pair-select').val(pair);
+            $('#backtest-pair').val(pair);
+            $('html, body').animate({
+                scrollTop: $('#analysis-section').offset().top - 20
+            }, 500);
+        }
+        
+        // Check AI status
+        function checkAIStatus() {
+            $.get('/ai_status', function(data) {
+                let statusClass = data.ai_available ? 'ai-status-online' : 'ai-status-offline';
+                let statusText = data.ai_available ? 'Online' : 'Offline';
+                let statusIcon = data.ai_available ? 'fa-check-circle' : 'fa-exclamation-circle';
                 
-                const response = await fetch(url);
-                const data = await response.json();
-                
+                $('#ai-status-content').html(`
+                    <h4><i class="fas ${statusIcon} ${statusClass}"></i> ${statusText}</h4>
+                    <p>${data.message}</p>
+                    <div class="mt-3">
+                        <span class="badge bg-primary">${data.ai_provider}</span>
+                        <span class="badge bg-success">Enhanced Fallback</span>
+                    </div>
+                `);
+            }).fail(function() {
+                $('#ai-status-content').html(`
+                    <h4><i class="fas fa-exclamation-triangle text-warning"></i> Status Unknown</h4>
+                    <p>Unable to determine AI status</p>
+                `);
+            });
+        }
+        
+        // Load performance metrics
+        function loadPerformanceMetrics() {
+            $.get('/performance', function(data) {
                 if (data.error) {
-                    throw new Error(data.error);
+                    $('#performance-content').html(`<p class="text-danger">${data.error}</p>`);
+                    return;
                 }
                 
+                if (data.length === 0) {
+                    $('#performance-content').html('<p class="text-muted text-center">No performance data available</p>');
+                    return;
+                }
+                
+                let html = '';
+                data.forEach(item => {
+                    html += `
+                    <div class="mb-3 p-2 border rounded">
+                        <div class="d-flex justify-content-between">
+                            <strong>${item.pair}</strong>
+                            <span class="badge bg-primary">${item.analysis_count} analyses</span>
+                        </div>
+                        <div class="mt-2">
+                            <small>Avg Confidence: <span class="confidence-${getConfidenceLevel(item.avg_confidence)}">${item.avg_confidence}%</span></small>
+                        </div>
+                        <div>
+                            <small>Provider: ${item.ai_provider}</small>
+                        </div>
+                    </div>
+                    `;
+                });
+                
+                $('#performance-content').html(html);
+            }).fail(function() {
+                $('#performance-content').html('<p class="text-danger">Failed to load performance data</p>');
+            });
+        }
+        
+        // Get confidence level for styling
+        function getConfidenceLevel(confidence) {
+            if (confidence >= 70) return 'high';
+            if (confidence >= 50) return 'medium';
+            return 'low';
+        }
+        
+        // Get analysis for selected pair and timeframe
+        function getAnalysis() {
+            const pair = $('#pair-select').val();
+            const timeframe = $('#timeframe-select').val();
+            const useHistory = $('#use-history-check').is(':checked') ? 1 : 0;
+            
+            $('#analysis-loading').show();
+            $('#analysis-results').html('');
+            
+            $.get('/get_analysis', {
+                pair: pair,
+                timeframe: timeframe,
+                use_history: useHistory
+            }, function(data) {
+                $('#analysis-loading').hide();
                 displayAnalysisResults(data);
-            } catch (error) {
-                alert('Error: ' + error.message);
-                console.error('Analysis error:', error);
-            } finally {
-                document.getElementById('loadingIndicator').style.display = 'none';
-            }
+            }).fail(function(xhr) {
+                $('#analysis-loading').hide();
+                let errorMsg = 'Failed to get analysis';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                $('#analysis-results').html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> ${errorMsg}
+                    </div>
+                `);
+            });
         }
         
         // Display analysis results
         function displayAnalysisResults(data) {
-            const resultsDiv = document.getElementById('analysisResults');
-            const tech = data.technical_indicators;
-            const ai = data.ai_analysis;
-            const chartData = data.chart_data;
+            if (data.error) {
+                $('#analysis-results').html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> ${data.error}
+                    </div>
+                `);
+                return;
+            }
             
             // Determine signal class
-            const signalClass = `signal-${ai.SIGNAL.toLowerCase().replace(' ', '-')}`;
+            let signalClass = 'signal-hold';
+            let signalText = 'HOLD';
+            if (data.ai_analysis.SIGNAL && data.ai_analysis.SIGNAL.includes('BELI')) {
+                signalClass = 'signal-buy';
+                signalText = 'BUY';
+            } else if (data.ai_analysis.SIGNAL && data.ai_analysis.SIGNAL.includes('JUAL')) {
+                signalClass = 'signal-sell';
+                signalText = 'SELL';
+            }
             
-            resultsDiv.innerHTML = `
-                <div class="row">
-                    <!-- Main Signal Card -->
-                    <div class="col-lg-4">
-                        <div class="card ${signalClass} mb-4">
-                            <div class="card-body text-center">
-                                <h2 class="card-title">
-                                    <i class="fas fa-bullhorn me-2"></i>${ai.SIGNAL}
-                                    <span class="ai-badge badge bg-dark">${data.ai_provider}</span>
-                                </h2>
-                                <h1 class="display-4 fw-bold">${data.current_price.toFixed(4)}</h1>
-                                <p class="mb-2">${data.pair} • ${data.timeframe}</p>
-                                
-                                <div class="confidence-bar mb-3">
-                                    <div class="confidence-fill bg-success" style="width: ${ai.CONFIDENCE_LEVEL}%"></div>
-                                </div>
-                                <p>Confidence: <strong>${ai.CONFIDENCE_LEVEL}%</strong></p>
-                                
-                                <div class="row text-start mt-3">
-                                    <div class="col-6">
-                                        <small>Entry: <strong>${ai.ENTRY_PRICE}</strong></small><br>
-                                        <small>Stop Loss: <strong>${ai.STOP_LOSS}</strong></small>
-                                    </div>
-                                    <div class="col-6">
-                                        <small>TP1: <strong>${ai.TAKE_PROFIT_1}</strong></small><br>
-                                        <small>TP2: <strong>${ai.TAKE_PROFIT_2}</strong></small>
-                                    </div>
-                                </div>
-                                
-                                <p class="mt-3 small">
-                                    <i class="fas fa-exclamation-triangle me-1"></i>
-                                    Risk: <span class="risk-${ai.RISK_LEVEL.toLowerCase()}">${ai.RISK_LEVEL}</span>
-                                </p>
-                                <p class="signal-explanation">${getSignalExplanation(ai.SIGNAL)}</p>
-                            </div>
+            // Determine confidence level
+            const confidence = data.ai_analysis.CONFIDENCE_LEVEL || 50;
+            const confidenceLevel = getConfidenceLevel(confidence);
+            
+            // Determine risk level
+            const riskLevel = data.ai_analysis.RISK_LEVEL || 'MEDIUM';
+            const riskClass = `risk-${riskLevel.toLowerCase()}`;
+            
+            let html = `
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-info-circle me-2"></i>Market Information
                         </div>
-                        
-                        <!-- Trading Advice -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-comment-dots me-2"></i>Rekomendasi Trading</h6>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Pair:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.pair}
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <p class="card-text">${ai.TRADING_ADVICE}</p>
-                                <small class="text-muted">Expected movement: ${ai.EXPECTED_MOVEMENT}</small>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Timeframe:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.timeframe}
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Technical Indicators -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Indikator Teknikal</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Current Price:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.current_price.toFixed(4)}
+                                </div>
                             </div>
-                            <div class="card-body">
-                                ${createIndicatorHTML('RSI', tech.RSI, 30, 70)}
-                                ${createIndicatorHTML('MACD', tech.MACD, -0.001, 0.001)}
-                                ${createIndicatorHTML('MACD Signal', tech.MACD_Signal, -0.001, 0.001)}
-                                ${createIndicatorHTML('MACD Histogram', tech.MACD_Histogram, -0.001, 0.001)}
-                                ${createIndicatorHTML('SMA 20', tech.SMA20, data.current_price * 0.99, data.current_price * 1.01, true)}
-                                ${createIndicatorHTML('SMA 50', tech.SMA50, data.current_price * 0.98, data.current_price * 1.02, true)}
-                                ${createIndicatorHTML('EMA 200', tech.EMA200, data.current_price * 0.95, data.current_price * 1.05, true)}
-                                ${createIndicatorHTML('Volatility', tech.Volatility + '%', 0, 5)}
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Data Source:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.data_source}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>AI Provider:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.ai_provider}
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Charts -->
-                    <div class="col-lg-8">
-                        <!-- Data Info -->
-                        <div class="alert alert-info d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-info-circle me-2"></i>
-                                <strong>Data:</strong> ${data.data_source} | 
-                                <strong>Points:</strong> ${data.data_points || chartData.dates.length} | 
-                                <strong>Processed in:</strong> ${data.processing_time}s
-                            </div>
-                            <div>
-                                <button class="btn btn-sm btn-outline-primary" onclick="toggleDataDensity()">
-                                    <i class="fas fa-chart-line me-1"></i>Toggle Density
-                                </button>
-                            </div>
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-chart-line me-2"></i>Technical Indicators
                         </div>
-                        
-                        <!-- Price Chart with EMA200 -->
-                        <div class="card mb-4">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Price Chart dengan EMA200</h6>
-                                <div class="chart-controls">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input indicator-toggle" type="checkbox" id="toggleEMA200" checked 
-                                               onchange="toggleIndicator('ema200', this.checked)">
-                                        <label class="form-check-label" for="toggleEMA200">EMA200</label>
-                                    </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>RSI (14):</strong>
+                                </div>
+                                <div class="col-6 ${data.technical_indicators.RSI < 30 ? 'price-up' : (data.technical_indicators.RSI > 70 ? 'price-down' : '')}">
+                                    ${data.technical_indicators.RSI}
                                 </div>
                             </div>
-                            <div class="card-body">
-                                <div class="chart-container">
-                                    <canvas id="priceChart"></canvas>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>MACD:</strong>
+                                </div>
+                                <div class="col-6 ${data.technical_indicators.MACD > data.technical_indicators.MACD_Signal ? 'price-up' : 'price-down'}">
+                                    ${data.technical_indicators.MACD.toFixed(4)}
                                 </div>
                             </div>
-                        </div>
-                        
-                        <!-- MACD Chart -->
-                        <div class="card mb-4">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>MACD Indicator</h6>
-                                <div class="chart-controls">
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input indicator-toggle" type="checkbox" id="toggleMACD" checked 
-                                               onchange="toggleIndicator('macd', this.checked)">
-                                        <label class="form-check-label" for="toggleMACD">MACD</label>
-                                    </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>MACD Signal:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.technical_indicators.MACD_Signal.toFixed(4)}
                                 </div>
                             </div>
-                            <div class="card-body">
-                                <div class="macd-chart-container">
-                                    <canvas id="macdChart"></canvas>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>SMA (20):</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.technical_indicators.SMA20.toFixed(4)}
                                 </div>
                             </div>
-                        </div>
-                        
-                        <!-- Support & Resistance and News -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Support & Resistance</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row text-center">
-                                            <div class="col-4">
-                                                <h5 class="text-danger">${tech.Resistance}</h5>
-                                                <small class="text-muted">Resistance</small>
-                                            </div>
-                                            <div class="col-4">
-                                                <h5 class="text-primary">${data.current_price.toFixed(4)}</h5>
-                                                <small class="text-muted">Current</small>
-                                            </div>
-                                            <div class="col-4">
-                                                <h5 class="text-success">${tech.Support}</h5>
-                                                <small class="text-muted">Support</small>
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>SMA (50):</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.technical_indicators.SMA50.toFixed(4)}
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0"><i class="fas fa-newspaper me-2"></i>Berita Fundamental</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="news-item">
-                                            <p class="mb-0">${data.fundamental_news}</p>
-                                        </div>
-                                        <small class="text-muted">Sumber: ${data.data_source}</small>
-                                    </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Volatility:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.technical_indicators.Volatility}%
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Support:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.technical_indicators.Support.toFixed(4)}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Resistance:</strong>
+                                </div>
+                                <div class="col-6">
+                                    ${data.technical_indicators.Resistance.toFixed(4)}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            `;
-            
-            // Create charts
-            createPriceChart(chartData);
-            createMACDChart(chartData);
-            
-            resultsDiv.style.display = 'block';
-        }
-        
-        // Get signal explanation
-        function getSignalExplanation(signal) {
-            const explanations = {
-                "BELI KUAT": "Kondisi oversold dengan momentum bullish kuat",
-                "BELI": "Signal beli dengan konfirmasi teknikal",
-                "JUAL KUAT": "Kondisi overbought dengan momentum bearish kuat", 
-                "JUAL": "Signal jual dengan konfirmasi teknikal",
-                "TUNGGU": "Market konsolidasi, tunggu konfirmasi breakout"
-            };
-            return explanations[signal] || "Analisis berdasarkan indikator teknikal dan fundamental";
-        }
-        
-        // Create indicator HTML with visual representation
-        function createIndicatorHTML(name, value, min, max, isPrice = false) {
-            let valueClass = '';
-            let barWidth = 50;
-            
-            if (typeof value === 'number') {
-                const range = max - min;
-                const normalized = Math.max(0, Math.min(100, ((value - min) / range) * 100));
-                barWidth = normalized;
                 
-                if (name === 'RSI') {
-                    if (value < 30) valueClass = 'text-success';
-                    else if (value > 70) valueClass = 'text-danger';
-                } else if (name.includes('MACD')) {
-                    if (value > 0) valueClass = 'text-success';
-                    else if (value < 0) valueClass = 'text-danger';
-                }
-            }
-            
-            const displayValue = typeof value === 'number' ? (isPrice ? value.toFixed(4) : value.toFixed(4)) : value;
-            
-            return `
-                <div class="indicator-item mb-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small">${name}:</span>
-                        <span class="${valueClass} fw-bold">${displayValue}</span>
-                    </div>
-                    ${typeof value === 'number' ? `
-                    <div class="progress">
-                        <div class="progress-bar ${valueClass.includes('success') ? 'bg-success' : valueClass.includes('danger') ? 'bg-danger' : 'bg-primary'}" 
-                             style="width: ${barWidth}%"></div>
-                    </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-
-        // Run Backtest
-        async function runBacktest() {
-            const pair = document.getElementById('backtestPairSelect').value;
-            const timeframe = document.getElementById('backtestTimeframeSelect').value;
-            const days = document.getElementById('backtestDays').value;
-
-            // Validate inputs
-            if (days < 7 || days > 365) {
-                alert('Periode testing harus antara 7 dan 365 hari');
-                return;
-            }
-
-            // Show loading
-            document.getElementById('backtestLoadingIndicator').style.display = 'block';
-            document.getElementById('backtestResults').style.display = 'none';
-
-            try {
-                const response = await fetch('/api/run_backtest', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        pair: pair,
-                        timeframe: timeframe,
-                        days: parseInt(days)
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                displayBacktestResults(data);
-            } catch (error) {
-                alert('Error: ' + error.message);
-                console.error('Backtest error:', error);
-            } finally {
-                document.getElementById('backtestLoadingIndicator').style.display = 'none';
-            }
-        }
-
-        // Display Backtest Results
-        function displayBacktestResults(data) {
-            const resultsDiv = document.getElementById('backtestResults');
-            const summary = data.summary;
-            const performanceByPair = data.performance_by_pair;
-            const tradeHistory = data.trade_history;
-
-            let html = `
-                <div class="card backtest-card mb-4">
-                    <div class="card-body text-center">
-                        <h3 class="card-title">
-                            <i class="fas fa-chart-bar me-2"></i>Backtesting Results
-                        </h3>
-                        <p class="mb-0">${data.metadata.pair} • ${data.metadata.timeframe} • ${data.metadata.period_days} Days</p>
-                    </div>
-                </div>
-
-                <!-- Key Metrics -->
-                <div class="row mb-4">
-                    <div class="col-md-2">
-                        <div class="backtest-metric">
-                            <div class="value ${summary.total_profit >= 0 ? 'performance-positive' : 'performance-negative'}">
-                                $${summary.total_profit}
-                            </div>
-                            <div class="label">Total Profit</div>
+                <div class="col-md-6">
+                    <div class="card mb-3 ${signalClass}">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-robot me-2"></i>AI Analysis
                         </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="backtest-metric">
-                            <div class="value ${summary.win_rate >= 50 ? 'performance-positive' : 'performance-negative'}">
-                                ${summary.win_rate}%
-                            </div>
-                            <div class="label">Win Rate</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="backtest-metric">
-                            <div class="value">${summary.total_trades}</div>
-                            <div class="label">Total Trades</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="backtest-metric">
-                            <div class="value ${summary.profit_factor >= 1 ? 'performance-positive' : 'performance-negative'}">
-                                ${summary.profit_factor}
-                            </div>
-                            <div class="label">Profit Factor</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="backtest-metric">
-                            <div class="value performance-negative">
-                                ${summary.max_drawdown}%
-                            </div>
-                            <div class="label">Max Drawdown</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="backtest-metric">
-                            <div class="value ${summary.expectancy >= 0 ? 'performance-positive' : 'performance-negative'}">
-                                $${summary.expectancy}
-                            </div>
-                            <div class="label">Expectancy</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Detailed Summary -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">Performance Summary</h6>
-                            </div>
-                            <div class="card-body">
-                                <table class="table table-sm">
-                                    <tr>
-                                        <td>Initial Balance</td>
-                                        <td class="text-end">$${summary.initial_balance}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Final Balance</td>
-                                        <td class="text-end">$${summary.final_balance}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Return</td>
-                                        <td class="text-end ${summary.return_percentage >= 0 ? 'performance-positive' : 'performance-negative'}">
-                                            ${summary.return_percentage}%
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>Winning Trades</td>
-                                        <td class="text-end">${summary.winning_trades}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Losing Trades</td>
-                                        <td class="text-end">${summary.losing_trades}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Average Win</td>
-                                        <td class="text-end performance-positive">$${summary.average_win}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Average Loss</td>
-                                        <td class="text-end performance-negative">$${summary.average_loss}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Risk/Reward Ratio</td>
-                                        <td class="text-end">${summary.risk_reward_ratio}:1</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">Trade History (Latest 20 Trades)</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped trade-history-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Pair</th>
-                                                <th>Action</th>
-                                                <th>Price</th>
-                                                <th>Profit</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-            `;
-
-            tradeHistory.forEach(trade => {
-                html += `
-                    <tr>
-                        <td>${trade.entry_date}</td>
-                        <td><strong>${trade.pair}</strong></td>
-                        <td>
-                            <span class="badge ${trade.direction === 'BUY' ? 'bg-success' : 'bg-danger'}">
-                                ${trade.direction}
-                            </span>
-                        </td>
-                        <td>${trade.entry_price}</td>
-                        <td class="${trade.profit >= 0 ? 'performance-positive' : 'performance-negative'}">
-                            $${trade.profit}
-                        </td>
-                        <td>
-                            <span class="badge ${trade.close_reason === 'TP' ? 'bg-success' : trade.close_reason === 'SL' ? 'bg-danger' : 'bg-warning'}">
-                                ${trade.close_reason}
-                            </span>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            html += `
-                                        </tbody>
-                                    </table>
+                        <div class="card-body">
+                            <h4 class="text-center mb-3">${signalText}</h4>
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <div class="p-2 border rounded">
+                                        <small>Confidence</small>
+                                        <div class="confidence-${confidenceLevel}">${confidence}%</div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            resultsDiv.innerHTML = html;
-            resultsDiv.style.display = 'block';
-
-            // Load updated history
-            loadBacktestHistory();
-        }
-
-        // Load Backtest History
-        async function loadBacktestHistory() {
-            try {
-                const response = await fetch('/api/backtest_history');
-                const data = await response.json();
-
-                const historyContent = document.getElementById('backtestHistoryContent');
-
-                if (data.error) {
-                    historyContent.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
-                    return;
-                }
-
-                if (data.length === 0) {
-                    historyContent.innerHTML = `
-                        <div class="text-center text-muted py-3">
-                            <i class="fas fa-clock fa-2x mb-2"></i>
-                            <p>Belum ada history backtesting</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                let historyHTML = `
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Pair</th>
-                                    <th>Timeframe</th>
-                                    <th>Period</th>
-                                    <th>Trades</th>
-                                    <th>Win Rate</th>
-                                    <th>Profit</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                data.forEach(item => {
-                    historyHTML += `
-                        <tr>
-                            <td><strong>${item.pair}</strong></td>
-                            <td>${item.timeframe}</td>
-                            <td>${item.period_days}d</td>
-                            <td>${item.total_trades}</td>
-                            <td>
-                                <span class="badge ${item.win_rate > 50 ? 'bg-success' : 'bg-warning'}">
-                                    ${item.win_rate}%
-                                </span>
-                            </td>
-                            <td class="${item.total_profit >= 0 ? 'performance-positive' : 'performance-negative'}">
-                                $${item.total_profit}
-                            </td>
-                            <td><small>${new Date(item.timestamp).toLocaleDateString()}</small></td>
-                        </tr>
-                    `;
-                });
-
-                historyHTML += `
-                            </tbody>
-                        </table>
-                    </div>
-                    <small class="text-muted">Menampilkan ${data.length} hasil backtesting terbaru</small>
-                `;
-
-                historyContent.innerHTML = historyHTML;
-            } catch (error) {
-                console.error('Error loading backtest history:', error);
-                document.getElementById('backtestHistoryContent').innerHTML = `
-                    <div class="alert alert-danger">Error loading backtest history</div>
-                `;
-            }
-        }
-
-        // Load Performance Data
-        async function loadPerformanceData() {
-            try {
-                const response = await fetch('/performance');
-                const data = await response.json();
-
-                let html = '<div class="row">';
-
-                if (data.error) {
-                    html = `<div class="alert alert-warning">${data.error}</div>`;
-                } else if (data.length === 0) {
-                    html = `<div class="alert alert-info">Belum ada data performa. Lakukan analisis terlebih dahulu.</div>`;
-                } else {
-                    data.forEach(item => {
-                        html += `
-                            <div class="col-md-6 col-lg-3 mb-3">
-                                <div class="card">
-                                    <div class="card-body text-center">
-                                        <h5>${item.pair}</h5>
-                                        <div class="display-6 fw-bold text-primary">${item.analysis_count}</div>
-                                        <small>Analisis (24h)</small>
-                                        <div class="mt-2">
-                                            <span class="badge bg-${item.avg_confidence > 70 ? 'success' : item.avg_confidence > 50 ? 'warning' : 'danger'}">
-                                                ${item.avg_confidence}% Confidence
-                                            </span>
-                                        </div>
-                                        <small class="text-muted">AI: ${item.ai_provider}</small>
-                                        <br>
-                                        <small class="text-muted">Terakhir: ${new Date(item.last_analysis).toLocaleTimeString()}</small>
+                                <div class="col-4">
+                                    <div class="p-2 border rounded">
+                                        <small>Risk Level</small>
+                                        <div class="${riskClass}">${riskLevel}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2 border rounded">
+                                        <small>Expected Move</small>
+                                        <div>${data.ai_analysis.EXPECTED_MOVEMENT}</div>
                                     </div>
                                 </div>
                             </div>
-                        `;
-                    });
-                }
-
-                html += '</div>';
-                document.getElementById('performanceContent').innerHTML = html;
-
-            } catch (error) {
-                console.error('Error loading performance:', error);
-                document.getElementById('performanceContent').innerHTML = '<div class="alert alert-danger">Error loading performance data</div>';
-            }
+                            <div class="mb-3">
+                                <strong>Trading Advice:</strong>
+                                <p>${data.ai_analysis.TRADING_ADVICE}</p>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Entry Price:</strong><br>
+                                    ${data.ai_analysis.ENTRY_PRICE}
+                                </div>
+                                <div class="col-6">
+                                    <strong>Stop Loss:</strong><br>
+                                    ${data.ai_analysis.STOP_LOSS}
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-6">
+                                    <strong>Take Profit 1:</strong><br>
+                                    ${data.ai_analysis.TAKE_PROFIT_1}
+                                </div>
+                                <div class="col-6">
+                                    <strong>Take Profit 2:</strong><br>
+                                    ${data.ai_analysis.TAKE_PROFIT_2}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-newspaper me-2"></i>Fundamental News
+                        </div>
+                        <div class="card-body">
+                            <p>${data.fundamental_news}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-chart-area me-2"></i>Price Chart</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateChart('1M')">1M</button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateChart('3M')">3M</button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="updateChart('6M')">6M</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="priceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-chart-bar me-2"></i>MACD Indicator
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="macdChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            $('#analysis-results').html(html);
+            
+            // Render charts
+            renderPriceChart(data.chart_data);
+            renderMACDChart(data.chart_data);
         }
         
-        // Chart functions (createPriceChart, createMACDChart, etc.) remain the same as in your original code
-        // ... [all the existing chart functions from your original code] ...
-        
-        // Optimize chart data for performance
-        let currentDataDensity = 'normal';
-        
-        function optimizeChartData(chartData, maxPoints = 200) {
-            if (chartData.dates.length <= maxPoints || currentDataDensity === 'high') {
-                return chartData;
-            }
-            
-            const step = Math.ceil(chartData.dates.length / maxPoints);
-            const reducedDates = [];
-            const reducedClose = [];
-            const reducedEma200 = [];
-            const reducedMacdLine = [];
-            const reducedMacdSignal = [];
-            const reducedMacdHistogram = [];
-            
-            for (let i = 0; i < chartData.dates.length; i += step) {
-                reducedDates.push(chartData.dates[i]);
-                reducedClose.push(chartData.close[i]);
-                reducedEma200.push(chartData.ema200[i]);
-                reducedMacdLine.push(chartData.macd_line[i]);
-                reducedMacdSignal.push(chartData.macd_signal[i]);
-                reducedMacdHistogram.push(chartData.macd_histogram[i]);
-            }
-            
-            console.log(`Reduced data from ${chartData.dates.length} to ${reducedDates.length} points`);
-            
-            return {
-                dates: reducedDates,
-                close: reducedClose,
-                ema200: reducedEma200,
-                macd_line: reducedMacdLine,
-                macd_signal: reducedMacdSignal,
-                macd_histogram: reducedMacdHistogram
-            };
-        }
-        
-        // Toggle data density
-        function toggleDataDensity() {
-            currentDataDensity = currentDataDensity === 'normal' ? 'high' : 'normal';
-            
-            const analysisResults = document.getElementById('analysisResults');
-            if (analysisResults.style.display !== 'none') {
-                getAnalysis();
-            }
-        }
-        
-        // Create price chart with EMA200
-        function createPriceChart(chartData) {
-            console.log('Creating price chart with:', chartData.dates.length, 'data points');
-            
+        // Render price chart
+        function renderPriceChart(chartData) {
             const ctx = document.getElementById('priceChart').getContext('2d');
             
             if (priceChart) {
                 priceChart.destroy();
             }
             
-            const displayData = optimizeChartData(chartData, 200);
+            // Prepare data
+            const dates = chartData.dates;
+            const closes = chartData.close;
+            const ema200 = chartData.ema200;
             
-            if (!displayData.dates || !displayData.close) {
-                console.error('❌ Missing required chart data');
-                return;
-            }
-            
-            try {
-                const labels = displayData.dates;
-                const prices = displayData.close;
-                const ema200 = displayData.ema200;
-                
-                const firstPrice = prices[0];
-                const lastPrice = prices[prices.length - 1];
-                const trendColor = lastPrice >= firstPrice ? 'rgba(39, 174, 96, 0.8)' : 'rgba(231, 76, 60, 0.8)';
-                
-                const datasets = [
-                    {
-                        label: 'Harga',
-                        data: prices,
-                        borderColor: trendColor,
-                        backgroundColor: trendColor.replace('0.8', '0.1'),
-                        borderWidth: 1.2,
-                        fill: false,
-                        tension: 0.1,
-                        pointRadius: currentDataDensity === 'high' ? 1 : 0,
-                        pointHoverRadius: 3,
-                        yAxisID: 'y'
-                    }
-                ];
-                
-                if (ema200 && ema200.length > 0 && chartIndicators.ema200) {
-                    datasets.push({
-                        label: 'EMA 200',
-                        data: ema200,
-                        borderColor: 'rgba(155, 89, 182, 0.8)',
-                        backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                        borderWidth: 1.2,
-                        fill: false,
-                        tension: 0.1,
-                        pointRadius: currentDataDensity === 'high' ? 1 : 0,
-                        pointHoverRadius: 3,
-                        yAxisID: 'y'
-                    });
-                }
-                
-                priceChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: datasets
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Close Price',
+                            data: closes,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.1
                         },
-                        plugins: {
-                            legend: {
+                        {
+                            label: 'EMA 200',
+                            data: ema200,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'transparent',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
                                 display: true,
-                                position: 'top'
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false,
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.y !== null) {
-                                            label += context.parsed.y.toFixed(4);
-                                        }
-                                        return label;
-                                    }
-                                }
+                                text: 'Date'
                             }
                         },
-                        scales: {
-                            x: {
+                        y: {
+                            display: true,
+                            title: {
                                 display: true,
-                                title: {
-                                    display: true,
-                                    text: 'Waktu'
-                                },
-                                grid: {
-                                    display: false
-                                },
-                                ticks: {
-                                    maxTicksLimit: 10,
-                                    callback: function(value, index, values) {
-                                        if (index % Math.ceil(values.length / 8) === 0) {
-                                            return this.getLabelForValue(value);
-                                        }
-                                        return '';
-                                    }
-                                }
-                            },
-                            y: {
-                                display: true,
-                                title: {
-                                    display: true,
-                                    text: 'Harga'
-                                },
-                                position: 'left'
+                                text: 'Price'
                             }
                         }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
                     }
-                });
-                
-                console.log('✅ Price chart created with', labels.length, 'data points');
-            } catch (error) {
-                console.error('❌ Error creating price chart:', error);
-            }
+                }
+            });
         }
         
-        // Create MACD chart
-        function createMACDChart(chartData) {
+        // Render MACD chart
+        function renderMACDChart(chartData) {
             const ctx = document.getElementById('macdChart').getContext('2d');
             
             if (macdChart) {
                 macdChart.destroy();
             }
             
-            const displayData = optimizeChartData(chartData, 200);
+            // Prepare data
+            const dates = chartData.dates;
+            const macdLine = chartData.macd_line;
+            const macdSignal = chartData.macd_signal;
+            const macdHistogram = chartData.macd_histogram;
             
-            const macdLine = displayData.macd_line;
-            const macdSignal = displayData.macd_signal;
-            const macdHistogram = displayData.macd_histogram;
+            // Create histogram data with colors
+            const histogramData = macdHistogram.map(value => {
+                return {
+                    x: dates[macdHistogram.indexOf(value)],
+                    y: value,
+                    backgroundColor: value >= 0 ? 'rgba(39, 174, 96, 0.7)' : 'rgba(231, 76, 60, 0.7)'
+                };
+            });
             
-            if (!macdLine || macdLine.length === 0 || !chartIndicators.macd) {
-                document.getElementById('macdChart').style.display = 'none';
+            macdChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'MACD Line',
+                            data: macdLine,
+                            borderColor: '#3498db',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            type: 'line',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'MACD Signal',
+                            data: macdSignal,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            type: 'line',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'MACD Histogram',
+                            data: histogramData,
+                            backgroundColor: histogramData.map(item => item.backgroundColor),
+                            borderWidth: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'MACD Value'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update chart time range (placeholder)
+        function updateChart(range) {
+            alert(`Chart range updated to ${range}. This would typically reload data with the new range.`);
+        }
+        
+        // Run backtest
+        function runBacktest() {
+            const pair = $('#backtest-pair').val();
+            const timeframe = $('#backtest-timeframe').val();
+            const days = $('#backtest-days').val();
+            
+            $('#backtest-loading').show();
+            $('#backtest-results').html('');
+            
+            $.ajax({
+                url: '/api/run_backtest',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    pair: pair,
+                    timeframe: timeframe,
+                    days: parseInt(days)
+                }),
+                success: function(data) {
+                    $('#backtest-loading').hide();
+                    displayBacktestResults(data);
+                },
+                error: function(xhr) {
+                    $('#backtest-loading').hide();
+                    let errorMsg = 'Failed to run backtest';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    $('#backtest-results').html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i> ${errorMsg}
+                        </div>
+                    `);
+                }
+            });
+        }
+        
+        // Display backtest results
+        function displayBacktestResults(data) {
+            if (data.error) {
+                $('#backtest-results').html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> ${data.error}
+                    </div>
+                `);
                 return;
             }
             
-            document.getElementById('macdChart').style.display = 'block';
+            const summary = data.summary;
+            const performanceByPair = data.performance_by_pair || {};
+            const recommendations = data.recommendations || [];
+            const tradeHistory = data.trade_history || [];
             
-            try {
-                const datasets = [
-                    {
-                        label: 'MACD Line',
-                        data: macdLine,
-                        borderColor: 'rgba(52, 152, 219, 1)',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        borderWidth: 1.2,
-                        fill: false,
-                        tension: 0.1,
-                        pointRadius: currentDataDensity === 'high' ? 1 : 0
-                    },
-                    {
-                        label: 'Signal Line',
-                        data: macdSignal,
-                        borderColor: 'rgba(231, 76, 60, 1)',
-                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                        borderWidth: 1.2,
-                        fill: false,
-                        tension: 0.1,
-                        pointRadius: currentDataDensity === 'high' ? 1 : 0
-                    },
-                    {
-                        label: 'MACD Histogram',
-                        data: macdHistogram,
-                        type: 'bar',
-                        backgroundColor: macdHistogram.map(value => 
-                            value >= 0 ? 'rgba(39, 174, 96, 0.7)' : 'rgba(231, 76, 60, 0.7)'
-                        ),
-                        borderColor: macdHistogram.map(value => 
-                            value >= 0 ? 'rgba(39, 174, 96, 1)' : 'rgba(231, 76, 60, 1)'
-                        ),
-                        borderWidth: 0.5,
-                        order: 3
-                    }
-                ];
+            // Determine result class based on performance
+            let resultClass = 'result-moderate';
+            if (summary.win_rate > 60 && summary.total_profit > 0) {
+                resultClass = 'result-good';
+            } else if (summary.win_rate < 40 || summary.total_profit < 0) {
+                resultClass = 'result-poor';
+            }
+            
+            let html = `
+            <div class="backtest-result ${resultClass}">
+                <h4 class="mb-3">Backtest Results</h4>
                 
-                macdChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: displayData.dates,
-                        datasets: datasets
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false
-                        },
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top'
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
-                            }
-                        },
-                        scales: {
-                            x: {
-                                display: true,
-                                title: {
-                                    display: true,
-                                    text: 'Waktu'
-                                },
-                                grid: {
-                                    display: false
-                                },
-                                ticks: {
-                                    maxTicksLimit: 10,
-                                    callback: function(value, index, values) {
-                                        if (index % Math.ceil(values.length / 8) === 0) {
-                                            return this.getLabelForValue(value);
-                                        }
-                                        return '';
-                                    }
-                                }
-                            },
-                            y: {
-                                display: true,
-                                title: {
-                                    display: true,
-                                    text: 'Nilai MACD'
-                                },
-                                position: 'left'
-                            }
-                        }
-                    }
+                <div class="row text-center mb-4">
+                    <div class="col-md-3">
+                        <div class="stats-value ${summary.total_profit >= 0 ? 'price-up' : 'price-down'}">
+                            $${summary.final_balance.toFixed(2)}
+                        </div>
+                        <small>Final Balance</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-value ${summary.total_profit >= 0 ? 'price-up' : 'price-down'}">
+                            $${summary.total_profit.toFixed(2)}
+                        </div>
+                        <small>Total Profit</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-value ${summary.win_rate >= 50 ? 'price-up' : 'price-down'}">
+                            ${summary.win_rate}%
+                        </div>
+                        <small>Win Rate</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-value">
+                            ${summary.total_trades}
+                        </div>
+                        <small>Total Trades</small>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Performance Metrics</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>Profit Factor:</td>
+                                <td class="text-end">${summary.profit_factor.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Risk/Reward Ratio:</td>
+                                <td class="text-end">${summary.risk_reward_ratio.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Expectancy:</td>
+                                <td class="text-end">${summary.expectancy.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Max Drawdown:</td>
+                                <td class="text-end ${summary.max_drawdown < -10 ? 'price-down' : ''}">${summary.max_drawdown.toFixed(2)}%</td>
+                            </tr>
+                            <tr>
+                                <td>Average Profit:</td>
+                                <td class="text-end">$${summary.average_profit.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Consecutive Losses:</td>
+                                <td class="text-end">${summary.consecutive_losses}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Performance by Pair</h5>
+            `;
+            
+            if (Object.keys(performanceByPair).length > 0) {
+                for (const [pair, perf] of Object.entries(performanceByPair)) {
+                    html += `
+                    <div class="d-flex justify-content-between border-bottom py-1">
+                        <span>${pair}</span>
+                        <span>
+                            <span class="badge ${perf.win_rate > 50 ? 'bg-success' : 'bg-danger'}">${perf.win_rate}%</span>
+                            <small class="ms-2 ${perf.profit > 0 ? 'price-up' : 'price-down'}">$${perf.profit.toFixed(2)}</small>
+                        </span>
+                    </div>
+                    `;
+                }
+            } else {
+                html += `<p class="text-muted">No pair-specific data available</p>`;
+            }
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Recommendations</h5>
+                    <ul class="list-group">
+            `;
+            
+            if (recommendations.length > 0) {
+                recommendations.forEach(rec => {
+                    html += `<li class="list-group-item">${rec}</li>`;
+                });
+            } else {
+                html += `<li class="list-group-item text-muted">No specific recommendations</li>`;
+            }
+            
+            html += `
+                    </ul>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Recent Trades</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Pair</th>
+                                    <th>Action</th>
+                                    <th>Entry</th>
+                                    <th>P&L</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
+            if (tradeHistory.length > 0) {
+                tradeHistory.forEach(trade => {
+                    html += `
+                    <tr>
+                        <td>${trade.entry_date}</td>
+                        <td>${trade.pair}</td>
+                        <td><span class="badge ${trade.direction === 'BUY' ? 'bg-success' : 'bg-danger'}">${trade.direction}</span></td>
+                        <td>${trade.entry_price}</td>
+                        <td class="${trade.profit >= 0 ? 'price-up' : 'price-down'}">$${trade.profit.toFixed(2)}</td>
+                        <td>${trade.close_reason}</td>
+                    </tr>
+                    `;
+                });
+            } else {
+                html += `<tr><td colspan="6" class="text-center text-muted">No trade history available</td></tr>`;
+            }
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            $('#backtest-results').html(html);
+            
+            // Refresh history after running a new backtest
+            loadBacktestHistory();
+        }
+        
+        // Load backtest history
+        function loadBacktestHistory() {
+            $.get('/api/backtest_history', function(data) {
+                if (data.error) {
+                    $('#backtest-history').html(`<p class="text-danger">${data.error}</p>`);
+                    return;
+                }
+                
+                if (data.length === 0) {
+                    $('#backtest-history').html('<p class="text-muted text-center">No backtest history available</p>');
+                    return;
+                }
+                
+                let html = '';
+                data.forEach(item => {
+                    html += `
+                    <div class="border-bottom py-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>${item.pair} - ${item.timeframe}</strong>
+                            <span class="badge ${item.win_rate > 50 ? 'bg-success' : 'bg-danger'}">${item.win_rate}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span>${item.period_days} days</span>
+                            <span class="${item.total_profit >= 0 ? 'price-up' : 'price-down'}">$${item.total_profit.toFixed(2)}</span>
+                        </div>
+                        <div class="small text-muted">
+                            ${new Date(item.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                    `;
                 });
                 
-                console.log('✅ MACD chart created with', displayData.dates.length, 'data points');
-            } catch (error) {
-                console.error('❌ Error creating MACD chart:', error);
-            }
+                $('#backtest-history').html(html);
+            }).fail(function() {
+                $('#backtest-history').html('<p class="text-danger">Failed to load backtest history</p>');
+            });
         }
-        
-        // Toggle indicators on/off
-        function toggleIndicator(indicator, isVisible) {
-            chartIndicators[indicator] = isVisible;
-            
-            const analysisResults = document.getElementById('analysisResults');
-            if (analysisResults.style.display !== 'none') {
-                getAnalysis();
-            }
-        }
-        
-        // Auto-refresh overview every 30 seconds
-        setInterval(loadQuickOverview, 30000);
-
-        // Load performance data when performance tab is clicked
-        document.getElementById('performance-tab').addEventListener('click', function() {
-            loadPerformanceData();
-        });
-
-        // Load backtest history when backtesting tab is clicked
-        document.getElementById('backtesting-tab').addEventListener('click', function() {
-            loadBacktestHistory();
-            checkBacktestStatus();
-        });
     </script>
 </body>
 </html>
