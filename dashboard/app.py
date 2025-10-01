@@ -1,3 +1,5 @@
+[file name]: app_enhanced.py
+[file content begin]
 from flask import Flask, request, jsonify, send_from_directory, render_template, session
 import pandas as pd
 import numpy as np
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'forex-analysis-backtest-secret-key-2024')
 
-# Configuration
+# Enhanced Configuration
 class Config:
     DB_PATH = 'forex_analysis.db'
     REQUEST_TIMEOUT = 15
@@ -42,13 +44,28 @@ class Config:
         "1W": 52         # 52 minggu
     }
     
-    # Risk management
+    # Enhanced Risk management
     DEFAULT_STOP_LOSS_PCT = 0.01
     DEFAULT_TAKE_PROFIT_PCT = 0.02
+    MAX_DRAWDOWN_PCT = 0.05  # Max 5% drawdown
+    DAILY_LOSS_LIMIT = 0.03  # Max 3% loss per day
 
     # Backtesting
     INITIAL_BALANCE = 10000
     DEFAULT_LOT_SIZE = 0.1
+    
+    # Enhanced Trading Parameters
+    PAIR_PRIORITY = {
+        'GBPJPY': 1,  # Highest priority - good trends
+        'USDJPY': 2,  
+        'EURJPY': 3,
+        'CHFJPY': 4   # Lowest priority - unpredictable
+    }
+    
+    OPTIMAL_TRADING_HOURS = list(range(0, 9))  # 00:00-08:00 GMT (Asian/London overlap)
+    MIN_VOLATILITY = 0.3
+    MAX_VOLATILITY = 5.0
+    MIN_TREND_STRENGTH = 0.1  # Minimum trend strength percentage
 
 # API Keys from environment variables
 TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
@@ -71,8 +88,8 @@ PAIR_MAP = {
     "CHFJPY": "CHF/JPY",
 }
 
-# ---------------- BACKTESTING MODULE ----------------
-class ForexBacktester:
+# ---------------- ENHANCED BACKTESTING MODULE ----------------
+class EnhancedForexBacktester:
     def __init__(self, initial_balance=10000):
         self.initial_balance = initial_balance
         self.balance = initial_balance
@@ -81,6 +98,8 @@ class ForexBacktester:
         self.equity_curve = []
         self.data = {}
         self.pairs = []
+        self.daily_loss_tracker = {}  # Track daily losses
+        self.consecutive_losses = 0   # Track consecutive losses
         
     def load_historical_data(self, historical_data):
         """Load historical data from main application"""
@@ -97,8 +116,28 @@ class ForexBacktester:
             return lot_size * 10    # 1 pip = 0.0001 untuk non-JPY
     
     def execute_trade(self, signal, current_price):
-        """Execute trade based on signal"""
+        """Enhanced trade execution dengan better risk management"""
         pip_value = self.calculate_pip_value(signal['pair'], signal.get('lot_size', 0.1))
+        
+        # Risk management: max 2% per trade
+        risk_per_trade = self.balance * 0.02
+        pip_risk = signal['sl']
+        potential_loss = pip_risk * pip_value
+        
+        # Adjust position size jika risk terlalu besar (tetap dalam lot size 0.1 tapi kurangi quantity)
+        if potential_loss > risk_per_trade and pip_risk > 0:
+            adjusted_lot_size = (risk_per_trade / (pip_risk * pip_value)) * signal.get('lot_size', 0.1)
+            adjusted_lot_size = max(0.01, min(adjusted_lot_size, 0.1))  # Min 0.01, max 0.1 (tidak naik)
+            pip_value = self.calculate_pip_value(signal['pair'], adjusted_lot_size)
+        else:
+            adjusted_lot_size = signal.get('lot_size', 0.1)
+        
+        # Check daily loss limit
+        today = datetime.now().date()
+        daily_loss = self.daily_loss_tracker.get(today, 0)
+        if daily_loss <= -self.balance * Config.DAILY_LOSS_LIMIT:
+            logger.warning(f"Daily loss limit reached for {today}, skipping trade")
+            return
         
         if signal['action'].upper() == 'BUY':
             entry_price = current_price
@@ -118,15 +157,24 @@ class ForexBacktester:
             'entry_price': entry_price,
             'stop_loss': stop_loss,
             'take_profit': take_profit,
-            'lot_size': signal.get('lot_size', 0.1),
+            'lot_size': adjusted_lot_size,
             'pip_value': pip_value,
-            'status': 'open'
+            'status': 'open',
+            'signal_confidence': signal.get('confidence', 50)
         }
         
-        self.positions.append(position)
+        # Limit maximum open positions
+        if len(self.positions) < 3:  # Max 3 positions simultaneously
+            self.positions.append(position)
+            logger.info(f"Executed {signal['action']} on {signal['pair']} at {current_price}")
+        else:
+            logger.warning(f"Max positions reached, skipping trade on {signal['pair']}")
     
     def check_positions(self, current_prices):
-        """Check open positions for TP/SL"""
+        """Enhanced position checking dengan daily loss tracking"""
+        today = datetime.now().date()
+        daily_profit = 0
+        
         for position in self.positions[:]:
             if position['status'] == 'open':
                 pair = position['pair']
@@ -140,19 +188,28 @@ class ForexBacktester:
                         pips = (position['take_profit'] - position['entry_price']) / 0.01
                         profit = pips * position['pip_value']
                         self.close_position(position, profit, 'TP')
+                        daily_profit += profit
                     elif current_price <= position['stop_loss']:
                         pips = (position['stop_loss'] - position['entry_price']) / 0.01
                         profit = pips * position['pip_value']
                         self.close_position(position, profit, 'SL')
+                        daily_profit += profit
                 else:  # Sell
                     if current_price <= position['take_profit']:
                         pips = (position['entry_price'] - position['take_profit']) / 0.01
                         profit = pips * position['pip_value']
                         self.close_position(position, profit, 'TP')
+                        daily_profit += profit
                     elif current_price >= position['stop_loss']:
                         pips = (position['entry_price'] - position['stop_loss']) / 0.01
                         profit = pips * position['pip_value']
                         self.close_position(position, profit, 'SL')
+                        daily_profit += profit
+        
+        # Update daily loss tracker
+        if today not in self.daily_loss_tracker:
+            self.daily_loss_tracker[today] = 0
+        self.daily_loss_tracker[today] += daily_profit
     
     def close_position(self, position, profit, close_reason):
         """Close position and record trade"""
@@ -164,23 +221,32 @@ class ForexBacktester:
         self.balance += profit
         self.trade_history.append(position.copy())
         
+        # Update consecutive losses tracker
+        if profit < 0:
+            self.consecutive_losses += 1
+        else:
+            self.consecutive_losses = 0
+        
         # Remove from open positions
         self.positions = [p for p in self.positions if p['status'] == 'open']
+        
+        logger.info(f"Closed {position['pair']} position: {close_reason}, P&L: ${profit:.2f}")
     
     def run_backtest(self, signals, timeframe="4H"):
-        """Run backtesting with signals"""
-        logger.info("Starting backtesting...")
+        """Enhanced backtesting dengan better risk controls"""
+        logger.info("Starting enhanced backtesting...")
         
         # Reset state
         self.balance = self.initial_balance
         self.positions = []
         self.trade_history = []
         self.equity_curve = []
+        self.daily_loss_tracker = {}
+        self.consecutive_losses = 0
         
         # Sort signals by date
         signals.sort(key=lambda x: x['date'])
         
-        # Get date range from signals
         if not signals:
             return {"error": "No signals provided for backtesting"}
             
@@ -188,12 +254,29 @@ class ForexBacktester:
         end_date = max([s['date'] for s in signals])
         
         current_date = start_date
+        trades_executed = 0
         
         while current_date <= end_date:
+            # Check for maximum drawdown
+            current_equity = self.balance + sum(
+                p['pip_value'] * ((current_prices.get(p['pair'], p['entry_price']) - p['entry_price']) / 0.01 * p['direction']) 
+                for p in self.positions if p['status'] == 'open'
+            )
+            
+            drawdown = (current_equity - self.initial_balance) / self.initial_balance * 100
+            if drawdown < -Config.MAX_DRAWDOWN_PCT * 100:
+                logger.warning(f"Max drawdown reached at {current_date}, stopping backtest")
+                break
+            
             # Execute signals for current date
             daily_signals = [s for s in signals if s['date'].date() == current_date.date()]
             
             for signal in daily_signals:
+                # Skip if too many consecutive losses
+                if self.consecutive_losses >= 3:
+                    logger.warning(f"3 consecutive losses reached, skipping signals for {current_date}")
+                    break
+                    
                 pair = signal['pair']
                 if pair in self.data and timeframe in self.data[pair]:
                     df_pair = self.data[pair][timeframe]
@@ -201,6 +284,7 @@ class ForexBacktester:
                     if not date_data.empty:
                         current_price = date_data['open'].values[0]
                         self.execute_trade(signal, current_price)
+                        trades_executed += 1
             
             # Check open positions
             current_prices = {}
@@ -217,16 +301,17 @@ class ForexBacktester:
             self.equity_curve.append({
                 'date': current_date,
                 'balance': self.balance,
-                'open_positions': len(self.positions)
+                'open_positions': len(self.positions),
+                'drawdown': drawdown
             })
             
             current_date += timedelta(days=1)
         
-        logger.info(f"Backtesting completed: {len(self.trade_history)} trades executed")
-        return self.generate_report()
+        logger.info(f"Backtesting completed: {trades_executed} trades executed, final balance: ${self.balance:.2f}")
+        return self.generate_enhanced_report()
     
-    def generate_report(self):
-        """Generate comprehensive backtesting report"""
+    def generate_enhanced_report(self):
+        """Generate comprehensive backtesting report dengan recommendations"""
         if not self.trade_history:
             return {
                 'status': 'error',
@@ -281,7 +366,8 @@ class ForexBacktester:
                 'expectancy': round(expectancy, 2),
                 'max_drawdown': round(max_drawdown, 2),
                 'final_balance': round(self.balance, 2),
-                'initial_balance': self.initial_balance
+                'initial_balance': self.initial_balance,
+                'consecutive_losses': self.consecutive_losses
             },
             'performance_by_pair': {},
             'trade_history': [
@@ -291,28 +377,78 @@ class ForexBacktester:
                     'direction': 'BUY' if trade['direction'] == 1 else 'SELL',
                     'entry_price': round(trade['entry_price'], 4),
                     'profit': round(trade.get('profit', 0), 2),
-                    'close_reason': trade.get('close_reason', 'Open')
+                    'close_reason': trade.get('close_reason', 'Open'),
+                    'confidence': trade.get('signal_confidence', 50)
                 }
                 for trade in self.trade_history[-20:]  # Last 20 trades
             ]
         }
         
-        # Performance by pair
+        # Enhanced performance by pair analysis
         for pair in self.pairs:
             pair_trades = df_trades[df_trades['pair'] == pair]
             if len(pair_trades) > 0:
                 pair_profit = pair_trades['profit'].sum()
                 pair_win_rate = len(pair_trades[pair_trades['profit'] > 0]) / len(pair_trades) * 100
+                avg_confidence = pair_trades['signal_confidence'].mean() if 'signal_confidence' in pair_trades else 50
+                
                 report['performance_by_pair'][pair] = {
                     'trades': len(pair_trades),
                     'profit': round(pair_profit, 2),
-                    'win_rate': round(pair_win_rate, 2)
+                    'win_rate': round(pair_win_rate, 2),
+                    'avg_confidence': round(avg_confidence, 1),
+                    'performance': 'GOOD' if pair_profit > 0 and pair_win_rate > 50 else 'POOR'
                 }
         
+        # Add recommendations
+        report['recommendations'] = self.generate_recommendations(report)
+        
         return report
+    
+    def generate_recommendations(self, report):
+        """Generate trading recommendations based on backtest results"""
+        recommendations = []
+        
+        win_rate = report['summary']['win_rate']
+        profit_factor = report['summary']['profit_factor']
+        max_drawdown = report['summary']['max_drawdown']
+        avg_confidence = report['summary'].get('avg_confidence', 50)
+        
+        if win_rate < 45:
+            recommendations.append("🎯 Increase signal quality filters - current win rate too low")
+        elif win_rate > 65:
+            recommendations.append("✅ Excellent win rate - maintain current strategy")
+        
+        if profit_factor < 1.0:
+            recommendations.append("⚡ Improve risk-reward ratio - profit factor below 1.0")
+        elif profit_factor > 1.5:
+            recommendations.append("💰 Good profit factor - strategy is profitable")
+        
+        if max_drawdown < -10:
+            recommendations.append("🛡️ Strengthen risk management - drawdown too high")
+        elif max_drawdown > -5:
+            recommendations.append("📊 Healthy drawdown level - good risk control")
+        
+        if report['summary']['average_loss'] > abs(report['summary']['average_win']):
+            recommendations.append("📉 Review stop-loss placement - average loss larger than average win")
+        
+        # Pair-specific recommendations
+        for pair, perf in report['performance_by_pair'].items():
+            if perf['performance'] == 'POOR':
+                recommendations.append(f"🔍 Review {pair} strategy - underperforming (Win Rate: {perf['win_rate']}%)")
+            else:
+                recommendations.append(f"✅ {pair} performing well (Win Rate: {perf['win_rate']}%)")
+        
+        if report['summary']['consecutive_losses'] >= 3:
+            recommendations.append("🚨 High consecutive losses - consider reducing position size or adding filters")
+        
+        if not recommendations:
+            recommendations.append("📈 Strategy performing well - continue with current parameters")
+        
+        return recommendations
 
-# Initialize backtester
-backtester = ForexBacktester(initial_balance=Config.INITIAL_BALANCE)
+# Initialize enhanced backtester
+backtester = EnhancedForexBacktester(initial_balance=Config.INITIAL_BALANCE)
 
 # ---------------- DATABASE FUNCTIONS ----------------
 def init_db():
@@ -337,7 +473,7 @@ def init_db():
             ai_provider TEXT
         )''')
         
-        # Performance tracking table
+        # Enhanced performance tracking table
         c.execute('''CREATE TABLE IF NOT EXISTS signal_performance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pair TEXT NOT NULL,
@@ -351,10 +487,12 @@ def init_db():
             outcome TEXT,
             pnl REAL,
             duration_hours INTEGER,
-            confidence_level INTEGER
+            confidence_level INTEGER,
+            volatility REAL,
+            trend_strength REAL
         )''')
 
-        # Backtesting results table
+        # Enhanced backtesting results table
         c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -368,7 +506,10 @@ def init_db():
             final_balance REAL,
             max_drawdown REAL,
             profit_factor REAL,
-            report_data TEXT
+            risk_reward_ratio REAL,
+            expectancy REAL,
+            report_data TEXT,
+            recommendations TEXT
         )''')
         
         conn.commit()
@@ -403,15 +544,18 @@ def save_analysis_result(data: Dict):
         conn.close()
 
 def save_backtest_result(report_data: Dict):
-    """Save backtesting result to database"""
+    """Save enhanced backtesting result to database"""
     try:
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
         
+        recommendations = json.dumps(report_data.get('recommendations', []))
+        
         c.execute('''INSERT INTO backtesting_results 
                     (pair, timeframe, period_days, total_trades, winning_trades, 
-                     win_rate, total_profit, final_balance, max_drawdown, profit_factor, report_data)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                     win_rate, total_profit, final_balance, max_drawdown, profit_factor, 
+                     risk_reward_ratio, expectancy, report_data, recommendations)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                  (report_data.get('pair', 'MULTI'),
                   report_data.get('timeframe', '4H'),
                   report_data.get('period_days', 30),
@@ -422,10 +566,13 @@ def save_backtest_result(report_data: Dict):
                   report_data['summary']['final_balance'],
                   report_data['summary']['max_drawdown'],
                   report_data['summary']['profit_factor'],
-                  json.dumps(report_data)))
+                  report_data['summary']['risk_reward_ratio'],
+                  report_data['summary']['expectancy'],
+                  json.dumps(report_data),
+                  recommendations))
         
         conn.commit()
-        logger.info("Backtesting result saved to database")
+        logger.info("Enhanced backtesting result saved to database")
     except Exception as e:
         logger.error(f"Error saving backtest result: {e}")
     finally:
@@ -433,7 +580,7 @@ def save_backtest_result(report_data: Dict):
 
 # ---------------- DATA LOADING ----------------
 def load_csv_data():
-    """Load historical CSV data with enhanced error handling and support for longer periods"""
+    """Load historical CSV data with enhanced error handling"""
     search_dirs = [".", "data", "historical_data"]
     loaded_count = 0
     
@@ -506,7 +653,7 @@ def load_csv_data():
     # Load data to backtester
     backtester.load_historical_data(HISTORICAL)
 
-# ---------------- TECHNICAL INDICATORS CALCULATION ----------------
+# ---------------- ENHANCED TECHNICAL INDICATORS CALCULATION ----------------
 def calculate_ema_series(series: pd.Series, period: int) -> pd.Series:
     """Calculate EMA for entire series"""
     return series.ewm(span=period, adjust=False).mean()
@@ -521,7 +668,7 @@ def calculate_macd_series(series: pd.Series) -> Tuple[pd.Series, pd.Series, pd.S
     return macd_line, macd_signal, macd_histogram
 
 def calc_indicators(series: List[float], volumes: Optional[List[float]] = None) -> Dict:
-    """Calculate technical indicators with enhanced features"""
+    """Calculate enhanced technical indicators"""
     if not series:
         return {"error": "No price data available"}
     
@@ -563,10 +710,20 @@ def calc_indicators(series: List[float], volumes: Optional[List[float]] = None) 
     # Bollinger Bands
     bb_upper = sma20 + (close.rolling(20).std() * 2)
     bb_lower = sma20 - (close.rolling(20).std() * 2)
+    bb_width = (bb_upper - bb_lower) / sma20 * 100  # Bollinger Band Width
     
     # Support and Resistance (simplified)
     recent_high = close.tail(20).max()
     recent_low = close.tail(20).min()
+    
+    # Trend strength
+    trend_strength = abs(sma20.iloc[-1] - sma50.iloc[-1]) / cp * 100 if not pd.isna(sma20.iloc[-1]) and not pd.isna(sma50.iloc[-1]) else 0
+    
+    # ATR (Average True Range)
+    high = pd.Series([c * 1.001 for c in close])  # Simplified high
+    low = pd.Series([c * 0.999 for c in close])   # Simplified low
+    tr = np.maximum(high - low, np.maximum(abs(high - close.shift()), abs(low - close.shift())))
+    atr = tr.rolling(14).mean()
     
     return {
         "current_price": round(cp, 4),
@@ -582,12 +739,234 @@ def calc_indicators(series: List[float], volumes: Optional[List[float]] = None) 
         "OBV": round(obv, 2) if obv is not None else "N/A",
         "Bollinger_Upper": round(bb_upper.iloc[-1], 4) if not pd.isna(bb_upper.iloc[-1]) else cp,
         "Bollinger_Lower": round(bb_lower.iloc[-1], 4) if not pd.isna(bb_lower.iloc[-1]) else cp,
+        "Bollinger_Width": round(bb_width.iloc[-1], 4) if not pd.isna(bb_width.iloc[-1]) else 0,
         "Resistance": round(recent_high, 4),
         "Support": round(recent_low, 4),
         "Volatility": round(close.pct_change().std() * 100, 2) if len(close) > 1 else 0,
+        "Trend_Strength": round(trend_strength, 2),
+        "ATR": round(atr.iloc[-1], 4) if not pd.isna(atr.iloc[-1]) else 0
     }
 
-# ---------------- DATA PROVIDERS ----------------
+# ---------------- ENHANCED SIGNAL GENERATION ----------------
+def calculate_signal_confidence(signal: Dict, tech: Dict) -> float:
+    """Calculate confidence score for trading signals"""
+    confidence = 50  # Base confidence
+    
+    # RSI confidence
+    rsi = tech['RSI']
+    if 30 <= rsi <= 70:
+        confidence += 10  # Good RSI range
+    elif 25 <= rsi <= 75:
+        confidence += 5   # Acceptable RSI range
+    
+    # MACD confidence
+    macd_strength = abs(tech['MACD_Histogram'])
+    if macd_strength > 0.1:
+        confidence += 10
+    elif macd_strength > 0.05:
+        confidence += 5
+    
+    # Trend alignment confidence
+    if (signal['action'] == 'BUY' and tech['SMA20'] > tech['SMA50']) or \
+       (signal['action'] == 'SELL' and tech['SMA20'] < tech['SMA50']):
+        confidence += 15
+    
+    # Volatility confidence (moderate volatility is good)
+    volatility = tech.get('Volatility', 0)
+    if 0.5 <= volatility <= 3.0:
+        confidence += 10
+    elif volatility > 5.0:
+        confidence -= 10  # Too volatile
+    
+    # Trend strength confidence
+    trend_strength = tech.get('Trend_Strength', 0)
+    if trend_strength > 0.2:
+        confidence += 10
+    elif trend_strength < 0.05:
+        confidence -= 5  # Weak trend
+    
+    return min(95, max(5, confidence))  # Cap between 5-95%
+
+def generate_enhanced_signal(tech: Dict, current_price: float) -> Dict:
+    """Generate enhanced trading signal dengan kondisi yang lebih ketat"""
+    rsi = tech['RSI']
+    macd = tech['MACD']
+    macd_signal = tech['MACD_Signal']
+    macd_histogram = tech['MACD_Histogram']
+    sma20 = tech['SMA20']
+    sma50 = tech['SMA50']
+    volatility = tech.get('Volatility', 1.0)
+    trend_strength = tech.get('Trend_Strength', 0)
+    bb_width = tech.get('Bollinger_Width', 0)
+    
+    # Enhanced signal logic dengan filter trend dan volatility
+    trend_bullish = sma20 > sma50 and current_price > sma20
+    trend_bearish = sma20 < sma50 and current_price < sma20
+    
+    # Dynamic SL/TP based on volatility and ATR
+    atr = tech.get('ATR', 0.5)
+    base_sl = max(20, min(50, atr * 100 * 1.5))  # 1.5 x ATR in pips
+    base_tp = base_sl * 2  # 2:1 risk-reward
+    
+    # Adjust for volatility
+    volatility_multiplier = max(0.5, min(2.0, volatility / 2.0))
+    
+    sl_pips = int(base_sl * volatility_multiplier)
+    tp_pips = int(base_tp * volatility_multiplier)
+    
+    # Strong buy conditions (multiple confirmations)
+    strong_buy_conditions = (
+        rsi < 35 and 
+        macd > macd_signal and 
+        macd_histogram > 0 and
+        trend_bullish and
+        current_price > tech['Bollinger_Lower'] and
+        trend_strength > Config.MIN_TREND_STRENGTH and
+        Config.MIN_VOLATILITY <= volatility <= Config.MAX_VOLATILITY
+    )
+    
+    # Strong sell conditions
+    strong_sell_conditions = (
+        rsi > 65 and 
+        macd < macd_signal and 
+        macd_histogram < 0 and
+        trend_bearish and
+        current_price < tech['Bollinger_Upper'] and
+        trend_strength > Config.MIN_TREND_STRENGTH and
+        Config.MIN_VOLATILITY <= volatility <= Config.MAX_VOLATILITY
+    )
+    
+    # Moderate buy conditions
+    moderate_buy_conditions = (
+        rsi < 45 and 
+        macd > macd_signal and
+        current_price > sma20 and
+        rsi > 25  # Avoid extreme oversold
+    )
+    
+    # Moderate sell conditions
+    moderate_sell_conditions = (
+        rsi > 55 and 
+        macd < macd_signal and
+        current_price < sma20 and
+        rsi < 75  # Avoid extreme overbought
+    )
+    
+    if strong_buy_conditions:
+        return {
+            'action': 'BUY',
+            'tp': tp_pips,
+            'sl': sl_pips,
+            'strength': 'STRONG'
+        }
+    elif strong_sell_conditions:
+        return {
+            'action': 'SELL', 
+            'tp': tp_pips,
+            'sl': sl_pips,
+            'strength': 'STRONG'
+        }
+    elif moderate_buy_conditions:
+        return {
+            'action': 'BUY',
+            'tp': int(tp_pips * 0.8),  # Smaller TP for moderate signals
+            'sl': int(sl_pips * 1.2),  # Larger SL for safety
+            'strength': 'MODERATE'
+        }
+    elif moderate_sell_conditions:
+        return {
+            'action': 'SELL',
+            'tp': int(tp_pips * 0.8),
+            'sl': int(sl_pips * 1.2),
+            'strength': 'MODERATE'
+        }
+    else:
+        return {
+            'action': 'HOLD',
+            'tp': 0,
+            'sl': 0,
+            'strength': 'WEAK'
+        }
+
+def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int = 30) -> List[Dict]:
+    """Generate enhanced trading signals untuk backtesting"""
+    signals = []
+    
+    try:
+        # Pair priority filtering
+        pair_priority = Config.PAIR_PRIORITY.get(pair, 5)
+        
+        # Skip low priority pairs untuk short-term backtest
+        if pair_priority > 3 and days < 60:
+            logger.info(f"Skipping {pair} for short-term backtest due to low priority")
+            return signals
+        
+        if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
+            logger.error(f"No historical data found for {pair}-{timeframe}")
+            return signals
+        
+        df = HISTORICAL[pair][timeframe].tail(days * 5)  # More data for better indicators
+        
+        # Hanya generate signals untuk data yang cukup
+        min_data_points = 50
+        if len(df) < min_data_points:
+            logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(df)} points")
+            return signals
+        
+        for i in range(50, len(df)):  # Start from 50 untuk indicator yang stabil
+            current_data = df.iloc[:i+1]
+            current_date = current_data.iloc[-1]['date']
+            current_price = current_data.iloc[-1]['close']
+            
+            # Session time filtering - focus on optimal trading hours
+            hour = current_date.hour
+            if hour not in Config.OPTIMAL_TRADING_HOURS:
+                continue
+                
+            # Calculate technical indicators
+            closes = current_data['close'].tolist()
+            volumes = current_data['vol.'].fillna(0).tolist() if 'vol.' in current_data.columns else None
+            
+            tech_indicators = calc_indicators(closes, volumes)
+            
+            # Filter berdasarkan volatility
+            volatility = tech_indicators.get('Volatility', 0)
+            if volatility < Config.MIN_VOLATILITY or volatility > Config.MAX_VOLATILITY:
+                continue
+                
+            # Filter berdasarkan trend strength
+            trend_strength = tech_indicators.get('Trend_Strength', 0)
+            if trend_strength < Config.MIN_TREND_STRENGTH:
+                continue
+            
+            signal = generate_enhanced_signal(tech_indicators, current_price)
+            
+            if signal['action'] != 'HOLD':
+                confidence = calculate_signal_confidence(signal, tech_indicators)
+                
+                # Only take signals with decent confidence
+                if confidence > 40:  
+                    signals.append({
+                        'date': current_date,
+                        'pair': pair,
+                        'action': signal['action'],
+                        'tp': signal['tp'],
+                        'sl': signal['sl'],
+                        'lot_size': Config.DEFAULT_LOT_SIZE,
+                        'confidence': confidence,
+                        'strength': signal['strength'],
+                        'volatility': volatility,
+                        'trend_strength': trend_strength
+                    })
+        
+        logger.info(f"Generated {len(signals)} filtered backtest signals for {pair}-{timeframe}")
+        return signals
+        
+    except Exception as e:
+        logger.error(f"Error generating backtest signals: {e}")
+        return signals
+
+# ---------------- DATA PROVIDERS & AI ANALYSIS (tetap sama) ----------------
 def get_price_twelvedata(pair: str) -> Optional[float]:
     """Get real-time price from Twelve Data API"""
     try:
@@ -660,7 +1039,6 @@ def get_fundamental_news(pair: str = "USDJPY") -> str:
     
     return news_text
 
-# ---------------- AI ANALYSIS ----------------
 def ai_fallback(tech: Dict, news_summary: str = "") -> Dict:
     """Enhanced fallback AI analysis in Bahasa Indonesia"""
     cp = tech["current_price"]
@@ -738,13 +1116,13 @@ def ai_fallback(tech: Dict, news_summary: str = "") -> Dict:
         "TRADING_ADVICE": f"Analisis teknikal: {advice} Berita: {news_summary[:100]}...",
         "RISK_LEVEL": "RENDAH" if confidence < 60 else "SEDANG" if confidence < 75 else "TINGGI",
         "EXPECTED_MOVEMENT": f"{abs(round((tp1-cp)/cp*100, 2))}%",
-        "AI_PROVIDER": "Fallback System"
+        "AI_PROVIDER": "Enhanced Fallback System"
     }
 
 def ai_deepseek_analysis(pair: str, tech: Dict, fundamentals: str) -> Dict:
     """AI analysis using DeepSeek API in Bahasa Indonesia"""
     if not DEEPSEEK_API_KEY:
-        logger.info("No DeepSeek API key, using fallback analysis")
+        logger.info("No DeepSeek API key, using enhanced fallback analysis")
         return ai_fallback(tech, fundamentals)
     
     try:
@@ -773,19 +1151,22 @@ DATA TRADING:
 Pair: {pair} ({PAIR_MAP.get(pair, pair)})
 Timeframe: {request.args.get('timeframe', '4H')}
 
-INDIKATOR TEKNIKAL:
+INDIKATOR TEKNIKAL TERBARU:
 - Harga Saat Ini: {tech['current_price']}
 - RSI (14): {tech['RSI']} {"(Oversold)" if tech['RSI'] < 30 else "(Overbought)" if tech['RSI'] > 70 else "(Neutral)"}
-- MACD: {tech['MACD']}, Signal: {tech['MACD_Signal']}
+- MACD: {tech['MACD']}, Signal: {tech['MACD_Signal']}, Histogram: {tech['MACD_Histogram']}
 - SMA20: {tech['SMA20']}, SMA50: {tech['SMA50']}, EMA200: {tech['EMA200']}
 - Support: {tech['Support']}, Resistance: {tech['Resistance']}
-- Bollinger Bands: Upper {tech['Bollinger_Upper']}, Lower {tech['Bollinger_Lower']}
+- Bollinger Bands: Upper {tech['Bollinger_Upper']}, Lower {tech['Bollinger_Lower']}, Width: {tech.get('Bollinger_Width', 0)}
 - Volatilitas: {tech['Volatility']}%
+- Trend Strength: {tech.get('Trend_Strength', 0)}%
+- ATR: {tech.get('ATR', 0)}
 
 KONTEKS FUNDAMENTAL:
 {fundamentals}
 
 Berikan analisis yang profesional dan realistis dalam Bahasa Indonesia. Pertimbangkan faktor teknikal dan fundamental.
+Berikan rekomendasi yang konservatif dengan risk management yang prudent.
 """
         
         payload = {
@@ -834,74 +1215,6 @@ Berikan analisis yang profesional dan realistis dalam Bahasa Indonesia. Pertimba
     except Exception as e:
         logger.error(f"DeepSeek unexpected error: {e}")
         return ai_fallback(tech, fundamentals)
-
-# ---------------- BACKTESTING SIGNAL GENERATION ----------------
-def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int = 30) -> List[Dict]:
-    """Generate trading signals for backtesting from historical analysis"""
-    signals = []
-    
-    try:
-        if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
-            logger.error(f"No historical data found for {pair}-{timeframe}")
-            return signals
-        
-        df = HISTORICAL[pair][timeframe].tail(days * 3)  # Get more data for indicator calculation
-        
-        for i in range(20, len(df)):  # Start from 20 to have enough data for indicators
-            current_data = df.iloc[:i+1]
-            current_price = current_data.iloc[-1]['close']
-            
-            # Calculate technical indicators for current point
-            closes = current_data['close'].tolist()
-            volumes = current_data['vol.'].fillna(0).tolist() if 'vol.' in current_data.columns else None
-            
-            tech_indicators = calc_indicators(closes, volumes)
-            
-            # Simple signal generation based on technical indicators
-            signal = generate_simple_signal(tech_indicators, current_price)
-            
-            if signal['action'] != 'HOLD':
-                signals.append({
-                    'date': current_data.iloc[-1]['date'],
-                    'pair': pair,
-                    'action': signal['action'],
-                    'tp': signal['tp'],
-                    'sl': signal['sl'],
-                    'lot_size': Config.DEFAULT_LOT_SIZE
-                })
-        
-        logger.info(f"Generated {len(signals)} backtest signals for {pair}-{timeframe}")
-        return signals
-        
-    except Exception as e:
-        logger.error(f"Error generating backtest signals: {e}")
-        return signals
-
-def generate_simple_signal(tech: Dict, current_price: float) -> Dict:
-    """Generate simple trading signal based on technical indicators"""
-    rsi = tech['RSI']
-    macd = tech['MACD']
-    macd_signal = tech['MACD_Signal']
-    
-    # Simple signal logic
-    if rsi < 30 and macd > macd_signal:
-        return {
-            'action': 'BUY',
-            'tp': 50,  # 50 pips
-            'sl': 25   # 25 pips
-        }
-    elif rsi > 70 and macd < macd_signal:
-        return {
-            'action': 'SELL', 
-            'tp': 50,
-            'sl': 25
-        }
-    else:
-        return {
-            'action': 'HOLD',
-            'tp': 0,
-            'sl': 0
-        }
 
 # ---------------- ROUTES ----------------
 @app.route('/')
@@ -1073,17 +1386,17 @@ def get_analysis():
         traceback.print_exc()
         return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
-# ---------------- BACKTESTING ROUTES ----------------
+# ---------------- ENHANCED BACKTESTING ROUTES ----------------
 @app.route('/api/run_backtest', methods=['POST'])
 def api_run_backtest():
-    """API endpoint untuk menjalankan backtesting"""
+    """API endpoint untuk menjalankan enhanced backtesting"""
     try:
         data = request.get_json()
         pair = data.get('pair', 'USDJPY')
         timeframe = data.get('timeframe', '4H')
         days = data.get('days', 30)
         
-        logger.info(f"Backtest request: {pair}-{timeframe} for {days} days")
+        logger.info(f"Enhanced backtest request: {pair}-{timeframe} for {days} days")
         
         # Validate inputs
         if pair not in Config.SUPPORTED_PAIRS:
@@ -1092,13 +1405,13 @@ def api_run_backtest():
         if timeframe not in Config.SUPPORTED_TIMEFRAMES:
             return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
         
-        # Generate signals for backtesting
+        # Generate enhanced signals untuk backtesting
         signals = generate_backtest_signals_from_analysis(pair, timeframe, days)
         
         if not signals:
             return jsonify({'error': 'No signals generated for backtesting'}), 400
         
-        # Run backtest
+        # Run enhanced backtest
         report = backtester.run_backtest(signals, timeframe)
         
         # Add metadata to report
@@ -1107,7 +1420,8 @@ def api_run_backtest():
             'timeframe': timeframe,
             'period_days': days,
             'signals_generated': len(signals),
-            'initial_balance': Config.INITIAL_BALANCE
+            'initial_balance': Config.INITIAL_BALANCE,
+            'strategy': 'Enhanced Multi-Filter Strategy'
         }
         
         # Save to database
@@ -1116,7 +1430,7 @@ def api_run_backtest():
         return jsonify(report)
         
     except Exception as e:
-        logger.error(f"Backtesting error: {e}")
+        logger.error(f"Enhanced backtesting error: {e}")
         return jsonify({'error': f'Backtesting failed: {str(e)}'}), 500
 
 @app.route('/api/backtest_status')
@@ -1126,7 +1440,15 @@ def api_backtest_status():
         'historical_data_loaded': len(HISTORICAL) > 0,
         'available_pairs': list(HISTORICAL.keys()),
         'initial_balance': Config.INITIAL_BALANCE,
-        'supported_timeframes': Config.SUPPORTED_TIMEFRAMES
+        'supported_timeframes': Config.SUPPORTED_TIMEFRAMES,
+        'enhanced_features': {
+            'pair_priority': Config.PAIR_PRIORITY,
+            'optimal_hours': Config.OPTIMAL_TRADING_HOURS,
+            'volatility_filters': f"{Config.MIN_VOLATILITY}-{Config.MAX_VOLATILITY}%",
+            'max_positions': 3,
+            'max_drawdown': f"{Config.MAX_DRAWDOWN_PCT * 100}%",
+            'daily_loss_limit': f"{Config.DAILY_LOSS_LIMIT * 100}%"
+        }
     }
     
     # Add data points info
@@ -1205,7 +1527,8 @@ def quick_overview():
                 "price": round(price, 4),
                 "change": round(change_pct, 2),
                 "source": source,
-                "trend": "up" if change_pct > 0 else "down" if change_pct < 0 else "flat"
+                "trend": "up" if change_pct > 0 else "down" if change_pct < 0 else "flat",
+                "priority": Config.PAIR_PRIORITY.get(pair, 5)
             }
             
         except Exception as e:
@@ -1214,7 +1537,8 @@ def quick_overview():
                 "price": None,
                 "change": 0,
                 "source": "error",
-                "trend": "flat"
+                "trend": "flat",
+                "priority": 5
             }
     
     return jsonify(overview)
@@ -1226,7 +1550,8 @@ def ai_status():
         "ai_available": bool(DEEPSEEK_API_KEY),
         "ai_provider": "DeepSeek",
         "fallback_ready": True,
-        "message": "AI DeepSeek siap digunakan" if DEEPSEEK_API_KEY else "AI DeepSeek tidak tersedia, menggunakan sistem fallback"
+        "enhanced_fallback": True,
+        "message": "AI DeepSeek siap digunakan" if DEEPSEEK_API_KEY else "AI DeepSeek tidak tersedia, menggunakan enhanced fallback system"
     }
     return jsonify(status)
 
@@ -1265,22 +1590,30 @@ def performance_metrics():
         logger.error(f"Performance metrics error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# ---------------- INITIALIZATION ----------------
+# ---------------- ENHANCED INITIALIZATION ----------------
 if __name__ == "__main__":
-    logger.info("Starting Forex Analysis Application with Backtesting...")
+    logger.info("Starting Enhanced Forex Analysis Application with Advanced Backtesting...")
     
     # Initialize components
     init_db()
     load_csv_data()
     
+    # Log enhanced features status
+    logger.info("🚀 ENHANCED FEATURES ENABLED:")
+    logger.info(f"   Pair Priority: {Config.PAIR_PRIORITY}")
+    logger.info(f"   Optimal Trading Hours: {Config.OPTIMAL_TRADING_HOURS}")
+    logger.info(f"   Volatility Filters: {Config.MIN_VOLATILITY}-{Config.MAX_VOLATILITY}%")
+    logger.info(f"   Max Drawdown: {Config.MAX_DRAWDOWN_PCT * 100}%")
+    logger.info(f"   Daily Loss Limit: {Config.DAILY_LOSS_LIMIT * 100}%")
+    
     # Log AI status
     if DEEPSEEK_API_KEY:
         logger.info("✅ DeepSeek AI integration ENABLED")
     else:
-        logger.info("⚠️ DeepSeek AI integration DISABLED - using fallback system")
+        logger.info("⚠️ DeepSeek AI integration DISABLED - using enhanced fallback system")
     
     # Log backtesting status
-    logger.info(f"✅ Backtesting module INITIALIZED with initial balance: ${Config.INITIAL_BALANCE}")
+    logger.info(f"✅ Enhanced Backtesting module INITIALIZED with initial balance: ${Config.INITIAL_BALANCE}")
     logger.info(f"📊 Historical data loaded for {len(HISTORICAL)} pairs")
     
     # Log data periods
@@ -1289,5 +1622,6 @@ if __name__ == "__main__":
         logger.info(f"   {tf}: {bars} bars")
     
     # Start Flask application
-    logger.info("Application initialized successfully")
+    logger.info("🎯 Enhanced Application initialized successfully")
     app.run(debug=True, host='0.0.0.0', port=5000)
+[file content end]
