@@ -1,3 +1,5 @@
+[file name]: app.py
+[file content begin]
 from flask import Flask, request, jsonify, send_from_directory, render_template, session
 import pandas as pd
 import numpy as np
@@ -101,9 +103,9 @@ class Config:
     }
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "demo")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "demo")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "demo")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # API URLs
@@ -343,99 +345,115 @@ class EnhancedForexBacktester:
                 'message': 'No trades executed during backtesting period'
             }
         
-        df_trades = pd.DataFrame(self.trade_history)
-        df_equity = pd.DataFrame(self.equity_curve)
-        
-        # Calculate performance metrics
-        total_trades = len(df_trades)
-        winning_trades = len(df_trades[df_trades['profit'] > 0])
-        losing_trades = len(df_trades[df_trades['profit'] < 0])
-        win_rate = winning_trades / total_trades * 100 if total_trades > 0 else 0
-        
-        total_profit = df_trades['profit'].sum()
-        average_profit = df_trades['profit'].mean()
-        average_win = df_trades[df_trades['profit'] > 0]['profit'].mean() if winning_trades > 0 else 0
-        average_loss = df_trades[df_trades['profit'] < 0]['profit'].mean() if losing_trades > 0 else 0
-        
-        # Risk Reward Ratio
-        avg_risk_reward = abs(average_win / average_loss) if average_loss != 0 else 0
-        
-        # Maximum drawdown
-        df_equity['peak'] = df_equity['balance'].expanding().max()
-        df_equity['drawdown'] = (df_equity['balance'] - df_equity['peak']) / df_equity['peak'] * 100
-        max_drawdown = df_equity['drawdown'].min()
-        
-        # Profit Factor
-        gross_profit = df_trades[df_trades['profit'] > 0]['profit'].sum()
-        gross_loss = abs(df_trades[df_trades['profit'] < 0]['profit'].sum())
-        profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
-        
-        # Expectancy
-        expectancy = (win_rate/100 * average_win) - ((100-win_rate)/100 * abs(average_loss))
-        
-        # Compile report
-        report = {
-            'status': 'success',
-            'summary': {
-                'total_trades': total_trades,
-                'winning_trades': winning_trades,
-                'losing_trades': losing_trades,
-                'win_rate': round(win_rate, 2),
-                'total_profit': round(total_profit, 2),
-                'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2),
-                'average_profit': round(average_profit, 2),
-                'average_win': round(average_win, 2),
-                'average_loss': round(average_loss, 2),
-                'risk_reward_ratio': round(avg_risk_reward, 2),
-                'profit_factor': round(profit_factor, 2),
-                'expectancy': round(expectancy, 2),
-                'max_drawdown': round(max_drawdown, 2),
-                'final_balance': round(self.balance, 2),
-                'initial_balance': self.initial_balance,
-                'consecutive_losses': self.consecutive_losses
-            },
-            'performance_by_pair': {},
-            'trade_history': [
-                {
-                    'entry_date': trade['entry_date'].strftime('%Y-%m-%d'),
-                    'pair': trade['pair'],
-                    'direction': 'BUY' if trade['direction'] == 1 else 'SELL',
-                    'entry_price': round(trade['entry_price'], 4),
-                    'profit': round(trade.get('profit', 0), 2),
-                    'close_reason': trade.get('close_reason', 'Open'),
-                    'confidence': trade.get('signal_confidence', 50)
-                }
-                for trade in self.trade_history[-20:]
-            ]
-        }
-        
-        # Enhanced performance by pair analysis
-        for pair in self.pairs:
-            pair_trades = df_trades[df_trades['pair'] == pair]
-            if len(pair_trades) > 0:
-                pair_profit = pair_trades['profit'].sum()
-                pair_win_rate = len(pair_trades[pair_trades['profit'] > 0]) / len(pair_trades) * 100
-                avg_confidence = pair_trades['signal_confidence'].mean() if 'signal_confidence' in pair_trades else 50
-                
-                report['performance_by_pair'][pair] = {
-                    'trades': len(pair_trades),
-                    'profit': round(pair_profit, 2),
-                    'win_rate': round(pair_win_rate, 2),
-                    'avg_confidence': round(avg_confidence, 1),
-                    'performance': 'GOOD' if pair_profit > 0 and pair_win_rate > 50 else 'POOR'
-                }
-        
-        # Add recommendations
-        report['recommendations'] = self.generate_recommendations(report)
-        
-        return report
+        try:
+            df_trades = pd.DataFrame(self.trade_history)
+            df_equity = pd.DataFrame(self.equity_curve)
+            
+            # Calculate performance metrics dengan error handling
+            total_trades = len(df_trades)
+            winning_trades = len(df_trades[df_trades['profit'] > 0]) if 'profit' in df_trades.columns else 0
+            losing_trades = len(df_trades[df_trades['profit'] < 0]) if 'profit' in df_trades.columns else 0
+            win_rate = winning_trades / total_trades * 100 if total_trades > 0 else 0
+            
+            total_profit = df_trades['profit'].sum() if 'profit' in df_trades.columns else 0
+            average_profit = df_trades['profit'].mean() if 'profit' in df_trades.columns and total_trades > 0 else 0
+            average_win = df_trades[df_trades['profit'] > 0]['profit'].mean() if winning_trades > 0 else 0
+            average_loss = df_trades[df_trades['profit'] < 0]['profit'].mean() if losing_trades > 0 else 0
+            
+            # Risk Reward Ratio dengan safe division
+            avg_risk_reward = abs(average_win / average_loss) if average_loss != 0 else 0
+            
+            # Maximum drawdown
+            if not df_equity.empty and 'balance' in df_equity.columns:
+                df_equity['peak'] = df_equity['balance'].expanding().max()
+                df_equity['drawdown'] = (df_equity['balance'] - df_equity['peak']) / df_equity['peak'] * 100
+                max_drawdown = df_equity['drawdown'].min() if 'drawdown' in df_equity.columns else 0
+            else:
+                max_drawdown = 0
+            
+            # Profit Factor
+            gross_profit = df_trades[df_trades['profit'] > 0]['profit'].sum() if winning_trades > 0 else 0
+            gross_loss = abs(df_trades[df_trades['profit'] < 0]['profit'].sum()) if losing_trades > 0 else 0
+            profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
+            
+            # Expectancy
+            expectancy = (win_rate/100 * average_win) - ((100-win_rate)/100 * abs(average_loss))
+            
+            # Compile report
+            report = {
+                'status': 'success',
+                'summary': {
+                    'total_trades': total_trades,
+                    'winning_trades': winning_trades,
+                    'losing_trades': losing_trades,
+                    'win_rate': round(win_rate, 2),
+                    'total_profit': round(total_profit, 2),
+                    'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2),
+                    'average_profit': round(average_profit, 2),
+                    'average_win': round(average_win, 2),
+                    'average_loss': round(average_loss, 2),
+                    'risk_reward_ratio': round(avg_risk_reward, 2),
+                    'profit_factor': round(profit_factor, 2),
+                    'expectancy': round(expectancy, 2),
+                    'max_drawdown': round(max_drawdown, 2),
+                    'final_balance': round(self.balance, 2),
+                    'initial_balance': self.initial_balance,
+                    'consecutive_losses': self.consecutive_losses
+                },
+                'performance_by_pair': {},
+                'trade_history': [
+                    {
+                        'entry_date': trade['entry_date'].strftime('%Y-%m-%d') if hasattr(trade['entry_date'], 'strftime') else str(trade['entry_date']),
+                        'pair': trade['pair'],
+                        'direction': 'BUY' if trade['direction'] == 1 else 'SELL',
+                        'entry_price': round(trade['entry_price'], 4),
+                        'profit': round(trade.get('profit', 0), 2),
+                        'close_reason': trade.get('close_reason', 'Open'),
+                        'confidence': trade.get('signal_confidence', 50)
+                    }
+                    for trade in self.trade_history[-20:]
+                ]
+            }
+            
+            # Enhanced performance by pair analysis
+            for pair in self.pairs:
+                pair_trades = df_trades[df_trades['pair'] == pair]
+                if len(pair_trades) > 0:
+                    pair_profit = pair_trades['profit'].sum() if 'profit' in pair_trades.columns else 0
+                    pair_win_rate = len(pair_trades[pair_trades['profit'] > 0]) / len(pair_trades) * 100 if 'profit' in pair_trades.columns else 0
+                    avg_confidence = pair_trades['signal_confidence'].mean() if 'signal_confidence' in pair_trades.columns else 50
+                    
+                    report['performance_by_pair'][pair] = {
+                        'trades': len(pair_trades),
+                        'profit': round(pair_profit, 2),
+                        'win_rate': round(pair_win_rate, 2),
+                        'avg_confidence': round(avg_confidence, 1),
+                        'performance': 'GOOD' if pair_profit > 0 and pair_win_rate > 50 else 'POOR'
+                    }
+            
+            # Add recommendations
+            report['recommendations'] = self.generate_recommendations(report)
+            
+            return report
+            
+        except Exception as e:
+            logger.error(f"Error generating enhanced report: {e}")
+            traceback.print_exc()
+            return {
+                'status': 'error',
+                'message': f'Error generating report: {str(e)}'
+            }
     
     def generate_recommendations(self, report):
         recommendations = []
         
-        win_rate = report['summary']['win_rate']
-        profit_factor = report['summary']['profit_factor']
-        max_drawdown = report['summary']['max_drawdown']
+        if report['status'] == 'error':
+            return ["⚠️ Error in report generation - check logs for details"]
+        
+        summary = report.get('summary', {})
+        win_rate = summary.get('win_rate', 0)
+        profit_factor = summary.get('profit_factor', 0)
+        max_drawdown = summary.get('max_drawdown', 0)
         
         if win_rate < 45:
             recommendations.append("🎯 Increase signal quality filters - current win rate too low")
@@ -452,17 +470,17 @@ class EnhancedForexBacktester:
         elif max_drawdown > -5:
             recommendations.append("📊 Healthy drawdown level - good risk control")
         
-        if report['summary']['average_loss'] > abs(report['summary']['average_win']):
+        if summary.get('average_loss', 0) > abs(summary.get('average_win', 0)):
             recommendations.append("📉 Review stop-loss placement - average loss larger than average win")
         
         # Pair-specific recommendations
-        for pair, perf in report['performance_by_pair'].items():
+        for pair, perf in report.get('performance_by_pair', {}).items():
             if perf['performance'] == 'POOR':
                 recommendations.append(f"🔍 Review {pair} strategy - underperforming (Win Rate: {perf['win_rate']}%)")
             else:
                 recommendations.append(f"✅ {pair} performing well (Win Rate: {perf['win_rate']}%)")
         
-        if report['summary']['consecutive_losses'] >= 3:
+        if summary.get('consecutive_losses', 0) >= 3:
             recommendations.append("🚨 High consecutive losses - consider reducing position size or adding filters")
         
         if not recommendations:
@@ -516,10 +534,35 @@ def init_db():
             recommendations TEXT
         )''')
         
+        # Check and add missing columns to analysis_results
+        c.execute("PRAGMA table_info(analysis_results)")
+        existing_columns = [column[1] for column in c.fetchall()]
+        
+        if 'fundamental_news' not in existing_columns:
+            c.execute("ALTER TABLE analysis_results ADD COLUMN fundamental_news TEXT")
+            logger.info("Added fundamental_news column to analysis_results")
+        
+        # Check and add missing columns to backtesting_results  
+        c.execute("PRAGMA table_info(backtesting_results)")
+        existing_columns = [column[1] for column in c.fetchall()]
+        
+        if 'risk_reward_ratio' not in existing_columns:
+            c.execute("ALTER TABLE backtesting_results ADD COLUMN risk_reward_ratio REAL")
+            logger.info("Added risk_reward_ratio column to backtesting_results")
+            
+        if 'expectancy' not in existing_columns:
+            c.execute("ALTER TABLE backtesting_results ADD COLUMN expectancy REAL")
+            logger.info("Added expectancy column to backtesting_results")
+            
+        if 'recommendations' not in existing_columns:
+            c.execute("ALTER TABLE backtesting_results ADD COLUMN recommendations TEXT")
+            logger.info("Added recommendations column to backtesting_results")
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
+        traceback.print_exc()
     finally:
         conn.close()
 
@@ -544,12 +587,20 @@ def save_analysis_result(data: Dict):
         logger.info(f"Analysis saved for {data['pair']}-{data['timeframe']}")
     except Exception as e:
         logger.error(f"Error saving analysis: {e}")
+        traceback.print_exc()
     finally:
         conn.close()
 
 def save_backtest_result(report_data: Dict):
     """Save enhanced backtesting result to database"""
     try:
+        # Check if report has summary section
+        if 'summary' not in report_data:
+            logger.warning("No summary found in report data, skipping save")
+            return
+            
+        summary = report_data['summary']
+        
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
         
@@ -563,15 +614,15 @@ def save_backtest_result(report_data: Dict):
                  (report_data.get('pair', 'MULTI'),
                   report_data.get('timeframe', '4H'),
                   report_data.get('period_days', 30),
-                  report_data['summary']['total_trades'],
-                  report_data['summary']['winning_trades'],
-                  report_data['summary']['win_rate'],
-                  report_data['summary']['total_profit'],
-                  report_data['summary']['final_balance'],
-                  report_data['summary']['max_drawdown'],
-                  report_data['summary']['profit_factor'],
-                  report_data['summary']['risk_reward_ratio'],
-                  report_data['summary']['expectancy'],
+                  summary.get('total_trades', 0),
+                  summary.get('winning_trades', 0),
+                  summary.get('win_rate', 0),
+                  summary.get('total_profit', 0),
+                  summary.get('final_balance', Config.INITIAL_BALANCE),
+                  summary.get('max_drawdown', 0),
+                  summary.get('profit_factor', 0),
+                  summary.get('risk_reward_ratio', 0),
+                  summary.get('expectancy', 0),
                   json.dumps(report_data),
                   recommendations))
         
@@ -579,6 +630,7 @@ def save_backtest_result(report_data: Dict):
         logger.info("Enhanced backtesting result saved to database")
     except Exception as e:
         logger.error(f"Error saving backtest result: {e}")
+        traceback.print_exc()
     finally:
         conn.close()
 
@@ -645,6 +697,7 @@ def load_csv_data():
                     
                 except Exception as e:
                     logger.error(f"⚠️ Error loading {file_path}: {e}")
+                    traceback.print_exc()
     
     # Log summary of loaded data
     for pair in HISTORICAL:
@@ -1020,6 +1073,7 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
         
     except Exception as e:
         logger.error(f"Error generating backtest signals: {e}")
+        traceback.print_exc()
         return signals
 
 # ---------------- DATA PROVIDERS & AI ANALYSIS ----------------
@@ -1453,11 +1507,28 @@ def api_run_backtest():
         if timeframe not in Config.SUPPORTED_TIMEFRAMES:
             return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
         
+        # Check if historical data exists
+        if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
+            available_data = []
+            for p in HISTORICAL:
+                for tf in HISTORICAL[p]:
+                    available_data.append(f"{p}-{tf}")
+            
+            return jsonify({
+                'error': f'No historical data found for {pair}-{timeframe}',
+                'available_data': available_data,
+                'suggestion': 'Please check the historical_data folder for CSV files'
+            }), 400
+        
         # Generate enhanced signals untuk backtesting
         signals = generate_backtest_signals_from_analysis(pair, timeframe, days)
         
         if not signals:
-            return jsonify({'error': 'No signals generated for backtesting'}), 400
+            return jsonify({
+                'error': 'No signals generated for backtesting',
+                'reason': 'Insufficient data or no trading conditions met',
+                'data_points': len(HISTORICAL[pair][timeframe]) if pair in HISTORICAL and timeframe in HISTORICAL[pair] else 0
+            }), 400
         
         # Run enhanced backtest
         report = backtester.run_backtest(signals, timeframe)
@@ -1479,6 +1550,7 @@ def api_run_backtest():
         
     except Exception as e:
         logger.error(f"Enhanced backtesting error: {e}")
+        traceback.print_exc()
         return jsonify({'error': f'Backtesting failed: {str(e)}'}), 500
 
 @app.route('/api/backtest_status')
@@ -1670,3 +1742,4 @@ if __name__ == "__main__":
     # Start Flask application
     logger.info("🎯 Enhanced Application initialized successfully")
     app.run(debug=True, host='0.0.0.0', port=5000)
+[file content end]
