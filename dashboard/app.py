@@ -101,10 +101,10 @@ class Config:
     }
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", " ")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "b90862d072ce41e4b0505cbd7b710b66")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-820e07acdd9d4c94868b7fb95c9e8225")
 
 # API URLs
 TWELVE_API_URL = "https://api.twelvedata.com"
@@ -620,9 +620,75 @@ def save_backtest_result(report_data: Dict):
     finally:
         conn.close()
 
-# ---------------- DATA LOADING ----------------
+# ---------------- FIX PROBLEMATIC CSV FILES ----------------
+def fix_problematic_csv_files():
+    """Fix problematic CSV files that failed to load"""
+    problematic_files = []
+    
+    for pair in Config.SUPPORTED_PAIRS:
+        for timeframe in ['4H', '1D']:  # Focus on problematic timeframes
+            filename = f"historical_data/{pair}_{timeframe}.csv"
+            if os.path.exists(filename):
+                try:
+                    # Read the file as text to see the structure
+                    with open(filename, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # If file contains tabs and seems malformed, fix it
+                    if '\t' in content and content.count('\t') >= 5:
+                        logger.info(f"Fixing problematic file: {filename}")
+                        
+                        # Read lines and parse manually
+                        with open(filename, 'r', encoding='utf-8') as f:
+                            lines = f.readlines()
+                        
+                        # Parse each line
+                        data = []
+                        for line in lines:
+                            parts = line.strip().split('\t')
+                            if len(parts) >= 5:
+                                # Assume format: datetime, open, high, low, close, volume
+                                row = {
+                                    'datetime': parts[0],
+                                    'open': parts[1],
+                                    'high': parts[2], 
+                                    'low': parts[3],
+                                    'close': parts[4],
+                                    'volume': parts[5] if len(parts) > 5 else '10000'
+                                }
+                                data.append(row)
+                        
+                        if data:
+                            # Create new DataFrame
+                            df_fixed = pd.DataFrame(data)
+                            
+                            # Convert numeric columns
+                            for col in ['open', 'high', 'low', 'close', 'volume']:
+                                df_fixed[col] = pd.to_numeric(df_fixed[col], errors='coerce')
+                            
+                            df_fixed = df_fixed.dropna()
+                            
+                            # Parse datetime - handle format like "2009-09-15_08:00"
+                            df_fixed['datetime'] = df_fixed['datetime'].str.replace('_', ' ')
+                            df_fixed['date'] = pd.to_datetime(df_fixed['datetime'], errors='coerce')
+                            df_fixed = df_fixed.dropna(subset=['date'])
+                            
+                            if len(df_fixed) > 0:
+                                # Save fixed version
+                                backup_name = filename + '.backup'
+                                os.rename(filename, backup_name)
+                                df_fixed[['date', 'open', 'high', 'low', 'close', 'volume']].to_csv(filename, index=False)
+                                logger.info(f"✅ Fixed {filename}, backup saved as {backup_name}")
+                                problematic_files.append(filename)
+                
+                except Exception as e:
+                    logger.error(f"Error fixing {filename}: {e}")
+    
+    return problematic_files
+
+# ---------------- ENHANCED DATA LOADING ----------------
 def load_csv_data():
-    """Load historical CSV data with enhanced error handling"""
+    """Load historical CSV data with enhanced error handling for various formats"""
     search_dirs = [".", "data", "historical_data"]
     loaded_count = 0
     
@@ -637,47 +703,115 @@ def load_csv_data():
                 file_path = os.path.join(directory, filename)
                 try:
                     logger.info(f"Loading CSV file: {file_path}")
-                    df = pd.read_csv(file_path)
+                    
+                    # Try different delimiters and encodings
+                    df = None
+                    delimiters = [',', '\t', ';', '|']
+                    encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+                    
+                    for encoding in encodings:
+                        for delimiter in delimiters:
+                            try:
+                                df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding)
+                                if df.shape[1] > 1:  # If we have more than 1 column, it's probably correct
+                                    logger.info(f"Successfully loaded with delimiter '{delimiter}' and encoding '{encoding}'")
+                                    break
+                            except Exception as e:
+                                continue
+                        if df is not None and df.shape[1] > 1:
+                            break
+                    
+                    # If still no success, try reading with no header and infer structure
+                    if df is None or df.shape[1] <= 1:
+                        logger.warning(f"Standard loading failed for {filename}, trying alternative methods")
+                        try:
+                            # Read the first few lines to understand structure
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                first_lines = [f.readline().strip() for _ in range(5)]
+                            
+                            # Check if it's tab-separated with combined columns
+                            if any('\t' in line for line in first_lines):
+                                # Try reading with tab separator and no header
+                                df = pd.read_csv(file_path, delimiter='\t', header=None, encoding='utf-8')
+                                logger.info("Loaded as tab-separated without header")
+                                
+                                # Assign column names based on number of columns
+                                if df.shape[1] >= 5:
+                                    df.columns = ['datetime', 'open', 'high', 'low', 'close'] + [f'extra_{i}' for i in range(5, df.shape[1])]
+                                elif df.shape[1] >= 4:
+                                    df.columns = ['datetime', 'open', 'high', 'low'] + [f'extra_{i}' for i in range(4, df.shape[1])]
+                                    df['close'] = df['low']  # Use low as close if close is missing
+                                else:
+                                    logger.warning(f"Not enough columns in {filename}: {df.shape[1]}")
+                                    continue
+                            else:
+                                logger.error(f"Cannot determine file structure for {filename}")
+                                continue
+                                
+                        except Exception as e:
+                            logger.error(f"Alternative loading also failed for {filename}: {e}")
+                            continue
                     
                     # Standardize column names
-                    df.columns = [col.lower().strip().replace(' ', '_') for col in df.columns]
+                    df.columns = [str(col).lower().strip().replace(' ', '_').replace('.', '') for col in df.columns]
                     logger.info(f"Columns found: {list(df.columns)}")
                     
                     # Handle different column naming conventions
                     if 'close' not in df.columns:
-                        if 'price' in df.columns:
-                            df['close'] = df['price']
-                        elif 'last' in df.columns:
-                            df['close'] = df['last']
-                        else:
-                            # Try to identify price column automatically
+                        price_found = False
+                        for col in df.columns:
+                            if col in ['close', 'price', 'last', 'value']:
+                                df['close'] = df[col]
+                                price_found = True
+                                break
+                        
+                        if not price_found:
+                            # Use the last numeric column as close price
                             for col in df.columns:
-                                if col in ['close', 'price', 'last', 'value']:
+                                if pd.api.types.is_numeric_dtype(df[col]):
                                     df['close'] = df[col]
+                                    price_found = True
                                     break
-                            else:
-                                # Use the first numeric column as close price
-                                for col in df.columns:
-                                    if pd.api.types.is_numeric_dtype(df[col]):
-                                        df['close'] = df[col]
-                                        break
-                                else:
-                                    logger.warning(f"No suitable price column found in {filename}")
-                                    continue
+                        
+                        if not price_found:
+                            logger.warning(f"No suitable price column found in {filename}")
+                            continue
                     
                     # Ensure we have open, high, low columns
                     if 'open' not in df.columns:
-                        df['open'] = df['close']
-                    if 'high' not in df.columns:
-                        df['high'] = df['close']
-                    if 'low' not in df.columns:
-                        df['low'] = df['close']
-                    if 'volume' not in df.columns and 'vol.' not in df.columns:
-                        df['volume'] = 10000
-                    elif 'vol.' in df.columns:
-                        df['volume'] = df['vol.']
+                        if any(col in df.columns for col in ['open', 'o']):
+                            for col in ['open', 'o']:
+                                if col in df.columns:
+                                    df['open'] = df[col]
+                                    break
+                        else:
+                            df['open'] = df['close']
                     
-                    # Parse date column
+                    if 'high' not in df.columns:
+                        if any(col in df.columns for col in ['high', 'h']):
+                            for col in ['high', 'h']:
+                                if col in df.columns:
+                                    df['high'] = df[col]
+                                    break
+                        else:
+                            df['high'] = df['close']
+                    
+                    if 'low' not in df.columns:
+                        if any(col in df.columns for col in ['low', 'l']):
+                            for col in ['low', 'l']:
+                                if col in df.columns:
+                                    df['low'] = df[col]
+                                    break
+                        else:
+                            df['low'] = df['close']
+                    
+                    if 'volume' not in df.columns:
+                        if 'vol' in df.columns:
+                            df['volume'] = df['vol']
+                        else:
+                            df['volume'] = 10000
+                    
+                    # Parse date column - handle various date formats
                     date_column = None
                     for col in ['date', 'time', 'datetime', 'timestamp']:
                         if col in df.columns:
@@ -685,8 +819,61 @@ def load_csv_data():
                             break
                     
                     if date_column:
-                        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+                        # Clean the date column - remove any non-date characters
+                        df[date_column] = df[date_column].astype(str).str.strip()
+                        
+                        # Try different date formats
+                        date_formats = [
+                            '%Y-%m-%d %H:%M:%S',
+                            '%Y-%m-%d %H:%M',
+                            '%Y-%m-%d',
+                            '%d/%m/%Y %H:%M:%S', 
+                            '%d/%m/%Y %H:%M',
+                            '%d/%m/%Y',
+                            '%m/%d/%Y %H:%M:%S',
+                            '%m/%d/%Y %H:%M',
+                            '%m/%d/%Y',
+                            '%Y.%m.%d %H:%M:%S',
+                            '%Y.%m.%d %H:%M', 
+                            '%Y.%m.%d',
+                            '%d-%m-%Y %H:%M:%S',
+                            '%d-%m-%Y %H:%M',
+                            '%d-%m-%Y',
+                            '%Y%m%d %H:%M:%S',
+                            '%Y%m%d %H:%M',
+                            '%Y%m%d'
+                        ]
+                        
+                        # Special handling for formats like "2009-09-15_08:00"
+                        if df[date_column].str.contains('_').any():
+                            df[date_column] = df[date_column].str.replace('_', ' ', regex=False)
+                            date_formats.insert(0, '%Y-%m-%d %H:%M')
+                        
+                        parsed_dates = pd.Series([pd.NaT] * len(df))
+                        
+                        for fmt in date_formats:
+                            try:
+                                temp_dates = pd.to_datetime(df[date_column], format=fmt, errors='coerce')
+                                success_rate = temp_dates.notna().mean()
+                                if success_rate > 0.8:  # If format works for most rows
+                                    parsed_dates = temp_dates
+                                    logger.info(f"Successfully parsed dates with format: {fmt}")
+                                    break
+                            except:
+                                continue
+                        
+                        if parsed_dates.isna().all():
+                            # Final fallback - let pandas infer
+                            logger.warning(f"Using pandas to infer date format for {filename}")
+                            parsed_dates = pd.to_datetime(df[date_column], errors='coerce')
+                        
+                        df[date_column] = parsed_dates
                         df = df.dropna(subset=[date_column])
+                        
+                        if len(df) == 0:
+                            logger.warning(f"All dates failed to parse in {filename}")
+                            continue
+                            
                         # Sort by date ascending
                         df = df.sort_values(date_column)
                         df = df.reset_index(drop=True)
@@ -711,20 +898,35 @@ def load_csv_data():
                     else:
                         # Detect timeframe from data
                         if len(df) > 0 and 'date' in df.columns:
-                            time_diff = df['date'].diff().mean()
-                            if time_diff <= pd.Timedelta(hours=1):
-                                timeframe = "1H"
-                            elif time_diff <= pd.Timedelta(hours=4):
-                                timeframe = "4H"
-                            elif time_diff <= pd.Timedelta(days=1):
+                            try:
+                                time_diff = df['date'].diff().mean()
+                                if time_diff <= pd.Timedelta(hours=1):
+                                    timeframe = "1H"
+                                elif time_diff <= pd.Timedelta(hours=4):
+                                    timeframe = "4H"
+                                elif time_diff <= pd.Timedelta(days=1):
+                                    timeframe = "1D"
+                                else:
+                                    timeframe = "1W"
+                            except:
                                 timeframe = "1D"
-                            else:
-                                timeframe = "1W"
                         else:
                             timeframe = "1D"
                     
                     if pair not in Config.SUPPORTED_PAIRS:
                         logger.warning(f"Unsupported pair {pair} in file {filename}")
+                        continue
+                    
+                    # Clean data - remove any rows with invalid prices
+                    numeric_cols = ['open', 'high', 'low', 'close']
+                    for col in numeric_cols:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                    
+                    df = df.dropna(subset=['close'])
+                    
+                    if len(df) == 0:
+                        logger.warning(f"No valid data rows in {filename} after cleaning")
                         continue
                     
                     # Initialize nested dictionaries
@@ -753,6 +955,7 @@ def load_csv_data():
     # Load data to backtester
     if HISTORICAL:
         backtester.load_historical_data(HISTORICAL)
+        logger.info("✅ Historical data loaded to backtester")
     else:
         logger.error("No historical data available for backtester!")
 
@@ -1936,6 +2139,12 @@ if __name__ == "__main__":
     
     # Initialize components
     init_db()
+    
+    # Try to fix problematic CSV files first
+    logger.info("Checking for problematic CSV files...")
+    fixed_files = fix_problematic_csv_files()
+    if fixed_files:
+        logger.info(f"Fixed {len(fixed_files)} problematic files")
     
     # Always create sample data for demonstration
     logger.info("Creating sample data for demonstration...")
