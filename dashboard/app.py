@@ -104,7 +104,7 @@ class Config:
 TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "demo")
 ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "demo")
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "demo")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "demo")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # API URLs
 TWELVE_API_URL = "https://api.twelvedata.com"
@@ -532,32 +532,53 @@ def init_db():
             recommendations TEXT
         )''')
         
-        # Check and add missing columns to analysis_results
+        # Check and add ALL missing columns to analysis_results
         c.execute("PRAGMA table_info(analysis_results)")
         existing_columns = [column[1] for column in c.fetchall()]
         
-        if 'fundamental_news' not in existing_columns:
-            c.execute("ALTER TABLE analysis_results ADD COLUMN fundamental_news TEXT")
-            logger.info("Added fundamental_news column to analysis_results")
+        # List of all required columns for analysis_results
+        required_columns = {
+            'fundamental_news': 'TEXT',
+            'confidence_score': 'REAL', 
+            'ai_provider': 'TEXT',
+            'chart_data': 'TEXT',
+            'data_source': 'TEXT'
+        }
         
-        # Check and add missing columns to backtesting_results  
+        for column, data_type in required_columns.items():
+            if column not in existing_columns:
+                c.execute(f"ALTER TABLE analysis_results ADD COLUMN {column} {data_type}")
+                logger.info(f"Added {column} column to analysis_results")
+        
+        # Check and add ALL missing columns to backtesting_results  
         c.execute("PRAGMA table_info(backtesting_results)")
         existing_columns = [column[1] for column in c.fetchall()]
         
-        if 'risk_reward_ratio' not in existing_columns:
-            c.execute("ALTER TABLE backtesting_results ADD COLUMN risk_reward_ratio REAL")
-            logger.info("Added risk_reward_ratio column to backtesting_results")
-            
-        if 'expectancy' not in existing_columns:
-            c.execute("ALTER TABLE backtesting_results ADD COLUMN expectancy REAL")
-            logger.info("Added expectancy column to backtesting_results")
-            
-        if 'recommendations' not in existing_columns:
-            c.execute("ALTER TABLE backtesting_results ADD COLUMN recommendations TEXT")
-            logger.info("Added recommendations column to backtesting_results")
+        # List of all required columns for backtesting_results
+        required_columns_bt = {
+            'risk_reward_ratio': 'REAL',
+            'expectancy': 'REAL',
+            'recommendations': 'TEXT',
+            'report_data': 'TEXT'
+        }
+        
+        for column, data_type in required_columns_bt.items():
+            if column not in existing_columns:
+                c.execute(f"ALTER TABLE backtesting_results ADD COLUMN {column} {data_type}")
+                logger.info(f"Added {column} column to backtesting_results")
         
         conn.commit()
         logger.info("Database initialized successfully")
+        
+        # Log current schema for debugging
+        c.execute("PRAGMA table_info(analysis_results)")
+        analysis_columns = [column[1] for column in c.fetchall()]
+        logger.info(f"Current analysis_results columns: {analysis_columns}")
+        
+        c.execute("PRAGMA table_info(backtesting_results)")
+        backtest_columns = [column[1] for column in c.fetchall()]
+        logger.info(f"Current backtesting_results columns: {backtest_columns}")
+        
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         traceback.print_exc()
@@ -570,22 +591,29 @@ def save_analysis_result(data: Dict):
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
         
+        # Get confidence score safely
+        confidence = data['ai_analysis'].get('CONFIDENCE_LEVEL', 50) if data.get('ai_analysis') else 50
+        ai_provider = data.get('ai_provider', "Fallback")
+        
         c.execute('''INSERT INTO analysis_results 
                     (pair, timeframe, current_price, technical_indicators, 
                      ai_analysis, fundamental_news, chart_data, data_source, 
                      confidence_score, ai_provider)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                  (data['pair'], data['timeframe'], data['current_price'],
-                  json.dumps(data['technical_indicators']), json.dumps(data['ai_analysis']),
-                  data.get('fundamental_news', ''), json.dumps(data.get('chart_data', {})),
-                  data.get('data_source', ''), data['ai_analysis'].get('CONFIDENCE_LEVEL', 50),
-                  "DeepSeek" if DEEPSEEK_API_KEY else "Fallback"))
+                  json.dumps(data['technical_indicators']), 
+                  json.dumps(data.get('ai_analysis', {})),
+                  data.get('fundamental_news', ''),
+                  json.dumps(data.get('chart_data', {})),
+                  data.get('data_source', ''),
+                  confidence,
+                  ai_provider))
         
         conn.commit()
         logger.info(f"Analysis saved for {data['pair']}-{data['timeframe']}")
     except Exception as e:
         logger.error(f"Error saving analysis: {e}")
-        traceback.print_exc()
+        # Don't raise the error, just log it so the analysis can continue
     finally:
         conn.close()
 
@@ -707,6 +735,80 @@ def load_csv_data():
 
     # Load data to backtester
     backtester.load_historical_data(HISTORICAL)
+
+# ---------------- SAMPLE DATA CREATION ----------------
+def create_sample_data():
+    """Create sample historical data if none exists"""
+    try:
+        # Create historical_data directory if not exists
+        if not os.path.exists('historical_data'):
+            os.makedirs('historical_data')
+        
+        # Generate sample data for all pairs and timeframes
+        pairs = ['USDJPY', 'GBPJPY', 'EURJPY', 'CHFJPY']
+        timeframes = ['1H', '4H', '1D']
+        
+        base_prices = {
+            'USDJPY': 146.0,
+            'GBPJPY': 198.0, 
+            'EURJPY': 172.0,
+            'CHFJPY': 184.0
+        }
+        
+        for pair in pairs:
+            for timeframe in timeframes:
+                filename = f"historical_data/{pair}_{timeframe}.csv"
+                
+                # Skip if file already exists
+                if os.path.exists(filename):
+                    continue
+                
+                # Generate dates based on timeframe
+                start_date = datetime(2024, 1, 1)
+                if timeframe == '1H':
+                    periods = 24 * 90  # 90 days of hourly data
+                    date_range = [start_date + timedelta(hours=i) for i in range(periods)]
+                elif timeframe == '4H':
+                    periods = 6 * 90  # 90 days of 4-hour data
+                    date_range = [start_date + timedelta(hours=4*i) for i in range(periods)]
+                else:  # 1D
+                    periods = 90  # 90 days
+                    date_range = [start_date + timedelta(days=i) for i in range(periods)]
+                
+                # Generate price data with some randomness
+                base_price = base_prices[pair]
+                prices = []
+                current_price = base_price
+                
+                for i in range(periods):
+                    # Simulate price movement
+                    change = (i / periods) * 10 - 5  # Overall trend
+                    random_move = (random.random() - 0.5) * 2  # Random fluctuation
+                    
+                    open_price = current_price
+                    high = open_price + abs(random_move) * 0.3
+                    low = open_price - abs(random_move) * 0.3
+                    close = open_price + change/100 + random_move
+                    
+                    prices.append({
+                        'date': date_range[i],
+                        'open': round(open_price, 4),
+                        'high': round(high, 4),
+                        'low': round(low, 4),
+                        'close': round(close, 4),
+                        'vol.': int(10000 + random.random() * 10000)
+                    })
+                    
+                    current_price = close
+                
+                # Create DataFrame and save
+                df = pd.DataFrame(prices)
+                df.to_csv(filename, index=False)
+                logger.info(f"Created {filename} with {len(df)} rows")
+                
+    except Exception as e:
+        logger.error(f"Error creating sample data: {e}")
+        traceback.print_exc()
 
 # ---------------- ENHANCED TECHNICAL INDICATORS CALCULATION ----------------
 def calculate_ema_series(series: pd.Series, period: int) -> pd.Series:
@@ -1708,6 +1810,12 @@ if __name__ == "__main__":
     
     # Initialize components
     init_db()
+    
+    # Check if we need to create sample data
+    if not os.path.exists('historical_data') or len(os.listdir('historical_data')) == 0:
+        logger.info("No historical data found, creating sample data...")
+        create_sample_data()
+    
     load_csv_data()
     
     # Log enhanced features status
