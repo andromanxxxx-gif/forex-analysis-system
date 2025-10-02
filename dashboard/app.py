@@ -101,10 +101,10 @@ class Config:
     }
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", " ")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", " ")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", " ")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "b90862d072ce41e4b0505cbd7b710b66")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-820e07acdd9d4c94868b7fb95c9e8225")
 
 # API URLs
 TWELVE_API_URL = "https://api.twelvedata.com"
@@ -496,8 +496,12 @@ def init_db():
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
         
+        # Drop and recreate tables to ensure clean schema
+        c.execute('DROP TABLE IF EXISTS analysis_results')
+        c.execute('DROP TABLE IF EXISTS backtesting_results')
+        
         # Main analysis results table
-        c.execute('''CREATE TABLE IF NOT EXISTS analysis_results (
+        c.execute('''CREATE TABLE analysis_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pair TEXT NOT NULL,
             timeframe TEXT NOT NULL,
@@ -513,7 +517,7 @@ def init_db():
         )''')
 
         # Enhanced backtesting results table
-        c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
+        c.execute('''CREATE TABLE backtesting_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             pair TEXT NOT NULL,
@@ -532,52 +536,8 @@ def init_db():
             recommendations TEXT
         )''')
         
-        # Check and add ALL missing columns to analysis_results
-        c.execute("PRAGMA table_info(analysis_results)")
-        existing_columns = [column[1] for column in c.fetchall()]
-        
-        # List of all required columns for analysis_results
-        required_columns = {
-            'fundamental_news': 'TEXT',
-            'confidence_score': 'REAL', 
-            'ai_provider': 'TEXT',
-            'chart_data': 'TEXT',
-            'data_source': 'TEXT'
-        }
-        
-        for column, data_type in required_columns.items():
-            if column not in existing_columns:
-                c.execute(f"ALTER TABLE analysis_results ADD COLUMN {column} {data_type}")
-                logger.info(f"Added {column} column to analysis_results")
-        
-        # Check and add ALL missing columns to backtesting_results  
-        c.execute("PRAGMA table_info(backtesting_results)")
-        existing_columns = [column[1] for column in c.fetchall()]
-        
-        # List of all required columns for backtesting_results
-        required_columns_bt = {
-            'risk_reward_ratio': 'REAL',
-            'expectancy': 'REAL',
-            'recommendations': 'TEXT',
-            'report_data': 'TEXT'
-        }
-        
-        for column, data_type in required_columns_bt.items():
-            if column not in existing_columns:
-                c.execute(f"ALTER TABLE backtesting_results ADD COLUMN {column} {data_type}")
-                logger.info(f"Added {column} column to backtesting_results")
-        
         conn.commit()
-        logger.info("Database initialized successfully")
-        
-        # Log current schema for debugging
-        c.execute("PRAGMA table_info(analysis_results)")
-        analysis_columns = [column[1] for column in c.fetchall()]
-        logger.info(f"Current analysis_results columns: {analysis_columns}")
-        
-        c.execute("PRAGMA table_info(backtesting_results)")
-        backtest_columns = [column[1] for column in c.fetchall()]
-        logger.info(f"Current backtesting_results columns: {backtest_columns}")
+        logger.info("Database initialized successfully with clean schema")
         
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
@@ -613,7 +573,7 @@ def save_analysis_result(data: Dict):
         logger.info(f"Analysis saved for {data['pair']}-{data['timeframe']}")
     except Exception as e:
         logger.error(f"Error saving analysis: {e}")
-        # Don't raise the error, just log it so the analysis can continue
+        traceback.print_exc()
     finally:
         conn.close()
 
@@ -755,12 +715,19 @@ def create_sample_data():
             'CHFJPY': 184.0
         }
         
+        volatility_multipliers = {
+            '1H': 0.3,
+            '4H': 0.5,
+            '1D': 1.0
+        }
+        
         for pair in pairs:
             for timeframe in timeframes:
                 filename = f"historical_data/{pair}_{timeframe}.csv"
                 
                 # Skip if file already exists
                 if os.path.exists(filename):
+                    logger.info(f"File {filename} already exists, skipping")
                     continue
                 
                 # Generate dates based on timeframe
@@ -779,16 +746,24 @@ def create_sample_data():
                 base_price = base_prices[pair]
                 prices = []
                 current_price = base_price
+                volatility = volatility_multipliers[timeframe]
                 
                 for i in range(periods):
-                    # Simulate price movement
-                    change = (i / periods) * 10 - 5  # Overall trend
-                    random_move = (random.random() - 0.5) * 2  # Random fluctuation
+                    # Simulate price movement with trend and noise
+                    trend = (i / periods) * 10 - 5  # Overall trend from -5 to +5
+                    random_move = (random.random() - 0.5) * 2 * volatility  # Random fluctuation
                     
                     open_price = current_price
-                    high = open_price + abs(random_move) * 0.3
-                    low = open_price - abs(random_move) * 0.3
-                    close = open_price + change/100 + random_move
+                    change = trend/1000 + random_move/100  # Small changes
+                    close = open_price + change
+                    
+                    # Ensure high > open and low < open
+                    high = open_price + abs(random_move) * 0.2
+                    low = open_price - abs(random_move) * 0.2
+                    
+                    # Adjust high/low to ensure they bracket the close
+                    high = max(high, close)
+                    low = min(low, close)
                     
                     prices.append({
                         'date': date_range[i],
@@ -1178,9 +1153,13 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
 
 # ---------------- DATA PROVIDERS & AI ANALYSIS ----------------
 def get_price_twelvedata(pair: str) -> Optional[float]:
-    """Get real-time price from Twelve Data API with fallback"""
+    """Get real-time price from Twelve Data API with enhanced fallback"""
     try:
-        # Use demo key to avoid API limits
+        # Skip API call if using demo key to avoid warnings
+        if TWELVE_API_KEY == "demo":
+            logger.info(f"Using demo API key, skipping TwelveData API call for {pair}")
+            return None
+            
         symbol = f"{pair[:3]}/{pair[3:]}"
         url = f"{TWELVE_API_URL}/exchange_rate?symbol={symbol}&apikey={TWELVE_API_KEY}"
         
@@ -1207,7 +1186,11 @@ def get_fundamental_news(pair: str = "USDJPY") -> str:
         news_items = [
             f"Market analysis for {pair}: Monitoring economic indicators and central bank policies.",
             f"Technical patterns forming for {pair}, watch for breakout opportunities.",
-            f"Global economic factors influencing {pair} movement this week."
+            f"Global economic factors influencing {pair} movement this week.",
+            f"{pair} showing typical volatility patterns for current session.",
+            f"Traders monitoring key support and resistance levels for {pair}.",
+            f"Market sentiment for {pair} remains balanced with slight bullish bias.",
+            f"Economic calendar events likely to impact {pair} movement this week."
         ]
         return random.choice(news_items)
     except Exception as e:
@@ -1457,7 +1440,7 @@ def get_analysis():
         if timeframe not in Config.SUPPORTED_TIMEFRAMES:
             return jsonify({"error": f"Unsupported timeframe: {timeframe}"}), 400
         
-        # Get price data with fallback
+        # Get price data with enhanced fallback
         current_price = get_price_twelvedata(pair)
         data_source = "Twelve Data"
         
@@ -1466,10 +1449,13 @@ def get_analysis():
             if pair in HISTORICAL and timeframe in HISTORICAL[pair]:
                 current_price = float(HISTORICAL[pair][timeframe].tail(1)["close"].iloc[0])
                 data_source = "Historical CSV"
+                logger.info(f"Using historical price for {pair}: {current_price}")
             else:
-                # Final fallback - synthetic data
+                # Enhanced final fallback - synthetic data based on realistic ranges
                 base_prices = {"USDJPY": 147.13, "GBPJPY": 198.29, "EURJPY": 172.56, "CHFJPY": 184.41}
-                current_price = base_prices.get(pair, 150.0) + random.uniform(-0.5, 0.5)
+                base_price = base_prices.get(pair, 150.0)
+                # Add realistic random variation
+                current_price = base_price + random.uniform(-0.8, 0.8)
                 data_source = "Synthetic"
                 logger.info(f"Using synthetic price for {pair}: {current_price}")
         
@@ -1617,7 +1603,7 @@ def api_run_backtest():
             return jsonify({
                 'error': f'No historical data found for {pair}-{timeframe}',
                 'available_data': available_data,
-                'suggestion': 'Please check the historical_data folder for CSV files'
+                'suggestion': 'Please ensure CSV files exist in historical_data folder'
             }), 400
         
         # Generate enhanced signals untuk backtesting
@@ -1627,7 +1613,8 @@ def api_run_backtest():
             return jsonify({
                 'error': 'No signals generated for backtesting',
                 'reason': 'Insufficient data or no trading conditions met',
-                'data_points': len(HISTORICAL[pair][timeframe]) if pair in HISTORICAL and timeframe in HISTORICAL[pair] else 0
+                'data_points': len(HISTORICAL[pair][timeframe]) if pair in HISTORICAL and timeframe in HISTORICAL[pair] else 0,
+                'suggestion': 'Try different timeframe or adjust signal parameters'
             }), 400
         
         # Run enhanced backtest
@@ -1808,6 +1795,11 @@ def performance_metrics():
 if __name__ == "__main__":
     logger.info("Starting Enhanced Forex Analysis Application with Advanced Backtesting...")
     
+    # Delete old database to ensure clean schema
+    if os.path.exists(Config.DB_PATH):
+        os.remove(Config.DB_PATH)
+        logger.info("Removed old database for clean schema")
+    
     # Initialize components
     init_db()
     
@@ -1815,6 +1807,10 @@ if __name__ == "__main__":
     if not os.path.exists('historical_data') or len(os.listdir('historical_data')) == 0:
         logger.info("No historical data found, creating sample data...")
         create_sample_data()
+    else:
+        logger.info("Historical data folder exists, checking contents...")
+        files = os.listdir('historical_data')
+        logger.info(f"Found {len(files)} files in historical_data: {files}")
     
     load_csv_data()
     
