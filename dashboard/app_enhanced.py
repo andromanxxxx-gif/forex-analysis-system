@@ -61,11 +61,11 @@ class Config:
     }
 
 # API Keys - Pastikan sudah di-set di file .env
-TWELVE_API_KEY = os.environ.get("")
-ALPHA_API_KEY = os.environ.get("")
-NEWS_API_KEY = os.environ.get("")
-DEEPSEEK_API_KEY = os.environ.get("")
-FINNHUB_API_KEY = os.environ.get("")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 
 # API URLs
 TWELVE_API_URL = "https://api.twelvedata.com"
