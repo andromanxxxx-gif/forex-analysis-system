@@ -1,5 +1,3 @@
-[file name]: app.py
-[file content begin]
 from flask import Flask, request, jsonify, send_from_directory, render_template, session
 import pandas as pd
 import numpy as np
@@ -103,10 +101,10 @@ class Config:
     }
 
 # API Keys from environment variables
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
-ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "1a5a4b69dae6419c951a4fb62e4ad7b2")
+ALPHA_API_KEY = os.environ.get("ALPHA_API_KEY", "G8588U1ISMGM8GZB")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "b90862d072ce41e4b0505cbd7b710b66")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-820e07acdd9d4c94868b7fb95c9e8225")
 
 # API URLs
 TWELVE_API_URL = "https://api.twelvedata.com"
@@ -1742,4 +1740,3 @@ if __name__ == "__main__":
     # Start Flask application
     logger.info("🎯 Enhanced Application initialized successfully")
     app.run(debug=True, host='0.0.0.0', port=5000)
-[file content end]
