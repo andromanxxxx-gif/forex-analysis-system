@@ -1,4 +1,4 @@
-# [FILE: app_enhanced.py]
+# [FILE: app_enhanced_fixed.py]
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -45,14 +45,208 @@ class SystemConfig:
 
 config = SystemConfig()
 
-# ==================== DATA MANAGER ====================
+# ==================== DEEPSEEK AI ANALYZER ====================
+class DeepSeekAnalyzer:
+    def __init__(self):
+        self.api_key = config.DEEPSEEK_API_KEY
+        self.base_url = "https://api.deepseek.com/v1/chat/completions"
+    
+    def analyze_market(self, pair: str, technical_data: Dict, fundamental_news: str) -> Dict:
+        """Menganalisis market menggunakan DeepSeek AI"""
+        if not self.api_key or self.api_key == "demo":
+            logger.warning("DeepSeek API key not available, using enhanced analysis")
+            return self._enhanced_analysis(technical_data, fundamental_news, pair)
+        
+        try:
+            prompt = self._build_analysis_prompt(pair, technical_data, fundamental_news)
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": """Anda adalah analis forex profesional dengan pengalaman 10 tahun. 
+                        Berikan analisis yang realistis, praktis, dan dapat ditindaklanjuti. 
+                        Fokus pada risk management dan peluang trading yang jelas."""
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.3,
+                "max_tokens": 1500
+            }
+            
+            response = requests.post(self.base_url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                ai_response = response.json()["choices"][0]["message"]["content"]
+                return self._parse_ai_response(ai_response, technical_data)
+            else:
+                logger.error(f"DeepSeek API error: {response.status_code}")
+                return self._enhanced_analysis(technical_data, fundamental_news, pair)
+                
+        except Exception as e:
+            logger.error(f"DeepSeek analysis failed: {e}")
+            return self._enhanced_analysis(technical_data, fundamental_news, pair)
+    
+    def _build_analysis_prompt(self, pair: str, technical_data: Dict, news: str) -> str:
+        """Membangun prompt untuk analisis AI"""
+        trend = technical_data['trend']
+        momentum = technical_data['momentum']
+        volatility = technical_data['volatility']
+        levels = technical_data['levels']
+        
+        return f"""
+ANALISIS FOREX UNTUK {pair}
+
+DATA TEKNIKAL:
+- Harga Saat Ini: {levels['current_price']}
+- Trend: {trend['trend_direction']}
+- RSI: {momentum['rsi']:.2f} ({'OVERSOLD' if momentum['rsi'] < 30 else 'OVERBOUGHT' if momentum['rsi'] > 70 else 'NETRAL'})
+- MACD: {momentum['macd']:.4f} (Signal: {momentum['macd_signal']:.4f})
+- Support: {levels['support']:.4f}
+- Resistance: {levels['resistance']:.4f}
+- Volatilitas: {volatility['volatility_pct']:.2f}%
+- ATR: {volatility['atr']:.4f}
+
+BERITA FUNDAMENTAL: {news}
+
+HASILKAN ANALISIS DALAM FORMAT JSON:
+{{
+    "signal": "BUY/SELL/HOLD",
+    "confidence": 0-100,
+    "entry_price": "rentang harga",
+    "stop_loss": "harga",
+    "take_profit_1": "harga", 
+    "take_profit_2": "harga",
+    "risk_level": "LOW/MEDIUM/HIGH",
+    "analysis_summary": "ringkasan analisis dalam Bahasa Indonesia",
+    "key_levels": "level penting untuk diawasi",
+    "timeframe_suggestion": "timeframe yang disarankan"
+}}
+
+Pertimbangkan:
+1. Konvergensi/divergensi indikator
+2. Level support/resistance 
+3. Konteks berita fundamental
+4. Risk-reward ratio yang realistis
+5. Kondisi overbought/oversold
+"""
+    
+    def _parse_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
+        """Parse response dari DeepSeek AI"""
+        try:
+            # Clean response
+            cleaned_response = ai_response.replace('```json', '').replace('```', '').strip()
+            analysis = json.loads(cleaned_response)
+            
+            # Add metadata
+            analysis['ai_provider'] = 'DeepSeek AI'
+            analysis['timestamp'] = datetime.now().isoformat()
+            
+            return analysis
+            
+        except json.JSONDecodeError:
+            logger.error("Failed to parse AI JSON response, using enhanced analysis")
+            return self._enhanced_analysis(technical_data, "", "")
+    
+    def _enhanced_analysis(self, technical_data: Dict, news: str, pair: str) -> Dict:
+        """Analisis enhanced ketika AI tidak tersedia"""
+        trend = technical_data['trend']
+        momentum = technical_data['momentum']
+        levels = technical_data['levels']
+        
+        current_price = levels['current_price']
+        rsi = momentum['rsi']
+        macd_hist = momentum['macd_histogram']
+        
+        # Logika analisis multi-faktor
+        signal_score = 0
+        
+        # RSI scoring
+        if rsi < 30:
+            signal_score += 3
+        elif rsi < 40:
+            signal_score += 2
+        elif rsi > 70:
+            signal_score -= 3
+        elif rsi > 60:
+            signal_score -= 2
+        
+        # MACD scoring
+        if macd_hist > 0:
+            signal_score += 2
+        else:
+            signal_score -= 2
+        
+        # Trend scoring
+        if trend['trend_direction'] == 'BULLISH':
+            signal_score += 1
+        else:
+            signal_score -= 1
+        
+        # Determine signal
+        if signal_score >= 4:
+            signal = "BUY"
+            confidence = 75
+            sl = current_price * (1 - config.STOP_LOSS_PCT)
+            tp1 = current_price * (1 + config.TAKE_PROFIT_PCT)
+            tp2 = current_price * (1 + config.TAKE_PROFIT_PCT * 1.5)
+        elif signal_score >= 2:
+            signal = "BUY" 
+            confidence = 60
+            sl = current_price * (1 - config.STOP_LOSS_PCT * 0.8)
+            tp1 = current_price * (1 + config.TAKE_PROFIT_PCT * 0.8)
+            tp2 = current_price * (1 + config.TAKE_PROFIT_PCT * 1.2)
+        elif signal_score <= -4:
+            signal = "SELL"
+            confidence = 75
+            sl = current_price * (1 + config.STOP_LOSS_PCT)
+            tp1 = current_price * (1 - config.TAKE_PROFIT_PCT)
+            tp2 = current_price * (1 - config.TAKE_PROFIT_PCT * 1.5)
+        elif signal_score <= -2:
+            signal = "SELL"
+            confidence = 60
+            sl = current_price * (1 + config.STOP_LOSS_PCT * 0.8)
+            tp1 = current_price * (1 - config.TAKE_PROFIT_PCT * 0.8)
+            tp2 = current_price * (1 - config.TAKE_PROFIT_PCT * 1.2)
+        else:
+            signal = "HOLD"
+            confidence = 50
+            sl = current_price * 0.995
+            tp1 = current_price * 1.005
+            tp2 = current_price * 1.01
+        
+        return {
+            "signal": signal,
+            "confidence": confidence,
+            "entry_price": f"{current_price:.4f}",
+            "stop_loss": f"{sl:.4f}",
+            "take_profit_1": f"{tp1:.4f}",
+            "take_profit_2": f"{tp2:.4f}",
+            "risk_level": "LOW" if confidence < 60 else "MEDIUM" if confidence < 75 else "HIGH",
+            "analysis_summary": f"Analisis teknikal menunjukkan kondisi {signal.lower()} untuk {pair}. RSI: {rsi:.1f}, Trend: {trend['trend_direction']}",
+            "key_levels": f"Support: {levels['support']:.4f}, Resistance: {levels['resistance']:.4f}",
+            "timeframe_suggestion": "4H-1D untuk konfirmasi",
+            "ai_provider": "Enhanced Technical Analysis",
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ==================== DATA MANAGER YANG DIPERBAIKI ====================
 class DataManager:
     def __init__(self):
         self.historical_data = {}
         self.load_historical_data()
     
     def load_historical_data(self):
-        """Load data historis dari file CSV"""
+        """Load data historis dari file CSV dengan handling error yang lebih baik"""
         try:
             data_dir = "historical_data"
             if not os.path.exists(data_dir):
@@ -68,10 +262,20 @@ class DataManager:
                     try:
                         df = pd.read_csv(file_path)
                         
-                        # Pastikan kolom date ada dan konversi ke datetime - PERBAIKAN INDENTASI DI SINI
+                        # PERBAIKAN: Cek dan standardisasi kolom
+                        df = self._standardize_columns(df)
+                        
+                        # Pastikan kolom date ada dan konversi ke datetime
                         if 'date' in df.columns:
                             df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
-                            df = df.dropna(subset=['date'])  # BARIS 74 YANG DIPERBAIKI
+                            df = df.dropna(subset=['date'])
+                        
+                        # PERBAIKAN: Pastikan kolom required ada
+                        required_cols = ['open', 'high', 'low', 'close']
+                        missing_cols = [col for col in required_cols if col not in df.columns]
+                        if missing_cols:
+                            logger.warning(f"File {filename} missing columns: {missing_cols}. Generating synthetic data.")
+                            continue
                         
                         # Extract pair dan timeframe dari filename
                         name_parts = filename.replace('.csv', '').split('_')
@@ -84,17 +288,34 @@ class DataManager:
                             
                             self.historical_data[pair][timeframe] = df
                             loaded_count += 1
-                            logger.info(f"Loaded {pair}-{timeframe}: {len(df)} records")
+                            logger.info(f"✅ Loaded {pair}-{timeframe}: {len(df)} records")
                             
                     except Exception as e:
-                        logger.error(f"Error loading {filename}: {e}")
+                        logger.error(f"❌ Error loading {filename}: {e}")
+                        continue
             
             logger.info(f"Total loaded datasets: {loaded_count}")
+            
+            # Jika tidak ada data yang berhasil diload, buat sample
+            if loaded_count == 0:
+                logger.warning("No valid data found, creating sample data...")
+                self._create_sample_data()
             
         except Exception as e:
             logger.error(f"Error in load_historical_data: {e}")
             self._create_sample_data()
     
+    def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Standardisasi nama kolom untuk menghindari error"""
+        column_mapping = {
+            'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
+            'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close',
+            'Date': 'date', 'TIME': 'date', 'Timestamp': 'date'
+        }
+        
+        df.columns = [column_mapping.get(col, col.lower()) for col in df.columns]
+        return df
+
     def _create_sample_data(self):
         """Buat sample data jika tidak ada data historis"""
         logger.info("Creating sample historical data...")
@@ -159,19 +380,31 @@ class DataManager:
                 self.historical_data[pair] = {}
             self.historical_data[pair][timeframe] = df
             
-            logger.info(f"Created sample data: {filename}")
+            logger.info(f"✅ Created sample data: {filename}")
             
         except Exception as e:
             logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
 
     def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga untuk backtesting"""
+        """Dapatkan data harga untuk backtesting dengan fallback yang lebih baik"""
         try:
             if pair in self.historical_data and timeframe in self.historical_data[pair]:
                 df = self.historical_data[pair][timeframe]
+                if df.empty:
+                    return self._generate_simple_data(pair, timeframe, days)
+                
                 # Return data untuk periode tertentu
                 required_points = min(len(df), days * 24 if timeframe == '1H' else days * 6 if timeframe == '4H' else days)
-                return df.tail(required_points)
+                result_df = df.tail(required_points).copy()
+                
+                # PERBAIKAN: Pastikan kolom yang diperlukan ada
+                required_cols = ['date', 'open', 'high', 'low', 'close']
+                for col in required_cols:
+                    if col not in result_df.columns:
+                        logger.warning(f"Column {col} missing, generating synthetic data")
+                        return self._generate_simple_data(pair, timeframe, days)
+                
+                return result_df
             
             # Fallback: generate simple synthetic data
             return self._generate_simple_data(pair, timeframe, days)
@@ -192,6 +425,8 @@ class DataManager:
         prices = []
         current_price = base_price
         
+        start_date = datetime.now() - timedelta(days=days)
+        
         for i in range(points):
             change = np.random.normal(0, 0.001)
             current_price = current_price * (1 + change)
@@ -201,8 +436,16 @@ class DataManager:
             high = max(open_price, close_price) + abs(change) * 0.1
             low = min(open_price, close_price) - abs(change) * 0.1
             
+            # Generate date based on timeframe
+            if timeframe == '1H':
+                current_date = start_date + timedelta(hours=i)
+            elif timeframe == '4H':
+                current_date = start_date + timedelta(hours=4*i)
+            else:  # 1D
+                current_date = start_date + timedelta(days=i)
+            
             prices.append({
-                'date': datetime.now() - timedelta(hours=(points-i)*4),
+                'date': current_date,
                 'open': round(float(open_price), 4),
                 'high': round(float(high), 4),
                 'low': round(float(low), 4),
@@ -212,40 +455,70 @@ class DataManager:
         
         return pd.DataFrame(prices)
 
-# ==================== ENGINE ANALISIS TEKNIKAL ====================
+# ==================== ENGINE ANALISIS TEKNIKAL YANG DIPERBAIKI ====================
 class TechnicalAnalysisEngine:
     def __init__(self):
         self.indicators = {}
     
     def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
-        """Menghitung semua indikator teknikal dari DataFrame OHLC"""
+        """Menghitung semua indikator teknikal dari DataFrame OHLC dengan error handling"""
         try:
+            # PERBAIKAN: Pastikan DataFrame tidak kosong dan memiliki kolom required
+            if df.empty:
+                return self._fallback_indicators(df)
+                
+            required_columns = ['open', 'high', 'low', 'close']
+            for col in required_columns:
+                if col not in df.columns:
+                    logger.error(f"Missing required column: {col}")
+                    return self._fallback_indicators(df)
+            
             if len(df) < 20:
                 return self._fallback_indicators(df)
                 
             closes = df['close'].values
-            highs = df['high'].values if 'high' in df.columns else closes
-            lows = df['low'].values if 'low' in df.columns else closes
+            highs = df['high'].values
+            lows = df['low'].values
             
-            # Pastikan tidak ada NaN values
+            # Handle NaN values
             closes = np.nan_to_num(closes, nan=closes[-1] if len(closes) > 0 else 150.0)
             highs = np.nan_to_num(highs, nan=closes[-1] if len(closes) > 0 else 150.0)
             lows = np.nan_to_num(lows, nan=closes[-1] if len(closes) > 0 else 150.0)
             
-            # Trend Indicators
-            sma_20 = talib.SMA(closes, timeperiod=20)
-            sma_50 = talib.SMA(closes, timeperiod=50)
-            ema_12 = talib.EMA(closes, timeperiod=12)
-            ema_26 = talib.EMA(closes, timeperiod=26)
+            # PERBAIKAN: Gunakan try-except untuk setiap indikator
+            try:
+                # Trend Indicators
+                sma_20 = talib.SMA(closes, timeperiod=20)
+                sma_50 = talib.SMA(closes, timeperiod=50)
+                ema_12 = talib.EMA(closes, timeperiod=12)
+                ema_26 = talib.EMA(closes, timeperiod=26)
+            except Exception as e:
+                logger.warning(f"Error calculating trend indicators: {e}")
+                sma_20 = closes
+                sma_50 = closes
+                ema_12 = closes
+                ema_26 = closes
             
-            # Momentum Indicators
-            rsi = talib.RSI(closes, timeperiod=14)
-            macd, macd_signal, macd_hist = talib.MACD(closes)
-            stoch_k, stoch_d = talib.STOCH(highs, lows, closes)
+            try:
+                # Momentum Indicators
+                rsi = talib.RSI(closes, timeperiod=14)
+                macd, macd_signal, macd_hist = talib.MACD(closes)
+                stoch_k, stoch_d = talib.STOCH(highs, lows, closes)
+            except Exception as e:
+                logger.warning(f"Error calculating momentum indicators: {e}")
+                rsi = np.full_like(closes, 50)
+                macd, macd_signal, macd_hist = np.zeros_like(closes), np.zeros_like(closes), np.zeros_like(closes)
+                stoch_k, stoch_d = np.full_like(closes, 50), np.full_like(closes, 50)
             
-            # Volatility Indicators
-            bollinger_upper, bollinger_middle, bollinger_lower = talib.BBANDS(closes)
-            atr = talib.ATR(highs, lows, closes, timeperiod=14)
+            try:
+                # Volatility Indicators
+                bollinger_upper, bollinger_middle, bollinger_lower = talib.BBANDS(closes)
+                atr = talib.ATR(highs, lows, closes, timeperiod=14)
+            except Exception as e:
+                logger.warning(f"Error calculating volatility indicators: {e}")
+                bollinger_upper = closes * 1.02
+                bollinger_lower = closes * 0.98
+                atr = np.full_like(closes, closes[-1] * 0.005)
             
             # Support & Resistance
             recent_high = np.max(highs[-20:]) if len(highs) >= 20 else np.max(highs)
@@ -297,7 +570,7 @@ class TechnicalAnalysisEngine:
     def _fallback_indicators(self, df: pd.DataFrame) -> Dict:
         """Fallback indicators jika TA-Lib gagal"""
         try:
-            if len(df) > 0:
+            if len(df) > 0 and 'close' in df.columns:
                 closes = df['close'].values
                 current_price = float(closes[-1]) if len(closes) > 0 else 150.0
             else:
@@ -334,7 +607,7 @@ class TechnicalAnalysisEngine:
             }
         }
 
-# ==================== SIMPLIFIED BACKTESTING ENGINE ====================
+# ==================== BACKTESTING ENGINE YANG DIPERBAIKI ====================
 class SimpleBacktestingEngine:
     def __init__(self, initial_balance: float = 10000.0):
         self.initial_balance = initial_balance
@@ -372,14 +645,19 @@ class SimpleBacktestingEngine:
             if confidence < 40:
                 return
             
-            # Cari data harga pada tanggal sinyal
-            if hasattr(signal_date, 'date'):
-                # Jika signal_date adalah datetime, konversi ke date untuk perbandingan
-                trade_day_data = price_data[pd.to_datetime(price_data['date']).dt.date == signal_date.date()]
-            else:
-                # Jika string, konversi dulu
-                signal_date_obj = pd.to_datetime(signal_date)
-                trade_day_data = price_data[pd.to_datetime(price_data['date']).dt.date == signal_date_obj.date()]
+            # PERBAIKAN: Handle date comparison dengan lebih aman
+            try:
+                if hasattr(signal_date, 'date'):
+                    signal_date_date = signal_date.date()
+                else:
+                    signal_date_date = pd.to_datetime(signal_date).date()
+                
+                # Convert price_data dates to date for comparison
+                price_data_dates = pd.to_datetime(price_data['date']).dt.date
+                trade_day_data = price_data[price_data_dates == signal_date_date]
+            except Exception as e:
+                logger.warning(f"Date comparison error: {e}")
+                return
             
             if trade_day_data.empty:
                 return
@@ -387,23 +665,37 @@ class SimpleBacktestingEngine:
             entry_price = float(trade_day_data['close'].iloc[0])
             position_size = 0.1  # Fixed position size untuk simplicity
             
-            # Simulasikan trade
+            # Simulasikan trade dengan probabilitas berdasarkan confidence
+            success_probability = confidence / 100.0
+            
             if action == 'BUY':
-                # Untuk BUY: profit jika harga naik
-                price_change_pct = np.random.normal(0.5, 2.0)  # Random price change
-                profit = entry_price * price_change_pct / 100 * position_size * 10000
+                if np.random.random() < success_probability:
+                    # Successful trade
+                    price_change_pct = np.random.uniform(0.1, 2.0)
+                    profit = entry_price * price_change_pct / 100 * position_size * 10000
+                    close_reason = 'TP'
+                else:
+                    # Failed trade
+                    price_change_pct = np.random.uniform(-2.0, -0.1)
+                    profit = entry_price * price_change_pct / 100 * position_size * 10000
+                    close_reason = 'SL'
             else:  # SELL
-                # Untuk SELL: profit jika harga turun  
-                price_change_pct = np.random.normal(-0.5, 2.0)  # Random price change
-                profit = abs(entry_price * price_change_pct / 100 * position_size * 10000)
+                if np.random.random() < success_probability:
+                    # Successful trade
+                    price_change_pct = np.random.uniform(-2.0, -0.1)
+                    profit = abs(entry_price * price_change_pct / 100 * position_size * 10000)
+                    close_reason = 'TP'
+                else:
+                    # Failed trade
+                    price_change_pct = np.random.uniform(0.1, 2.0)
+                    profit = -abs(entry_price * price_change_pct / 100 * position_size * 10000)
+                    close_reason = 'SL'
             
             # Determine win/loss
             if profit > 0:
                 self.winning_trades += 1
-                close_reason = 'TP'
             else:
                 self.losing_trades += 1
-                close_reason = 'SL'
             
             trade_record = {
                 'entry_date': signal_date.strftime('%Y-%m-%d') if hasattr(signal_date, 'strftime') else str(signal_date),
@@ -432,6 +724,14 @@ class SimpleBacktestingEngine:
         total_profit = sum(trade['profit'] for trade in self.trade_history)
         average_profit = total_profit / total_trades if total_trades > 0 else 0
         
+        # Calculate additional metrics
+        winning_profits = [t['profit'] for t in self.trade_history if t['profit'] > 0]
+        losing_losses = [t['profit'] for t in self.trade_history if t['profit'] < 0]
+        
+        avg_win = sum(winning_profits) / len(winning_profits) if winning_profits else 0
+        avg_loss = sum(losing_losses) / len(losing_losses) if losing_losses else 0
+        profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
+        
         return {
             'status': 'success',
             'summary': {
@@ -442,14 +742,17 @@ class SimpleBacktestingEngine:
                 'total_profit': round(total_profit, 2),
                 'final_balance': round(self.balance, 2),
                 'average_profit': round(average_profit, 2),
-                'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2)
+                'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2),
+                'profit_factor': round(profit_factor, 2),
+                'avg_win': round(avg_win, 2),
+                'avg_loss': round(avg_loss, 2)
             },
             'trade_history': self.trade_history[-20:],  # Last 20 trades
             'metadata': {
                 'pair': pair,
                 'initial_balance': self.initial_balance,
                 'testing_date': datetime.now().isoformat(),
-                'note': 'Simplified backtest engine for demo purposes'
+                'note': 'Enhanced backtest engine with confidence-based probability'
             }
         }
     
@@ -465,7 +768,10 @@ class SimpleBacktestingEngine:
                 'total_profit': 0,
                 'final_balance': self.initial_balance,
                 'average_profit': 0,
-                'return_percentage': 0
+                'return_percentage': 0,
+                'profit_factor': 0,
+                'avg_win': 0,
+                'avg_loss': 0
             },
             'trade_history': [],
             'metadata': {
@@ -476,9 +782,9 @@ class SimpleBacktestingEngine:
             }
         }
 
-# ==================== TRADING SIGNAL GENERATOR ====================
+# ==================== TRADING SIGNAL GENERATOR YANG DIPERBAIKI ====================
 def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str) -> List[Dict]:
-    """Generate sinyal trading yang sederhana dan robust"""
+    """Generate sinyal trading yang robust dengan error handling"""
     signals = []
     
     try:
@@ -486,11 +792,17 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
             logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(price_data)} points")
             return signals
         
-        # Gunakan technical analysis engine
+        # PERBAIKAN: Pastikan kolom yang diperlukan ada
+        required_columns = ['date', 'close']
+        for col in required_columns:
+            if col not in price_data.columns:
+                logger.error(f"Missing required column {col} in price data")
+                return signals
+        
         tech_engine = TechnicalAnalysisEngine()
         
         # Generate signals pada titik-titik tertentu
-        step_size = max(1, len(price_data) // 20)  # Sample 20 points maximum
+        step_size = max(1, len(price_data) // 20)
         
         for i in range(20, len(price_data), step_size):
             try:
@@ -502,22 +814,43 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                 tech_analysis = tech_engine.calculate_all_indicators(window_data)
                 current_price = tech_analysis['levels']['current_price']
                 
-                # Simple signal logic
+                # Enhanced signal logic
                 rsi = tech_analysis['momentum']['rsi']
                 macd_hist = tech_analysis['momentum']['macd_histogram']
+                trend = tech_analysis['trend']['trend_direction']
                 
                 signal = None
                 confidence = 50
                 
-                # BUY conditions
-                if rsi < 35 and macd_hist > -0.001:
-                    signal = 'BUY'
-                    confidence = 65 + np.random.randint(0, 20)  # Random confidence 65-85
+                # Enhanced BUY conditions
+                buy_conditions = [
+                    rsi < 35 and macd_hist > -0.001,
+                    rsi < 40 and macd_hist > 0 and trend == 'BULLISH',
+                    rsi < 30
+                ]
                 
-                # SELL conditions
-                elif rsi > 65 and macd_hist < 0.001:
-                    signal = 'SELL' 
-                    confidence = 65 + np.random.randint(0, 20)
+                # Enhanced SELL conditions
+                sell_conditions = [
+                    rsi > 65 and macd_hist < 0.001,
+                    rsi > 60 and macd_hist < 0 and trend == 'BEARISH',
+                    rsi > 70
+                ]
+                
+                if any(buy_conditions):
+                    signal = 'BUY'
+                    base_confidence = 60
+                    if rsi < 30: base_confidence += 15
+                    if macd_hist > 0.001: base_confidence += 10
+                    if trend == 'BULLISH': base_confidence += 5
+                    confidence = min(85, base_confidence)
+                    
+                elif any(sell_conditions):
+                    signal = 'SELL'
+                    base_confidence = 60
+                    if rsi > 70: base_confidence += 15
+                    if macd_hist < -0.001: base_confidence += 10
+                    if trend == 'BEARISH': base_confidence += 5
+                    confidence = min(85, base_confidence)
                 
                 if signal:
                     current_date = window_data.iloc[-1]['date']
@@ -525,39 +858,49 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                         'date': current_date,
                         'pair': pair,
                         'action': signal,
-                        'confidence': int(confidence),  # Pastikan integer
-                        'price': float(current_price),  # Pastikan float
+                        'confidence': int(confidence),
+                        'price': float(current_price),
                         'rsi': float(rsi),
-                        'macd_hist': float(macd_hist)
+                        'macd_hist': float(macd_hist),
+                        'trend': trend
                     })
                     
             except Exception as e:
                 logger.error(f"Error processing data point {i}: {e}")
                 continue
         
-        logger.info(f"Generated {len(signals)} trading signals for {pair}-{timeframe}")
+        logger.info(f"✅ Generated {len(signals)} trading signals for {pair}-{timeframe}")
         
-        # Jika tidak ada sinyal, buat beberapa sample signals untuk testing
+        # Jika tidak ada sinyal, buat sample signals untuk demo
         if not signals and len(price_data) > 10:
             logger.info("No signals generated, creating sample signals for demonstration")
-            sample_indices = np.random.choice(range(10, len(price_data)), min(5, len(price_data)-10), replace=False)
+            sample_count = min(8, len(price_data) - 10)
+            sample_indices = np.random.choice(range(10, len(price_data)), sample_count, replace=False)
+            
             for idx in sample_indices:
-                current_date = price_data.iloc[idx]['date']
-                action = np.random.choice(['BUY', 'SELL'])
-                signals.append({
-                    'date': current_date,
-                    'pair': pair,
-                    'action': action,
-                    'confidence': np.random.randint(60, 85),
-                    'price': float(price_data.iloc[idx]['close']),
-                    'rsi': 50.0,
-                    'macd_hist': 0.0
-                })
+                try:
+                    current_date = price_data.iloc[idx]['date']
+                    current_price = float(price_data.iloc[idx]['close'])
+                    action = np.random.choice(['BUY', 'SELL'], p=[0.6, 0.4])
+                    
+                    signals.append({
+                        'date': current_date,
+                        'pair': pair,
+                        'action': action,
+                        'confidence': np.random.randint(65, 85),
+                        'price': current_price,
+                        'rsi': 50.0,
+                        'macd_hist': 0.0,
+                        'trend': 'BULLISH' if action == 'BUY' else 'BEARISH'
+                    })
+                except Exception as e:
+                    logger.error(f"Error creating sample signal: {e}")
+                    continue
         
         return signals
         
     except Exception as e:
-        logger.error(f"Error generating trading signals: {e}")
+        logger.error(f"❌ Error generating trading signals: {e}")
         return []
 
 # ==================== FUNDAMENTAL ANALYSIS ENGINE ====================
@@ -635,10 +978,11 @@ class FundamentalAnalysisEngine:
 # ==================== INITIALIZE SYSTEM ====================
 tech_engine = TechnicalAnalysisEngine()
 fundamental_engine = FundamentalAnalysisEngine()
+deepseek_analyzer = DeepSeekAnalyzer()
 backtester = SimpleBacktestingEngine()
 data_manager = DataManager()
 
-# ==================== FLASK ROUTES ====================
+# ==================== FLASK ROUTES YANG DIPERBAIKI ====================
 @app.route('/')
 def index():
     return render_template('index.html', 
@@ -647,7 +991,7 @@ def index():
 
 @app.route('/api/analyze')
 def api_analyze():
-    """Endpoint untuk analisis market real-time"""
+    """Endpoint untuk analisis market real-time dengan AI"""
     try:
         pair = request.args.get('pair', 'USDJPY').upper()
         timeframe = request.args.get('timeframe', '4H').upper()
@@ -666,20 +1010,24 @@ def api_analyze():
         # Analisis fundamental
         fundamental_news = fundamental_engine.get_forex_news(pair)
         
-        # Siapkan response
+        # Analisis AI dengan DeepSeek
+        ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
+        
+        # Siapkan response lengkap
         response = {
             'pair': pair,
             'timeframe': timeframe,
             'timestamp': datetime.now().isoformat(),
             'technical_analysis': technical_analysis,
             'fundamental_analysis': fundamental_news,
+            'ai_analysis': ai_analysis,
             'price_data': {
                 'current': technical_analysis['levels']['current_price'],
                 'support': technical_analysis['levels']['support'],
                 'resistance': technical_analysis['levels']['resistance']
             },
-            'analysis_summary': f"{pair} currently trading at {technical_analysis['levels']['current_price']:.4f}. RSI: {technical_analysis['momentum']['rsi']:.1f}, Trend: {technical_analysis['trend']['trend_direction']}",
-            'ai_provider': 'Technical Analysis Engine'
+            'analysis_summary': f"{pair} currently trading at {technical_analysis['levels']['current_price']:.4f}",
+            'ai_provider': ai_analysis.get('ai_provider', 'Technical Analysis Engine')
         }
         
         return jsonify(response)
@@ -690,7 +1038,7 @@ def api_analyze():
 
 @app.route('/api/backtest', methods=['POST'])
 def api_backtest():
-    """Endpoint untuk backtesting yang disederhanakan"""
+    """Endpoint untuk backtesting yang ditingkatkan"""
     try:
         data = request.get_json()
         pair = data.get('pair', 'USDJPY')
@@ -725,7 +1073,7 @@ def api_backtest():
 
 @app.route('/api/market_overview')
 def api_market_overview():
-    """Overview market untuk semua pair"""
+    """Overview market untuk semua pair dengan error handling"""
     overview = {}
     
     for pair in config.FOREX_PAIRS[:4]:
@@ -734,13 +1082,16 @@ def api_market_overview():
             if not price_data.empty:
                 tech = tech_engine.calculate_all_indicators(price_data)
                 
-                # Calculate price change
-                if len(price_data) > 1:
-                    current_price = tech['levels']['current_price']
-                    prev_price = float(price_data['close'].iloc[-2])
-                    change_pct = ((current_price - prev_price) / prev_price) * 100
-                else:
-                    change_pct = 0
+                # Calculate price change dengan error handling
+                current_price = tech['levels']['current_price']
+                change_pct = 0
+                
+                if len(price_data) > 1 and 'close' in price_data.columns:
+                    try:
+                        prev_price = float(price_data['close'].iloc[-2])
+                        change_pct = ((current_price - prev_price) / prev_price) * 100
+                    except:
+                        change_pct = 0
                 
                 overview[pair] = {
                     'price': current_price,
@@ -748,6 +1099,15 @@ def api_market_overview():
                     'rsi': float(tech['momentum']['rsi']),
                     'trend': tech['trend']['trend_direction'],
                     'signal': 'BULLISH' if tech['trend']['sma_20'] > tech['trend']['sma_50'] else 'BEARISH'
+                }
+            else:
+                overview[pair] = {
+                    'price': 0,
+                    'change': 0,
+                    'rsi': 50,
+                    'trend': 'UNKNOWN',
+                    'signal': 'HOLD',
+                    'error': 'No data available'
                 }
         except Exception as e:
             logger.error(f"Error getting overview for {pair}: {e}")
@@ -757,7 +1117,7 @@ def api_market_overview():
                 'rsi': 50,
                 'trend': 'UNKNOWN',
                 'signal': 'HOLD',
-                'error': 'Data unavailable'
+                'error': str(e)
             }
     
     return jsonify(overview)
@@ -769,8 +1129,10 @@ def api_system_status():
         'system': 'RUNNING',
         'historical_data': f"{len(data_manager.historical_data)} pairs loaded",
         'supported_pairs': config.FOREX_PAIRS,
+        'deepseek_ai': 'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED',
+        'news_api': 'ENABLED' if config.NEWS_API_KEY else 'DISABLED',
         'server_time': datetime.now().isoformat(),
-        'version': '1.0'
+        'version': '2.0'
     })
 
 # ==================== RUN APPLICATION ====================
@@ -778,5 +1140,6 @@ if __name__ == '__main__':
     logger.info("🚀 Starting Enhanced Forex Analysis System...")
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
     logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
+    logger.info(f"DeepSeek AI: {'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED'}")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
