@@ -3,299 +3,575 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Analysis & Backtesting System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <title>Forex Analysis & Backtesting</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #e74c3c;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --light-bg: #f8f9fa;
-            --dark-text: #2c3e50;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f7fa;
-            color: var(--dark-text);
+            background-color: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+            min-height: 100vh;
         }
         
-        .navbar-brand {
-            font-weight: 700;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        
+        .logo i {
+            font-size: 28px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
         }
         
         .card {
+            background-color: #1e293b;
             border-radius: 10px;
+            padding: 25px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            border: none;
-            margin-bottom: 20px;
-            transition: transform 0.3s ease;
-        }
-        
-        .card:hover {
-            transform: translateY(-2px);
         }
         
         .card-header {
-            border-radius: 10px 10px 0 0 !important;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .card-title {
+            font-size: 20px;
             font-weight: 600;
+            color: #f1f5f9;
         }
         
-        .btn-primary {
-            background-color: var(--secondary-color);
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        
-        .btn-warning {
-            background-color: var(--warning-color);
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        
-        .price-up {
-            color: var(--success-color);
-            font-weight: 600;
-        }
-        
-        .price-down {
-            color: var(--accent-color);
-            font-weight: 600;
-        }
-        
-        .signal-buy {
-            background-color: rgba(39, 174, 96, 0.1);
-            border-left: 4px solid var(--success-color);
-            padding: 15px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .signal-sell {
-            background-color: rgba(231, 76, 60, 0.1);
-            border-left: 4px solid var(--accent-color);
-            padding: 15px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .signal-hold {
-            background-color: rgba(243, 156, 18, 0.1);
-            border-left: 4px solid var(--warning-color);
-            padding: 15px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .confidence-high {
-            color: var(--success-color);
-            font-weight: 700;
-        }
-        
-        .confidence-medium {
-            color: var(--warning-color);
-            font-weight: 700;
-        }
-        
-        .confidence-low {
-            color: var(--accent-color);
-            font-weight: 700;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-        }
-        
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-        }
-        
-        .technical-indicator {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px;
+        .card-icon {
+            width: 40px;
+            height: 40px;
             border-radius: 8px;
-            margin-bottom: 10px;
+            background-color: #3b82f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
-        .indicator-value {
-            font-size: 1.5rem;
-            font-weight: 700;
+        .form-group {
+            margin-bottom: 20px;
         }
         
-        .news-card {
-            background-color: #f8f9fa;
-            border-left: 4px solid var(--secondary-color);
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 0 8px 8px 0;
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        
+        .select-wrapper {
+            position: relative;
+        }
+        
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            background-color: #334155;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 14px;
+            appearance: none;
+        }
+        
+        .select-wrapper::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            pointer-events: none;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn:hover {
+            background-color: #2563eb;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .btn-outline:hover {
+            background-color: rgba(59, 130, 246, 0.1);
         }
         
         .chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-            margin-bottom: 20px;
+            margin-top: 20px;
+            height: 250px;
         }
         
-        .backtest-summary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        .analysis-result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #334155;
+            border-radius: 6px;
+            border-left: 4px solid #3b82f6;
         }
         
-        .summary-value {
-            font-size: 2rem;
-            font-weight: 700;
+        .result-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
         }
         
-        .trade-row {
-            border-left: 4px solid transparent;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 0 6px 6px 0;
+        .result-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
         }
         
-        .trade-profit {
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #475569;
+        }
+        
+        .result-label {
+            color: #94a3b8;
+        }
+        
+        .result-value {
             font-weight: 600;
         }
         
-        .robot-logo {
-            font-size: 2rem;
-            color: var(--secondary-color);
-            margin-right: 10px;
+        .positive {
+            color: #10b981;
         }
         
-        .chart-tabs .nav-link {
-            color: var(--dark-text);
+        .negative {
+            color: #ef4444;
+        }
+        
+        .backtest-results {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .result-table th {
+            text-align: left;
+            padding: 12px 15px;
+            background-color: #334155;
+            color: #94a3b8;
             font-weight: 500;
+            font-size: 14px;
         }
         
-        .chart-tabs .nav-link.active {
-            background-color: var(--secondary-color);
-            color: white;
-            border-color: var(--secondary-color);
+        .result-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #334155;
         }
         
-        .indicator-line {
-            border-width: 2px;
+        .result-table tr:hover {
+            background-color: #334155;
+        }
+        
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            padding: 20px;
+            color: #94a3b8;
+            font-size: 14px;
+            border-top: 1px solid #334155;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--primary-color);">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-robot robot-logo"></i>Forex Analysis & Backtesting
-            </a>
-        </div>
-    </nav>
-
-    <!-- Main Container -->
-    <div class="container mt-4">
-        <!-- Market Overview -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-chart-line me-2"></i> Market Overview</span>
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadMarketOverview()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <span>ForexPro Analytics</span>
+            </div>
+            <div class="user-info">
+                <div class="user-avatar">JD</div>
+                <span>John Doe</span>
+            </div>
+        </header>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Forex Analysis</h2>
+                    <div class="card-icon">
+                        <i class="fas fa-chart-bar"></i>
                     </div>
-                    <div class="card-body">
-                        <div class="row" id="marketOverview">
-                            <!-- Market overview will be loaded here -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="currency-pair">Currency Pair</label>
+                    <div class="select-wrapper">
+                        <select id="currency-pair">
+                            <option value="GBP/JPY" selected>GBP/JPY</option>
+                            <option value="EUR/USD">EUR/USD</option>
+                            <option value="USD/JPY">USD/JPY</option>
+                            <option value="GBP/USD">GBP/USD</option>
+                            <option value="AUD/USD">AUD/USD</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="timeframe">Timeframe</label>
+                    <div class="select-wrapper">
+                        <select id="timeframe">
+                            <option value="1h">1 Hour</option>
+                            <option value="4h" selected>4 Hours</option>
+                            <option value="1d">1 Day</option>
+                            <option value="1w">1 Week</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button class="btn" id="get-analysis">
+                    <i class="fas fa-chart-line"></i>
+                    Get Analysis
+                </button>
+                
+                <div class="chart-container">
+                    <canvas id="analysis-chart"></canvas>
+                </div>
+                
+                <div class="analysis-result" id="analysis-result">
+                    <div class="result-title">Market Overview: GBP/JPY (4H)</div>
+                    <p>Current trend shows bullish momentum with resistance at 187.50. RSI indicates overbought conditions.</p>
+                    
+                    <div class="result-details">
+                        <div class="result-item">
+                            <span class="result-label">Current Price:</span>
+                            <span class="result-value">186.75</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Trend:</span>
+                            <span class="result-value positive">Bullish</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">RSI:</span>
+                            <span class="result-value negative">72.5</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Support:</span>
+                            <span class="result-value">185.20</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Resistance:</span>
+                            <span class="result-value">187.50</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Volatility:</span>
+                            <span class="result-value">High</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="row">
-            <!-- Left Column - Analysis & Backtesting -->
-            <div class="col-lg-8">
-                <!-- Analysis Section -->
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <i class="fas fa-chart-bar me-2"></i>Forex Analysis
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label for="pair-select" class="form-label">Currency Pair</label>
-                                <select class="form-select" id="pair-select">
-                                    <option value="USDJPY">USD/JPY</option>
-                                    <option value="GBPJPY">GBP/JPY</option>
-                                    <option value="EURJPY">EUR/JPY</option>
-                                    <option value="CHFJPY">CHF/JPY</option>
-                                    <option value="EURUSD">EUR/USD</option>
-                                    <option value="GBPUSD">GBP/USD</option>
-                                    <option value="USDCHF">USD/CHF</option>
-                                    <option value="AUDUSD">AUD/USD</option>
-                                    <option value="USDCAD">USD/CAD</option>
-                                    <option value="NZDUSD">NZD/USD</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="timeframe-select" class="form-label">Timeframe</label>
-                                <select class="form-select" id="timeframe-select">
-                                    <option value="M30">30 Minutes</option>
-                                    <option value="1H">1 Hour</option>
-                                    <option value="4H" selected>4 Hours</option>
-                                    <option value="1D">Daily</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="d-grid">
-                                    <button class="btn btn-primary" onclick="getAnalysis()">
-                                        <i class="fas fa-search me-2"></i>Get Analysis
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Loading Indicator -->
-                        <div class="loading" id="analysis-loading" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Analyzing market data...</p>
-                        </div>
-                        
-                        <!-- Analysis Results -->
-                        <div id="analysis-results"></div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Backtesting</h2>
+                    <div class="card-icon">
+                        <i class="fas fa-history"></i>
                     </div>
                 </div>
                 
-                <!-- Backtesting Section -->
-                <div class="card mt-4">
-                    <div class="card-header bg-warning text-dark">
-                        <i class="fas fa-history me-2"></i>Backtesting
+                <div class="form-group">
+                    <label for="backtest-pair">Currency Pair</label>
+                    <div class="select-wrapper">
+                        <select id="backtest-pair">
+                            <option value="USD/JPY" selected>USD/JPY</option>
+                            <option value="EUR/USD">EUR/USD</option>
+                            <option value="GBP/JPY">GBP/JPY</option>
+                            <option value="GBP/USD">GBP/USD</option>
+                            <option value="AUD/USD">AUD/USD</option>
+                        </select>
                     </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <label for="backtest-pair" class="form-label">Currency Pair</label>
-                                <select class="form-select" id="backtest-pair">
-                                    <option value="USDJPY">USD/JPY</option>
-                                    <option value="GBPJPY">GBP/JPY</option>
-                                    <option value="EURJPY">EUR/JPY</option>
-                                    <option value="CHFJPY">CHF/JPY</option>
-                                    <option value="EURUSD">EUR/USD</option>
-                                    <option value="GBPUSD">GBP/USD</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="backtest-timeframe" class="form-label">Timeframe</label>
-                                <select class="form-select" id="backtest-timeframe">
-                                    <option
+                </div>
+                
+                <div class="form-group">
+                    <label for="backtest-timeframe">Timeframe</label>
+                    <div class="select-wrapper">
+                        <select id="backtest-timeframe">
+                            <option value="1h">1 Hour</option>
+                            <option value="4h" selected>4 Hours</option>
+                            <option value="1d">1 Day</option>
+                            <option value="1w">1 Week</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="enable-backtest" checked>
+                    <label for="enable-backtest">Enable Backtesting</label>
+                </div>
+                
+                <button class="btn btn-outline" id="run-backtest">
+                    <i class="fas fa-play"></i>
+                    Run Backtest
+                </button>
+                
+                <div class="backtest-results">
+                    <table class="result-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Strategy</th>
+                                <th>Profit/Loss</th>
+                                <th>Win Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2023-10-01 to 2023-10-31</td>
+                                <td>Moving Average Crossover</td>
+                                <td class="positive">+4.2%</td>
+                                <td>68%</td>
+                            </tr>
+                            <tr>
+                                <td>2023-09-01 to 2023-09-30</td>
+                                <td>RSI Divergence</td>
+                                <td class="positive">+2.8%</td>
+                                <td>62%</td>
+                            </tr>
+                            <tr>
+                                <td>2023-08-01 to 2023-08-31</td>
+                                <td>Bollinger Bands</td>
+                                <td class="negative">-1.5%</td>
+                                <td>45%</td>
+                            </tr>
+                            <tr>
+                                <td>2023-07-01 to 2023-07-31</td>
+                                <td>MACD Signal</td>
+                                <td class="positive">+3.7%</td>
+                                <td>71%</td>
+                            </tr>
+                            <tr>
+                                <td>2023-06-01 to 2023-06-30</td>
+                                <td>Support/Resistance</td>
+                                <td class="positive">+5.1%</td>
+                                <td>74%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Forex Analysis & Backtesting Dashboard | Data updates every 15 minutes</p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize charts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Analysis Chart
+            const analysisCtx = document.getElementById('analysis-chart').getContext('2d');
+            const analysisChart = new Chart(analysisCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'GBP/JPY',
+                        data: [185.2, 185.8, 186.1, 186.5, 186.9, 186.7, 186.3],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Backtesting Chart
+            const backtestCtx = document.getElementById('backtest-chart').getContext('2d');
+            const backtestChart = new Chart(backtestCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['MA Cross', 'RSI', 'Bollinger', 'MACD', 'S/R'],
+                    datasets: [{
+                        label: 'Profit/Loss %',
+                        data: [4.2, 2.8, -1.5, 3.7, 5.1],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(16, 185, 129, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgb(16, 185, 129)',
+                            'rgb(16, 185, 129)',
+                            'rgb(239, 68, 68)',
+                            'rgb(16, 185, 129)',
+                            'rgb(16, 185, 129)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Button event handlers
+            document.getElementById('get-analysis').addEventListener('click', function() {
+                alert('Analysis updated for selected parameters!');
+            });
+            
+            document.getElementById('run-backtest').addEventListener('click', function() {
+                alert('Backtest completed! Results updated.');
+            });
+        });
+    </script>
+</body>
+</html>
