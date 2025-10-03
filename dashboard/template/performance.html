@@ -92,10 +92,80 @@
             padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
-            float: right;
+            margin-left: 10px;
         }
         .refresh-btn:hover {
             background: #0056b3;
+        }
+        .reset-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .reset-btn:hover {
+            background: #c82333;
+        }
+        .generate-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .generate-btn:hover {
+            background: #1e7e34;
+        }
+        .button-group {
+            float: right;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            text-align: center;
+        }
+        .modal-buttons {
+            margin-top: 20px;
+        }
+        .modal-btn {
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .modal-confirm {
+            background: #dc3545;
+            color: white;
+        }
+        .modal-cancel {
+            background: #6c757d;
+            color: white;
+        }
+        .database-stats {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -104,10 +174,18 @@
         <div class="nav-bar">
             <a href="/">🏠 Home</a>
             <a href="/performance">📊 Performance</a>
-            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+            <div class="button-group">
+                <button class="refresh-btn" onclick="refreshData()">🔄 Refresh</button>
+                <button class="generate-btn" onclick="generateSampleData()">🎲 Generate Sample</button>
+                <button class="reset-btn" onclick="showResetModal()">🗑️ Reset Data</button>
+            </div>
         </div>
         
         <h1>📊 Performance Dashboard</h1>
+        
+        <div class="database-stats" id="databaseStats">
+            Loading database statistics...
+        </div>
         
         <div class="debug-info" id="debugInfo">
             Loading performance data...
@@ -163,6 +241,18 @@
         </div>
     </div>
 
+    <!-- Reset Confirmation Modal -->
+    <div id="resetModal" class="modal">
+        <div class="modal-content">
+            <h3>Reset Backtest Data</h3>
+            <p>Are you sure you want to reset all backtest data? This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-confirm" onclick="resetBacktestData()">Yes, Reset Data</button>
+                <button class="modal-btn modal-cancel" onclick="hideResetModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let performanceData = null;
         let winRateChartInstance = null;
@@ -198,6 +288,27 @@
                 console.error('Error loading performance data:', error);
                 showDebugInfo(`Error: ${error.message}`, 'error');
                 displayError(error.message);
+            }
+        }
+
+        // Load database statistics
+        async function loadDatabaseStats() {
+            try {
+                const response = await fetch('/api/database_stats');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const stats = data.stats;
+                    const statsEl = document.getElementById('databaseStats');
+                    statsEl.innerHTML = `
+                        <strong>Database Statistics:</strong> 
+                        Backtest Records: ${stats.backtesting_records} | 
+                        Analysis Records: ${stats.analysis_records} |
+                        Latest Backtest: ${stats.latest_backtest ? new Date(stats.latest_backtest).toLocaleDateString() : 'None'}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading database stats:', error);
             }
         }
 
@@ -474,6 +585,66 @@
             });
         }
 
+        // Reset functions
+        function showResetModal() {
+            document.getElementById('resetModal').style.display = 'block';
+        }
+
+        function hideResetModal() {
+            document.getElementById('resetModal').style.display = 'none';
+        }
+
+        async function resetBacktestData() {
+            try {
+                showDebugInfo('Resetting backtest data...');
+                
+                const response = await fetch('/api/reset_backtest_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showDebugInfo('Backtest data reset successfully!', 'success');
+                    hideResetModal();
+                    // Refresh data after reset
+                    setTimeout(() => {
+                        refreshData();
+                        loadDatabaseStats();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (error) {
+                showDebugInfo(`Error resetting data: ${error.message}`, 'error');
+            }
+        }
+
+        async function generateSampleData() {
+            try {
+                showDebugInfo('Generating sample data...');
+                
+                const response = await fetch('/api/generate_sample_backtests');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showDebugInfo('Sample data generated successfully!', 'success');
+                    // Refresh data after generation
+                    setTimeout(() => {
+                        refreshData();
+                        loadDatabaseStats();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (error) {
+                showDebugInfo(`Error generating sample data: ${error.message}`, 'error');
+            }
+        }
+
         function refreshData() {
             showDebugInfo('Refreshing data...');
             if (winRateChartInstance) {
@@ -485,10 +656,22 @@
                 profitChartInstance = null;
             }
             loadPerformanceData();
+            loadDatabaseStats();
         }
 
         // Load data when page loads
-        document.addEventListener('DOMContentLoaded', loadPerformanceData);
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPerformanceData();
+            loadDatabaseStats();
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('resetModal');
+            if (event.target === modal) {
+                hideResetModal();
+            }
+        }
     </script>
 </body>
 </html>
