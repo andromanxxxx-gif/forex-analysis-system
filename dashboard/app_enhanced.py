@@ -70,7 +70,7 @@ class DataManager:
                         
                         # Pastikan kolom date ada dan konversi ke datetime
                         if 'date' in df.columns:
-                            df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                           df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
                             df = df.dropna(subset=['date'])
                         
                         # Extract pair dan timeframe dari filename
