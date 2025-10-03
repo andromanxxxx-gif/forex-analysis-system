@@ -369,134 +369,138 @@ class EnhancedForexBacktester:
             }
     
     def generate_recommendations(self, report):
-    recommendations = []
-    
-    if report['status'] == 'error':
-        return ["⚠️ Error in report generation - check logs for details"]
-    
-    summary = report.get('summary', {})
-    win_rate = summary.get('win_rate', 0)
-    profit_factor = summary.get('profit_factor', 0)
-    max_drawdown = summary.get('max_drawdown', 0)
-    consecutive_losses = summary.get('consecutive_losses', 0)
-    total_trades = summary.get('total_trades', 0)
-    expectancy = summary.get('expectancy', 0)
-    
-    # Overall strategy assessment
-    profitable = summary.get('total_profit', 0) > 0
-    acceptable_win_rate = win_rate >= 45
-    acceptable_drawdown = max_drawdown > -15  # More realistic threshold
-    
-    # Win Rate Analysis - Realistic thresholds
-    if win_rate < 35:
-        recommendations.append("🎯 CRITICAL: Win rate too low - review strategy fundamentals")
-    elif win_rate < 45:
-        recommendations.append("⚠️ LOW: Win rate below optimal - improve entry signals")
-    elif win_rate > 65:
-        recommendations.append("✅ EXCELLENT: High win rate - maintain strategy")
-    elif win_rate > 55:
-        recommendations.append("📊 GOOD: Solid win rate - strategy effective")
-    else:
-        recommendations.append("📈 DECENT: Acceptable win rate - minor optimizations possible")
-    
-    # Profit Factor Analysis
-    if profit_factor < 0.8:
-        recommendations.append("🔴 CRITICAL: Profit factor very low - strategy losing money")
-    elif profit_factor < 1.0:
-        recommendations.append("⚠️ WARNING: Profit factor below 1.0 - needs improvement")
-    elif profit_factor > 2.0:
-        recommendations.append("💰 EXCELLENT: Outstanding profit factor")
-    elif profit_factor > 1.5:
-        recommendations.append("💵 STRONG: Good profit factor - strategy profitable")
-    elif profit_factor > 1.2:
-        recommendations.append("📈 POSITIVE: Decent profit factor - marginally profitable")
-    
-    # Drawdown Analysis - More realistic thresholds
-    if max_drawdown < -20:
-        recommendations.append("🚨 CRITICAL: Extreme drawdown - implement stricter risk management")
-    elif max_drawdown < -15:
-        recommendations.append("⚠️ HIGH: Significant drawdown - consider reducing position size")
-    elif max_drawdown < -10:
-        recommendations.append("📉 MODERATE: Manageable drawdown - monitor closely")
-    elif max_drawdown > -5:
-        recommendations.append("🛡️ EXCELLENT: Low drawdown - good risk control")
-    
-    # Consecutive Losses Analysis - Context aware
-    if consecutive_losses >= 5:
-        if win_rate < 40:
-            recommendations.append("🚨 DANGER: Very high consecutive losses with low win rate - pause strategy")
-        else:
-            recommendations.append("⚠️ ALERT: High consecutive losses - reduce position size by 50%")
-    elif consecutive_losses >= 3:
-        if win_rate >= 50:
-            # With good win rate, 3 consecutive losses is normal variance
-            recommendations.append("📊 NORMAL: Moderate consecutive losses - expected in trading")
-        else:
-            recommendations.append("📉 CAUTION: Consecutive losses detected - add trade filters")
-    elif consecutive_losses == 0 and total_trades > 10:
-        recommendations.append("✅ EXCELLENT: No consecutive losses - great risk management")
-    
-    # Risk-Reward Analysis
-    risk_reward = summary.get('risk_reward_ratio', 0)
-    if risk_reward < 0.8:
-        recommendations.append("⚡ IMPROVE: Risk-reward ratio too low - increase take profit targets")
-    elif risk_reward > 1.5:
-        recommendations.append("🎯 OPTIMAL: Good risk-reward ratio")
-    
-    # Expectancy Analysis
-    if expectancy > 0:
-        recommendations.append(f"📈 POSITIVE: Strategy expectancy ${expectancy:.2f} per trade")
-    else:
-        recommendations.append(f"📉 NEGATIVE: Negative expectancy - review strategy")
-    
-    # Pair Performance Analysis
-    excellent_pairs = []
-    good_pairs = []
-    review_pairs = []
-    
-    for pair, perf in report.get('performance_by_pair', {}).items():
-        pair_win_rate = perf.get('win_rate', 0)
-        pair_profit = perf.get('profit', 0)
+        recommendations = []
         
-        if pair_win_rate > 60 and pair_profit > 0:
-            excellent_pairs.append(f"{pair}({pair_win_rate}%)")
-        elif pair_win_rate > 50 and pair_profit > 0:
-            good_pairs.append(f"{pair}({pair_win_rate}%)")
-        elif pair_win_rate < 40 or pair_profit < 0:
-            review_pairs.append(f"{pair}({pair_win_rate}%)")
-    
-    if excellent_pairs:
-        recommendations.append(f"🏆 TOP PERFORMERS: {', '.join(excellent_pairs)}")
-    if good_pairs:
-        recommendations.append(f"✅ SOLID: {', '.join(good_pairs)}")
-    if review_pairs:
-        recommendations.append(f"🔍 NEEDS REVIEW: {', '.join(review_pairs)}")
-    
-    # Sample Size Consideration
-    if total_trades < 10:
-        recommendations.append("📊 NOTE: Low trade count - results may not be statistically significant")
-    
-    # Final Overall Assessment
-    strong_performance = (win_rate >= 50 and profit_factor >= 1.3 and max_drawdown >= -10)
-    good_performance = (win_rate >= 45 and profit_factor >= 1.1 and max_drawdown >= -15)
-    
-    if strong_performance:
-        recommendations.append("🏅 STRATEGY RATING: EXCELLENT - Continue with confidence")
-    elif good_performance:
-        recommendations.append("🥈 STRATEGY RATING: GOOD - Minor optimizations possible")
-    elif profitable:
-        recommendations.append("🥉 STRATEGY RATING: ACCEPTABLE - Consider improvements")
-    else:
-        recommendations.append("🔧 STRATEGY RATING: NEEDS WORK - Review and optimize")
-    
-    # Limit recommendations to most important ones
-    if len(recommendations) > 8:
-        # Prioritize critical warnings and excellent ratings
-        critical = [r for r in recommendations if any(word in r for word in ['CRITICAL', 'DANGER', 'ALERT', 'EXCELLENT', 'STRONG'])]
-        others = [r for r in recommendations if r not in critical]
-        recommendations = critical + others[:6]  # Max 8 recommendations
-    
-    return recommendations
+        if report['status'] == 'error':
+            return ["⚠️ Error in report generation - check logs for details"]
+        
+        summary = report.get('summary', {})
+        win_rate = summary.get('win_rate', 0)
+        profit_factor = summary.get('profit_factor', 0)
+        max_drawdown = summary.get('max_drawdown', 0)
+        consecutive_losses = summary.get('consecutive_losses', 0)
+        total_trades = summary.get('total_trades', 0)
+        expectancy = summary.get('expectancy', 0)
+        
+        # Overall strategy assessment
+        profitable = summary.get('total_profit', 0) > 0
+        acceptable_win_rate = win_rate >= 45
+        acceptable_drawdown = max_drawdown > -15  # More realistic threshold
+        
+        # Win Rate Analysis - Realistic thresholds
+        if win_rate < 35:
+            recommendations.append("🎯 CRITICAL: Win rate too low - review strategy fundamentals")
+        elif win_rate < 45:
+            recommendations.append("⚠️ LOW: Win rate below optimal - improve entry signals")
+        elif win_rate > 65:
+            recommendations.append("✅ EXCELLENT: High win rate - maintain strategy")
+        elif win_rate > 55:
+            recommendations.append("📊 GOOD: Solid win rate - strategy effective")
+        else:
+            recommendations.append("📈 DECENT: Acceptable win rate - minor optimizations possible")
+        
+        # Profit Factor Analysis
+        if profit_factor < 0.8:
+            recommendations.append("🔴 CRITICAL: Profit factor very low - strategy losing money")
+        elif profit_factor < 1.0:
+            recommendations.append("⚠️ WARNING: Profit factor below 1.0 - needs improvement")
+        elif profit_factor > 2.0:
+            recommendations.append("💰 EXCELLENT: Outstanding profit factor")
+        elif profit_factor > 1.5:
+            recommendations.append("💵 STRONG: Good profit factor - strategy profitable")
+        elif profit_factor > 1.2:
+            recommendations.append("📈 POSITIVE: Decent profit factor - marginally profitable")
+        
+        # Drawdown Analysis - More realistic thresholds
+        if max_drawdown < -20:
+            recommendations.append("🚨 CRITICAL: Extreme drawdown - implement stricter risk management")
+        elif max_drawdown < -15:
+            recommendations.append("⚠️ HIGH: Significant drawdown - consider reducing position size")
+        elif max_drawdown < -10:
+            recommendations.append("📉 MODERATE: Manageable drawdown - monitor closely")
+        elif max_drawdown > -5:
+            recommendations.append("🛡️ EXCELLENT: Low drawdown - good risk control")
+        
+        # Consecutive Losses Analysis - Context aware
+        if consecutive_losses >= 5:
+            if win_rate < 40:
+                recommendations.append("🚨 DANGER: Very high consecutive losses with low win rate - pause strategy")
+            else:
+                recommendations.append("⚠️ ALERT: High consecutive losses - reduce position size by 50%")
+        elif consecutive_losses >= 3:
+            if win_rate >= 50:
+                # With good win rate, 3 consecutive losses is normal variance
+                recommendations.append("📊 NORMAL: Moderate consecutive losses - expected in trading")
+            else:
+                recommendations.append("📉 CAUTION: Consecutive losses detected - add trade filters")
+        elif consecutive_losses == 0 and total_trades > 10:
+            recommendations.append("✅ EXCELLENT: No consecutive losses - great risk management")
+        
+        # Risk-Reward Analysis
+        risk_reward = summary.get('risk_reward_ratio', 0)
+        if risk_reward < 0.8:
+            recommendations.append("⚡ IMPROVE: Risk-reward ratio too low - increase take profit targets")
+        elif risk_reward > 1.5:
+            recommendations.append("🎯 OPTIMAL: Good risk-reward ratio")
+        
+        # Expectancy Analysis
+        if expectancy > 0:
+            recommendations.append(f"📈 POSITIVE: Strategy expectancy ${expectancy:.2f} per trade")
+        else:
+            recommendations.append(f"📉 NEGATIVE: Negative expectancy - review strategy")
+        
+        # Pair Performance Analysis
+        excellent_pairs = []
+        good_pairs = []
+        review_pairs = []
+        
+        for pair, perf in report.get('performance_by_pair', {}).items():
+            pair_win_rate = perf.get('win_rate', 0)
+            pair_profit = perf.get('profit', 0)
+            
+            if pair_win_rate > 60 and pair_profit > 0:
+                excellent_pairs.append(f"{pair}({pair_win_rate}%)")
+            elif pair_win_rate > 50 and pair_profit > 0:
+                good_pairs.append(f"{pair}({pair_win_rate}%)")
+            elif pair_win_rate < 40 or pair_profit < 0:
+                review_pairs.append(f"{pair}({pair_win_rate}%)")
+        
+        if excellent_pairs:
+            recommendations.append(f"🏆 TOP PERFORMERS: {', '.join(excellent_pairs)}")
+        if good_pairs:
+            recommendations.append(f"✅ SOLID: {', '.join(good_pairs)}")
+        if review_pairs:
+            recommendations.append(f"🔍 NEEDS REVIEW: {', '.join(review_pairs)}")
+        
+        # Sample Size Consideration
+        if total_trades < 10:
+            recommendations.append("📊 NOTE: Low trade count - results may not be statistically significant")
+        
+        # Final Overall Assessment
+        strong_performance = (win_rate >= 50 and profit_factor >= 1.3 and max_drawdown >= -10)
+        good_performance = (win_rate >= 45 and profit_factor >= 1.1 and max_drawdown >= -15)
+        
+        if strong_performance:
+            recommendations.append("🏅 STRATEGY RATING: EXCELLENT - Continue with confidence")
+        elif good_performance:
+            recommendations.append("🥈 STRATEGY RATING: GOOD - Minor optimizations possible")
+        elif profitable:
+            recommendations.append("🥉 STRATEGY RATING: ACCEPTABLE - Consider improvements")
+        else:
+            recommendations.append("🔧 STRATEGY RATING: NEEDS WORK - Review and optimize")
+        
+        # Limit recommendations to most important ones
+        if len(recommendations) > 8:
+            # Prioritize critical warnings and excellent ratings
+            critical = [r for r in recommendations if any(word in r for word in ['CRITICAL', 'DANGER', 'ALERT', 'EXCELLENT', 'STRONG'])]
+            others = [r for r in recommendations if r not in critical]
+            recommendations = critical + others[:6]  # Max 8 recommendations
+        
+        return recommendations
+
+# Initialize enhanced backtester
+backtester = EnhancedForexBacktester(initial_balance=Config.INITIAL_BALANCE)
+
 # ---------------- DATABASE FUNCTIONS ----------------
 def init_db():
     """Initialize database with enhanced tables"""
@@ -1358,6 +1362,68 @@ def index():
 def serve_static(path):
     return send_from_directory('static', path)
 
+@app.route('/performance')
+def performance():
+    """Performance dashboard page"""
+    return render_template('performance.html')
+
+@app.route('/api/performance_metrics')
+def api_performance_metrics():
+    """API endpoint for performance metrics"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        # Get recent backtest results for performance metrics
+        c.execute('''
+            SELECT pair, timeframe, win_rate, total_profit, max_drawdown, profit_factor, timestamp
+            FROM backtesting_results 
+            ORDER BY timestamp DESC LIMIT 20
+        ''')
+        
+        results = c.fetchall()
+        metrics = []
+        
+        for row in results:
+            metrics.append({
+                'pair': row[0],
+                'timeframe': row[1],
+                'win_rate': row[2],
+                'total_profit': row[3],
+                'max_drawdown': row[4],
+                'profit_factor': row[5],
+                'timestamp': row[6]
+            })
+        
+        # Calculate overall stats
+        if metrics:
+            win_rates = [m['win_rate'] for m in metrics if m['win_rate']]
+            total_profits = [m['total_profit'] for m in metrics if m['total_profit']]
+            
+            overall_stats = {
+                'avg_win_rate': round(sum(win_rates) / len(win_rates), 2) if win_rates else 0,
+                'total_profit_all': round(sum(total_profits), 2) if total_profits else 0,
+                'best_pair': max(metrics, key=lambda x: x.get('win_rate', 0)) if metrics else {},
+                'total_tests': len(metrics)
+            }
+        else:
+            overall_stats = {
+                'avg_win_rate': 0,
+                'total_profit_all': 0,
+                'best_pair': {},
+                'total_tests': 0
+            }
+        
+        conn.close()
+        return jsonify({
+            'metrics': metrics,
+            'overall_stats': overall_stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching performance metrics: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/get_analysis')
 def get_analysis():
     start_time = datetime.now()
@@ -1677,68 +1743,6 @@ def ai_status():
         "message": "All systems operational" if (DEEPSEEK_API_KEY and NEWS_API_KEY and TWELVE_API_KEY) else "Some features disabled - check API keys"
     }
     return jsonify(status)
-
-@app.route('/performance')
-def performance():
-    """Performance dashboard page"""
-    return render_template('performance.html')
-
-@app.route('/api/performance_metrics')
-def api_performance_metrics():
-    """API endpoint for performance metrics"""
-    try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        # Get recent backtest results for performance metrics
-        c.execute('''
-            SELECT pair, timeframe, win_rate, total_profit, max_drawdown, profit_factor, timestamp
-            FROM backtesting_results 
-            ORDER BY timestamp DESC LIMIT 20
-        ''')
-        
-        results = c.fetchall()
-        metrics = []
-        
-        for row in results:
-            metrics.append({
-                'pair': row[0],
-                'timeframe': row[1],
-                'win_rate': row[2],
-                'total_profit': row[3],
-                'max_drawdown': row[4],
-                'profit_factor': row[5],
-                'timestamp': row[6]
-            })
-        
-        # Calculate overall stats
-        if metrics:
-            win_rates = [m['win_rate'] for m in metrics if m['win_rate']]
-            total_profits = [m['total_profit'] for m in metrics if m['total_profit']]
-            
-            overall_stats = {
-                'avg_win_rate': round(sum(win_rates) / len(win_rates), 2) if win_rates else 0,
-                'total_profit_all': round(sum(total_profits), 2) if total_profits else 0,
-                'best_pair': max(metrics, key=lambda x: x.get('win_rate', 0)) if metrics else {},
-                'total_tests': len(metrics)
-            }
-        else:
-            overall_stats = {
-                'avg_win_rate': 0,
-                'total_profit_all': 0,
-                'best_pair': {},
-                'total_tests': 0
-            }
-        
-        conn.close()
-        return jsonify({
-            'metrics': metrics,
-            'overall_stats': overall_stats
-        })
-        
-    except Exception as e:
-        logger.error(f"Error fetching performance metrics: {e}")
-        return jsonify({'error': str(e)}), 500
 
 # ---------------- INITIALIZATION ----------------
 if __name__ == "__main__":
