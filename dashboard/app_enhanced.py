@@ -508,10 +508,7 @@ def init_db():
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
         
-        c.execute('DROP TABLE IF EXISTS analysis_results')
-        c.execute('DROP TABLE IF EXISTS backtesting_results')
-        
-        c.execute('''CREATE TABLE analysis_results (
+        c.execute('''CREATE TABLE IF NOT EXISTS analysis_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pair TEXT NOT NULL,
             timeframe TEXT NOT NULL,
@@ -526,7 +523,7 @@ def init_db():
             ai_provider TEXT
         )''')
 
-        c.execute('''CREATE TABLE backtesting_results (
+        c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             pair TEXT NOT NULL,
@@ -586,16 +583,36 @@ def save_analysis_result(data: Dict):
         conn.close()
 
 def save_backtest_result(report_data: Dict):
-    """Save enhanced backtesting result to database"""
+    """Save enhanced backtesting result to database dengan error handling lebih baik"""
     try:
         if 'summary' not in report_data:
             logger.warning("No summary found in report data, skipping save")
-            return
+            return False
             
         summary = report_data['summary']
         
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
+        
+        # Pastikan tabel ada
+        c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            pair TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            period_days INTEGER,
+            total_trades INTEGER,
+            winning_trades INTEGER,
+            win_rate REAL,
+            total_profit REAL,
+            final_balance REAL,
+            max_drawdown REAL,
+            profit_factor REAL,
+            risk_reward_ratio REAL,
+            expectancy REAL,
+            report_data TEXT,
+            recommendations TEXT
+        )''')
         
         recommendations = json.dumps(report_data.get('recommendations', []))
         
@@ -620,12 +637,16 @@ def save_backtest_result(report_data: Dict):
                   recommendations))
         
         conn.commit()
-        logger.info("Enhanced backtesting result saved to database")
+        logger.info(f"✅ Backtesting result saved to database for {report_data.get('pair', 'MULTI')}-{report_data.get('timeframe', '4H')}")
+        return True
+        
     except Exception as e:
         logger.error(f"Error saving backtest result: {e}")
         traceback.print_exc()
+        return False
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 # ---------------- ENHANCED NEWS API ----------------
 def get_real_news(pair: str) -> str:
@@ -1369,14 +1390,31 @@ def performance():
 
 @app.route('/api/performance_metrics')
 def api_performance_metrics():
-    """API endpoint for performance metrics"""
+    """API endpoint for performance metrics dengan error handling yang lebih baik"""
     try:
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
         
+        # Check if table exists first
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='backtesting_results'")
+        table_exists = c.fetchone()
+        
+        if not table_exists:
+            logger.warning("Table 'backtesting_results' does not exist yet")
+            return jsonify({
+                'metrics': [],
+                'overall_stats': {
+                    'avg_win_rate': 0,
+                    'total_profit_all': 0,
+                    'best_pair': {},
+                    'total_tests': 0,
+                    'message': 'No backtest data available. Run some backtests first.'
+                }
+            })
+        
         # Get recent backtest results for performance metrics
         c.execute('''
-            SELECT pair, timeframe, win_rate, total_profit, max_drawdown, profit_factor, timestamp
+            SELECT pair, timeframe, win_rate, total_profit, final_balance, max_drawdown, profit_factor, timestamp
             FROM backtesting_results 
             ORDER BY timestamp DESC LIMIT 20
         ''')
@@ -1386,42 +1424,115 @@ def api_performance_metrics():
         
         for row in results:
             metrics.append({
-                'pair': row[0],
-                'timeframe': row[1],
-                'win_rate': row[2],
-                'total_profit': row[3],
-                'max_drawdown': row[4],
-                'profit_factor': row[5],
-                'timestamp': row[6]
+                'pair': row[0] or 'Unknown',
+                'timeframe': row[1] or '4H',
+                'win_rate': float(row[2]) if row[2] is not None else 0,
+                'total_profit': float(row[3]) if row[3] is not None else 0,
+                'final_balance': float(row[4]) if row[4] is not None else Config.INITIAL_BALANCE,
+                'max_drawdown': float(row[5]) if row[5] is not None else 0,
+                'profit_factor': float(row[6]) if row[6] is not None else 0,
+                'timestamp': row[7] or datetime.now().isoformat()
             })
         
+        logger.info(f"Found {len(metrics)} backtest records for performance metrics")
+        
         # Calculate overall stats
-        if metrics:
-            win_rates = [m['win_rate'] for m in metrics if m['win_rate']]
-            total_profits = [m['total_profit'] for m in metrics if m['total_profit']]
+        if metrics and len(metrics) > 0:
+            win_rates = [m['win_rate'] for m in metrics if m['win_rate'] is not None]
+            total_profits = [m['total_profit'] for m in metrics if m['total_profit'] is not None]
+            
+            if win_rates:
+                avg_win_rate = round(sum(win_rates) / len(win_rates), 2)
+                best_pair = max(metrics, key=lambda x: x.get('win_rate', 0))
+            else:
+                avg_win_rate = 0
+                best_pair = {}
+                
+            if total_profits:
+                total_profit_all = round(sum(total_profits), 2)
+            else:
+                total_profit_all = 0
             
             overall_stats = {
-                'avg_win_rate': round(sum(win_rates) / len(win_rates), 2) if win_rates else 0,
-                'total_profit_all': round(sum(total_profits), 2) if total_profits else 0,
-                'best_pair': max(metrics, key=lambda x: x.get('win_rate', 0)) if metrics else {},
-                'total_tests': len(metrics)
+                'avg_win_rate': avg_win_rate,
+                'total_profit_all': total_profit_all,
+                'best_pair': best_pair,
+                'total_tests': len(metrics),
+                'message': f'Loaded {len(metrics)} backtest results'
             }
         else:
             overall_stats = {
                 'avg_win_rate': 0,
                 'total_profit_all': 0,
                 'best_pair': {},
-                'total_tests': 0
+                'total_tests': 0,
+                'message': 'No backtest results found in database'
             }
         
         conn.close()
-        return jsonify({
+        
+        response_data = {
             'metrics': metrics,
-            'overall_stats': overall_stats
-        })
+            'overall_stats': overall_stats,
+            'status': 'success'
+        }
+        
+        logger.info(f"Performance metrics response: {overall_stats}")
+        return jsonify(response_data)
         
     except Exception as e:
         logger.error(f"Error fetching performance metrics: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'error': str(e),
+            'metrics': [],
+            'overall_stats': {
+                'avg_win_rate': 0,
+                'total_profit_all': 0,
+                'best_pair': {},
+                'total_tests': 0,
+                'message': f'Error: {str(e)}'
+            },
+            'status': 'error'
+        }), 500
+
+@app.route('/api/debug_database')
+def api_debug_database():
+    """Debug endpoint to check database contents"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        # Check tables
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = c.fetchall()
+        
+        result = {
+            'tables': [table[0] for table in tables],
+            'backtesting_results_count': 0,
+            'backtesting_results_sample': []
+        }
+        
+        if 'backtesting_results' in result['tables']:
+            c.execute("SELECT COUNT(*) FROM backtesting_results")
+            result['backtesting_results_count'] = c.fetchone()[0]
+            
+            c.execute("SELECT pair, timeframe, win_rate, total_profit, timestamp FROM backtesting_results ORDER BY timestamp DESC LIMIT 5")
+            sample = c.fetchall()
+            result['backtesting_results_sample'] = [
+                {
+                    'pair': row[0],
+                    'timeframe': row[1], 
+                    'win_rate': row[2],
+                    'total_profit': row[3],
+                    'timestamp': row[4]
+                } for row in sample
+            ]
+        
+        conn.close()
+        return jsonify(result)
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get_analysis')
@@ -1623,9 +1734,15 @@ def api_run_backtest():
             'data_points_used': len(HISTORICAL[pair][timeframe]) if pair in HISTORICAL and timeframe in HISTORICAL[pair] else 0
         }
         
-        save_backtest_result(report)
+        # Save to database dan cek hasilnya
+        save_success = save_backtest_result(report)
+        report['save_success'] = save_success
         
-        logger.info(f"✅ Backtest completed successfully with {len(signals)} signals")
+        if save_success:
+            logger.info(f"✅ Backtest completed and saved successfully with {len(signals)} signals")
+        else:
+            logger.error("❌ Backtest completed but failed to save to database")
+        
         return jsonify(report)
         
     except Exception as e:
