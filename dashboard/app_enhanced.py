@@ -423,7 +423,7 @@ class EnhancedForexBacktester:
         elif max_drawdown > -5:
             recommendations.append("🛡️ EXCELLENT: Low drawdown - good risk control")
         
-        return recommendations[:6]  # Return max 6 recommendations
+        return recommendations[:6]
 
 # Initialize enhanced backtester
 backtester = EnhancedForexBacktester(initial_balance=Config.INITIAL_BALANCE)
@@ -785,10 +785,34 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
         for i in range(start_index, len(df)):
             try:
                 current_data = df.iloc[:i+1]
-                current_date = current_data.iloc[-1]['date']
-                current_price = current_data.iloc[-1]['close']
                 
-                closes = current_data['close'].tolist()
+                # Check if 'date' column exists, if not try to find it
+                date_col = None
+                for col in ['date', 'Date', 'DATE', 'time', 'Time', 'TIME', 'datetime', 'Datetime', 'DATETIME']:
+                    if col in current_data.columns:
+                        date_col = col
+                        break
+                
+                if date_col is None:
+                    logger.warning(f"No date column found in data for {pair}-{timeframe}")
+                    continue
+                
+                current_date = current_data.iloc[-1][date_col]
+                
+                # Find close price column
+                close_col = None
+                for col in ['close', 'Close', 'CLOSE', 'price', 'Price', 'PRICE']:
+                    if col in current_data.columns:
+                        close_col = col
+                        break
+                
+                if close_col is None:
+                    logger.warning(f"No close price column found in data for {pair}-{timeframe}")
+                    continue
+                
+                current_price = current_data.iloc[-1][close_col]
+                
+                closes = current_data[close_col].tolist()
                 
                 tech_indicators = calc_indicators(closes)
                 
@@ -829,8 +853,30 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
             sample_indices = random.sample(range(len(df)), min(10, len(df)))
             for idx in sample_indices:
                 current_data = df.iloc[:idx+1]
-                current_date = current_data.iloc[-1]['date']
-                current_price = current_data.iloc[-1]['close']
+                
+                # Find date column
+                date_col = None
+                for col in ['date', 'Date', 'DATE', 'time', 'Time', 'TIME', 'datetime', 'Datetime', 'DATETIME']:
+                    if col in current_data.columns:
+                        date_col = col
+                        break
+                
+                if date_col is None:
+                    continue
+                    
+                current_date = current_data.iloc[-1][date_col]
+                
+                # Find close price column
+                close_col = None
+                for col in ['close', 'Close', 'CLOSE', 'price', 'Price', 'PRICE']:
+                    if col in current_data.columns:
+                        close_col = col
+                        break
+                
+                if close_col is None:
+                    continue
+                    
+                current_price = current_data.iloc[-1][close_col]
                 
                 action = random.choice(['BUY', 'SELL'])
                 signals.append({
@@ -857,7 +903,7 @@ def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int
 
 # ---------------- DATA LOADING & SAMPLE DATA ----------------
 def load_csv_data():
-    """Load historical CSV data"""
+    """Load historical CSV data dengan handling untuk berbagai format kolom"""
     search_dirs = [".", "data", "historical_data"]
     loaded_count = 0
     
@@ -871,20 +917,48 @@ def load_csv_data():
                 try:
                     df = pd.read_csv(file_path)
                     
-                    # Standardize column names
-                    df.columns = [str(col).lower().strip().replace(' ', '_').replace('.', '') for col in df.columns]
+                    logger.info(f"Loading {filename} with columns: {list(df.columns)}")
+                    
+                    # Standardize column names - lebih komprehensif
+                    column_mapping = {}
+                    for col in df.columns:
+                        original_col = col
+                        col = str(col).lower().strip().replace(' ', '_').replace('.', '').replace('-', '_')
+                        
+                        # Map berbagai kemungkinan nama kolom ke nama standar
+                        if 'date' in col or 'time' in col or 'datetime' in col:
+                            column_mapping[original_col] = 'date'
+                        elif 'open' in col:
+                            column_mapping[original_col] = 'open'
+                        elif 'high' in col:
+                            column_mapping[original_col] = 'high' 
+                        elif 'low' in col:
+                            column_mapping[original_col] = 'low'
+                        elif 'close' in col:
+                            column_mapping[original_col] = 'close'
+                        elif 'volume' in col or 'vol' in col:
+                            column_mapping[original_col] = 'volume'
+                        else:
+                            column_mapping[original_col] = col
+                    
+                    # Rename columns
+                    df = df.rename(columns=column_mapping)
                     
                     # Handle date parsing
-                    date_column = None
-                    for col in ['date', 'time', 'datetime', 'timestamp']:
-                        if col in df.columns:
-                            date_column = col
-                            break
+                    if 'date' in df.columns:
+                        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                        df = df.dropna(subset=['date'])
+                        df = df.sort_values('date')
+                    else:
+                        logger.warning(f"No date column found in {file_path}. Skipping.")
+                        continue
                     
-                    if date_column:
-                        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
-                        df = df.dropna(subset=[date_column])
-                        df = df.sort_values(date_column)
+                    # Pastikan kolom required ada
+                    required_cols = ['open', 'high', 'low', 'close']
+                    missing_cols = [col for col in required_cols if col not in df.columns]
+                    if missing_cols:
+                        logger.warning(f"Missing required columns {missing_cols} in {file_path}. Skipping.")
+                        continue
                     
                     # Extract pair and timeframe from filename
                     base_name = os.path.basename(filename).replace(".csv", "").upper()
@@ -904,6 +978,7 @@ def load_csv_data():
                     
                 except Exception as e:
                     logger.error(f"Error loading {file_path}: {e}")
+                    traceback.print_exc()
     
     logger.info(f"Total loaded datasets: {loaded_count}")
 
@@ -912,7 +987,7 @@ def load_csv_data():
         logger.info("✅ Historical data loaded to backtester")
 
 def create_sample_data():
-    """Create sample historical data if none exists"""
+    """Create sample historical data if none exists dengan struktur kolom yang benar"""
     try:
         if not os.path.exists('historical_data'):
             os.makedirs('historical_data')
@@ -932,7 +1007,16 @@ def create_sample_data():
                 filename = f"historical_data/{pair}_{timeframe}.csv"
                 
                 if os.path.exists(filename):
-                    continue
+                    # Check if file has correct structure
+                    try:
+                        df = pd.read_csv(filename)
+                        if 'date' not in df.columns or 'close' not in df.columns:
+                            logger.warning(f"File {filename} has incorrect structure, recreating...")
+                            os.remove(filename)
+                        else:
+                            continue
+                    except:
+                        os.remove(filename)
                 
                 logger.info(f"Creating sample data for {pair}-{timeframe}")
                 
@@ -976,6 +1060,7 @@ def create_sample_data():
         
     except Exception as e:
         logger.error(f"Error creating sample data: {e}")
+        traceback.print_exc()
 
 # ---------------- FLASK ROUTES ----------------
 @app.route('/')
@@ -1225,35 +1310,45 @@ def run_auto_backtest():
         if count == 0:
             logger.info("No backtest data found, running initial backtest...")
             
-            # Run backtest for USDJPY 4H as default
-            pair = "USDJPY"
-            timeframe = "4H"
-            days = 30
+            # Try multiple pairs and timeframes until one works
+            pairs_to_try = ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY"]
+            timeframes_to_try = ["1D", "4H", "1H"]  # Prioritize 1D first karena data lebih banyak
             
-            if pair in HISTORICAL and timeframe in HISTORICAL[pair]:
-                signals = generate_backtest_signals_from_analysis(pair, timeframe, days)
-                if signals:
-                    report = backtester.run_backtest(signals, timeframe)
-                    report['metadata'] = {
-                        'pair': pair,
-                        'timeframe': timeframe,
-                        'period_days': days,
-                        'signals_generated': len(signals)
-                    }
-                    save_success = save_backtest_result(report)
-                    if save_success:
-                        logger.info("✅ Auto backtest completed and data saved")
+            for pair in pairs_to_try:
+                for timeframe in timeframes_to_try:
+                    if pair in HISTORICAL and timeframe in HISTORICAL[pair]:
+                        logger.info(f"Trying auto backtest for {pair}-{timeframe}")
+                        signals = generate_backtest_signals_from_analysis(pair, timeframe, 30)
+                        if signals:
+                            logger.info(f"Running backtest with {len(signals)} signals for {pair}-{timeframe}")
+                            report = backtester.run_backtest(signals, timeframe)
+                            
+                            if report.get('status') == 'success':
+                                report['metadata'] = {
+                                    'pair': pair,
+                                    'timeframe': timeframe,
+                                    'period_days': 30,
+                                    'signals_generated': len(signals)
+                                }
+                                save_success = save_backtest_result(report)
+                                if save_success:
+                                    logger.info("✅ Auto backtest completed and data saved")
+                                    return  # Exit after first successful backtest
+                                else:
+                                    logger.error("❌ Auto backtest failed to save")
+                            else:
+                                logger.warning(f"Backtest failed for {pair}-{timeframe}: {report.get('message')}")
+                        else:
+                            logger.warning(f"No signals generated for {pair}-{timeframe} in auto backtest")
                     else:
-                        logger.error("❌ Auto backtest failed to save")
-                else:
-                    logger.warning("No signals generated in auto backtest")
-            else:
-                logger.warning("No historical data available for auto backtest")
+                        logger.warning(f"No historical data for {pair}-{timeframe} for auto backtest")
+            logger.error("❌ No auto backtest could be completed for any pair and timeframe")
         else:
             logger.info(f"Found {count} existing backtest records, skipping auto backtest")
             
     except Exception as e:
         logger.error(f"Auto backtest error: {e}")
+        traceback.print_exc()
 
 # ---------------- RESET & MAINTENANCE ROUTES ----------------
 @app.route('/api/reset_backtest_data', methods=['POST'])
