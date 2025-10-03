@@ -1,4 +1,4 @@
-# [FILE: app_enhanced_final.py]
+# [FILE: app_enhanced_fixed.py]
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -9,9 +9,9 @@ import sqlite3
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Optional
+from dataclasses import dataclass, field
 import talib
 import yfinance as yf
-from dataclasses import dataclass
 
 # Konfigurasi logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
 
-# ==================== KONFIGURASI SISTEM ====================
+# ==================== KONFIGURASI SISTEM - FIXED ====================
 @dataclass
 class SystemConfig:
     # API Configuration
@@ -35,9 +35,9 @@ class SystemConfig:
     STOP_LOSS_PCT: float = 0.01   # 1% stop loss
     TAKE_PROFIT_PCT: float = 0.02 # 2% take profit
     
-    # Supported Instruments
-    FOREX_PAIRS: List[str] = "USDJPY,GBPJPY,EURJPY,CHFJPY,EURUSD,GBPUSD,USDCHF".split(",")
-    TIMEFRAMES: List[str] = "1H,4H,1D,1W".split(",")
+    # Supported Instruments - FIX: menggunakan field dengan default_factory
+    FOREX_PAIRS: List[str] = field(default_factory=lambda: ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY", "EURUSD", "GBPUSD", "USDCHF"])
+    TIMEFRAMES: List[str] = field(default_factory=lambda: ["1H", "4H", "1D", "1W"])
     
     # Backtesting
     DEFAULT_BACKTEST_DAYS: int = 30
@@ -53,9 +53,13 @@ class TechnicalAnalysisEngine:
     def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
         """Menghitung semua indikator teknikal dari DataFrame OHLC"""
         try:
+            # Pastikan data cukup
+            if len(df) < 50:
+                return self._fallback_indicators(df)
+                
             closes = df['close'].values
-            highs = df['high'].values
-            lows = df['low'].values
+            highs = df['high'].values if 'high' in df.columns else closes
+            lows = df['low'].values if 'low' in df.columns else closes
             
             # Trend Indicators
             sma_20 = talib.SMA(closes, timeperiod=20)
@@ -73,35 +77,39 @@ class TechnicalAnalysisEngine:
             atr = talib.ATR(highs, lows, closes, timeperiod=14)
             
             # Support & Resistance
-            recent_high = highs[-20:].max()
-            recent_low = lows[-20:].min()
+            recent_high = highs[-20:].max() if len(highs) >= 20 else highs.max()
+            recent_low = lows[-20:].min() if len(lows) >= 20 else lows.min()
+            
+            # Handle NaN values
+            def safe_float(value, default=0):
+                return float(value) if not np.isnan(value) else default
             
             return {
                 'trend': {
-                    'sma_20': float(sma_20[-1]) if not np.isnan(sma_20[-1]) else None,
-                    'sma_50': float(sma_50[-1]) if not np.isnan(sma_50[-1]) else None,
-                    'ema_12': float(ema_12[-1]) if not np.isnan(ema_12[-1]) else None,
-                    'ema_26': float(ema_26[-1]) if not np.isnan(ema_26[-1]) else None,
-                    'trend_direction': 'BULLISH' if sma_20[-1] > sma_50[-1] else 'BEARISH'
+                    'sma_20': safe_float(sma_20[-1], closes[-1]),
+                    'sma_50': safe_float(sma_50[-1], closes[-1]),
+                    'ema_12': safe_float(ema_12[-1], closes[-1]),
+                    'ema_26': safe_float(ema_26[-1], closes[-1]),
+                    'trend_direction': 'BULLISH' if safe_float(sma_20[-1], closes[-1]) > safe_float(sma_50[-1], closes[-1]) else 'BEARISH'
                 },
                 'momentum': {
-                    'rsi': float(rsi[-1]) if not np.isnan(rsi[-1]) else 50,
-                    'macd': float(macd[-1]) if not np.isnan(macd[-1]) else 0,
-                    'macd_signal': float(macd_signal[-1]) if not np.isnan(macd_signal[-1]) else 0,
-                    'macd_histogram': float(macd_hist[-1]) if not np.isnan(macd_hist[-1]) else 0,
-                    'stoch_k': float(stoch_k[-1]) if not np.isnan(stoch_k[-1]) else 50,
-                    'stoch_d': float(stoch_d[-1]) if not np.isnan(stoch_d[-1]) else 50
+                    'rsi': safe_float(rsi[-1], 50),
+                    'macd': safe_float(macd[-1], 0),
+                    'macd_signal': safe_float(macd_signal[-1], 0),
+                    'macd_histogram': safe_float(macd_hist[-1], 0),
+                    'stoch_k': safe_float(stoch_k[-1], 50),
+                    'stoch_d': safe_float(stoch_d[-1], 50)
                 },
                 'volatility': {
-                    'bollinger_upper': float(bollinger_upper[-1]) if not np.isnan(bollinger_upper[-1]) else None,
-                    'bollinger_lower': float(bollinger_lower[-1]) if not np.isnan(bollinger_lower[-1]) else None,
-                    'atr': float(atr[-1]) if not np.isnan(atr[-1]) else 0,
-                    'volatility_pct': float(np.std(closes[-20:]) / np.mean(closes[-20:]) * 100) if len(closes) >= 20 else 0
+                    'bollinger_upper': safe_float(bollinger_upper[-1], closes[-1] * 1.01),
+                    'bollinger_lower': safe_float(bollinger_lower[-1], closes[-1] * 0.99),
+                    'atr': safe_float(atr[-1], closes[-1] * 0.005),
+                    'volatility_pct': safe_float(np.std(closes[-20:]) / np.mean(closes[-20:]) * 100, 1.0) if len(closes) >= 20 else 1.0
                 },
                 'levels': {
-                    'support': float(recent_low),
-                    'resistance': float(recent_high),
-                    'current_price': float(closes[-1])
+                    'support': safe_float(recent_low, closes[-1] * 0.99),
+                    'resistance': safe_float(recent_high, closes[-1] * 1.01),
+                    'current_price': safe_float(closes[-1])
                 }
             }
         except Exception as e:
@@ -110,16 +118,19 @@ class TechnicalAnalysisEngine:
 
     def _fallback_indicators(self, df: pd.DataFrame) -> Dict:
         """Fallback indicators jika TA-Lib gagal"""
-        closes = df['close'].values
-        current_price = float(closes[-1])
-        
+        try:
+            closes = df['close'].values
+            current_price = float(closes[-1]) if len(closes) > 0 else 150.0
+        except:
+            current_price = 150.0
+            
         return {
             'trend': {
                 'sma_20': current_price * 0.998,
                 'sma_50': current_price * 0.995,
                 'ema_12': current_price * 0.999,
                 'ema_26': current_price * 0.997,
-                'trend_direction': 'BULLISH' if current_price > df['close'].mean() else 'BEARISH'
+                'trend_direction': 'BULLISH' if current_price > (df['close'].mean() if len(df) > 0 else current_price) else 'BEARISH'
             },
             'momentum': {
                 'rsi': 50,
@@ -202,11 +213,17 @@ class FundamentalAnalysisEngine:
                 "ECB monitoring inflation closely. Euro area growth shows signs of stabilization.",
                 "EUR/JPY influenced by ECB policy outlook and Japanese economic recovery.",
                 "European inflation data key for EUR direction against safe-haven JPY."
+            ],
+            'CHFJPY': [
+                "Swiss National Bank maintains focus on currency interventions amid global uncertainty.",
+                "CHF/JPY influenced by safe-haven flows and Bank of Japan policy decisions.",
+                "Switzerland inflation stays within target range, supporting CHF stability."
             ]
         }
         
         import random
-        return random.choice(news_templates.get(pair, ["Market analysis ongoing. Monitor economic indicators for trading opportunities."]))
+        templates = news_templates.get(pair, ["Market analysis ongoing. Monitor economic indicators for trading opportunities."])
+        return random.choice(templates)
 
 # ==================== DEEPSEEK AI ANALYZER ====================
 class DeepSeekAnalyzer:
@@ -452,11 +469,11 @@ class RealisticBacktestingEngine:
             position_size = self._calculate_position_size(entry_price, signal.get('sl_pips', 30))
             
             if signal_action == 'BUY':
-                stop_loss = entry_price * (1 - signal.get('sl_pct', 0.01))
-                take_profit = entry_price * (1 + signal.get('tp_pct', 0.02))
+                stop_loss = entry_price * (1 - config.STOP_LOSS_PCT)
+                take_profit = entry_price * (1 + config.TAKE_PROFIT_PCT)
             else:  # SELL
-                stop_loss = entry_price * (1 + signal.get('sl_pct', 0.01))
-                take_profit = entry_price * (1 - signal.get('tp_pct', 0.02))
+                stop_loss = entry_price * (1 + config.STOP_LOSS_PCT)
+                take_profit = entry_price * (1 - config.TAKE_PROFIT_PCT)
             
             # Simulasikan trade
             trade = {
@@ -489,7 +506,10 @@ class RealisticBacktestingEngine:
     
     def _check_positions(self, price_data: pd.DataFrame):
         """Check semua posisi terbuka untuk SL/TP"""
-        current_price = price_data['close'].iloc[-1] if not price_data.empty else 0
+        if price_data.empty:
+            return
+            
+        current_price = price_data['close'].iloc[-1]
         
         for position in self.positions[:]:
             if position['status'] != 'open':
@@ -530,45 +550,49 @@ class RealisticBacktestingEngine:
         if not self.trade_history:
             return self._empty_backtest_result(pair)
         
-        df_trades = pd.DataFrame(self.trade_history)
-        
-        total_trades = len(df_trades)
-        winning_trades = len(df_trades[df_trades['pnl'] > 0])
-        losing_trades = len(df_trades[df_trades['pnl'] < 0])
-        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-        
-        total_profit = df_trades['pnl'].sum()
-        average_profit = df_trades['pnl'].mean()
-        
-        return {
-            'status': 'success',
-            'summary': {
-                'total_trades': total_trades,
-                'winning_trades': winning_trades,
-                'losing_trades': losing_trades,
-                'win_rate': round(win_rate, 2),
-                'total_profit': round(total_profit, 2),
-                'final_balance': round(self.balance, 2),
-                'average_profit': round(average_profit, 2),
-                'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2)
-            },
-            'trade_history': [
-                {
-                    'entry_date': trade['entry_date'].strftime('%Y-%m-%d'),
-                    'pair': trade['pair'],
-                    'action': trade['action'],
-                    'entry_price': round(trade['entry_price'], 4),
-                    'pnl': round(trade.get('pnl', 0), 2),
-                    'close_reason': trade.get('close_reason', 'Open')
+        try:
+            df_trades = pd.DataFrame(self.trade_history)
+            
+            total_trades = len(df_trades)
+            winning_trades = len(df_trades[df_trades['pnl'] > 0]) if 'pnl' in df_trades.columns else 0
+            losing_trades = len(df_trades[df_trades['pnl'] < 0]) if 'pnl' in df_trades.columns else 0
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+            
+            total_profit = df_trades['pnl'].sum() if 'pnl' in df_trades.columns else 0
+            average_profit = df_trades['pnl'].mean() if 'pnl' in df_trades.columns and total_trades > 0 else 0
+            
+            return {
+                'status': 'success',
+                'summary': {
+                    'total_trades': total_trades,
+                    'winning_trades': winning_trades,
+                    'losing_trades': losing_trades,
+                    'win_rate': round(win_rate, 2),
+                    'total_profit': round(total_profit, 2),
+                    'final_balance': round(self.balance, 2),
+                    'average_profit': round(average_profit, 2),
+                    'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2)
+                },
+                'trade_history': [
+                    {
+                        'entry_date': trade['entry_date'].strftime('%Y-%m-%d') if hasattr(trade['entry_date'], 'strftime') else str(trade['entry_date']),
+                        'pair': trade['pair'],
+                        'action': trade['action'],
+                        'entry_price': round(trade['entry_price'], 4),
+                        'pnl': round(trade.get('pnl', 0), 2),
+                        'close_reason': trade.get('close_reason', 'Open')
+                    }
+                    for trade in self.trade_history[-20:]  # Last 20 trades
+                ],
+                'metadata': {
+                    'pair': pair,
+                    'initial_balance': self.initial_balance,
+                    'testing_date': datetime.now().isoformat()
                 }
-                for trade in self.trade_history[-20:]  # Last 20 trades
-            ],
-            'metadata': {
-                'pair': pair,
-                'initial_balance': self.initial_balance,
-                'testing_date': datetime.now().isoformat()
             }
-        }
+        except Exception as e:
+            logger.error(f"Error generating performance report: {e}")
+            return self._empty_backtest_result(pair)
     
     def _empty_backtest_result(self, pair: str) -> Dict:
         """Hasil backtest ketika tidak ada trade"""
@@ -896,9 +920,17 @@ def api_market_overview():
             if not price_data.empty:
                 tech = tech_engine.calculate_all_indicators(price_data)
                 
+                # Calculate price change
+                if len(price_data) > 1:
+                    current_price = tech['levels']['current_price']
+                    prev_price = price_data['close'].iloc[-2]
+                    change_pct = ((current_price - prev_price) / prev_price) * 100
+                else:
+                    change_pct = 0
+                
                 overview[pair] = {
                     'price': tech['levels']['current_price'],
-                    'change': round(((tech['levels']['current_price'] - price_data['close'].iloc[-2]) / price_data['close'].iloc[-2] * 100), 2) if len(price_data) > 1 else 0,
+                    'change': round(change_pct, 2),
                     'rsi': tech['momentum']['rsi'],
                     'trend': tech['trend']['trend_direction'],
                     'signal': 'BULLISH' if tech['trend']['sma_20'] > tech['trend']['sma_50'] else 'BEARISH'
