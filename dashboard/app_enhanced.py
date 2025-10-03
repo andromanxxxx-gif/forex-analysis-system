@@ -1,1231 +1,814 @@
-from flask import Flask, request, jsonify, send_from_directory, render_template, session
+# [FILE: app_enhanced_final.py]
+from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
 import requests
 import os
 import json
 import sqlite3
-import traceback
 from datetime import datetime, timedelta
-import random
 import logging
-from typing import Dict, List, Optional, Tuple
-from dotenv import load_dotenv
+from typing import Dict, List, Optional
+import talib
+import yfinance as yf
+from dataclasses import dataclass
 
-# Load environment variables
-load_dotenv()
-
-# Configure logging
+# Konfigurasi logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get('SECRET_KEY', 'forex-analysis-backtest-secret-key-2024')
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
 
-# Enhanced Configuration
-class Config:
-    DB_PATH = 'forex_analysis_enhanced.db'
-    REQUEST_TIMEOUT = 30
-    MAX_RETRIES = 3
-    CACHE_DURATION = 300
+# ==================== KONFIGURASI SISTEM ====================
+@dataclass
+class SystemConfig:
+    # API Configuration
+    DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "")
+    NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "") 
+    TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "")
     
-    # Trading parameters
-    DEFAULT_TIMEFRAME = "4H"
-    SUPPORTED_PAIRS = ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY"]
-    SUPPORTED_TIMEFRAMES = ["1H", "4H", "1D", "1W"]
+    # Trading Parameters
+    INITIAL_BALANCE: float = 10000.0
+    RISK_PER_TRADE: float = 0.02  # 2% risk per trade
+    MAX_POSITIONS: int = 3
+    STOP_LOSS_PCT: float = 0.01   # 1% stop loss
+    TAKE_PROFIT_PCT: float = 0.02 # 2% take profit
     
-    # Data periods
-    DATA_PERIODS = {
-        "1H": 30 * 24,
-        "4H": 30 * 6,
-        "1D": 120,
-        "1W": 52
-    }
+    # Supported Instruments
+    FOREX_PAIRS: List[str] = "USDJPY,GBPJPY,EURJPY,CHFJPY,EURUSD,GBPUSD,USDCHF".split(",")
+    TIMEFRAMES: List[str] = "1H,4H,1D,1W".split(",")
     
-    # Enhanced Risk management
-    DEFAULT_STOP_LOSS_PCT = 0.01
-    DEFAULT_TAKE_PROFIT_PCT = 0.02
-    MAX_DRAWDOWN_PCT = 0.05
-    DAILY_LOSS_LIMIT = 0.03
-
     # Backtesting
-    INITIAL_BALANCE = 10000
-    DEFAULT_LOT_SIZE = 0.1
-    
-    # Enhanced Trading Parameters - lebih longgar
-    PAIR_PRIORITY = {
-        'GBPJPY': 1,  
-        'USDJPY': 2,
-        'EURJPY': 3,
-        'CHFJPY': 4
-    }
+    DEFAULT_BACKTEST_DAYS: int = 30
+    MIN_DATA_POINTS: int = 100
 
-# API Keys
-TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+config = SystemConfig()
 
-# Global variables
-HISTORICAL = {}
-
-# ---------------- ENHANCED BACKTESTING MODULE ----------------
-class EnhancedForexBacktester:
-    def __init__(self, initial_balance=10000):
-        self.initial_balance = initial_balance
-        self.balance = initial_balance
-        self.positions = []
-        self.trade_history = []
-        self.equity_curve = []
-        self.data = {}
-        self.pairs = []
-        self.daily_loss_tracker = {}
-        self.consecutive_losses = 0
-        
-    def load_historical_data(self, historical_data):
-        self.data = historical_data
-        self.pairs = list(historical_data.keys())
-        logger.info(f"Backtester loaded data for pairs: {self.pairs}")
-        return self.data
+# ==================== ENGINE ANALISIS TEKNIKAL ====================
+class TechnicalAnalysisEngine:
+    def __init__(self):
+        self.indicators = {}
     
-    def calculate_pip_value(self, pair, lot_size=0.1):
-        jpy_pairs = ['GBPJPY', 'USDJPY', 'EURJPY', 'CHFJPY']
-        if any(p in pair for p in jpy_pairs):
-            return lot_size * 1000
-        else:
-            return lot_size * 10
-    
-    def execute_trade(self, signal, current_price):
-        pip_value = self.calculate_pip_value(signal['pair'], signal.get('lot_size', 0.1))
-        
-        risk_per_trade = self.balance * 0.02
-        pip_risk = signal['sl']
-        potential_loss = pip_risk * pip_value
-        
-        if potential_loss > risk_per_trade and pip_risk > 0:
-            adjusted_lot_size = (risk_per_trade / (pip_risk * pip_value)) * signal.get('lot_size', 0.1)
-            adjusted_lot_size = max(0.01, min(adjusted_lot_size, 0.1))
-            pip_value = self.calculate_pip_value(signal['pair'], adjusted_lot_size)
-        else:
-            adjusted_lot_size = signal.get('lot_size', 0.1)
-        
-        today = datetime.now().date()
-        daily_loss = self.daily_loss_tracker.get(today, 0)
-        if daily_loss <= -self.balance * Config.DAILY_LOSS_LIMIT:
-            logger.warning(f"Daily loss limit reached for {today}, skipping trade")
-            return
-        
-        if signal['action'].upper() == 'BUY':
-            entry_price = current_price
-            stop_loss = entry_price - signal['sl'] * 0.01
-            take_profit = entry_price + signal['tp'] * 0.01
-            direction = 1
-        else:
-            entry_price = current_price
-            stop_loss = entry_price + signal['sl'] * 0.01
-            take_profit = entry_price - signal['tp'] * 0.01
-            direction = -1
+    def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
+        """Menghitung semua indikator teknikal dari DataFrame OHLC"""
+        try:
+            closes = df['close'].values
+            highs = df['high'].values
+            lows = df['low'].values
             
-        position = {
-            'entry_date': signal['date'],
-            'pair': signal['pair'],
-            'direction': direction,
-            'entry_price': entry_price,
-            'stop_loss': stop_loss,
-            'take_profit': take_profit,
-            'lot_size': adjusted_lot_size,
-            'pip_value': pip_value,
-            'status': 'open',
-            'signal_confidence': signal.get('confidence', 50)
+            # Trend Indicators
+            sma_20 = talib.SMA(closes, timeperiod=20)
+            sma_50 = talib.SMA(closes, timeperiod=50)
+            ema_12 = talib.EMA(closes, timeperiod=12)
+            ema_26 = talib.EMA(closes, timeperiod=26)
+            
+            # Momentum Indicators
+            rsi = talib.RSI(closes, timeperiod=14)
+            macd, macd_signal, macd_hist = talib.MACD(closes)
+            stoch_k, stoch_d = talib.STOCH(highs, lows, closes)
+            
+            # Volatility Indicators
+            bollinger_upper, bollinger_middle, bollinger_lower = talib.BBANDS(closes)
+            atr = talib.ATR(highs, lows, closes, timeperiod=14)
+            
+            # Support & Resistance
+            recent_high = highs[-20:].max()
+            recent_low = lows[-20:].min()
+            
+            return {
+                'trend': {
+                    'sma_20': float(sma_20[-1]) if not np.isnan(sma_20[-1]) else None,
+                    'sma_50': float(sma_50[-1]) if not np.isnan(sma_50[-1]) else None,
+                    'ema_12': float(ema_12[-1]) if not np.isnan(ema_12[-1]) else None,
+                    'ema_26': float(ema_26[-1]) if not np.isnan(ema_26[-1]) else None,
+                    'trend_direction': 'BULLISH' if sma_20[-1] > sma_50[-1] else 'BEARISH'
+                },
+                'momentum': {
+                    'rsi': float(rsi[-1]) if not np.isnan(rsi[-1]) else 50,
+                    'macd': float(macd[-1]) if not np.isnan(macd[-1]) else 0,
+                    'macd_signal': float(macd_signal[-1]) if not np.isnan(macd_signal[-1]) else 0,
+                    'macd_histogram': float(macd_hist[-1]) if not np.isnan(macd_hist[-1]) else 0,
+                    'stoch_k': float(stoch_k[-1]) if not np.isnan(stoch_k[-1]) else 50,
+                    'stoch_d': float(stoch_d[-1]) if not np.isnan(stoch_d[-1]) else 50
+                },
+                'volatility': {
+                    'bollinger_upper': float(bollinger_upper[-1]) if not np.isnan(bollinger_upper[-1]) else None,
+                    'bollinger_lower': float(bollinger_lower[-1]) if not np.isnan(bollinger_lower[-1]) else None,
+                    'atr': float(atr[-1]) if not np.isnan(atr[-1]) else 0,
+                    'volatility_pct': float(np.std(closes[-20:]) / np.mean(closes[-20:]) * 100) if len(closes) >= 20 else 0
+                },
+                'levels': {
+                    'support': float(recent_low),
+                    'resistance': float(recent_high),
+                    'current_price': float(closes[-1])
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error calculating technical indicators: {e}")
+            return self._fallback_indicators(df)
+
+    def _fallback_indicators(self, df: pd.DataFrame) -> Dict:
+        """Fallback indicators jika TA-Lib gagal"""
+        closes = df['close'].values
+        current_price = float(closes[-1])
+        
+        return {
+            'trend': {
+                'sma_20': current_price * 0.998,
+                'sma_50': current_price * 0.995,
+                'ema_12': current_price * 0.999,
+                'ema_26': current_price * 0.997,
+                'trend_direction': 'BULLISH' if current_price > df['close'].mean() else 'BEARISH'
+            },
+            'momentum': {
+                'rsi': 50,
+                'macd': 0.001,
+                'macd_signal': 0.0005,
+                'macd_histogram': 0.0005,
+                'stoch_k': 50,
+                'stoch_d': 50
+            },
+            'volatility': {
+                'bollinger_upper': current_price * 1.01,
+                'bollinger_lower': current_price * 0.99,
+                'atr': current_price * 0.005,
+                'volatility_pct': 1.0
+            },
+            'levels': {
+                'support': current_price * 0.99,
+                'resistance': current_price * 1.01,
+                'current_price': current_price
+            }
+        }
+
+# ==================== ENGINE ANALISIS FUNDAMENTAL ====================
+class FundamentalAnalysisEngine:
+    def __init__(self):
+        self.news_cache = {}
+    
+    def get_forex_news(self, pair: str) -> str:
+        """Mendapatkan berita fundamental untuk pair forex"""
+        try:
+            # Map pair ke negara terkait
+            country_map = {
+                'USDJPY': 'Japan United States economy',
+                'GBPJPY': 'Japan UK economy Brexit',
+                'EURJPY': 'Japan Europe ECB economy',
+                'CHFJPY': 'Japan Switzerland economy',
+                'EURUSD': 'Europe United States Fed ECB',
+                'GBPUSD': 'UK United States Bank of England Fed',
+                'USDCHF': 'United States Switzerland SNB Fed'
+            }
+            
+            query = country_map.get(pair, 'forex market news')
+            
+            if config.NEWS_API_KEY and config.NEWS_API_KEY != "demo":
+                url = f"https://newsapi.org/v2/everything?q={query}&language=en&sortBy=publishedAt&pageSize=3&apiKey={config.NEWS_API_KEY}"
+                response = requests.get(url, timeout=10)
+                
+                if response.status_code == 200:
+                    articles = response.json().get('articles', [])
+                    if articles:
+                        news_items = []
+                        for article in articles[:2]:  # Ambil 2 artikel terbaru
+                            title = article.get('title', '')
+                            source = article.get('source', {}).get('name', 'Unknown')
+                            news_items.append(f"{title} (Source: {source})")
+                        
+                        return " | ".join(news_items)
+            
+            # Fallback news
+            return self._get_fallback_news(pair)
+            
+        except Exception as e:
+            logger.error(f"Error fetching news for {pair}: {e}")
+            return self._get_fallback_news(pair)
+    
+    def _get_fallback_news(self, pair: str) -> str:
+        """Berita fallback ketika API tidak tersedia"""
+        news_templates = {
+            'USDJPY': [
+                "Bank of Japan maintains ultra-loose monetary policy. Fed signals potential rate cuts in 2024.",
+                "Yen weakness continues as BOJ sticks to yield curve control. USD strength persists.",
+                "USD/JPY approaches intervention levels as interest rate differential widens."
+            ],
+            'GBPJPY': [
+                "Bank of England holds rates steady amid inflation concerns. GBP shows volatility.",
+                "UK economic data mixed, GBP/JPY influenced by risk sentiment and carry trades.",
+                "Brexit aftermath continues to impact GBP crosses with Japanese Yen."
+            ],
+            'EURJPY': [
+                "ECB monitoring inflation closely. Euro area growth shows signs of stabilization.",
+                "EUR/JPY influenced by ECB policy outlook and Japanese economic recovery.",
+                "European inflation data key for EUR direction against safe-haven JPY."
+            ]
         }
         
-        if len(self.positions) < 3:
-            self.positions.append(position)
-            logger.info(f"Executed {signal['action']} on {signal['pair']} at {current_price}")
-        else:
-            logger.warning(f"Max positions reached, skipping trade on {signal['pair']}")
+        import random
+        return random.choice(news_templates.get(pair, ["Market analysis ongoing. Monitor economic indicators for trading opportunities."]))
+
+# ==================== DEEPSEEK AI ANALYZER ====================
+class DeepSeekAnalyzer:
+    def __init__(self):
+        self.api_key = config.DEEPSEEK_API_KEY
+        self.base_url = "https://api.deepseek.com/v1/chat/completions"
     
-    def check_positions(self, current_prices):
-        today = datetime.now().date()
-        daily_profit = 0
+    def analyze_market(self, pair: str, technical_data: Dict, fundamental_news: str) -> Dict:
+        """Menganalisis market menggunakan DeepSeek AI"""
+        if not self.api_key or self.api_key == "demo":
+            logger.warning("DeepSeek API key not available, using enhanced analysis")
+            return self._enhanced_analysis(technical_data, fundamental_news, pair)
         
-        for position in self.positions[:]:
-            if position['status'] == 'open':
-                pair = position['pair']
-                current_price = current_prices.get(pair)
+        try:
+            prompt = self._build_analysis_prompt(pair, technical_data, fundamental_news)
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": """Anda adalah analis forex profesional dengan pengalaman 10 tahun. 
+                        Berikan analisis yang realistis, praktis, dan dapat ditindaklanjuti. 
+                        Fokus pada risk management dan peluang trading yang jelas."""
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.3,
+                "max_tokens": 1500
+            }
+            
+            response = requests.post(self.base_url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                ai_response = response.json()["choices"][0]["message"]["content"]
+                return self._parse_ai_response(ai_response, technical_data)
+            else:
+                logger.error(f"DeepSeek API error: {response.status_code}")
+                return self._enhanced_analysis(technical_data, fundamental_news, pair)
                 
-                if current_price is None:
-                    continue
-                    
-                if position['direction'] == 1:
-                    if current_price >= position['take_profit']:
-                        pips = (position['take_profit'] - position['entry_price']) / 0.01
-                        profit = pips * position['pip_value']
-                        self.close_position(position, profit, 'TP')
-                        daily_profit += profit
-                    elif current_price <= position['stop_loss']:
-                        pips = (position['stop_loss'] - position['entry_price']) / 0.01
-                        profit = pips * position['pip_value']
-                        self.close_position(position, profit, 'SL')
-                        daily_profit += profit
-                else:
-                    if current_price <= position['take_profit']:
-                        pips = (position['entry_price'] - position['take_profit']) / 0.01
-                        profit = pips * position['pip_value']
-                        self.close_position(position, profit, 'TP')
-                        daily_profit += profit
-                    elif current_price >= position['stop_loss']:
-                        pips = (position['entry_price'] - position['stop_loss']) / 0.01
-                        profit = pips * position['pip_value']
-                        self.close_position(position, profit, 'SL')
-                        daily_profit += profit
-        
-        if today not in self.daily_loss_tracker:
-            self.daily_loss_tracker[today] = 0
-        self.daily_loss_tracker[today] += daily_profit
+        except Exception as e:
+            logger.error(f"DeepSeek analysis failed: {e}")
+            return self._enhanced_analysis(technical_data, fundamental_news, pair)
     
-    def close_position(self, position, profit, close_reason):
-        position['status'] = 'closed'
-        position['close_reason'] = close_reason
-        position['profit'] = profit
-        position['close_date'] = datetime.now()
+    def _build_analysis_prompt(self, pair: str, technical_data: Dict, news: str) -> str:
+        """Membangun prompt untuk analisis AI"""
+        trend = technical_data['trend']
+        momentum = technical_data['momentum']
+        volatility = technical_data['volatility']
+        levels = technical_data['levels']
         
-        self.balance += profit
-        self.trade_history.append(position.copy())
+        return f"""
+ANALISIS FOREX UNTUK {pair}
+
+DATA TEKNIKAL:
+- Harga Saat Ini: {levels['current_price']}
+- Trend: {trend['trend_direction']}
+- RSI: {momentum['rsi']:.2f} ({'OVERSOLD' if momentum['rsi'] < 30 else 'OVERBOUGHT' if momentum['rsi'] > 70 else 'NETRAL'})
+- MACD: {momentum['macd']:.4f} (Signal: {momentum['macd_signal']:.4f})
+- Support: {levels['support']:.4f}
+- Resistance: {levels['resistance']:.4f}
+- Volatilitas: {volatility['volatility_pct']:.2f}%
+- ATR: {volatility['atr']:.4f}
+
+BERITA FUNDAMENTAL: {news}
+
+HASILKAN ANALISIS DALAM FORMAT JSON:
+{{
+    "signal": "BUY/SELL/HOLD",
+    "confidence": 0-100,
+    "entry_price": "rentang harga",
+    "stop_loss": "harga",
+    "take_profit_1": "harga", 
+    "take_profit_2": "harga",
+    "risk_level": "LOW/MEDIUM/HIGH",
+    "analysis_summary": "ringkasan analisis dalam Bahasa Indonesia",
+    "key_levels": "level penting untuk diawasi",
+    "timeframe_suggestion": "timeframe yang disarankan"
+}}
+
+Pertimbangkan:
+1. Konvergensi/divergensi indikator
+2. Level support/resistance 
+3. Konteks berita fundamental
+4. Risk-reward ratio yang realistis
+5. Kondisi overbought/oversold
+"""
+    
+    def _parse_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
+        """Parse response dari DeepSeek AI"""
+        try:
+            # Clean response
+            cleaned_response = ai_response.replace('```json', '').replace('```', '').strip()
+            analysis = json.loads(cleaned_response)
+            
+            # Add metadata
+            analysis['ai_provider'] = 'DeepSeek AI'
+            analysis['timestamp'] = datetime.now().isoformat()
+            
+            return analysis
+            
+        except json.JSONDecodeError:
+            logger.error("Failed to parse AI JSON response, using enhanced analysis")
+            return self._enhanced_analysis(technical_data, "", "")
+    
+    def _enhanced_analysis(self, technical_data: Dict, news: str, pair: str) -> Dict:
+        """Analisis enhanced ketika AI tidak tersedia"""
+        trend = technical_data['trend']
+        momentum = technical_data['momentum']
+        levels = technical_data['levels']
         
-        if profit < 0:
-            self.consecutive_losses += 1
+        current_price = levels['current_price']
+        rsi = momentum['rsi']
+        macd_hist = momentum['macd_histogram']
+        
+        # Logika analisis multi-faktor
+        signal_score = 0
+        
+        # RSI scoring
+        if rsi < 30:
+            signal_score += 3
+        elif rsi < 40:
+            signal_score += 2
+        elif rsi > 70:
+            signal_score -= 3
+        elif rsi > 60:
+            signal_score -= 2
+        
+        # MACD scoring
+        if macd_hist > 0:
+            signal_score += 2
         else:
-            self.consecutive_losses = 0
+            signal_score -= 2
         
-        self.positions = [p for p in self.positions if p['status'] == 'open']
+        # Trend scoring
+        if trend['trend_direction'] == 'BULLISH':
+            signal_score += 1
+        else:
+            signal_score -= 1
         
-        logger.info(f"Closed {position['pair']} position: {close_reason}, P&L: ${profit:.2f}")
+        # Determine signal
+        if signal_score >= 4:
+            signal = "BUY"
+            confidence = 75
+            sl = current_price * (1 - config.STOP_LOSS_PCT)
+            tp1 = current_price * (1 + config.TAKE_PROFIT_PCT)
+            tp2 = current_price * (1 + config.TAKE_PROFIT_PCT * 1.5)
+        elif signal_score >= 2:
+            signal = "BUY" 
+            confidence = 60
+            sl = current_price * (1 - config.STOP_LOSS_PCT * 0.8)
+            tp1 = current_price * (1 + config.TAKE_PROFIT_PCT * 0.8)
+            tp2 = current_price * (1 + config.TAKE_PROFIT_PCT * 1.2)
+        elif signal_score <= -4:
+            signal = "SELL"
+            confidence = 75
+            sl = current_price * (1 + config.STOP_LOSS_PCT)
+            tp1 = current_price * (1 - config.TAKE_PROFIT_PCT)
+            tp2 = current_price * (1 - config.TAKE_PROFIT_PCT * 1.5)
+        elif signal_score <= -2:
+            signal = "SELL"
+            confidence = 60
+            sl = current_price * (1 + config.STOP_LOSS_PCT * 0.8)
+            tp1 = current_price * (1 - config.TAKE_PROFIT_PCT * 0.8)
+            tp2 = current_price * (1 - config.TAKE_PROFIT_PCT * 1.2)
+        else:
+            signal = "HOLD"
+            confidence = 50
+            sl = current_price * 0.995
+            tp1 = current_price * 1.005
+            tp2 = current_price * 1.01
+        
+        return {
+            "signal": signal,
+            "confidence": confidence,
+            "entry_price": f"{current_price:.4f}",
+            "stop_loss": f"{sl:.4f}",
+            "take_profit_1": f"{tp1:.4f}",
+            "take_profit_2": f"{tp2:.4f}",
+            "risk_level": "LOW" if confidence < 60 else "MEDIUM" if confidence < 75 else "HIGH",
+            "analysis_summary": f"Analisis teknikal menunjukkan kondisi {signal.lower()} untuk {pair}. RSI: {rsi:.1f}, Trend: {trend['trend_direction']}",
+            "key_levels": f"Support: {levels['support']:.4f}, Resistance: {levels['resistance']:.4f}",
+            "timeframe_suggestion": "4H-1D untuk konfirmasi",
+            "ai_provider": "Enhanced Technical Analysis",
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ==================== REALISTIC BACKTESTING ENGINE ====================
+class RealisticBacktestingEngine:
+    def __init__(self, initial_balance: float = 10000.0):
+        self.initial_balance = initial_balance
+        self.reset()
     
-    def run_backtest(self, signals, timeframe="4H"):
-        logger.info("Starting enhanced backtesting...")
-        
+    def reset(self):
         self.balance = self.initial_balance
         self.positions = []
         self.trade_history = []
         self.equity_curve = []
-        self.daily_loss_tracker = {}
-        self.consecutive_losses = 0
-        
-        signals.sort(key=lambda x: x['date'])
+        self.current_date = None
+    
+    def run_backtest(self, signals: List[Dict], price_data: pd.DataFrame, pair: str) -> Dict:
+        """Menjalankan backtest yang realistis dengan data harga aktual"""
+        self.reset()
         
         if not signals:
-            logger.error("No signals provided for backtesting")
-            return {"error": "No signals provided for backtesting"}
-            
-        start_date = min([s['date'] for s in signals])
-        end_date = max([s['date'] for s in signals])
+            return self._empty_backtest_result(pair)
         
-        current_date = start_date
-        trades_executed = 0
+        logger.info(f"Running backtest for {pair} with {len(signals)} signals")
         
-        logger.info(f"Backtest period: {start_date} to {end_date}")
-        logger.info(f"Total signals: {len(signals)}")
+        # Simulasikan eksekusi trade berdasarkan sinyal
+        for signal in signals:
+            self._execute_signal(signal, price_data, pair)
         
-        while current_date <= end_date:
-            current_equity = self.balance + sum(
-                p['pip_value'] * ((current_prices.get(p['pair'], p['entry_price']) - p['entry_price']) / 0.01 * p['direction']) 
-                for p in self.positions if p['status'] == 'open'
-            )
-            
-            drawdown = (current_equity - self.initial_balance) / self.initial_balance * 100
-            if drawdown < -Config.MAX_DRAWDOWN_PCT * 100:
-                logger.warning(f"Max drawdown reached at {current_date}, stopping backtest")
-                break
-            
-            daily_signals = [s for s in signals if s['date'].date() == current_date.date()]
-            
-            for signal in daily_signals:
-                if self.consecutive_losses >= 3:
-                    logger.warning(f"3 consecutive losses reached, skipping signals for {current_date}")
-                    break
-                    
-                pair = signal['pair']
-                if pair in self.data and timeframe in self.data[pair]:
-                    df_pair = self.data[pair][timeframe]
-                    date_data = df_pair[df_pair['date'] == current_date]
-                    if not date_data.empty:
-                        current_price = date_data['open'].values[0]
-                        self.execute_trade(signal, current_price)
-                        trades_executed += 1
-            
-            current_prices = {}
-            for pair in self.pairs:
-                if pair in self.data and timeframe in self.data[pair]:
-                    df_pair = self.data[pair][timeframe]
-                    date_data = df_pair[df_pair['date'] == current_date]
-                    if not date_data.empty:
-                        current_prices[pair] = date_data['close'].values[0]
-            
-            self.check_positions(current_prices)
-            
-            self.equity_curve.append({
-                'date': current_date,
-                'balance': self.balance,
-                'open_positions': len(self.positions),
-                'drawdown': drawdown
-            })
-            
-            current_date += timedelta(days=1)
-        
-        logger.info(f"Backtesting completed: {trades_executed} trades executed, final balance: ${self.balance:.2f}")
-        return self.generate_enhanced_report()
+        return self._generate_performance_report(pair)
     
-    def generate_enhanced_report(self):
-        if not self.trade_history:
-            logger.warning("No trades executed during backtesting period")
-            return {
-                'status': 'error',
-                'message': 'No trades executed during backtesting period'
-            }
-        
+    def _execute_signal(self, signal: Dict, price_data: pd.DataFrame, pair: str):
+        """Eksekusi sinyal trading"""
         try:
-            df_trades = pd.DataFrame(self.trade_history)
-            df_equity = pd.DataFrame(self.equity_curve)
+            signal_date = signal['date']
+            signal_action = signal['action']
+            confidence = signal.get('confidence', 50)
             
-            total_trades = len(df_trades)
-            winning_trades = len(df_trades[df_trades['profit'] > 0]) if 'profit' in df_trades.columns else 0
-            losing_trades = len(df_trades[df_trades['profit'] < 0]) if 'profit' in df_trades.columns else 0
-            win_rate = winning_trades / total_trades * 100 if total_trades > 0 else 0
+            # Skip jika confidence terlalu rendah
+            if confidence < 40:
+                return
             
-            total_profit = df_trades['profit'].sum() if 'profit' in df_trades.columns else 0
-            average_profit = df_trades['profit'].mean() if 'profit' in df_trades.columns and total_trades > 0 else 0
-            average_win = df_trades[df_trades['profit'] > 0]['profit'].mean() if winning_trades > 0 else 0
-            average_loss = df_trades[df_trades['profit'] < 0]['profit'].mean() if losing_trades > 0 else 0
+            # Cari harga pada tanggal sinyal
+            trade_data = price_data[price_data['date'] == signal_date]
+            if trade_data.empty:
+                return
             
-            avg_risk_reward = abs(average_win / average_loss) if average_loss != 0 else 0
+            entry_price = trade_data['close'].iloc[0]
             
-            if not df_equity.empty and 'balance' in df_equity.columns:
-                df_equity['peak'] = df_equity['balance'].expanding().max()
-                df_equity['drawdown'] = (df_equity['balance'] - df_equity['peak']) / df_equity['peak'] * 100
-                max_drawdown = df_equity['drawdown'].min() if 'drawdown' in df_equity.columns else 0
-            else:
-                max_drawdown = 0
+            # Hitung position size berdasarkan risk management
+            position_size = self._calculate_position_size(entry_price, signal.get('sl_pips', 30))
             
-            gross_profit = df_trades[df_trades['profit'] > 0]['profit'].sum() if winning_trades > 0 else 0
-            gross_loss = abs(df_trades[df_trades['profit'] < 0]['profit'].sum()) if losing_trades > 0 else 0
-            profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
+            if signal_action == 'BUY':
+                stop_loss = entry_price * (1 - signal.get('sl_pct', 0.01))
+                take_profit = entry_price * (1 + signal.get('tp_pct', 0.02))
+            else:  # SELL
+                stop_loss = entry_price * (1 + signal.get('sl_pct', 0.01))
+                take_profit = entry_price * (1 - signal.get('tp_pct', 0.02))
             
-            expectancy = (win_rate/100 * average_win) - ((100-win_rate)/100 * abs(average_loss))
-            
-            report = {
-                'status': 'success',
-                'summary': {
-                    'total_trades': total_trades,
-                    'winning_trades': winning_trades,
-                    'losing_trades': losing_trades,
-                    'win_rate': round(win_rate, 2),
-                    'total_profit': round(total_profit, 2),
-                    'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2),
-                    'average_profit': round(average_profit, 2),
-                    'average_win': round(average_win, 2),
-                    'average_loss': round(average_loss, 2),
-                    'risk_reward_ratio': round(avg_risk_reward, 2),
-                    'profit_factor': round(profit_factor, 2),
-                    'expectancy': round(expectancy, 2),
-                    'max_drawdown': round(max_drawdown, 2),
-                    'final_balance': round(self.balance, 2),
-                    'initial_balance': self.initial_balance,
-                    'consecutive_losses': self.consecutive_losses
-                },
-                'performance_by_pair': {},
-                'trade_history': [
-                    {
-                        'entry_date': trade['entry_date'].strftime('%Y-%m-%d') if hasattr(trade['entry_date'], 'strftime') else str(trade['entry_date']),
-                        'pair': trade['pair'],
-                        'direction': 'BUY' if trade['direction'] == 1 else 'SELL',
-                        'entry_price': round(trade['entry_price'], 4),
-                        'profit': round(trade.get('profit', 0), 2),
-                        'close_reason': trade.get('close_reason', 'Open'),
-                        'confidence': trade.get('signal_confidence', 50)
-                    }
-                    for trade in self.trade_history[-50:]
-                ]
+            # Simulasikan trade
+            trade = {
+                'entry_date': signal_date,
+                'pair': pair,
+                'action': signal_action,
+                'entry_price': entry_price,
+                'stop_loss': stop_loss,
+                'take_profit': take_profit,
+                'position_size': position_size,
+                'status': 'open'
             }
             
-            for pair in self.pairs:
-                pair_trades = df_trades[df_trades['pair'] == pair]
-                if len(pair_trades) > 0:
-                    pair_profit = pair_trades['profit'].sum() if 'profit' in pair_trades.columns else 0
-                    pair_win_rate = len(pair_trades[pair_trades['profit'] > 0]) / len(pair_trades) * 100 if 'profit' in pair_trades.columns else 0
-                    avg_confidence = pair_trades['signal_confidence'].mean() if 'signal_confidence' in pair_trades.columns else 50
-                    
-                    report['performance_by_pair'][pair] = {
-                        'trades': len(pair_trades),
-                        'profit': round(pair_profit, 2),
-                        'win_rate': round(pair_win_rate, 2),
-                        'avg_confidence': round(avg_confidence, 1),
-                        'performance': 'EXCELLENT' if pair_win_rate > 60 and pair_profit > 0 else 'GOOD' if pair_win_rate > 50 and pair_profit > 0 else 'POOR'
-                    }
-            
-            report['recommendations'] = self.generate_recommendations(report)
-            
-            logger.info(f"✅ Generated report with {total_trades} trades, win rate: {win_rate}%")
-            return report
+            self.positions.append(trade)
+            self._check_positions(price_data)
             
         except Exception as e:
-            logger.error(f"Error generating enhanced report: {e}")
-            traceback.print_exc()
-            return {
-                'status': 'error',
-                'message': f'Error generating report: {str(e)}'
-            }
+            logger.error(f"Error executing signal: {e}")
     
-    def generate_recommendations(self, report):
-        recommendations = []
+    def _calculate_position_size(self, entry_price: float, stop_loss_pips: int) -> float:
+        """Hitung position size berdasarkan risk management"""
+        risk_amount = self.balance * config.RISK_PER_TRADE
+        pip_value = 10  # Untuk JPY pairs
+        potential_loss = stop_loss_pips * pip_value
         
-        if report['status'] == 'error':
-            return ["⚠️ Error in report generation - check logs for details"]
-        
-        summary = report.get('summary', {})
-        win_rate = summary.get('win_rate', 0)
-        profit_factor = summary.get('profit_factor', 0)
-        max_drawdown = summary.get('max_drawdown', 0)
-        consecutive_losses = summary.get('consecutive_losses', 0)
-        total_trades = summary.get('total_trades', 0)
-        expectancy = summary.get('expectancy', 0)
-        
-        # Win Rate Analysis
-        if win_rate < 35:
-            recommendations.append("🎯 CRITICAL: Win rate too low - review strategy fundamentals")
-        elif win_rate < 45:
-            recommendations.append("⚠️ LOW: Win rate below optimal - improve entry signals")
-        elif win_rate > 65:
-            recommendations.append("✅ EXCELLENT: High win rate - maintain strategy")
-        elif win_rate > 55:
-            recommendations.append("📊 GOOD: Solid win rate - strategy effective")
-        else:
-            recommendations.append("📈 DECENT: Acceptable win rate - minor optimizations possible")
-        
-        # Profit Factor Analysis
-        if profit_factor < 0.8:
-            recommendations.append("🔴 CRITICAL: Profit factor very low - strategy losing money")
-        elif profit_factor < 1.0:
-            recommendations.append("⚠️ WARNING: Profit factor below 1.0 - needs improvement")
-        elif profit_factor > 2.0:
-            recommendations.append("💰 EXCELLENT: Outstanding profit factor")
-        elif profit_factor > 1.5:
-            recommendations.append("💵 STRONG: Good profit factor - strategy profitable")
-        elif profit_factor > 1.2:
-            recommendations.append("📈 POSITIVE: Decent profit factor - marginally profitable")
-        
-        # Drawdown Analysis
-        if max_drawdown < -20:
-            recommendations.append("🚨 CRITICAL: Extreme drawdown - implement stricter risk management")
-        elif max_drawdown < -15:
-            recommendations.append("⚠️ HIGH: Significant drawdown - consider reducing position size")
-        elif max_drawdown < -10:
-            recommendations.append("📉 MODERATE: Manageable drawdown - monitor closely")
-        elif max_drawdown > -5:
-            recommendations.append("🛡️ EXCELLENT: Low drawdown - good risk control")
-        
-        return recommendations[:6]
-
-# Initialize enhanced backtester
-backtester = EnhancedForexBacktester(initial_balance=Config.INITIAL_BALANCE)
-
-# ---------------- DATABASE FUNCTIONS ----------------
-def init_db():
-    """Initialize database with enhanced tables"""
-    try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS analysis_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pair TEXT NOT NULL,
-            timeframe TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            current_price REAL,
-            technical_indicators TEXT,
-            ai_analysis TEXT,
-            fundamental_news TEXT,
-            chart_data TEXT,
-            data_source TEXT,
-            confidence_score REAL,
-            ai_provider TEXT
-        )''')
-
-        c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            pair TEXT NOT NULL,
-            timeframe TEXT NOT NULL,
-            period_days INTEGER,
-            total_trades INTEGER,
-            winning_trades INTEGER,
-            win_rate REAL,
-            total_profit REAL,
-            final_balance REAL,
-            max_drawdown REAL,
-            profit_factor REAL,
-            risk_reward_ratio REAL,
-            expectancy REAL,
-            report_data TEXT,
-            recommendations TEXT
-        )''')
-        
-        conn.commit()
-        logger.info("Database initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Database initialization error: {e}")
-        traceback.print_exc()
-    finally:
-        if 'conn' in locals():
-            conn.close()
-
-def save_analysis_result(data: Dict):
-    """Save analysis result to database"""
-    try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        confidence = data['ai_analysis'].get('CONFIDENCE_LEVEL', 50) if data.get('ai_analysis') else 50
-        ai_provider = data.get('ai_provider', "Fallback")
-        
-        c.execute('''INSERT INTO analysis_results 
-                    (pair, timeframe, current_price, technical_indicators, 
-                     ai_analysis, fundamental_news, chart_data, data_source, 
-                     confidence_score, ai_provider)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                 (data['pair'], data['timeframe'], data['current_price'],
-                  json.dumps(data['technical_indicators']), 
-                  json.dumps(data.get('ai_analysis', {})),
-                  data.get('fundamental_news', ''),
-                  json.dumps(data.get('chart_data', {})),
-                  data.get('data_source', ''),
-                  confidence,
-                  ai_provider))
-        
-        conn.commit()
-        logger.info(f"Analysis saved for {data['pair']}-{data['timeframe']}")
-    except Exception as e:
-        logger.error(f"Error saving analysis: {e}")
-        traceback.print_exc()
-    finally:
-        if 'conn' in locals():
-            conn.close()
-
-def save_backtest_result(report_data: Dict):
-    """Save enhanced backtesting result to database dengan error handling lebih baik"""
-    try:
-        logger.info(f"Attempting to save backtest result. Status: {report_data.get('status')}")
-        
-        if report_data.get('status') == 'error':
-            logger.warning("Report has error status, skipping save")
-            return False
-            
-        summary = report_data.get('summary', {})
-        
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        # Pastikan tabel ada
-        c.execute('''CREATE TABLE IF NOT EXISTS backtesting_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            pair TEXT NOT NULL,
-            timeframe TEXT NOT NULL,
-            period_days INTEGER,
-            total_trades INTEGER,
-            winning_trades INTEGER,
-            win_rate REAL,
-            total_profit REAL,
-            final_balance REAL,
-            max_drawdown REAL,
-            profit_factor REAL,
-            risk_reward_ratio REAL,
-            expectancy REAL,
-            report_data TEXT,
-            recommendations TEXT
-        )''')
-        
-        recommendations = json.dumps(report_data.get('recommendations', []))
-        
-        c.execute('''INSERT INTO backtesting_results 
-                    (pair, timeframe, period_days, total_trades, winning_trades, 
-                     win_rate, total_profit, final_balance, max_drawdown, profit_factor, 
-                     risk_reward_ratio, expectancy, report_data, recommendations)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                 (report_data.get('pair', 'MULTI'),
-                  report_data.get('timeframe', '4H'),
-                  report_data.get('period_days', 30),
-                  summary.get('total_trades', 0),
-                  summary.get('winning_trades', 0),
-                  summary.get('win_rate', 0),
-                  summary.get('total_profit', 0),
-                  summary.get('final_balance', Config.INITIAL_BALANCE),
-                  summary.get('max_drawdown', 0),
-                  summary.get('profit_factor', 0),
-                  summary.get('risk_reward_ratio', 0),
-                  summary.get('expectancy', 0),
-                  json.dumps(report_data),
-                  recommendations))
-        
-        conn.commit()
-        logger.info(f"✅ Backtesting result saved to database for {report_data.get('pair', 'MULTI')}-{report_data.get('timeframe', '4H')}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error saving backtest result: {e}")
-        traceback.print_exc()
-        return False
-    finally:
-        if 'conn' in locals():
-            conn.close()
-
-# ---------------- ENHANCED TECHNICAL INDICATORS & SIGNAL GENERATION ----------------
-def calculate_ema_series(series: pd.Series, period: int) -> pd.Series:
-    return series.ewm(span=period, adjust=False).mean()
-
-def calculate_macd_series(series: pd.Series) -> Tuple[pd.Series, pd.Series, pd.Series]:
-    ema_12 = series.ewm(span=12, adjust=False).mean()
-    ema_26 = series.ewm(span=26, adjust=False).mean()
-    macd_line = ema_12 - ema_26
-    macd_signal = macd_line.ewm(span=9, adjust=False).mean()
-    macd_histogram = macd_line - macd_signal
-    return macd_line, macd_signal, macd_histogram
-
-def calc_indicators(series: List[float], volumes: Optional[List[float]] = None) -> Dict:
-    if not series:
-        return {"error": "No price data available"}
+        if potential_loss > 0:
+            position_size = risk_amount / potential_loss
+            return min(position_size, 0.1)  # Max 0.1 lot
+        return 0.01  # Default 0.01 lot
     
-    close = pd.Series(series)
-    
-    cp = close.iloc[-1]
-    price_change = close.pct_change().iloc[-1] * 100 if len(close) > 1 else 0
-    
-    # RSI
-    delta = close.diff().fillna(0)
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=14, min_periods=1).mean()
-    avg_loss = loss.rolling(window=14, min_periods=1).mean()
-    rs = avg_gain / (avg_loss.replace(0, np.nan)).fillna(0)
-    rsi = 100 - (100 / (1 + rs))
-    
-    # Moving averages
-    sma20 = close.rolling(20).mean()
-    sma50 = close.rolling(50).mean()
-    
-    # MACD
-    ema12 = close.ewm(span=12).mean()
-    ema26 = close.ewm(span=26).mean()
-    macd_line = ema12 - ema26
-    macd_signal = macd_line.ewm(span=9).mean()
-    macd_histogram = macd_line - macd_signal
-    
-    # Support and Resistance
-    recent_high = close.tail(20).max()
-    recent_low = close.tail(20).min()
-    
-    # Trend strength
-    trend_strength = abs(sma20.iloc[-1] - sma50.iloc[-1]) / cp * 100 if not pd.isna(sma20.iloc[-1]) and not pd.isna(sma50.iloc[-1]) else 0
-    
-    return {
-        "current_price": round(cp, 4),
-        "price_change_pct": round(price_change, 2),
-        "RSI": round(rsi.iloc[-1], 2),
-        "SMA20": round(sma20.iloc[-1], 4) if not pd.isna(sma20.iloc[-1]) else cp,
-        "SMA50": round(sma50.iloc[-1], 4) if not pd.isna(sma50.iloc[-1]) else cp,
-        "MACD": round(macd_line.iloc[-1], 4),
-        "MACD_Signal": round(macd_signal.iloc[-1], 4),
-        "MACD_Histogram": round(macd_histogram.iloc[-1], 4),
-        "Resistance": round(recent_high, 4),
-        "Support": round(recent_low, 4),
-        "Volatility": round(close.pct_change().std() * 100, 2) if len(close) > 1 else 0,
-        "Trend_Strength": round(trend_strength, 2)
-    }
-
-def generate_enhanced_signal(tech: Dict, current_price: float, timeframe: str = "4H") -> Dict:
-    rsi = tech['RSI']
-    macd = tech['MACD']
-    macd_signal = tech['MACD_Signal']
-    sma20 = tech['SMA20']
-    sma50 = tech['SMA50']
-    
-    # Lebih longgar - untuk testing
-    trend_bullish = sma20 > sma50
-    trend_bearish = sma20 < sma50
-    
-    # SL/TP lebih konservatif
-    base_sl = 30
-    base_tp = 45
-    
-    # CONDITION YANG LEBIH LONGGAR
-    strong_buy_conditions = (
-        rsi < 45 and
-        macd > macd_signal and 
-        trend_bullish
-    )
-    
-    strong_sell_conditions = (
-        rsi > 55 and
-        macd < macd_signal and 
-        trend_bearish
-    )
-    
-    moderate_buy_conditions = (
-        rsi < 55 and
-        macd > macd_signal
-    )
-    
-    moderate_sell_conditions = (
-        rsi > 45 and
-        macd < macd_signal
-    )
-    
-    if strong_buy_conditions:
-        return {
-            'action': 'BUY',
-            'tp': base_tp,
-            'sl': base_sl,
-            'strength': 'STRONG'
-        }
-    elif strong_sell_conditions:
-        return {
-            'action': 'SELL', 
-            'tp': base_tp,
-            'sl': base_sl,
-            'strength': 'STRONG'
-        }
-    elif moderate_buy_conditions:
-        return {
-            'action': 'BUY',
-            'tp': int(base_tp * 0.8),
-            'sl': int(base_sl * 1.2),
-            'strength': 'MODERATE'
-        }
-    elif moderate_sell_conditions:
-        return {
-            'action': 'SELL',
-            'tp': int(base_tp * 0.8),
-            'sl': int(base_sl * 1.2),
-            'strength': 'MODERATE'
-        }
-    else:
-        # Fallback: jika tidak ada kondisi terpenuhi, berikan sinyal acak untuk testing
-        if random.random() > 0.6:  # 40% chance untuk generate signal
-            action = random.choice(['BUY', 'SELL'])
-            return {
-                'action': action,
-                'tp': random.randint(20, 50),
-                'sl': random.randint(15, 30),
-                'strength': 'MODERATE'
-            }
-        else:
-            return {
-                'action': 'HOLD',
-                'tp': 0,
-                'sl': 0,
-                'strength': 'WEAK'
-            }
-
-def calculate_signal_confidence(signal: Dict, tech: Dict) -> float:
-    confidence = 50
-    
-    # RSI confidence - lebih longgar
-    rsi = tech['RSI']
-    if 30 <= rsi <= 70:
-        confidence += 20
-    elif 25 <= rsi <= 75:
-        confidence += 15
-    
-    # MACD confidence - lebih longgar
-    macd_strength = abs(tech['MACD_Histogram'])
-    if macd_strength > 0.03:
-        confidence += 15
-    elif macd_strength > 0.01:
-        confidence += 10
-    
-    # Trend alignment confidence
-    if (signal['action'] == 'BUY' and tech['SMA20'] > tech['SMA50']) or \
-       (signal['action'] == 'SELL' and tech['SMA20'] < tech['SMA50']):
-        confidence += 15
-    
-    # Risk-Reward Ratio scoring
-    rr_ratio = signal['tp'] / signal['sl'] if signal['sl'] > 0 else 1
-    if rr_ratio >= 1.5:
-        confidence += 10
-    
-    return min(95, max(30, confidence))
-
-def generate_backtest_signals_from_analysis(pair: str, timeframe: str, days: int = 30) -> List[Dict]:
-    signals = []
-    
-    try:
-        if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
-            logger.error(f"No historical data found for {pair}-{timeframe}")
-            return signals
+    def _check_positions(self, price_data: pd.DataFrame):
+        """Check semua posisi terbuka untuk SL/TP"""
+        current_price = price_data['close'].iloc[-1] if not price_data.empty else 0
         
-        # Gunakan lebih banyak data
-        required_bars = days * 6
-        df = HISTORICAL[pair][timeframe].tail(required_bars * 2)
-        
-        if len(df) < 50:
-            logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(df)} points")
-            df = HISTORICAL[pair][timeframe]
-            if len(df) < 20:
-                logger.error(f"Absolutely insufficient data for {pair}-{timeframe}: {len(df)} points")
-                return signals
-        
-        signal_count = 0
-        skip_count = 0
-        
-        # Start dari index yang lebih awal untuk lebih banyak sinyal
-        start_index = max(50, len(df) - required_bars)
-        
-        logger.info(f"Generating signals for {pair}-{timeframe} with {len(df)} data points, starting from index {start_index}")
-        
-        for i in range(start_index, len(df)):
-            try:
-                current_data = df.iloc[:i+1]
-                
-                # Check if 'date' column exists, if not try to find it
-                date_col = None
-                for col in ['date', 'Date', 'DATE', 'time', 'Time', 'TIME', 'datetime', 'Datetime', 'DATETIME']:
-                    if col in current_data.columns:
-                        date_col = col
-                        break
-                
-                if date_col is None:
-                    logger.warning(f"No date column found in data for {pair}-{timeframe}")
-                    continue
-                
-                current_date = current_data.iloc[-1][date_col]
-                
-                # Find close price column
-                close_col = None
-                for col in ['close', 'Close', 'CLOSE', 'price', 'Price', 'PRICE']:
-                    if col in current_data.columns:
-                        close_col = col
-                        break
-                
-                if close_col is None:
-                    logger.warning(f"No close price column found in data for {pair}-{timeframe}")
-                    continue
-                
-                current_price = current_data.iloc[-1][close_col]
-                
-                closes = current_data[close_col].tolist()
-                
-                tech_indicators = calc_indicators(closes)
-                
-                # Skip jika data tidak lengkap
-                if any(pd.isna(value) for value in tech_indicators.values() if isinstance(value, (int, float))):
-                    skip_count += 1
-                    continue
-                
-                signal = generate_enhanced_signal(tech_indicators, current_price, timeframe)
-                
-                if signal['action'] != 'HOLD':
-                    confidence = calculate_signal_confidence(signal, tech_indicators)
-                    
-                    # Lower confidence threshold untuk testing
-                    if confidence >= 35:
-                        signals.append({
-                            'date': current_date,
-                            'pair': pair,
-                            'action': signal['action'],
-                            'tp': signal['tp'],
-                            'sl': signal['sl'],
-                            'lot_size': Config.DEFAULT_LOT_SIZE,
-                            'confidence': confidence,
-                            'strength': signal['strength'],
-                            'volatility': tech_indicators.get('Volatility', 0),
-                            'trend_strength': tech_indicators.get('Trend_Strength', 0)
-                        })
-                        signal_count += 1
-            except Exception as e:
-                skip_count += 1
+        for position in self.positions[:]:
+            if position['status'] != 'open':
                 continue
-        
-        logger.info(f"✅ Generated {signal_count} signals for {pair}-{timeframe} ({skip_count} points skipped)")
-        
-        # Jika masih tidak ada sinyal, buat sample signals untuk testing
-        if signal_count == 0:
-            logger.warning("No signals generated, creating sample signals for testing")
-            sample_indices = random.sample(range(len(df)), min(10, len(df)))
-            for idx in sample_indices:
-                current_data = df.iloc[:idx+1]
-                
-                # Find date column
-                date_col = None
-                for col in ['date', 'Date', 'DATE', 'time', 'Time', 'TIME', 'datetime', 'Datetime', 'DATETIME']:
-                    if col in current_data.columns:
-                        date_col = col
-                        break
-                
-                if date_col is None:
-                    continue
-                    
-                current_date = current_data.iloc[-1][date_col]
-                
-                # Find close price column
-                close_col = None
-                for col in ['close', 'Close', 'CLOSE', 'price', 'Price', 'PRICE']:
-                    if col in current_data.columns:
-                        close_col = col
-                        break
-                
-                if close_col is None:
-                    continue
-                    
-                current_price = current_data.iloc[-1][close_col]
-                
-                action = random.choice(['BUY', 'SELL'])
-                signals.append({
-                    'date': current_date,
-                    'pair': pair,
-                    'action': action,
-                    'tp': random.randint(25, 45),
-                    'sl': random.randint(15, 25),
-                    'lot_size': Config.DEFAULT_LOT_SIZE,
-                    'confidence': random.randint(40, 70),
-                    'strength': random.choice(['MODERATE', 'STRONG']),
-                    'volatility': 1.5,
-                    'trend_strength': 0.5
-                })
-                signal_count += 1
-            logger.info(f"✅ Created {signal_count} sample signals for testing")
-        
-        return signals
-        
-    except Exception as e:
-        logger.error(f"Error generating backtest signals: {e}")
-        traceback.print_exc()
-        return signals
-
-# ---------------- DATA LOADING & SAMPLE DATA ----------------
-def load_csv_data():
-    """Load historical CSV data dengan handling untuk berbagai format kolom"""
-    search_dirs = [".", "data", "historical_data"]
-    loaded_count = 0
-    
-    for directory in search_dirs:
-        if not os.path.exists(directory):
-            continue
             
-        for filename in os.listdir(directory):
-            if filename.endswith(".csv"):
-                file_path = os.path.join(directory, filename)
-                try:
-                    df = pd.read_csv(file_path)
-                    
-                    logger.info(f"Loading {filename} with columns: {list(df.columns)}")
-                    
-                    # Standardize column names - lebih komprehensif
-                    column_mapping = {}
-                    for col in df.columns:
-                        original_col = col
-                        col = str(col).lower().strip().replace(' ', '_').replace('.', '').replace('-', '_')
-                        
-                        # Map berbagai kemungkinan nama kolom ke nama standar
-                        if 'date' in col or 'time' in col or 'datetime' in col:
-                            column_mapping[original_col] = 'date'
-                        elif 'open' in col:
-                            column_mapping[original_col] = 'open'
-                        elif 'high' in col:
-                            column_mapping[original_col] = 'high' 
-                        elif 'low' in col:
-                            column_mapping[original_col] = 'low'
-                        elif 'close' in col:
-                            column_mapping[original_col] = 'close'
-                        elif 'volume' in col or 'vol' in col:
-                            column_mapping[original_col] = 'volume'
-                        else:
-                            column_mapping[original_col] = col
-                    
-                    # Rename columns
-                    df = df.rename(columns=column_mapping)
-                    
-                    # Handle date parsing
-                    if 'date' in df.columns:
-                        df['date'] = pd.to_datetime(df['date'], errors='coerce')
-                        df = df.dropna(subset=['date'])
-                        df = df.sort_values('date')
-                    else:
-                        logger.warning(f"No date column found in {file_path}. Skipping.")
-                        continue
-                    
-                    # Pastikan kolom required ada
-                    required_cols = ['open', 'high', 'low', 'close']
-                    missing_cols = [col for col in required_cols if col not in df.columns]
-                    if missing_cols:
-                        logger.warning(f"Missing required columns {missing_cols} in {file_path}. Skipping.")
-                        continue
-                    
-                    # Extract pair and timeframe from filename
-                    base_name = os.path.basename(filename).replace(".csv", "").upper()
-                    parts = base_name.split("_")
-                    pair = parts[0] if parts else "UNKNOWN"
-                    timeframe = parts[1] if len(parts) > 1 else "1D"
-                    
-                    if pair not in Config.SUPPORTED_PAIRS:
-                        continue
-                    
-                    if pair not in HISTORICAL:
-                        HISTORICAL[pair] = {}
-                    
-                    HISTORICAL[pair][timeframe] = df
-                    loaded_count += 1
-                    logger.info(f"✅ Loaded {pair}-{timeframe} from {file_path}, {len(df)} rows")
-                    
-                except Exception as e:
-                    logger.error(f"Error loading {file_path}: {e}")
-                    traceback.print_exc()
+            pnl = 0
+            close_reason = None
+            
+            if position['action'] == 'BUY':
+                if current_price >= position['take_profit']:
+                    pnl = (position['take_profit'] - position['entry_price']) * position['position_size'] * 10000
+                    close_reason = 'TP'
+                elif current_price <= position['stop_loss']:
+                    pnl = (position['stop_loss'] - position['entry_price']) * position['position_size'] * 10000
+                    close_reason = 'SL'
+            else:  # SELL
+                if current_price <= position['take_profit']:
+                    pnl = (position['entry_price'] - position['take_profit']) * position['position_size'] * 10000
+                    close_reason = 'TP'
+                elif current_price >= position['stop_loss']:
+                    pnl = (position['entry_price'] - position['stop_loss']) * position['position_size'] * 10000
+                    close_reason = 'SL'
+            
+            if close_reason:
+                position['status'] = 'closed'
+                position['close_date'] = datetime.now()
+                position['pnl'] = pnl
+                position['close_reason'] = close_reason
+                
+                self.balance += pnl
+                self.trade_history.append(position.copy())
+                
+                # Remove dari positions aktif
+                self.positions = [p for p in self.positions if p['status'] == 'open']
     
-    logger.info(f"Total loaded datasets: {loaded_count}")
-
-    if HISTORICAL:
-        backtester.load_historical_data(HISTORICAL)
-        logger.info("✅ Historical data loaded to backtester")
-
-def create_sample_data():
-    """Create sample historical data if none exists dengan struktur kolom yang benar"""
-    try:
-        if not os.path.exists('historical_data'):
-            os.makedirs('historical_data')
+    def _generate_performance_report(self, pair: str) -> Dict:
+        """Generate laporan performa backtest"""
+        if not self.trade_history:
+            return self._empty_backtest_result(pair)
         
-        pairs = ['USDJPY', 'GBPJPY', 'EURJPY', 'CHFJPY']
-        timeframes = ['1H', '4H', '1D']
+        df_trades = pd.DataFrame(self.trade_history)
         
+        total_trades = len(df_trades)
+        winning_trades = len(df_trades[df_trades['pnl'] > 0])
+        losing_trades = len(df_trades[df_trades['pnl'] < 0])
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        total_profit = df_trades['pnl'].sum()
+        average_profit = df_trades['pnl'].mean()
+        
+        return {
+            'status': 'success',
+            'summary': {
+                'total_trades': total_trades,
+                'winning_trades': winning_trades,
+                'losing_trades': losing_trades,
+                'win_rate': round(win_rate, 2),
+                'total_profit': round(total_profit, 2),
+                'final_balance': round(self.balance, 2),
+                'average_profit': round(average_profit, 2),
+                'return_percentage': round(((self.balance - self.initial_balance) / self.initial_balance * 100), 2)
+            },
+            'trade_history': [
+                {
+                    'entry_date': trade['entry_date'].strftime('%Y-%m-%d'),
+                    'pair': trade['pair'],
+                    'action': trade['action'],
+                    'entry_price': round(trade['entry_price'], 4),
+                    'pnl': round(trade.get('pnl', 0), 2),
+                    'close_reason': trade.get('close_reason', 'Open')
+                }
+                for trade in self.trade_history[-20:]  # Last 20 trades
+            ],
+            'metadata': {
+                'pair': pair,
+                'initial_balance': self.initial_balance,
+                'testing_date': datetime.now().isoformat()
+            }
+        }
+    
+    def _empty_backtest_result(self, pair: str) -> Dict:
+        """Hasil backtest ketika tidak ada trade"""
+        return {
+            'status': 'no_trades',
+            'summary': {
+                'total_trades': 0,
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'win_rate': 0,
+                'total_profit': 0,
+                'final_balance': self.initial_balance,
+                'average_profit': 0,
+                'return_percentage': 0
+            },
+            'trade_history': [],
+            'metadata': {
+                'pair': pair,
+                'initial_balance': self.initial_balance,
+                'testing_date': datetime.now().isoformat(),
+                'message': 'No trades executed during backtest period'
+            }
+        }
+
+# ==================== DATA MANAGER ====================
+class DataManager:
+    def __init__(self):
+        self.historical_data = {}
+        self.load_historical_data()
+    
+    def load_historical_data(self):
+        """Load data historis dari file CSV"""
+        try:
+            data_dir = "historical_data"
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+                logger.info("Created historical_data directory")
+                self._create_sample_data()
+                return
+            
+            for filename in os.listdir(data_dir):
+                if filename.endswith('.csv'):
+                    file_path = os.path.join(data_dir, filename)
+                    try:
+                        df = pd.read_csv(file_path)
+                        df['date'] = pd.to_datetime(df['date'])
+                        
+                        # Extract pair and timeframe from filename
+                        name_parts = filename.replace('.csv', '').split('_')
+                        if len(name_parts) >= 2:
+                            pair = name_parts[0].upper()
+                            timeframe = name_parts[1].upper()
+                            
+                            if pair not in self.historical_data:
+                                self.historical_data[pair] = {}
+                            
+                            self.historical_data[pair][timeframe] = df
+                            logger.info(f"Loaded {pair}-{timeframe}: {len(df)} records")
+                            
+                    except Exception as e:
+                        logger.error(f"Error loading {filename}: {e}")
+            
+            logger.info(f"Total loaded: {len(self.historical_data)} pairs")
+            
+        except Exception as e:
+            logger.error(f"Error in load_historical_data: {e}")
+            self._create_sample_data()
+    
+    def _create_sample_data(self):
+        """Buat sample data jika tidak ada data historis"""
+        logger.info("Creating sample historical data...")
+        
+        for pair in config.FOREX_PAIRS[:4]:  # Buat untuk 4 pair pertama
+            for timeframe in ['1H', '4H', '1D']:
+                self._generate_sample_data(pair, timeframe)
+    
+    def _generate_sample_data(self, pair: str, timeframe: str):
+        """Generate sample data yang realistis"""
+        periods = 1000
         base_prices = {
-            'USDJPY': 147.0,
-            'GBPJPY': 198.0, 
-            'EURJPY': 172.0,
-            'CHFJPY': 184.0
+            'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
+            'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850
         }
         
-        for pair in pairs:
-            for timeframe in timeframes:
-                filename = f"historical_data/{pair}_{timeframe}.csv"
-                
-                if os.path.exists(filename):
-                    # Check if file has correct structure
-                    try:
-                        df = pd.read_csv(filename)
-                        if 'date' not in df.columns or 'close' not in df.columns:
-                            logger.warning(f"File {filename} has incorrect structure, recreating...")
-                            os.remove(filename)
-                        else:
-                            continue
-                    except:
-                        os.remove(filename)
-                
-                logger.info(f"Creating sample data for {pair}-{timeframe}")
-                
-                periods = 1000
-                base_price = base_prices[pair]
-                prices = []
-                current_price = base_price
-                
-                for i in range(periods):
-                    open_price = current_price
-                    change = random.uniform(-0.002, 0.002) * open_price
-                    close = open_price + change
-                    
-                    high = max(open_price, close) + abs(change) * 0.3
-                    low = min(open_price, close) - abs(change) * 0.3
-                    
-                    # Generate dates based on timeframe
-                    if timeframe == '1H':
-                        current_date = datetime(2023, 1, 1) + timedelta(hours=i)
-                    elif timeframe == '4H':
-                        current_date = datetime(2023, 1, 1) + timedelta(hours=4*i)
-                    else:  # 1D
-                        current_date = datetime(2023, 1, 1) + timedelta(days=i)
-                    
-                    prices.append({
-                        'date': current_date,
-                        'open': round(open_price, 4),
-                        'high': round(high, 4),
-                        'low': round(low, 4),
-                        'close': round(close, 4),
-                        'volume': int(10000 + random.random() * 10000)
-                    })
-                    
-                    current_price = close
-                
-                df = pd.DataFrame(prices)
-                df.to_csv(filename, index=False)
-                logger.info(f"✅ Created sample data: {filename} with {len(df)} rows")
-                
-        logger.info("Sample data creation completed")
+        base_price = base_prices.get(pair, 150.0)
+        prices = []
+        current_price = base_price
         
-    except Exception as e:
-        logger.error(f"Error creating sample data: {e}")
-        traceback.print_exc()
+        for i in range(periods):
+            # Random walk dengan trend dan volatilitas realistis
+            trend = np.random.normal(0, 0.0005)
+            noise = np.random.normal(0, 0.001)
+            
+            price_change = trend + noise
+            new_price = current_price * (1 + price_change)
+            
+            # Generate OHLC
+            open_price = current_price
+            close_price = new_price
+            high_price = max(open_price, close_price) + abs(noise) * base_price * 0.3
+            low_price = min(open_price, close_price) - abs(noise) * base_price * 0.3
+            
+            # Generate date
+            if timeframe == '1H':
+                current_date = datetime(2023, 1, 1) + timedelta(hours=i)
+            elif timeframe == '4H':
+                current_date = datetime(2023, 1, 1) + timedelta(hours=4*i)
+            else:  # 1D
+                current_date = datetime(2023, 1, 1) + timedelta(days=i)
+            
+            prices.append({
+                'date': current_date,
+                'open': round(open_price, 4),
+                'high': round(high_price, 4),
+                'low': round(low_price, 4),
+                'close': round(close_price, 4),
+                'volume': np.random.randint(10000, 50000)
+            })
+            
+            current_price = close_price
+        
+        df = pd.DataFrame(prices)
+        
+        # Save to file
+        data_dir = "historical_data"
+        filename = f"{data_dir}/{pair}_{timeframe}.csv"
+        df.to_csv(filename, index=False)
+        
+        # Store in memory
+        if pair not in self.historical_data:
+            self.historical_data[pair] = {}
+        self.historical_data[pair][timeframe] = df
+        
+        logger.info(f"Created sample data: {filename}")
 
-# ---------------- FLASK ROUTES ----------------
+    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
+        """Dapatkan data harga untuk backtesting"""
+        if pair in self.historical_data and timeframe in self.historical_data[pair]:
+            df = self.historical_data[pair][timeframe]
+            # Return data untuk periode tertentu
+            required_points = days * 24 if timeframe == '1H' else days * 6 if timeframe == '4H' else days
+            return df.tail(min(len(df), required_points))
+        
+        # Fallback: generate synthetic data
+        return self._generate_synthetic_data(pair, timeframe, days)
+
+    def _generate_synthetic_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Generate synthetic data untuk backtesting"""
+        points = days * 24 if timeframe == '1H' else days * 6 if timeframe == '4H' else days
+        base_prices = {
+            'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
+            'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850
+        }
+        
+        base_price = base_prices.get(pair, 150.0)
+        prices = []
+        current_price = base_price
+        
+        for i in range(points):
+            change = np.random.normal(0, 0.001)  # 0.1% daily volatility
+            current_price = current_price * (1 + change)
+            
+            open_price = current_price
+            close_price = current_price * (1 + np.random.normal(0, 0.0005))
+            high = max(open_price, close_price) + abs(change) * 0.3
+            low = min(open_price, close_price) - abs(change) * 0.3
+            
+            prices.append({
+                'date': datetime.now() - timedelta(hours=points-i) if timeframe in ['1H','4H'] else datetime.now() - timedelta(days=points-i),
+                'open': round(open_price, 4),
+                'high': round(high, 4),
+                'low': round(low, 4),
+                'close': round(close_price, 4),
+                'volume': np.random.randint(10000, 50000)
+            })
+        
+        return pd.DataFrame(prices)
+
+# ==================== INITIALIZE SYSTEM ====================
+tech_engine = TechnicalAnalysisEngine()
+fundamental_engine = FundamentalAnalysisEngine() 
+ai_analyzer = DeepSeekAnalyzer()
+backtester = RealisticBacktestingEngine()
+data_manager = DataManager()
+
+# ==================== FLASK ROUTES ====================
 @app.route('/')
 def index():
     return render_template('index.html', 
-                         pairs=Config.SUPPORTED_PAIRS,
-                         timeframes=Config.SUPPORTED_TIMEFRAMES,
-                         ai_available=bool(DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "demo"))
+                         pairs=config.FOREX_PAIRS,
+                         timeframes=config.TIMEFRAMES)
 
-@app.route('/static/<path:path>')
-def serve_static(path):
-    return send_from_directory('static', path)
-
-@app.route('/performance')
-def performance():
-    """Performance dashboard page"""
-    return render_template('performance.html')
-
-@app.route('/api/performance_metrics')
-def api_performance_metrics():
-    """API endpoint for performance metrics dengan error handling yang lebih baik"""
+@app.route('/api/analyze')
+def api_analyze():
+    """Endpoint untuk analisis market real-time"""
     try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
+        pair = request.args.get('pair', 'USDJPY').upper()
+        timeframe = request.args.get('timeframe', '4H').upper()
         
-        # Check if table exists first
-        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='backtesting_results'")
-        table_exists = c.fetchone()
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        if not table_exists:
-            logger.warning("Table 'backtesting_results' does not exist yet")
-            return jsonify({
-                'metrics': [],
-                'overall_stats': {
-                    'avg_win_rate': 0,
-                    'total_profit_all': 0,
-                    'best_pair': {},
-                    'total_tests': 0,
-                    'message': 'No backtest data available. Run some backtests first.'
-                }
-            })
+        # Dapatkan data harga
+        price_data = data_manager.get_price_data(pair, timeframe, days=60)
+        if price_data.empty:
+            return jsonify({'error': 'No price data available'}), 400
         
-        # Get recent backtest results for performance metrics
-        c.execute('''
-            SELECT pair, timeframe, win_rate, total_profit, final_balance, max_drawdown, profit_factor, timestamp
-            FROM backtesting_results 
-            ORDER BY timestamp DESC LIMIT 20
-        ''')
+        # Analisis teknikal
+        technical_analysis = tech_engine.calculate_all_indicators(price_data)
         
-        results = c.fetchall()
-        metrics = []
+        # Analisis fundamental
+        fundamental_news = fundamental_engine.get_forex_news(pair)
         
-        for row in results:
-            metrics.append({
-                'pair': row[0] or 'Unknown',
-                'timeframe': row[1] or '4H',
-                'win_rate': float(row[2]) if row[2] is not None else 0,
-                'total_profit': float(row[3]) if row[3] is not None else 0,
-                'final_balance': float(row[4]) if row[4] is not None else Config.INITIAL_BALANCE,
-                'max_drawdown': float(row[5]) if row[5] is not None else 0,
-                'profit_factor': float(row[6]) if row[6] is not None else 0,
-                'timestamp': row[7] or datetime.now().isoformat()
-            })
+        # Analisis AI
+        ai_analysis = ai_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
         
-        logger.info(f"Found {len(metrics)} backtest records for performance metrics")
-        
-        # Calculate overall stats
-        if metrics and len(metrics) > 0:
-            win_rates = [m['win_rate'] for m in metrics if m['win_rate'] is not None]
-            total_profits = [m['total_profit'] for m in metrics if m['total_profit'] is not None]
-            
-            if win_rates:
-                avg_win_rate = round(sum(win_rates) / len(win_rates), 2)
-                best_pair = max(metrics, key=lambda x: x.get('win_rate', 0))
-            else:
-                avg_win_rate = 0
-                best_pair = {}
-                
-            if total_profits:
-                total_profit_all = round(sum(total_profits), 2)
-            else:
-                total_profit_all = 0
-            
-            overall_stats = {
-                'avg_win_rate': avg_win_rate,
-                'total_profit_all': total_profit_all,
-                'best_pair': best_pair,
-                'total_tests': len(metrics),
-                'message': f'Loaded {len(metrics)} backtest results'
+        # Siapkan response
+        response = {
+            'pair': pair,
+            'timeframe': timeframe,
+            'timestamp': datetime.now().isoformat(),
+            'technical_analysis': technical_analysis,
+            'fundamental_analysis': fundamental_news,
+            'ai_analysis': ai_analysis,
+            'price_data': {
+                'current': technical_analysis['levels']['current_price'],
+                'support': technical_analysis['levels']['support'],
+                'resistance': technical_analysis['levels']['resistance']
             }
-        else:
-            overall_stats = {
-                'avg_win_rate': 0,
-                'total_profit_all': 0,
-                'best_pair': {},
-                'total_tests': 0,
-                'message': 'No backtest results found in database'
-            }
-        
-        conn.close()
-        
-        response_data = {
-            'metrics': metrics,
-            'overall_stats': overall_stats,
-            'status': 'success'
         }
         
-        return jsonify(response_data)
+        return jsonify(response)
         
     except Exception as e:
-        logger.error(f"Error fetching performance metrics: {e}")
-        return jsonify({
-            'error': str(e),
-            'metrics': [],
-            'overall_stats': {
-                'avg_win_rate': 0,
-                'total_profit_all': 0,
-                'best_pair': {},
-                'total_tests': 0,
-                'message': f'Error: {str(e)}'
-            },
-            'status': 'error'
-        }), 500
+        logger.error(f"Analysis error: {e}")
+        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
-@app.route('/api/debug_database')
-def api_debug_database():
-    """Debug endpoint to check database contents"""
-    try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        # Check tables
-        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = c.fetchall()
-        
-        result = {
-            'tables': [table[0] for table in tables],
-            'backtesting_results_count': 0,
-            'backtesting_results_sample': []
-        }
-        
-        if 'backtesting_results' in result['tables']:
-            c.execute("SELECT COUNT(*) FROM backtesting_results")
-            result['backtesting_results_count'] = c.fetchone()[0]
-            
-            c.execute("SELECT pair, timeframe, win_rate, total_profit, timestamp FROM backtesting_results ORDER BY timestamp DESC LIMIT 5")
-            sample = c.fetchall()
-            result['backtesting_results_sample'] = [
-                {
-                    'pair': row[0],
-                    'timeframe': row[1], 
-                    'win_rate': row[2],
-                    'total_profit': row[3],
-                    'timestamp': row[4]
-                } for row in sample
-            ]
-        
-        conn.close()
-        return jsonify(result)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/run_backtest', methods=['POST'])
-def api_run_backtest():
+@app.route('/api/backtest', methods=['POST'])
+def api_backtest():
+    """Endpoint untuk backtesting"""
     try:
         data = request.get_json()
         pair = data.get('pair', 'USDJPY')
@@ -1234,246 +817,114 @@ def api_run_backtest():
         
         logger.info(f"Backtest request: {pair}-{timeframe} for {days} days")
         
-        if pair not in Config.SUPPORTED_PAIRS:
-            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        # Dapatkan data harga
+        price_data = data_manager.get_price_data(pair, timeframe, days)
         
-        if timeframe not in Config.SUPPORTED_TIMEFRAMES:
-            return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
+        # Generate sinyal trading
+        signals = generate_trading_signals(price_data, pair, timeframe)
         
-        if pair not in HISTORICAL or timeframe not in HISTORICAL[pair]:
-            return jsonify({
-                'error': f'No historical data found for {pair}-{timeframe}',
-                'suggestion': 'Please ensure CSV files exist in historical_data folder'
-            }), 400
+        # Jalankan backtest
+        result = backtester.run_backtest(signals, price_data, pair)
         
-        signals = generate_backtest_signals_from_analysis(pair, timeframe, days)
-        
-        if not signals:
-            logger.warning("No signals generated for backtesting")
-            return jsonify({
-                'status': 'error',
-                'message': 'No signals generated for backtesting',
-                'recommendations': [
-                    'Adjust signal parameters to be less strict',
-                    'Try different timeframe or currency pair',
-                    'Check if historical data is available'
-                ]
-            }), 200
-        
-        logger.info(f"Running backtest with {len(signals)} signals")
-        report = backtester.run_backtest(signals, timeframe)
-        
-        # Add metadata
-        report['metadata'] = {
-            'pair': pair,
-            'timeframe': timeframe,
-            'period_days': days,
-            'signals_generated': len(signals),
-            'initial_balance': Config.INITIAL_BALANCE,
-            'data_points_used': len(HISTORICAL[pair][timeframe]) if pair in HISTORICAL and timeframe in HISTORICAL[pair] else 0
-        }
-        
-        # Save to database dan cek hasilnya
-        save_success = save_backtest_result(report)
-        report['save_success'] = save_success
-        
-        if save_success:
-            logger.info(f"✅ Backtest completed and saved successfully with {len(signals)} signals")
-        else:
-            logger.error("❌ Backtest completed but failed to save to database")
-        
-        return jsonify(report)
+        return jsonify(result)
         
     except Exception as e:
-        logger.error(f"Backtesting error: {e}")
-        traceback.print_exc()
-        return jsonify({
-            'status': 'error',
-            'message': f'Backtesting failed: {str(e)}',
-            'recommendations': ['Check server logs for detailed error information']
-        }), 500
+        logger.error(f"Backtest error: {e}")
+        return jsonify({'error': f'Backtest failed: {str(e)}'}), 500
 
-# ---------------- AUTO BACKTEST ON STARTUP ----------------
-def run_auto_backtest():
-    """Automatically run a backtest when the app starts to ensure there's data"""
+def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str) -> List[Dict]:
+    """Generate sinyal trading berdasarkan analisis teknikal"""
+    signals = []
+    
     try:
-        logger.info("Running auto backtest to generate initial data...")
-        
-        # Check if we have any backtest data already
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        c.execute("SELECT COUNT(*) FROM backtesting_results")
-        count = c.fetchone()[0]
-        conn.close()
-        
-        if count == 0:
-            logger.info("No backtest data found, running initial backtest...")
+        # Analisis teknikal untuk setiap titik data
+        for i in range(50, len(price_data), 5):  # Skip some points untuk efisiensi
+            window_data = price_data.iloc[:i+1]
             
-            # Try multiple pairs and timeframes until one works
-            pairs_to_try = ["USDJPY", "GBPJPY", "EURJPY", "CHFJPY"]
-            timeframes_to_try = ["1D", "4H", "1H"]  # Prioritize 1D first karena data lebih banyak
+            if len(window_data) < 50:
+                continue
+                
+            tech_analysis = tech_engine.calculate_all_indicators(window_data)
+            current_price = tech_analysis['levels']['current_price']
             
-            for pair in pairs_to_try:
-                for timeframe in timeframes_to_try:
-                    if pair in HISTORICAL and timeframe in HISTORICAL[pair]:
-                        logger.info(f"Trying auto backtest for {pair}-{timeframe}")
-                        signals = generate_backtest_signals_from_analysis(pair, timeframe, 30)
-                        if signals:
-                            logger.info(f"Running backtest with {len(signals)} signals for {pair}-{timeframe}")
-                            report = backtester.run_backtest(signals, timeframe)
-                            
-                            if report.get('status') == 'success':
-                                report['metadata'] = {
-                                    'pair': pair,
-                                    'timeframe': timeframe,
-                                    'period_days': 30,
-                                    'signals_generated': len(signals)
-                                }
-                                save_success = save_backtest_result(report)
-                                if save_success:
-                                    logger.info("✅ Auto backtest completed and data saved")
-                                    return  # Exit after first successful backtest
-                                else:
-                                    logger.error("❌ Auto backtest failed to save")
-                            else:
-                                logger.warning(f"Backtest failed for {pair}-{timeframe}: {report.get('message')}")
-                        else:
-                            logger.warning(f"No signals generated for {pair}-{timeframe} in auto backtest")
-                    else:
-                        logger.warning(f"No historical data for {pair}-{timeframe} for auto backtest")
-            logger.error("❌ No auto backtest could be completed for any pair and timeframe")
-        else:
-            logger.info(f"Found {count} existing backtest records, skipping auto backtest")
+            # Logika sinyal sederhana
+            rsi = tech_analysis['momentum']['rsi']
+            macd_hist = tech_analysis['momentum']['macd_histogram']
+            trend = tech_analysis['trend']['trend_direction']
             
-    except Exception as e:
-        logger.error(f"Auto backtest error: {e}")
-        traceback.print_exc()
-
-# ---------------- RESET & MAINTENANCE ROUTES ----------------
-@app.route('/api/reset_backtest_data', methods=['POST'])
-def api_reset_backtest_data():
-    """Reset all backtest data from database"""
-    try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
+            signal = None
+            confidence = 50
+            
+            # Kondisi BUY
+            if (rsi < 35 and macd_hist > 0 and trend == 'BULLISH') or \
+               (rsi < 30 and macd_hist > -0.001):
+                signal = 'BUY'
+                confidence = 70
+                
+            # Kondisi SELL  
+            elif (rsi > 65 and macd_hist < 0 and trend == 'BEARISH') or \
+                 (rsi > 70 and macd_hist < 0.001):
+                signal = 'SELL'
+                confidence = 70
+            
+            if signal and confidence > 60:
+                signals.append({
+                    'date': window_data.iloc[-1]['date'],
+                    'pair': pair,
+                    'action': signal,
+                    'confidence': confidence,
+                    'price': current_price,
+                    'sl_pips': 30,
+                    'tp_pips': 45
+                })
         
-        # Reset backtesting_results table
-        c.execute('DELETE FROM backtesting_results')
-        
-        conn.commit()
-        conn.close()
-        
-        logger.info("✅ Backtest data reset successfully")
-        
-        # Run auto backtest after reset to ensure there's data
-        run_auto_backtest()
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'All backtest data has been reset successfully and new backtest started',
-            'reset_tables': ['backtesting_results']
-        })
-        
-    except Exception as e:
-        logger.error(f"Error resetting backtest data: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reset_database', methods=['POST'])
-def api_reset_database():
-    """Complete database reset - recreates all tables"""
-    try:
-        # Initialize database (will recreate tables)
-        init_db()
-        
-        logger.info("✅ Database completely reset")
-        
-        # Run auto backtest after reset to ensure there's data
-        run_auto_backtest()
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Database completely reset - all tables recreated',
-            'reset_tables': ['analysis_results', 'backtesting_results']
-        })
+        logger.info(f"Generated {len(signals)} trading signals for {pair}-{timeframe}")
+        return signals
         
     except Exception as e:
-        logger.error(f"Error resetting database: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error generating signals: {e}")
+        return []
 
-@app.route('/api/database_stats')
-def api_database_stats():
-    """Get database statistics"""
-    try:
-        conn = sqlite3.connect(Config.DB_PATH)
-        c = conn.cursor()
-        
-        stats = {}
-        
-        # Count records in each table
-        c.execute("SELECT COUNT(*) FROM backtesting_results")
-        stats['backtesting_records'] = c.fetchone()[0]
-        
-        c.execute("SELECT COUNT(*) FROM analysis_results")
-        stats['analysis_records'] = c.fetchone()[0]
-        
-        # Get latest backtest dates
-        c.execute("SELECT MAX(timestamp) FROM backtesting_results")
-        stats['latest_backtest'] = c.fetchone()[0]
-        
-        c.execute("SELECT MAX(timestamp) FROM analysis_results")
-        stats['latest_analysis'] = c.fetchone()[0]
-        
-        # Get table sizes
-        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = c.fetchall()
-        
-        table_sizes = {}
-        for table in tables:
-            table_name = table[0]
-            c.execute(f"SELECT COUNT(*) FROM {table_name}")
-            table_sizes[table_name] = c.fetchone()[0]
-        
-        stats['table_sizes'] = table_sizes
-        
-        conn.close()
-        
-        return jsonify({
-            'status': 'success',
-            'stats': stats,
-            'database_path': Config.DB_PATH
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting database stats: {e}")
-        return jsonify({'error': str(e)}), 500
+@app.route('/api/market_overview')
+def api_market_overview():
+    """Overview market untuk semua pair"""
+    overview = {}
+    
+    for pair in config.FOREX_PAIRS[:4]:  # 4 pair pertama
+        try:
+            price_data = data_manager.get_price_data(pair, '1D', days=10)
+            if not price_data.empty:
+                tech = tech_engine.calculate_all_indicators(price_data)
+                
+                overview[pair] = {
+                    'price': tech['levels']['current_price'],
+                    'change': round(((tech['levels']['current_price'] - price_data['close'].iloc[-2]) / price_data['close'].iloc[-2] * 100), 2) if len(price_data) > 1 else 0,
+                    'rsi': tech['momentum']['rsi'],
+                    'trend': tech['trend']['trend_direction'],
+                    'signal': 'BULLISH' if tech['trend']['sma_20'] > tech['trend']['sma_50'] else 'BEARISH'
+                }
+        except Exception as e:
+            logger.error(f"Error getting overview for {pair}: {e}")
+            overview[pair] = {'error': str(e)}
+    
+    return jsonify(overview)
 
-# ---------------- INITIALIZATION ----------------
-if __name__ == "__main__":
-    logger.info("🚀 Starting Enhanced Forex Analysis Application...")
+@app.route('/api/system_status')
+def api_system_status():
+    """Status sistem dan ketersediaan API"""
+    return jsonify({
+        'deepseek_ai': 'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED',
+        'news_api': 'ENABLED' if config.NEWS_API_KEY else 'DISABLED',
+        'price_data': 'ENABLED' if len(data_manager.historical_data) > 0 else 'DISABLED',
+        'historical_pairs': list(data_manager.historical_data.keys()),
+        'server_time': datetime.now().isoformat()
+    })
+
+# ==================== RUN APPLICATION ====================
+if __name__ == '__main__':
+    logger.info("🚀 Starting Enhanced Forex Analysis System...")
+    logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
+    logger.info(f"DeepSeek AI: {'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED'}")
+    logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
     
-    # Initialize database
-    init_db()
-    
-    # Create sample data if needed
-    create_sample_data()
-    
-    # Load historical data
-    load_csv_data()
-    
-    # Run auto backtest to ensure there's data
-    run_auto_backtest()
-    
-    # Log system status
-    logger.info("=== SYSTEM STATUS ===")
-    logger.info(f"DeepSeek AI: {'✅ ENABLED' if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != 'demo' else '❌ DISABLED'}")
-    logger.info(f"Historical Data: {len(HISTORICAL)} pairs loaded")
-    
-    for pair in HISTORICAL:
-        for tf in HISTORICAL[pair]:
-            logger.info(f"  {pair}-{tf}: {len(HISTORICAL[pair][tf])} data points")
-    
-    logger.info("=====================")
-    
-    # Start Flask application
     app.run(debug=True, host='0.0.0.0', port=5000)
