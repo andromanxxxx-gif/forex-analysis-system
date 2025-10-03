@@ -549,7 +549,8 @@ def init_db():
         logger.error(f"Database initialization error: {e}")
         traceback.print_exc()
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 def save_analysis_result(data: Dict):
     """Save analysis result to database"""
@@ -580,16 +581,17 @@ def save_analysis_result(data: Dict):
         logger.error(f"Error saving analysis: {e}")
         traceback.print_exc()
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 def save_backtest_result(report_data: Dict):
     """Save enhanced backtesting result to database dengan error handling lebih baik"""
     try:
-        if 'summary' not in report_data:
-            logger.warning("No summary found in report data, skipping save")
+        if report_data.get('status') == 'error':
+            logger.warning("Report has error status, skipping save")
             return False
             
-        summary = report_data['summary']
+        summary = report_data.get('summary', {})
         
         conn = sqlite3.connect(Config.DB_PATH)
         c = conn.cursor()
@@ -1953,6 +1955,7 @@ def api_database_stats():
     except Exception as e:
         logger.error(f"Error getting database stats: {e}")
         return jsonify({'error': str(e)}), 500
+
 # ---------------- INITIALIZATION ----------------
 if __name__ == "__main__":
     logger.info("🚀 Starting Enhanced Forex Analysis Application...")
