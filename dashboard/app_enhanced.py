@@ -515,69 +515,69 @@ Pertimbangkan:
 """
     
     def _parse_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
-    """Parse response dari DeepSeek AI dengan error handling yang lebih baik"""
-    try:
-        # Clean response - handle berbagai format
-        cleaned_response = ai_response.strip()
-        
-        # Coba extract JSON dari berbagai format
-        if '```json' in cleaned_response:
-            # Format dengan code block
-            start_idx = cleaned_response.find('```json') + 7
-            end_idx = cleaned_response.find('```', start_idx)
-            if end_idx == -1:
-                end_idx = len(cleaned_response)
-            json_str = cleaned_response[start_idx:end_idx].strip()
-        elif '```' in cleaned_response:
-            # Format dengan code block tanpa json
-            start_idx = cleaned_response.find('```') + 3
-            end_idx = cleaned_response.find('```', start_idx)
-            if end_idx == -1:
-                end_idx = len(cleaned_response)
-            json_str = cleaned_response[start_idx:end_idx].strip()
-        else:
-            # Assume it's plain JSON
-            json_str = cleaned_response
-        
-        # Remove any non-JSON text di awal atau akhir
-        json_str = json_str.strip()
-        if not json_str.startswith('{'):
-            start_idx = json_str.find('{')
-            if start_idx != -1:
-                json_str = json_str[start_idx:]
-        
-        if not json_str.endswith('}'):
-            end_idx = json_str.rfind('}')
-            if end_idx != -1:
-                json_str = json_str[:end_idx+1]
-        
-        # Parse JSON
-        analysis = json.loads(json_str)
-        
-        # Validate required fields
-        required_fields = ['signal', 'confidence', 'entry_price', 'stop_loss', 
-                          'take_profit_1', 'risk_level', 'analysis_summary']
-        
-        for field in required_fields:
-            if field not in analysis:
-                logger.warning(f"Missing field {field} in AI response, using enhanced analysis")
-                return self._enhanced_analysis(technical_data, "", "")
-        
-        # Add metadata
-        analysis['ai_provider'] = 'DeepSeek AI'
-        analysis['timestamp'] = datetime.now().isoformat()
-        
-        # Ensure confidence is integer
-        if 'confidence' in analysis:
-            analysis['confidence'] = int(analysis['confidence'])
-        
-        logger.info("Successfully parsed AI response")
-        return analysis
-        
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.error(f"Failed to parse AI JSON response: {e}, using enhanced analysis")
-        logger.debug(f"Raw AI response: {ai_response}")
-        return self._enhanced_analysis(technical_data, "", "")
+        """Parse response dari DeepSeek AI dengan error handling yang lebih baik"""
+        try:
+            # Clean response - handle berbagai format
+            cleaned_response = ai_response.strip()
+            
+            # Coba extract JSON dari berbagai format
+            if '```json' in cleaned_response:
+                # Format dengan code block
+                start_idx = cleaned_response.find('```json') + 7
+                end_idx = cleaned_response.find('```', start_idx)
+                if end_idx == -1:
+                    end_idx = len(cleaned_response)
+                json_str = cleaned_response[start_idx:end_idx].strip()
+            elif '```' in cleaned_response:
+                # Format dengan code block tanpa json
+                start_idx = cleaned_response.find('```') + 3
+                end_idx = cleaned_response.find('```', start_idx)
+                if end_idx == -1:
+                    end_idx = len(cleaned_response)
+                json_str = cleaned_response[start_idx:end_idx].strip()
+            else:
+                # Assume it's plain JSON
+                json_str = cleaned_response
+            
+            # Remove any non-JSON text di awal atau akhir
+            json_str = json_str.strip()
+            if not json_str.startswith('{'):
+                start_idx = json_str.find('{')
+                if start_idx != -1:
+                    json_str = json_str[start_idx:]
+            
+            if not json_str.endswith('}'):
+                end_idx = json_str.rfind('}')
+                if end_idx != -1:
+                    json_str = json_str[:end_idx+1]
+            
+            # Parse JSON
+            analysis = json.loads(json_str)
+            
+            # Validate required fields
+            required_fields = ['signal', 'confidence', 'entry_price', 'stop_loss', 
+                              'take_profit_1', 'risk_level', 'analysis_summary']
+            
+            for field in required_fields:
+                if field not in analysis:
+                    logger.warning(f"Missing field {field} in AI response, using enhanced analysis")
+                    return self._enhanced_analysis(technical_data, "", "")
+            
+            # Add metadata
+            analysis['ai_provider'] = 'DeepSeek AI'
+            analysis['timestamp'] = datetime.now().isoformat()
+            
+            # Ensure confidence is integer
+            if 'confidence' in analysis:
+                analysis['confidence'] = int(analysis['confidence'])
+            
+            logger.info("Successfully parsed AI response")
+            return analysis
+            
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.error(f"Failed to parse AI JSON response: {e}, using enhanced analysis")
+            logger.debug(f"Raw AI response: {ai_response}")
+            return self._enhanced_analysis(technical_data, "", "")
     
     def _enhanced_analysis(self, technical_data: Dict, news: str, pair: str) -> Dict:
         """Analisis enhanced ketika AI tidak tersedia"""
@@ -680,40 +680,41 @@ class DataManager:
     def __init__(self):
         self.historical_data = {}
         self.load_historical_data()
-        def validate_and_fix_data(self, pair: str, timeframe: str):
-    """Validasi dan perbaiki data yang rusak"""
-    try:
-        if pair in self.historical_data and timeframe in self.historical_data[pair]:
-            df = self.historical_data[pair][timeframe]
-            
-            # Check if dataframe is empty or has missing columns
-            if df.empty or len(df) == 0:
-                logger.warning(f"Empty dataframe for {pair}-{timeframe}, regenerating data")
-                self._generate_sample_data(pair, timeframe)
-                return
-            
-            # Check for required columns
-            required_cols = ['open', 'high', 'low', 'close', 'date']
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            
-            if missing_cols:
-                logger.warning(f"Missing columns {missing_cols} for {pair}-{timeframe}, regenerating data")
-                self._generate_sample_data(pair, timeframe)
-                return
+
+    def validate_and_fix_data(self, pair: str, timeframe: str):
+        """Validasi dan perbaiki data yang rusak"""
+        try:
+            if pair in self.historical_data and timeframe in self.historical_data[pair]:
+                df = self.historical_data[pair][timeframe]
                 
-            # Check for NaN values in critical columns
-            critical_cols = ['open', 'high', 'low', 'close']
-            for col in critical_cols:
-                if df[col].isna().any():
-                    logger.warning(f"NaN values found in {col} for {pair}-{timeframe}, regenerating data")
+                # Check if dataframe is empty or has missing columns
+                if df.empty or len(df) == 0:
+                    logger.warning(f"Empty dataframe for {pair}-{timeframe}, regenerating data")
+                    self._generate_sample_data(pair, timeframe)
+                    return
+                
+                # Check for required columns
+                required_cols = ['open', 'high', 'low', 'close', 'date']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                
+                if missing_cols:
+                    logger.warning(f"Missing columns {missing_cols} for {pair}-{timeframe}, regenerating data")
                     self._generate_sample_data(pair, timeframe)
                     return
                     
-            logger.info(f"Data validation passed for {pair}-{timeframe}")
-            
-    except Exception as e:
-        logger.error(f"Data validation error for {pair}-{timeframe}: {e}")
-        self._generate_sample_data(pair, timeframe)
+                # Check for NaN values in critical columns
+                critical_cols = ['open', 'high', 'low', 'close']
+                for col in critical_cols:
+                    if df[col].isna().any():
+                        logger.warning(f"NaN values found in {col} for {pair}-{timeframe}, regenerating data")
+                        self._generate_sample_data(pair, timeframe)
+                        return
+                        
+                logger.info(f"Data validation passed for {pair}-{timeframe}")
+                
+        except Exception as e:
+            logger.error(f"Data validation error for {pair}-{timeframe}: {e}")
+            self._generate_sample_data(pair, timeframe)
     
     def load_historical_data(self):
         """Load data historis dari file CSV dengan handling error yang lebih baik"""
@@ -1245,90 +1246,90 @@ class AdvancedBacktestingEngine:
     
     def _execute_trade_with_risk_management(self, signal: Dict, price_data: pd.DataFrame, 
                                       mtf_analysis: Dict) -> bool:
-    """Eksekusi trade dengan risk management yang lebih toleran untuk testing"""
-    try:
-        signal_date = signal['date']
-        action = signal['action']
-        confidence = signal.get('confidence', 50)
-        
-        # Untuk testing, kita lebih longgar dengan confidence
-        if confidence < 30:  # Diubah dari 40 menjadi 30
-            return False
-        
-        # Dapatkan price data untuk entry
+        """Eksekusi trade dengan risk management yang lebih toleran untuk testing"""
         try:
-            if hasattr(signal_date, 'date'):
-                signal_date_date = signal_date.date()
-            else:
-                signal_date_date = pd.to_datetime(signal_date).date()
+            signal_date = signal['date']
+            action = signal['action']
+            confidence = signal.get('confidence', 50)
             
-            price_data_dates = pd.to_datetime(price_data['date']).dt.date
-            trade_data = price_data[price_data_dates == signal_date_date]
+            # Untuk testing, kita lebih longgar dengan confidence
+            if confidence < 30:  # Diubah dari 40 menjadi 30
+                return False
             
-            if trade_data.empty:
-                # Jika tidak找到 exact date, cari yang terdekat
+            # Dapatkan price data untuk entry
+            try:
+                if hasattr(signal_date, 'date'):
+                    signal_date_date = signal_date.date()
+                else:
+                    signal_date_date = pd.to_datetime(signal_date).date()
+                
+                price_data_dates = pd.to_datetime(price_data['date']).dt.date
+                trade_data = price_data[price_data_dates == signal_date_date]
+                
+                if trade_data.empty:
+                    # Jika tidak找到 exact date, cari yang terdekat
+                    if len(price_data) > 0:
+                        trade_data = price_data.iloc[-1:]  # Ambil data terakhir
+                    else:
+                        return False
+                        
+                entry_price = float(trade_data['close'].iloc[0])
+                
+            except Exception as e:
+                logger.warning(f"Date processing error: {e}, using latest price")
                 if len(price_data) > 0:
-                    trade_data = price_data.iloc[-1:]  # Ambil data terakhir
+                    entry_price = float(price_data['close'].iloc[-1])
                 else:
                     return False
-                    
-            entry_price = float(trade_data['close'].iloc[0])
+            
+            # Multi-timeframe confirmation - lebih longgar untuk testing
+            mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
+            
+            # Untuk testing, kita approve trade bahkan jika MTF tidak fully confirm
+            if not mtf_confirmation['confirmed']:
+                # Tapi beri warning
+                logger.info(f"MTF confirmation weak for {signal['pair']}-{action}, but proceeding for testing")
+            
+            # Risk management validation - lebih longgar untuk testing
+            risk_validation = self.risk_manager.validate_trade(
+                pair=signal.get('pair', 'UNKNOWN'),
+                signal=action,
+                confidence=confidence,
+                proposed_lot_size=0.1,
+                account_balance=self.balance,
+                current_price=entry_price,
+                open_positions=self._get_current_positions()
+            )
+            
+            # Untuk testing, kita override rejection jika risk score tidak terlalu tinggi
+            if not risk_validation['approved'] and risk_validation['risk_score'] < 8:
+                logger.info(f"Trade override for testing: {signal['pair']}-{action}")
+                risk_validation['approved'] = True
+                risk_validation['adjusted_lot_size'] = 0.05  # Lot size kecil untuk testing
+            
+            if not risk_validation['approved']:
+                logger.info(f"Trade rejected: {risk_validation['rejection_reasons']}")
+                return False
+            
+            # Eksekusi trade dengan parameter yang disetujui
+            lot_size = risk_validation['adjusted_lot_size']
+            trade_result = self._simulate_trade_execution(
+                action=action,
+                entry_price=entry_price,
+                lot_size=lot_size,
+                confidence=confidence,
+                mtf_strength=mtf_confirmation['strength'],
+                risk_score=risk_validation['risk_score']
+            )
+            
+            # Update portfolio
+            self._update_portfolio(signal, trade_result, entry_price, lot_size, risk_validation)
+            
+            return True
             
         except Exception as e:
-            logger.warning(f"Date processing error: {e}, using latest price")
-            if len(price_data) > 0:
-                entry_price = float(price_data['close'].iloc[-1])
-            else:
-                return False
-        
-        # Multi-timeframe confirmation - lebih longgar untuk testing
-        mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
-        
-        # Untuk testing, kita approve trade bahkan jika MTF tidak fully confirm
-        if not mtf_confirmation['confirmed']:
-            # Tapi beri warning
-            logger.info(f"MTF confirmation weak for {signal['pair']}-{action}, but proceeding for testing")
-        
-        # Risk management validation - lebih longgar untuk testing
-        risk_validation = self.risk_manager.validate_trade(
-            pair=signal.get('pair', 'UNKNOWN'),
-            signal=action,
-            confidence=confidence,
-            proposed_lot_size=0.1,
-            account_balance=self.balance,
-            current_price=entry_price,
-            open_positions=self._get_current_positions()
-        )
-        
-        # Untuk testing, kita override rejection jika risk score tidak terlalu tinggi
-        if not risk_validation['approved'] and risk_validation['risk_score'] < 8:
-            logger.info(f"Trade override for testing: {signal['pair']}-{action}")
-            risk_validation['approved'] = True
-            risk_validation['adjusted_lot_size'] = 0.05  # Lot size kecil untuk testing
-        
-        if not risk_validation['approved']:
-            logger.info(f"Trade rejected: {risk_validation['rejection_reasons']}")
+            logger.error(f"Error in trade execution: {e}")
             return False
-        
-        # Eksekusi trade dengan parameter yang disetujui
-        lot_size = risk_validation['adjusted_lot_size']
-        trade_result = self._simulate_trade_execution(
-            action=action,
-            entry_price=entry_price,
-            lot_size=lot_size,
-            confidence=confidence,
-            mtf_strength=mtf_confirmation['strength'],
-            risk_score=risk_validation['risk_score']
-        )
-        
-        # Update portfolio
-        self._update_portfolio(signal, trade_result, entry_price, lot_size, risk_validation)
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error in trade execution: {e}")
-        return False
     
     def _get_mtf_confirmation(self, action: str, mtf_analysis: Dict) -> Dict:
         """Dapatkan konfirmasi multi-timeframe"""
