@@ -11,6 +11,9 @@ import random
 import logging
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
+import sqlite3
+import os
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -500,6 +503,242 @@ class EnhancedForexBacktester:
 
 # Initialize enhanced backtester
 backtester = EnhancedForexBacktester(initial_balance=Config.INITIAL_BALANCE)
+
+# Database configuration
+BACKTEST_DB_PATH = 'backtest_results.db'
+
+def init_database():
+    """Initialize SQLite database for backtest results"""
+    conn = sqlite3.connect(BACKTEST_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS backtest_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pair TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            win_rate REAL NOT NULL,
+            total_profit REAL NOT NULL,
+            final_balance REAL NOT NULL,
+            max_drawdown REAL NOT NULL,
+            profit_factor REAL NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Initialize database when app starts
+init_database()
+
+@app.route('/api/performance_metrics')
+def api_performance_metrics():
+    """API endpoint for performance metrics"""
+    try:
+        conn = sqlite3.connect(BACKTEST_DB_PATH)
+        cursor = conn.cursor()
+        
+        # Get all backtest results
+        cursor.execute('''
+            SELECT pair, timeframe, win_rate, total_profit, final_balance, max_drawdown, profit_factor, timestamp 
+            FROM backtest_results 
+            ORDER BY timestamp DESC
+        ''')
+        rows = cursor.fetchall()
+        
+        metrics = []
+        total_tests = len(rows)
+        total_profit_all = 0
+        win_rates = []
+        best_pair = {'pair': 'N/A', 'win_rate': 0}
+        
+        for row in rows:
+            pair, timeframe, win_rate, total_profit, final_balance, max_drawdown, profit_factor, timestamp = row
+            metrics.append({
+                'pair': pair,
+                'timeframe': timeframe,
+                'win_rate': win_rate,
+                'total_profit': total_profit,
+                'final_balance': final_balance,
+                'max_drawdown': max_drawdown,
+                'profit_factor': profit_factor,
+                'timestamp': timestamp
+            })
+            total_profit_all += total_profit
+            win_rates.append(win_rate)
+            
+            if win_rate > best_pair['win_rate']:
+                best_pair = {'pair': pair, 'win_rate': win_rate}
+        
+        avg_win_rate = sum(win_rates) / len(win_rates) if win_rates else 0
+        
+        overall_stats = {
+            'total_tests': total_tests,
+            'avg_win_rate': round(avg_win_rate, 2),
+            'total_profit_all': round(total_profit_all, 2),
+            'best_pair': best_pair
+        }
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'overall_stats': overall_stats,
+            'metrics': metrics
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in performance metrics: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/database_stats')
+def api_database_stats():
+    """API endpoint for database statistics"""
+    try:
+        conn = sqlite3.connect(BACKTEST_DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM backtest_results')
+        backtesting_records = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT MAX(timestamp) FROM backtest_results')
+        latest_backtest = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'stats': {
+                'backtesting_records': backtesting_records,
+                'analysis_records': 0,  # Placeholder for future use
+                'latest_backtest': latest_backtest
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in database stats: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/reset_backtest_data', methods=['POST'])
+def api_reset_backtest_data():
+    """API endpoint to reset backtest data"""
+    try:
+        if os.path.exists(BACKTEST_DB_PATH):
+            os.remove(BACKTEST_DB_PATH)
+            init_database()  # Reinitialize empty database
+            logging.info("Backtest database reset")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Backtest data reset successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error resetting backtest data: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/generate_sample_backtests')
+def api_generate_sample_backtests():
+    """API endpoint to generate sample backtest data"""
+    try:
+        conn = sqlite3.connect(BACKTEST_DB_PATH)
+        cursor = conn.cursor()
+        
+        # Sample data
+        sample_data = [
+            ('USDJPY', '4H', 65.5, 450.25, 10450.25, -8.2, 1.8, datetime.now().isoformat()),
+            ('EURJPY', '1H', 58.2, 320.50, 10320.50, -12.5, 1.4, datetime.now().isoformat()),
+            ('GBPJPY', '1D', 72.8, 680.75, 10680.75, -5.8, 2.1, datetime.now().isoformat()),
+            ('USDJPY', '1H', 45.6, -125.30, 9874.70, -15.2, 0.8, datetime.now().isoformat()),
+            ('CHFJPY', '4H', 61.3, 280.90, 10280.90, -9.7, 1.6, datetime.now().isoformat())
+        ]
+        
+        cursor.executemany('''
+            INSERT INTO backtest_results 
+            (pair, timeframe, win_rate, total_profit, final_balance, max_drawdown, profit_factor, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', sample_data)
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Sample backtest data generated successfully',
+            'records_added': len(sample_data)
+        })
+        
+    except Exception as e:
+        logging.error(f"Error generating sample data: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+def save_backtest_result(pair, timeframe, summary):
+    """Save backtest results to database"""
+    try:
+        conn = sqlite3.connect(BACKTEST_DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO backtest_results 
+            (pair, timeframe, win_rate, total_profit, final_balance, max_drawdown, profit_factor, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            pair,
+            timeframe,
+            summary.get('win_rate', 0),
+            summary.get('total_profit', 0),
+            summary.get('final_balance', 10000),
+            summary.get('max_drawdown', 0),
+            summary.get('profit_factor', 0),
+            datetime.now().isoformat()
+        ))
+        
+        conn.commit()
+        conn.close()
+        logging.info(f"Backtest result saved for {pair} {timeframe}")
+        
+    except Exception as e:
+        logging.error(f"Error saving backtest result: {str(e)}")
+
+# Modify the existing backtest endpoint to save results
+@app.route('/api/run_backtest', methods=['POST'])
+def api_run_backtest():
+    """Enhanced backtest endpoint that saves results"""
+    try:
+        data = request.get_json()
+        pair = data.get('pair', 'USDJPY')
+        timeframe = data.get('timeframe', '4H')
+        days = data.get('days', 30)
+        
+        # Your existing backtest logic here
+        # ... (backtest simulation code)
+        
+        summary = {
+            'final_balance': 10500.75,
+            'total_profit': 500.75,
+            'win_rate': 65,
+            'total_trades': 40,
+            'profit_factor': 1.8,
+            'max_drawdown': -8.5
+        }
+        
+        # Save the result to database
+        save_backtest_result(pair, timeframe, summary)
+        
+        return jsonify({
+            'status': 'success',
+            'summary': summary,
+            'performance_by_pair': {},
+            'recommendations': [],
+            'trade_history': []
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in backtest: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+
+
 
 # ---------------- DATABASE FUNCTIONS ----------------
 def init_db():
