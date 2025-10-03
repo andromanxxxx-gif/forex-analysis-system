@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Dashboard - Forex Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            margin: 10px 0; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
+        .stat-card { 
+            background: #fff; 
+            padding: 15px; 
+            border-radius: 8px; 
+            text-align: center; 
+            border-left: 4px solid #007bff; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .chart-container { 
+            height: 300px; 
+            margin: 20px 0; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0;
+        }
+        th, td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #f8f9fa; 
+            font-weight: bold; 
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .nav-bar {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .nav-bar a {
+            margin-right: 20px;
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+        }
+        .nav-bar a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-bar">
+            <a href="/">🏠 Home</a>
+            <a href="/performance">📊 Performance</a>
+        </div>
+        
+        <h1>📊 Performance Dashboard</h1>
+        
+        <div class="card">
+            <h2>Overall Statistics</h2>
+            <div id="overallStats" class="stats-grid">
+                <div class="stat-card">
+                    <h3>Loading...</h3>
+                    <div style="font-size: 24px; font-weight: bold;">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Backtests</h2>
+            <div id="recentTests">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pair</th>
+                            <th>Timeframe</th>
+                            <th style="text-align: right;">Win Rate</th>
+                            <th style="text-align: right;">Profit</th>
+                            <th style="text-align: right;">Drawdown</th>
+                            <th style="text-align: right;">Profit Factor</th>
+                            <th style="text-align: right;">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="testsTable">
+                        <tr>
+                            <td colspan="7" style="text-align: center;">Loading data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Win Rate Distribution</h2>
+            <div class="chart-container">
+                <canvas id="winRateChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Performance Metrics Over Time</h2>
+            <div class="chart-container">
+                <canvas id="profitChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load performance data
+        async function loadPerformanceData() {
+            try {
+                console.log('Loading performance data...');
+                const response = await fetch('/api/performance_metrics');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Performance data loaded:', data);
+                
+                displayOverallStats(data.overall_stats);
+                displayRecentTests(data.metrics);
+                createWinRateChart(data.metrics);
+                createProfitChart(data.metrics);
+            } catch (error) {
+                console.error('Error loading performance data:', error);
+                document.getElementById('overallStats').innerHTML = `
+                    <div class="stat-card" style="grid-column: 1 / -1;">
+                        <h3>Error Loading Data</h3>
+                        <div style="color: #dc3545;">${error.message}</div>
+                        <div style="font-size: 14px; margin-top: 10px;">
+                            Make sure you have run some backtests first.
+                        </div>
+                    </div>
+                `;
+                document.getElementById('testsTable').innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #dc3545;">
+                            Error loading data: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function displayOverallStats(stats) {
+            const container = document.getElementById('overallStats');
+            
+            if (!stats || stats.total_tests === 0) {
+                container.innerHTML = `
+                    <div class="stat-card" style="grid-column: 1 / -1;">
+                        <h3>No Data Available</h3>
+                        <div>Run some backtests to see performance metrics</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="stat-card">
+                    <h3>Average Win Rate</h3>
+                    <div style="font-size: 24px; font-weight: bold; ${stats.avg_win_rate >= 50 ? 'color: #28a745;' : stats.avg_win_rate >= 40 ? 'color: #ffc107;' : 'color: #dc3545;'}">
+                        ${stats.avg_win_rate}%
+                    </div>
+                    <div style="font-size: 12px; margin-top: 5px;">
+                        ${stats.total_tests} tests
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Profit</h3>
+                    <div style="font-size: 24px; font-weight: bold; ${stats.total_profit_all >= 0 ? 'color: #28a745;' : 'color: #dc3545;'}">
+                        $${stats.total_profit_all.toLocaleString()}
+                    </div>
+                    <div style="font-size: 12px; margin-top: 5px;">
+                        All backtests
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Best Performer</h3>
+                    <div style="font-size: 18px; font-weight: bold; color: #28a745;">
+                        ${stats.best_pair.pair || 'N/A'}
+                    </div>
+                    <div style="font-size: 14px;">
+                        ${stats.best_pair.win_rate || 0}% Win Rate
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Tests</h3>
+                    <div style="font-size: 24px; font-weight: bold; color: #007bff;">
+                        ${stats.total_tests}
+                    </div>
+                    <div style="font-size: 12px; margin-top: 5px;">
+                        Backtests run
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayRecentTests(metrics) {
+            const tbody = document.getElementById('testsTable');
+            
+            if (!metrics || metrics.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center;">
+                            No backtest data available. Run some backtests first.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = metrics.map(test => `
+                <tr>
+                    <td><strong>${test.pair}</strong></td>
+                    <td>${test.timeframe}</td>
+                    <td style="text-align: right; ${test.win_rate >= 50 ? 'color: #28a745;' : test.win_rate >= 40 ? 'color: #ffc107;' : 'color: #dc3545;'}">
+                        <strong>${test.win_rate}%</strong>
+                    </td>
+                    <td style="text-align: right; ${test.total_profit >= 0 ? 'color: #28a745;' : 'color: #dc3545;'}">
+                        <strong>$${test.total_profit}</strong>
+                    </td>
+                    <td style="text-align: right; ${test.max_drawdown > -10 ? 'color: #28a745;' : test.max_drawdown > -15 ? 'color: #ffc107;' : 'color: #dc3545;'}">
+                        ${test.max_drawdown}%
+                    </td>
+                    <td style="text-align: right; ${test.profit_factor > 1.5 ? 'color: #28a745;' : test.profit_factor > 1.0 ? 'color: #ffc107;' : 'color: #dc3545;'}">
+                        ${test.profit_factor}
+                    </td>
+                    <td style="text-align: right;">
+                        ${new Date(test.timestamp).toLocaleDateString()}<br>
+                        <small>${new Date(test.timestamp).toLocaleTimeString()}</small>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function createWinRateChart(metrics) {
+            const ctx = document.getElementById('winRateChart').getContext('2d');
+            
+            if (!metrics || metrics.length === 0) {
+                ctx.font = '16px Arial';
+                ctx.fillText('No data available for chart', 50, 50);
+                return;
+            }
+            
+            const winRates = metrics.map(m => m.win_rate).filter(rate => rate != null);
+            const labels = metrics.map(m => `${m.pair} (${m.timeframe})`);
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Win Rate %',
+                        data: winRates,
+                        backgroundColor: winRates.map(rate => 
+                            rate >= 60 ? '#28a745' : 
+                            rate >= 50 ? '#7cbd1e' : 
+                            rate >= 40 ? '#ffc107' : '#dc3545'
+                        ),
+                        borderColor: winRates.map(rate => 
+                            rate >= 60 ? '#1e7e34' : 
+                            rate >= 50 ? '#5a8c1a' : 
+                            rate >= 40 ? '#e0a800' : '#c82333'
+                        ),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Win Rate %'
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Win Rate: ${context.parsed.y}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createProfitChart(metrics) {
+            const ctx = document.getElementById('profitChart').getContext('2d');
+            
+            if (!metrics || metrics.length === 0) {
+                ctx.font = '16px Arial';
+                ctx.fillText('No data available for chart', 50, 50);
+                return;
+            }
+            
+            const profits = metrics.map(m => m.total_profit).filter(profit => profit != null);
+            const labels = metrics.map(m => `${m.pair} (${m.timeframe})`);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Profit ($)',
+                        data: profits,
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderColor: '#28a745',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Profit ($)'
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Profit: $${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', loadPerformanceData);
+    </script>
+</body>
+</html>
