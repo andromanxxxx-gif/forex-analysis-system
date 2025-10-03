@@ -77,6 +77,26 @@
         .nav-bar a:hover {
             text-decoration: underline;
         }
+        .debug-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
     </style>
 </head>
 <body>
@@ -84,9 +104,14 @@
         <div class="nav-bar">
             <a href="/">🏠 Home</a>
             <a href="/performance">📊 Performance</a>
+            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
         </div>
         
         <h1>📊 Performance Dashboard</h1>
+        
+        <div class="debug-info" id="debugInfo">
+            Loading performance data...
+        </div>
         
         <div class="card">
             <h2>Overall Statistics</h2>
@@ -108,6 +133,7 @@
                             <th>Timeframe</th>
                             <th style="text-align: right;">Win Rate</th>
                             <th style="text-align: right;">Profit</th>
+                            <th style="text-align: right;">Final Balance</th>
                             <th style="text-align: right;">Drawdown</th>
                             <th style="text-align: right;">Profit Factor</th>
                             <th style="text-align: right;">Date</th>
@@ -115,7 +141,7 @@
                     </thead>
                     <tbody id="testsTable">
                         <tr>
-                            <td colspan="7" style="text-align: center;">Loading data...</td>
+                            <td colspan="8" style="text-align: center;">Loading data...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -138,10 +164,16 @@
     </div>
 
     <script>
+        let performanceData = null;
+        let winRateChartInstance = null;
+        let profitChartInstance = null;
+        
         // Load performance data
         async function loadPerformanceData() {
             try {
+                showDebugInfo('Loading performance data from API...');
                 console.log('Loading performance data...');
+                
                 const response = await fetch('/api/performance_metrics');
                 
                 if (!response.ok) {
@@ -149,31 +181,52 @@
                 }
                 
                 const data = await response.json();
-                console.log('Performance data loaded:', data);
+                console.log('Performance API response:', data);
+                performanceData = data;
                 
+                if (data.status === 'error') {
+                    throw new Error(data.error || 'Unknown error from server');
+                }
+                
+                showDebugInfo(`Loaded ${data.metrics.length} backtest records`);
                 displayOverallStats(data.overall_stats);
                 displayRecentTests(data.metrics);
                 createWinRateChart(data.metrics);
                 createProfitChart(data.metrics);
+                
             } catch (error) {
                 console.error('Error loading performance data:', error);
-                document.getElementById('overallStats').innerHTML = `
-                    <div class="stat-card" style="grid-column: 1 / -1;">
-                        <h3>Error Loading Data</h3>
-                        <div style="color: #dc3545;">${error.message}</div>
-                        <div style="font-size: 14px; margin-top: 10px;">
-                            Make sure you have run some backtests first.
-                        </div>
-                    </div>
-                `;
-                document.getElementById('testsTable').innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; color: #dc3545;">
-                            Error loading data: ${error.message}
-                        </td>
-                    </tr>
-                `;
+                showDebugInfo(`Error: ${error.message}`, 'error');
+                displayError(error.message);
             }
+        }
+
+        function showDebugInfo(message, type = 'info') {
+            const debugEl = document.getElementById('debugInfo');
+            const color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff';
+            debugEl.innerHTML = `<strong>Debug:</strong> ${message}`;
+            debugEl.style.borderLeftColor = color;
+        }
+
+        function displayError(errorMessage) {
+            const container = document.getElementById('overallStats');
+            container.innerHTML = `
+                <div class="stat-card" style="grid-column: 1 / -1;">
+                    <h3>Error Loading Data</h3>
+                    <div style="color: #dc3545;">${errorMessage}</div>
+                    <div style="font-size: 14px; margin-top: 10px;">
+                        Please run some backtests first and refresh this page.
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('testsTable').innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #dc3545;">
+                        ${errorMessage}
+                    </td>
+                </tr>
+            `;
         }
 
         function displayOverallStats(stats) {
@@ -182,8 +235,11 @@
             if (!stats || stats.total_tests === 0) {
                 container.innerHTML = `
                     <div class="stat-card" style="grid-column: 1 / -1;">
-                        <h3>No Data Available</h3>
-                        <div>Run some backtests to see performance metrics</div>
+                        <h3>No Backtest Data Available</h3>
+                        <div>Run some backtests on the home page to see performance metrics</div>
+                        <div style="margin-top: 10px;">
+                            <a href="/" style="color: #007bff; text-decoration: none;">➡️ Go to Home Page</a>
+                        </div>
                     </div>
                 `;
                 return;
@@ -227,6 +283,8 @@
                     </div>
                 </div>
             `;
+            
+            showDebugInfo(`Successfully loaded ${stats.total_tests} backtest results`, 'success');
         }
 
         function displayRecentTests(metrics) {
@@ -235,7 +293,7 @@
             if (!metrics || metrics.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="text-align: center;">
+                        <td colspan="8" style="text-align: center;">
                             No backtest data available. Run some backtests first.
                         </td>
                     </tr>
@@ -251,13 +309,16 @@
                         <strong>${test.win_rate}%</strong>
                     </td>
                     <td style="text-align: right; ${test.total_profit >= 0 ? 'color: #28a745;' : 'color: #dc3545;'}">
-                        <strong>$${test.total_profit}</strong>
+                        <strong>$${test.total_profit.toFixed(2)}</strong>
+                    </td>
+                    <td style="text-align: right;">
+                        $${test.final_balance.toFixed(2)}
                     </td>
                     <td style="text-align: right; ${test.max_drawdown > -10 ? 'color: #28a745;' : test.max_drawdown > -15 ? 'color: #ffc107;' : 'color: #dc3545;'}">
                         ${test.max_drawdown}%
                     </td>
                     <td style="text-align: right; ${test.profit_factor > 1.5 ? 'color: #28a745;' : test.profit_factor > 1.0 ? 'color: #ffc107;' : 'color: #dc3545;'}">
-                        ${test.profit_factor}
+                        ${test.profit_factor.toFixed(2)}
                     </td>
                     <td style="text-align: right;">
                         ${new Date(test.timestamp).toLocaleDateString()}<br>
@@ -276,10 +337,15 @@
                 return;
             }
             
+            // Clear previous chart if exists
+            if (winRateChartInstance) {
+                winRateChartInstance.destroy();
+            }
+            
             const winRates = metrics.map(m => m.win_rate).filter(rate => rate != null);
             const labels = metrics.map(m => `${m.pair} (${m.timeframe})`);
             
-            new Chart(ctx, {
+            winRateChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -349,10 +415,15 @@
                 return;
             }
             
+            // Clear previous chart if exists
+            if (profitChartInstance) {
+                profitChartInstance.destroy();
+            }
+            
             const profits = metrics.map(m => m.total_profit).filter(profit => profit != null);
             const labels = metrics.map(m => `${m.pair} (${m.timeframe})`);
             
-            new Chart(ctx, {
+            profitChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -394,13 +465,26 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `Profit: $${context.parsed.y}`;
+                                    return `Profit: $${context.parsed.y.toFixed(2)}`;
                                 }
                             }
                         }
                     }
                 }
             });
+        }
+
+        function refreshData() {
+            showDebugInfo('Refreshing data...');
+            if (winRateChartInstance) {
+                winRateChartInstance.destroy();
+                winRateChartInstance = null;
+            }
+            if (profitChartInstance) {
+                profitChartInstance.destroy();
+                profitChartInstance = null;
+            }
+            loadPerformanceData();
         }
 
         // Load data when page loads
