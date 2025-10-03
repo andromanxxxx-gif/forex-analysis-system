@@ -1861,6 +1861,98 @@ def ai_status():
     }
     return jsonify(status)
 
+# ---------------- RESET & MAINTENANCE ROUTES ----------------
+@app.route('/api/reset_backtest_data', methods=['POST'])
+def api_reset_backtest_data():
+    """Reset all backtest data from database"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        # Reset backtesting_results table
+        c.execute('DELETE FROM backtesting_results')
+        
+        # Reset analysis_results table (optional)
+        # c.execute('DELETE FROM analysis_results')
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info("✅ Backtest data reset successfully")
+        return jsonify({
+            'status': 'success',
+            'message': 'All backtest data has been reset successfully',
+            'reset_tables': ['backtesting_results']
+        })
+        
+    except Exception as e:
+        logger.error(f"Error resetting backtest data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reset_database', methods=['POST'])
+def api_reset_database():
+    """Complete database reset - recreates all tables"""
+    try:
+        # Initialize database (will recreate tables)
+        init_db()
+        
+        logger.info("✅ Database completely reset")
+        return jsonify({
+            'status': 'success',
+            'message': 'Database completely reset - all tables recreated',
+            'reset_tables': ['analysis_results', 'backtesting_results']
+        })
+        
+    except Exception as e:
+        logger.error(f"Error resetting database: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/database_stats')
+def api_database_stats():
+    """Get database statistics"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        stats = {}
+        
+        # Count records in each table
+        c.execute("SELECT COUNT(*) FROM backtesting_results")
+        stats['backtesting_records'] = c.fetchone()[0]
+        
+        c.execute("SELECT COUNT(*) FROM analysis_results")
+        stats['analysis_records'] = c.fetchone()[0]
+        
+        # Get latest backtest dates
+        c.execute("SELECT MAX(timestamp) FROM backtesting_results")
+        stats['latest_backtest'] = c.fetchone()[0]
+        
+        c.execute("SELECT MAX(timestamp) FROM analysis_results")
+        stats['latest_analysis'] = c.fetchone()[0]
+        
+        # Get table sizes
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = c.fetchall()
+        
+        table_sizes = {}
+        for table in tables:
+            table_name = table[0]
+            c.execute(f"SELECT COUNT(*) FROM {table_name}")
+            table_sizes[table_name] = c.fetchone()[0]
+        
+        stats['table_sizes'] = table_sizes
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'stats': stats,
+            'database_path': Config.DB_PATH
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting database stats: {e}")
+        return jsonify({'error': str(e)}), 500
 # ---------------- INITIALIZATION ----------------
 if __name__ == "__main__":
     logger.info("🚀 Starting Enhanced Forex Analysis Application...")
