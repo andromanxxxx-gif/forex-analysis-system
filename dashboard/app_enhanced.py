@@ -13,16 +13,38 @@ from dataclasses import dataclass, field
 import talib
 import yfinance as yf
 
-# Konfigurasi logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('forex_trading.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+# ==================== KONFIGURASI LOGGING YANG DIPERBAIKI ====================
+def setup_logging():
+    """Setup logging yang compatible dengan Windows"""
+    logger = logging.getLogger()
+    
+    # Hapus handler lama jika ada
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create formatter tanpa emoji untuk Windows compatibility
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Stream handler untuk console
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    
+    # File handler untuk log file
+    file_handler = logging.FileHandler('forex_trading.log', encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    
+    # Add handlers ke root logger
+    logger.addHandler(stream_handler)
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
+    
+    return logger
+
+# Setup logging
+logger = setup_logging()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
@@ -96,7 +118,7 @@ class AdvancedRiskManager:
             'NZDUSD': {'USDJPY': -0.5, 'EURUSD': 0.5, 'GBPUSD': 0.4, 'AUDUSD': 0.8, 'USDCAD': -0.3}
         }
         
-        logger.info("✅ Advanced Risk Manager initialized")
+        logger.info("Advanced Risk Manager initialized")
     
     def reset_daily_limits(self):
         """Reset daily limits jika hari baru"""
@@ -105,7 +127,7 @@ class AdvancedRiskManager:
             self.today_trades = 0
             self.daily_pnl = 0.0
             self.last_reset_date = today
-            logger.info("🔄 Daily risk limits reset")
+            logger.info("Daily risk limits reset")
     
     def validate_trade(self, pair: str, signal: str, confidence: int, 
                       proposed_lot_size: float, account_balance: float, 
@@ -657,10 +679,10 @@ class DataManager:
                             
                             self.historical_data[pair][timeframe] = df
                             loaded_count += 1
-                            logger.info(f"✅ Loaded {pair}-{timeframe}: {len(df)} records")
+                            logger.info(f"Loaded {pair}-{timeframe}: {len(df)} records")
                             
                     except Exception as e:
-                        logger.error(f"❌ Error loading {filename}: {e}")
+                        logger.error(f"Error loading {filename}: {e}")
                         continue
             
             logger.info(f"Total loaded datasets: {loaded_count}")
@@ -756,7 +778,7 @@ class DataManager:
                 self.historical_data[pair] = {}
             self.historical_data[pair][timeframe] = df
             
-            logger.info(f"✅ Created sample data: {filename}")
+            logger.info(f"Created sample data: {filename}")
             
         except Exception as e:
             logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
@@ -852,6 +874,7 @@ class DataManager:
 class TechnicalAnalysisEngine:
     def __init__(self):
         self.indicators = {}
+        logger.info("Technical Analysis Engine initialized")
     
     def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
         """Menghitung semua indikator teknikal dari DataFrame OHLC dengan error handling"""
@@ -1061,7 +1084,7 @@ class AdvancedBacktestingEngine:
         """Menjalankan backtest komprehensif dengan multiple timeframe analysis"""
         self.reset()
         
-        logger.info(f"🚀 Running comprehensive backtest for {pair}-{timeframe} with {len(signals)} signals")
+        logger.info(f"Running comprehensive backtest for {pair}-{timeframe} with {len(signals)} signals")
         
         if not signals or price_data.empty:
             return self._empty_backtest_result(pair)
@@ -1641,7 +1664,7 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                 logger.error(f"Error processing data point {i}: {e}")
                 continue
         
-        logger.info(f"✅ Generated {len(signals)} trading signals for {pair}-{timeframe}")
+        logger.info(f"Generated {len(signals)} trading signals for {pair}-{timeframe}")
         
         # Jika tidak ada sinyal, buat sample signals untuk demo
         if not signals and len(price_data) > 10:
@@ -1673,7 +1696,7 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
         return signals
         
     except Exception as e:
-        logger.error(f"❌ Error generating trading signals: {e}")
+        logger.error(f"Error generating trading signals: {e}")
         return []
 
 # ==================== FUNDAMENTAL ANALYSIS ENGINE ====================
@@ -1681,6 +1704,7 @@ class FundamentalAnalysisEngine:
     def __init__(self):
         self.news_cache = {}
         self.cache_duration = timedelta(minutes=30)
+        logger.info("Fundamental Analysis Engine initialized")
     
     def get_forex_news(self, pair: str) -> str:
         """Mendapatkan berita fundamental untuk pair forex"""
@@ -1781,12 +1805,16 @@ class FundamentalAnalysisEngine:
         return random.choice(templates)
 
 # ==================== INITIALIZE SYSTEM ====================
+logger.info("Initializing Forex Analysis System...")
+
 tech_engine = TechnicalAnalysisEngine()
 fundamental_engine = FundamentalAnalysisEngine()
 deepseek_analyzer = DeepSeekAnalyzer()
 data_manager = DataManager()
 advanced_backtester = AdvancedBacktestingEngine()
 risk_manager = AdvancedRiskManager()
+
+logger.info("All system components initialized successfully")
 
 # ==================== FLASK ROUTES YANG DIPERBAIKI ====================
 @app.route('/')
@@ -2130,7 +2158,7 @@ def api_system_status():
 
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
-    logger.info("🚀 Starting Enhanced Forex Analysis System...")
+    logger.info("Starting Enhanced Forex Analysis System...")
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
     logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
     logger.info(f"DeepSeek AI: {'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED'}")
@@ -2140,5 +2168,7 @@ if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('historical_data', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
+    
+    logger.info("Forex Analysis System is ready and running on http://localhost:5000")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
