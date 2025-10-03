@@ -1013,6 +1013,76 @@ def calc_indicators(series: List[float], volumes: Optional[List[float]] = None) 
         "ATR": round(atr.iloc[-1], 4) if not pd.isna(atr.iloc[-1]) else 0
     }
 
+# ---------------- INITIALIZATION ----------------
+def force_init_db():
+    """Force initialize database tables"""
+    try:
+        conn = sqlite3.connect(Config.DB_PATH)
+        c = conn.cursor()
+        
+        # Drop tables if exist and recreate
+        c.execute('DROP TABLE IF EXISTS backtesting_results')
+        c.execute('DROP TABLE IF EXISTS analysis_results')
+        
+        # Recreate tables
+        c.execute('''CREATE TABLE analysis_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pair TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            current_price REAL,
+            technical_indicators TEXT,
+            ai_analysis TEXT,
+            fundamental_news TEXT,
+            chart_data TEXT,
+            data_source TEXT,
+            confidence_score REAL,
+            ai_provider TEXT
+        )''')
+
+        c.execute('''CREATE TABLE backtesting_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            pair TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            period_days INTEGER,
+            total_trades INTEGER,
+            winning_trades INTEGER,
+            win_rate REAL,
+            total_profit REAL,
+            final_balance REAL,
+            max_drawdown REAL,
+            profit_factor REAL,
+            risk_reward_ratio REAL,
+            expectancy REAL,
+            report_data TEXT,
+            recommendations TEXT
+        )''')
+        
+        conn.commit()
+        logger.info("✅ Database force initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Database force initialization error: {e}")
+        traceback.print_exc()
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+# Tambahkan endpoint untuk force reset
+@app.route('/api/force_reset_database', methods=['POST'])
+def api_force_reset_database():
+    """Force reset database - drops and recreates all tables"""
+    try:
+        force_init_db()
+        return jsonify({
+            'status': 'success',
+            'message': 'Database completely reset - all tables recreated',
+            'reset_tables': ['analysis_results', 'backtesting_results']
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def generate_enhanced_signal(tech: Dict, current_price: float, timeframe: str = "4H") -> Dict:
     rsi = tech['RSI']
     macd = tech['MACD']
@@ -1497,6 +1567,9 @@ def api_performance_metrics():
             },
             'status': 'error'
         }), 500
+@app.route('/test_backtest')
+def test_backtest():
+    return render_template('test_backtest.html')
 
 @app.route('/api/debug_database')
 def api_debug_database():
