@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 import talib
 import yfinance as yf
-from scipy import stats
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -935,7 +934,7 @@ class TechnicalAnalysisEngine:
                 except (TypeError, ValueError):
                     return default
             
-            current_price = safe_float(closes[-1], base_prices.get('USDJPY', 150.0))
+            current_price = safe_float(closes[-1], 150.0)
             
             # Calculate additional metrics
             price_change_pct = ((closes[-1] - closes[-2]) / closes[-2] * 100) if len(closes) > 1 else 0
@@ -1383,7 +1382,7 @@ class AdvancedBacktestingEngine:
         # Risk-adjusted metrics
         total_return_pct = ((self.balance - self.initial_balance) / self.initial_balance * 100)
         
-        # Calculate Sharpe ratio
+        # Calculate Sharpe ratio menggunakan numpy saja
         returns = [t['profit'] / self.initial_balance for t in self.trade_history]
         if len(returns) > 1:
             avg_return = np.mean(returns)
