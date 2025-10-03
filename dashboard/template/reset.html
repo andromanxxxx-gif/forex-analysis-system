@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset Database</title>
+</head>
+<body>
+    <h1>Reset Database Tools</h1>
+    
+    <button onclick="resetDatabase()">Reset Entire Database</button>
+    <button onclick="resetBacktestData()">Reset Only Backtest Data</button>
+    <button onclick="checkDatabase()">Check Database Status</button>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+
+    <script>
+        async function resetDatabase() {
+            try {
+                const response = await fetch('/api/reset_database', { method: 'POST' });
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `Error: ${error}`;
+            }
+        }
+
+        async function resetBacktestData() {
+            try {
+                const response = await fetch('/api/reset_backtest_data', { method: 'POST' });
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `Error: ${error}`;
+            }
+        }
+
+        async function checkDatabase() {
+            try {
+                const response = await fetch('/api/debug_database');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `Error: ${error}`;
+            }
+        }
+    </script>
+</body>
+</html>
