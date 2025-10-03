@@ -172,6 +172,21 @@
             color: var(--secondary-color);
             margin-right: 10px;
         }
+        
+        .chart-tabs .nav-link {
+            color: var(--dark-text);
+            font-weight: 500;
+        }
+        
+        .chart-tabs .nav-link.active {
+            background-color: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
+        }
+        
+        .indicator-line {
+            border-width: 2px;
+        }
     </style>
 </head>
 <body>
@@ -222,6 +237,12 @@
                                     <option value="GBPJPY">GBP/JPY</option>
                                     <option value="EURJPY">EUR/JPY</option>
                                     <option value="CHFJPY">CHF/JPY</option>
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
+                                    <option value="USDCHF">USD/CHF</option>
+                                    <option value="AUDUSD">AUD/USD</option>
+                                    <option value="USDCAD">USD/CAD</option>
+                                    <option value="NZDUSD">NZD/USD</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
@@ -269,6 +290,8 @@
                                     <option value="GBPJPY">GBP/JPY</option>
                                     <option value="EURJPY">EUR/JPY</option>
                                     <option value="CHFJPY">CHF/JPY</option>
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -284,12 +307,13 @@
                                     <option value="7">7 Days</option>
                                     <option value="30" selected>30 Days</option>
                                     <option value="60">60 Days</option>
+                                    <option value="90">90 Days</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">&nbsp;</label>
                                 <div class="d-grid">
-                                    <button class="btn btn-warning" onclick="runBacktest()">
+                                    <button class="btn btn-warning" onclick="runAdvancedBacktest()">
                                         <i class="fas fa-play-circle me-2"></i>Run Backtest
                                     </button>
                                 </div>
@@ -352,6 +376,18 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Risk Dashboard -->
+                <div class="card mt-4">
+                    <div class="card-header bg-danger text-white">
+                        <i class="fas fa-shield-alt me-2"></i>Risk Dashboard
+                    </div>
+                    <div class="card-body">
+                        <div id="risk-dashboard">
+                            <p class="text-muted text-center">Loading risk metrics...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -380,11 +416,18 @@
         // Global variables for charts
         let priceChart = null;
         let indicatorChart = null;
+        let historicalChart = null;
 
         // Initialize on page load
         $(document).ready(function() {
             loadMarketOverview();
             checkSystemStatus();
+            loadRiskDashboard();
+            
+            // Auto-refresh market overview every 2 minutes
+            setInterval(loadMarketOverview, 120000);
+            setInterval(checkSystemStatus, 30000);
+            setInterval(loadRiskDashboard, 60000);
         });
 
         // Load market overview
@@ -406,19 +449,22 @@
                 for (const [pair, info] of Object.entries(data)) {
                     const changeClass = info.change > 0 ? 'price-up' : (info.change < 0 ? 'price-down' : '');
                     const trendIcon = info.change > 0 ? 'fa-arrow-up' : (info.change < 0 ? 'fa-arrow-down' : 'fa-minus');
+                    const recommendationClass = info.recommendation === 'BUY' ? 'success' : 
+                                              info.recommendation === 'SELL' ? 'danger' : 'warning';
                     
                     html += `
-                    <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 mb-3">
                         <div class="card h-100">
-                            <div class="card-body text-center">
-                                <h5 class="card-title">${pair}</h5>
-                                <h4 class="card-text ${changeClass}">${info.price ? info.price.toFixed(4) : 'N/A'}</h4>
-                                <p class="card-text ${changeClass}">
+                            <div class="card-body text-center p-2">
+                                <h6 class="card-title mb-1">${pair}</h6>
+                                <h5 class="card-text ${changeClass} mb-1">${info.price ? info.price.toFixed(4) : 'N/A'}</h5>
+                                <p class="card-text ${changeClass} mb-1 small">
                                     <i class="fas ${trendIcon} me-1"></i> ${info.change ? info.change.toFixed(2) + '%' : '0%'}
                                 </p>
-                                <div class="mt-2">
-                                    <small class="text-muted">RSI: ${info.rsi ? info.rsi.toFixed(1) : 'N/A'}</small><br>
-                                    <small class="text-muted">Trend: ${info.trend || 'N/A'}</small>
+                                <span class="badge bg-${recommendationClass} mb-1">${info.recommendation || 'HOLD'}</span>
+                                <div class="mt-1">
+                                    <small class="text-muted d-block">RSI: ${info.rsi ? info.rsi.toFixed(1) : 'N/A'}</small>
+                                    <small class="text-muted">${info.trend || 'N/A'}</small>
                                 </div>
                             </div>
                         </div>
@@ -455,6 +501,10 @@
                                 <span>Supported Pairs:</span>
                                 <span class="badge bg-primary">${data.supported_pairs ? data.supported_pairs.length : 0}</span>
                             </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>DeepSeek AI:</span>
+                                <span class="badge ${data.deepseek_ai === 'ENABLED' ? 'bg-success' : 'bg-secondary'}">${data.deepseek_ai}</span>
+                            </div>
                             <div class="d-flex justify-content-between">
                                 <span>Server Time:</span>
                                 <small>${new Date(data.server_time).toLocaleTimeString()}</small>
@@ -469,6 +519,57 @@
                         <p class="text-muted">Unable to connect to server</p>
                     </div>
                 `);
+            }
+        }
+
+        // Load risk dashboard
+        async function loadRiskDashboard() {
+            try {
+                const response = await fetch('/api/risk_dashboard');
+                const data = await response.json();
+                
+                if (data.error) {
+                    $('#risk-dashboard').html('<p class="text-muted text-center">Risk data unavailable</p>');
+                    return;
+                }
+                
+                const risk = data.risk_management || {};
+                const market = data.market_conditions || {};
+                
+                let html = `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Overall Risk:</span>
+                            <span class="badge ${risk.current_risk_level === 'HIGH' ? 'bg-danger' : risk.current_risk_level === 'MEDIUM' ? 'bg-warning' : 'bg-success'}">
+                                ${risk.current_risk_level || 'LOW'}
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Trades Today:</span>
+                            <span>${risk.daily_metrics ? risk.daily_metrics.trades_today : 0}/${risk.daily_metrics ? risk.daily_metrics.daily_trade_limit : 0}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Daily P&L:</span>
+                            <span class="${risk.daily_metrics && risk.daily_metrics.daily_pnl < 0 ? 'price-down' : 'price-up'}">
+                                $${risk.daily_metrics ? risk.daily_metrics.daily_pnl.toFixed(2) : '0.00'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                
+                // Add warnings if any
+                if (risk.warnings && risk.warnings.length > 0) {
+                    html += `<div class="alert alert-warning p-2 small">`;
+                    risk.warnings.forEach(warning => {
+                        html += `<div><i class="fas fa-exclamation-triangle me-1"></i> ${warning}</div>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                $('#risk-dashboard').html(html);
+                
+            } catch (error) {
+                $('#risk-dashboard').html('<p class="text-muted text-center">Risk data unavailable</p>');
             }
         }
 
@@ -516,6 +617,7 @@
             const aiAnalysis = data.ai_analysis || {};
             const technical = data.technical_analysis || {};
             const priceData = data.price_data || {};
+            const riskAssessment = data.risk_assessment || {};
             
             // Determine signal class
             let signalClass = 'signal-hold';
@@ -532,6 +634,12 @@
             const confidence = aiAnalysis.confidence || 50;
             const confidenceLevel = confidence >= 70 ? 'high' : (confidence >= 50 ? 'medium' : 'low');
             
+            // Format trading levels
+            const entryPrice = aiAnalysis.entry_price || (priceData.current ? priceData.current.toFixed(4) : 'N/A');
+            const stopLoss = aiAnalysis.stop_loss || 'N/A';
+            const takeProfit1 = aiAnalysis.take_profit_1 || 'N/A';
+            const takeProfit2 = aiAnalysis.take_profit_2 || 'N/A';
+            
             let html = `
             <div class="${signalClass}">
                 <div class="row align-items-center">
@@ -544,6 +652,11 @@
                     <div class="col-md-4 text-center">
                         <div class="confidence-${confidenceLevel} display-4">${confidence}%</div>
                         <small>Confidence Level</small>
+                        <div class="mt-2">
+                            <span class="badge ${riskAssessment.approved ? 'bg-success' : 'bg-danger'}">
+                                ${riskAssessment.approved ? 'TRADE APPROVED' : 'TRADE REJECTED'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -558,21 +671,21 @@
                             <div class="row">
                                 <div class="col-6">
                                     <strong>Entry Price:</strong><br>
-                                    ${aiAnalysis.entry_price || 'N/A'}
+                                    <span class="${entryPrice !== 'N/A' ? 'price-up' : ''}">${entryPrice}</span>
                                 </div>
                                 <div class="col-6">
                                     <strong>Stop Loss:</strong><br>
-                                    ${aiAnalysis.stop_loss || 'N/A'}
+                                    <span class="${stopLoss !== 'N/A' ? 'price-down' : ''}">${stopLoss}</span>
                                 </div>
                             </div>
                             <div class="row mt-2">
                                 <div class="col-6">
                                     <strong>Take Profit 1:</strong><br>
-                                    ${aiAnalysis.take_profit_1 || 'N/A'}
+                                    <span class="${takeProfit1 !== 'N/A' ? 'price-up' : ''}">${takeProfit1}</span>
                                 </div>
                                 <div class="col-6">
                                     <strong>Take Profit 2:</strong><br>
-                                    ${aiAnalysis.take_profit_2 || 'N/A'}
+                                    <span class="${takeProfit2 !== 'N/A' ? 'price-up' : ''}">${takeProfit2}</span>
                                 </div>
                             </div>
                             <div class="row mt-2">
@@ -618,12 +731,37 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-chart-line me-2"></i>Price Chart Simulation</span>
+                            <span><i class="fas fa-chart-line me-2"></i>Technical Analysis Charts</span>
                             <small class="text-muted">AI Provider: ${aiAnalysis.ai_provider || 'Technical Analysis'}</small>
                         </div>
                         <div class="card-body">
-                            <div class="chart-container">
-                                <canvas id="priceChart"></canvas>
+                            <ul class="nav nav-pills chart-tabs mb-3" id="chartTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="price-tab" data-bs-toggle="pill" data-bs-target="#price-chart" type="button" role="tab">Price & MA</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="rsi-tab" data-bs-toggle="pill" data-bs-target="#rsi-chart" type="button" role="tab">RSI</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="macd-tab" data-bs-toggle="pill" data-bs-target="#macd-chart" type="button" role="tab">MACD</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content" id="chartTabsContent">
+                                <div class="tab-pane fade show active" id="price-chart" role="tabpanel">
+                                    <div class="chart-container">
+                                        <canvas id="priceChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="rsi-chart" role="tabpanel">
+                                    <div class="chart-container">
+                                        <canvas id="rsiChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="macd-chart" role="tabpanel">
+                                    <div class="chart-container">
+                                        <canvas id="macdChart"></canvas>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -633,8 +771,8 @@
             
             $('#analysis-results').html(html);
             
-            // Render simple price chart simulation
-            renderPriceChartSimulation(technical, priceData);
+            // Render technical charts
+            renderTechnicalCharts(technical, priceData, data.pair);
         }
 
         // Display technical indicators
@@ -676,7 +814,7 @@
                         <div class="technical-indicator text-center">
                             <small>Trend</small>
                             <div class="indicator-value">${trend.trend_direction || 'N/A'}</div>
-                            <small>Direction</small>
+                            <small>Strength: ${trend.trend_strength || 'N/A'}</small>
                         </div>
                     </div>
                     <div class="col-6 mb-3">
@@ -698,12 +836,16 @@
                         <td class="text-end">${trend.sma_50 ? trend.sma_50.toFixed(4) : 'N/A'}</td>
                     </tr>
                     <tr>
-                        <td>Stoch K:</td>
-                        <td class="text-end">${momentum.stoch_k ? momentum.stoch_k.toFixed(1) : 'N/A'}</td>
+                        <td>EMA 12:</td>
+                        <td class="text-end">${trend.ema_12 ? trend.ema_12.toFixed(4) : 'N/A'}</td>
                     </tr>
                     <tr>
-                        <td>Stoch D:</td>
-                        <td class="text-end">${momentum.stoch_d ? momentum.stoch_d.toFixed(1) : 'N/A'}</td>
+                        <td>EMA 26:</td>
+                        <td class="text-end">${trend.ema_26 ? trend.ema_26.toFixed(4) : 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td>ADX:</td>
+                        <td class="text-end">${trend.adx ? trend.adx.toFixed(1) : 'N/A'}</td>
                     </tr>
                 </table>
             `;
@@ -731,33 +873,109 @@
             $('#fundamental-news').html(html);
         }
 
-        // Render price chart simulation
-        function renderPriceChartSimulation(technical, priceData) {
+        // Render technical charts with indicators
+        function renderTechnicalCharts(technical, priceData, pair) {
+            // Generate sample data based on technical indicators
+            const currentPrice = priceData.current || 150.0;
+            const period = 50;
+            
+            // Generate price data with trend
+            const prices = [];
+            const ema20 = [];
+            const ema50 = [];
+            const rsi = [];
+            const macdLine = [];
+            const macdSignal = [];
+            const macdHistogram = [];
+            
+            let price = currentPrice;
+            const trendDirection = technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
+            const volatility = technical.volatility.volatility_pct / 100 || 0.01;
+            
+            for (let i = 0; i < period; i++) {
+                // Price movement with trend
+                const randomChange = (Math.random() - 0.5 + trendDirection * 0.2) * volatility;
+                price = price * (1 + randomChange);
+                prices.push(price);
+                
+                // Calculate EMAs (simplified)
+                if (i < 20) {
+                    ema20.push(null);
+                } else {
+                    ema20.push(prices.slice(i-19, i+1).reduce((a, b) => a + b, 0) / 20);
+                }
+                
+                if (i < 50) {
+                    ema50.push(null);
+                } else {
+                    ema50.push(prices.slice(i-49, i+1).reduce((a, b) => a + b, 0) / 50);
+                }
+                
+                // RSI simulation
+                if (i < 14) {
+                    rsi.push(null);
+                } else {
+                    const recentPrices = prices.slice(i-13, i+1);
+                    const gains = [];
+                    const losses = [];
+                    
+                    for (let j = 1; j < recentPrices.length; j++) {
+                        const change = recentPrices[j] - recentPrices[j-1];
+                        gains.push(change > 0 ? change : 0);
+                        losses.push(change < 0 ? Math.abs(change) : 0);
+                    }
+                    
+                    const avgGain = gains.reduce((a, b) => a + b, 0) / 14;
+                    const avgLoss = losses.reduce((a, b) => a + b, 0) / 14;
+                    const rs = avgGain / (avgLoss || 0.001);
+                    rsi.push(100 - (100 / (1 + rs)));
+                }
+                
+                // MACD simulation
+                if (i < 26) {
+                    macdLine.push(null);
+                    macdSignal.push(null);
+                    macdHistogram.push(null);
+                } else {
+                    const ema12 = prices.slice(i-11, i+1).reduce((a, b) => a + b, 0) / 12;
+                    const ema26 = prices.slice(i-25, i+1).reduce((a, b) => a + b, 0) / 26;
+                    macdLine.push(ema12 - ema26);
+                    
+                    if (i >= 34) {
+                        const signal = macdLine.slice(i-8, i+1).reduce((a, b) => a + b, 0) / 9;
+                        macdSignal.push(signal);
+                        macdHistogram.push(macdLine[i] - signal);
+                    } else {
+                        macdSignal.push(null);
+                        macdHistogram.push(null);
+                    }
+                }
+            }
+            
+            const labels = Array.from({length: period}, (_, i) => `T-${period - i}`);
+            
+            // Render Price Chart with EMAs
+            renderPriceChart(labels, prices, ema20, ema50, pair);
+            
+            // Render RSI Chart
+            renderRSIChart(labels, rsi);
+            
+            // Render MACD Chart
+            renderMACDChart(labels, macdLine, macdSignal, macdHistogram);
+        }
+
+        // Render price chart with EMAs
+        function renderPriceChart(labels, prices, ema20, ema50, pair) {
             const ctx = document.getElementById('priceChart').getContext('2d');
             
-            if (priceChart) {
-                priceChart.destroy();
+            if (window.priceChart) {
+                window.priceChart.destroy();
             }
             
-            // Generate sample price data for demonstration
-            const dates = [];
-            const prices = [];
-            const currentPrice = priceData.current || 150.0;
-            const support = priceData.support || currentPrice * 0.99;
-            const resistance = priceData.resistance || currentPrice * 1.01;
-            
-            for (let i = 0; i < 20; i++) {
-                dates.push(`Day ${i + 1}`);
-                // Simulate price movement around current price
-                const basePrice = currentPrice - 0.5 + (i * 0.1);
-                const randomMove = (Math.random() - 0.5) * 0.8;
-                prices.push(basePrice + randomMove);
-            }
-            
-            priceChart = new Chart(ctx, {
+            window.priceChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: dates,
+                    labels: labels,
                     datasets: [
                         {
                             label: 'Price',
@@ -766,21 +984,21 @@
                             backgroundColor: 'rgba(52, 152, 219, 0.1)',
                             borderWidth: 2,
                             fill: true,
-                            tension: 0.4
+                            tension: 0.1
                         },
                         {
-                            label: 'Support',
-                            data: Array(20).fill(support),
+                            label: 'EMA 20',
+                            data: ema20,
                             borderColor: '#e74c3c',
-                            borderWidth: 1,
+                            borderWidth: 1.5,
                             borderDash: [5, 5],
                             fill: false
                         },
                         {
-                            label: 'Resistance',
-                            data: Array(20).fill(resistance),
-                            borderColor: '#27ae60',
-                            borderWidth: 1,
+                            label: 'EMA 50',
+                            data: ema50,
+                            borderColor: '#2ecc71',
+                            borderWidth: 1.5,
                             borderDash: [5, 5],
                             fill: false
                         }
@@ -809,14 +1027,180 @@
                         legend: {
                             display: true,
                             position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: `${pair} - Price with Moving Averages`
                         }
                     }
                 }
             });
         }
 
-        // Run backtest
-        async function runBacktest() {
+        // Render RSI chart
+        function renderRSIChart(labels, rsi) {
+            const ctx = document.getElementById('rsiChart').getContext('2d');
+            
+            if (window.rsiChart) {
+                window.rsiChart.destroy();
+            }
+            
+            window.rsiChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'RSI',
+                            data: rsi,
+                            borderColor: '#9b59b6',
+                            backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Overbought (70)',
+                            data: Array(labels.length).fill(70),
+                            borderColor: '#e74c3c',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            fill: false
+                        },
+                        {
+                            label: 'Oversold (30)',
+                            data: Array(labels.length).fill(30),
+                            borderColor: '#2ecc71',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            fill: false
+                        },
+                        {
+                            label: 'Middle (50)',
+                            data: Array(labels.length).fill(50),
+                            borderColor: '#95a5a6',
+                            borderWidth: 0.5,
+                            borderDash: [2, 2],
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'RSI'
+                            },
+                            min: 0,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Relative Strength Index (RSI)'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render MACD chart
+        function renderMACDChart(labels, macdLine, macdSignal, macdHistogram) {
+            const ctx = document.getElementById('macdChart').getContext('2d');
+            
+            if (window.macdChart) {
+                window.macdChart.destroy();
+            }
+            
+            window.macdChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'MACD Histogram',
+                            data: macdHistogram,
+                            backgroundColor: macdHistogram.map(val => 
+                                val === null ? 'rgba(149, 165, 166, 0.5)' : 
+                                val >= 0 ? 'rgba(46, 204, 113, 0.7)' : 'rgba(231, 76, 60, 0.7)'),
+                            borderColor: macdHistogram.map(val => 
+                                val === null ? 'rgba(149, 165, 166, 1)' : 
+                                val >= 0 ? 'rgba(46, 204, 113, 1)' : 'rgba(231, 76, 60, 1)'),
+                            borderWidth: 1,
+                            type: 'bar',
+                            order: 1
+                        },
+                        {
+                            label: 'MACD Line',
+                            data: macdLine,
+                            borderColor: '#3498db',
+                            borderWidth: 2,
+                            fill: false,
+                            type: 'line',
+                            order: 2
+                        },
+                        {
+                            label: 'Signal Line',
+                            data: macdSignal,
+                            borderColor: '#e74c3c',
+                            borderWidth: 1.5,
+                            fill: false,
+                            type: 'line',
+                            order: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'MACD'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Moving Average Convergence Divergence (MACD)'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Run advanced backtest
+        async function runAdvancedBacktest() {
             const pair = $('#backtest-pair').val();
             const timeframe = $('#backtest-timeframe').val();
             const days = $('#backtest-days').val();
@@ -825,7 +1209,7 @@
             $('#backtest-results').html('');
             
             try {
-                const response = await fetch('/api/backtest', {
+                const response = await fetch('/api/advanced_backtest', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -833,7 +1217,8 @@
                     body: JSON.stringify({
                         pair: pair,
                         timeframe: timeframe,
-                        days: parseInt(days)
+                        days: parseInt(days),
+                        initial_balance: 10000
                     })
                 });
                 
@@ -866,6 +1251,8 @@
             const summary = data.summary || {};
             const tradeHistory = data.trade_history || [];
             const metadata = data.metadata || {};
+            const tradeAnalysis = data.trade_analysis || {};
+            const performanceGrade = data.performance_grade || 'N/A';
             
             let html = `
                 <div class="backtest-summary">
@@ -895,37 +1282,58 @@
                             <small>Return</small>
                         </div>
                     </div>
+                    <div class="row text-center mt-2">
+                        <div class="col-12">
+                            <span class="badge bg-${performanceGrade === 'A' || performanceGrade === 'A+' ? 'success' : 
+                                            performanceGrade === 'B' ? 'warning' : 'danger'} fs-6">
+                                Performance Grade: ${performanceGrade}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             `;
             
-            // Additional metrics if available
-            if (summary.max_drawdown !== undefined) {
-                html += `
-                    <div class="row text-center mb-4">
-                        <div class="col-md-4">
-                            <small>Max Drawdown</small>
-                            <div class="${summary.max_drawdown < -10 ? 'price-down' : ''}">
-                                ${summary.max_drawdown ? summary.max_drawdown.toFixed(2) + '%' : 'N/A'}
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <small>Profit Factor</small>
-                            <div>${summary.profit_factor ? summary.profit_factor.toFixed(2) : 'N/A'}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <small>Avg Profit</small>
-                            <div class="${summary.average_profit > 0 ? 'price-up' : 'price-down'}">
-                                $${summary.average_profit ? summary.average_profit.toFixed(2) : '0.00'}
-                            </div>
+            // Additional metrics
+            html += `
+                <div class="row text-center mb-4 mt-3">
+                    <div class="col-md-2 col-6 mb-2">
+                        <small>Max Drawdown</small>
+                        <div class="${summary.max_drawdown > 10 ? 'price-down' : ''}">
+                            ${summary.max_drawdown ? summary.max_drawdown.toFixed(2) + '%' : 'N/A'}
                         </div>
                     </div>
-                `;
-            }
+                    <div class="col-md-2 col-6 mb-2">
+                        <small>Profit Factor</small>
+                        <div>${summary.profit_factor ? summary.profit_factor.toFixed(2) : 'N/A'}</div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-2">
+                        <small>Sharpe Ratio</small>
+                        <div>${summary.sharpe_ratio ? summary.sharpe_ratio.toFixed(2) : 'N/A'}</div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-2">
+                        <small>Avg Profit</small>
+                        <div class="${summary.avg_trade > 0 ? 'price-up' : 'price-down'}">
+                            $${summary.avg_trade ? summary.avg_trade.toFixed(2) : '0.00'}
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-2">
+                        <small>Long Win Rate</small>
+                        <div>${tradeAnalysis.long_win_rate ? tradeAnalysis.long_win_rate.toFixed(1) + '%' : 'N/A'}</div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-2">
+                        <small>Short Win Rate</small>
+                        <div>${tradeAnalysis.short_win_rate ? tradeAnalysis.short_win_rate.toFixed(1) + '%' : 'N/A'}</div>
+                    </div>
+                </div>
+            `;
             
             // Trade history
             if (tradeHistory.length > 0) {
                 html += `
-                    <h6 class="mt-4 mb-3">Trade History</h6>
+                    <h6 class="mt-4 mb-3">
+                        <i class="fas fa-history me-2"></i>Trade History (Last ${Math.min(20, tradeHistory.length)} Trades)
+                        <span class="badge bg-primary">${summary.total_trades} Total</span>
+                    </h6>
                     <div class="table-responsive">
                         <table class="table table-sm table-striped">
                             <thead>
@@ -934,16 +1342,19 @@
                                     <th>Action</th>
                                     <th>Entry</th>
                                     <th>P&L</th>
-                                    <th>Reason</th>
+                                    <th>Confidence</th>
                                 </tr>
                             </thead>
                             <tbody>
                 `;
                 
-                tradeHistory.forEach(trade => {
+                // Show last 20 trades
+                const recentTrades = tradeHistory.slice(-20);
+                
+                recentTrades.forEach(trade => {
                     html += `
                         <tr>
-                            <td>${trade.entry_date || 'N/A'}</td>
+                            <td class="small">${trade.entry_date || 'N/A'}</td>
                             <td>
                                 <span class="badge ${trade.action === 'BUY' ? 'bg-success' : 'bg-danger'}">
                                     ${trade.action}
@@ -953,7 +1364,11 @@
                             <td class="trade-profit ${trade.profit > 0 ? 'price-up' : 'price-down'}">
                                 $${trade.profit ? trade.profit.toFixed(2) : '0.00'}
                             </td>
-                            <td>${trade.close_reason || 'N/A'}</td>
+                            <td>
+                                <span class="badge ${trade.confidence >= 70 ? 'bg-success' : trade.confidence >= 50 ? 'bg-warning' : 'bg-secondary'}">
+                                    ${trade.confidence || 0}%
+                                </span>
+                            </td>
                         </tr>
                     `;
                 });
@@ -967,6 +1382,7 @@
                 html += `
                     <div class="alert alert-info mt-4">
                         <i class="fas fa-info-circle me-2"></i> No trades were executed during this backtest period.
+                        Try increasing the backtest period or selecting a different currency pair.
                     </div>
                 `;
             }
@@ -976,6 +1392,7 @@
                 <div class="mt-3 text-center">
                     <small class="text-muted">
                         Backtest for ${metadata.pair || 'N/A'} - ${metadata.timeframe || 'N/A'} | 
+                        Period: ${metadata.total_days || 0} days |
                         Initial Balance: $${metadata.initial_balance || '10000'} |
                         ${metadata.testing_date ? new Date(metadata.testing_date).toLocaleString() : ''}
                     </small>
