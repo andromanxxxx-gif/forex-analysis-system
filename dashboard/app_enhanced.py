@@ -45,7 +45,7 @@ class SystemConfig:
 
 config = SystemConfig()
 
-# ==================== DATA MANAGER - DIPINDAHKAN KE ATAS ====================
+# ==================== DATA MANAGER ====================
 class DataManager:
     def __init__(self):
         self.historical_data = {}
@@ -68,10 +68,10 @@ class DataManager:
                     try:
                         df = pd.read_csv(file_path)
                         
-                        # Pastikan kolom date ada dan konversi ke datetime
+                        # Pastikan kolom date ada dan konversi ke datetime - PERBAIKAN INDENTASI DI SINI
                         if 'date' in df.columns:
-                           df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
-                            df = df.dropna(subset=['date'])
+                            df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
+                            df = df.dropna(subset=['date'])  # BARIS 74 YANG DIPERBAIKI
                         
                         # Extract pair dan timeframe dari filename
                         name_parts = filename.replace('.csv', '').split('_')
@@ -636,7 +636,7 @@ class FundamentalAnalysisEngine:
 tech_engine = TechnicalAnalysisEngine()
 fundamental_engine = FundamentalAnalysisEngine()
 backtester = SimpleBacktestingEngine()
-data_manager = DataManager()  # Sekarang DataManager sudah didefinisikan
+data_manager = DataManager()
 
 # ==================== FLASK ROUTES ====================
 @app.route('/')
