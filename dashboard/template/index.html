@@ -415,8 +415,8 @@
     <script>
         // Global variables for charts
         let priceChart = null;
-        let indicatorChart = null;
-        let historicalChart = null;
+        let rsiChart = null;
+        let macdChart = null;
 
         // Initialize on page load
         $(document).ready(function() {
@@ -749,17 +749,17 @@
                             <div class="tab-content" id="chartTabsContent">
                                 <div class="tab-pane fade show active" id="price-chart" role="tabpanel">
                                     <div class="chart-container">
-                                        <canvas id="priceChart"></canvas>
+                                        <canvas id="priceChartCanvas"></canvas>
                                     </div>
                                 </div>
                                 <div class="tab-pane fade" id="rsi-chart" role="tabpanel">
                                     <div class="chart-container">
-                                        <canvas id="rsiChart"></canvas>
+                                        <canvas id="rsiChartCanvas"></canvas>
                                     </div>
                                 </div>
                                 <div class="tab-pane fade" id="macd-chart" role="tabpanel">
                                     <div class="chart-container">
-                                        <canvas id="macdChart"></canvas>
+                                        <canvas id="macdChartCanvas"></canvas>
                                     </div>
                                 </div>
                             </div>
@@ -771,13 +771,23 @@
             
             $('#analysis-results').html(html);
             
+            // Initialize Bootstrap tabs
+            const triggerTabList = [].slice.call(document.querySelectorAll('#chartTabs button'));
+            triggerTabList.forEach(function (triggerEl) {
+                var tabTrigger = new bootstrap.Tab(triggerEl);
+                triggerEl.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    tabTrigger.show();
+                });
+            });
+            
             // Render technical charts
             renderTechnicalCharts(technical, priceData, data.pair);
         }
 
         // Display technical indicators
         function displayTechnicalIndicators(technical) {
-            if (!technical) {
+            if (!technical || Object.keys(technical).length === 0) {
                 $('#technical-indicators').html('<p class="text-muted text-center">No technical data available</p>');
                 return;
             }
@@ -787,13 +797,19 @@
             const volatility = technical.volatility || {};
             const levels = technical.levels || {};
             
+            // Safe value formatting function
+            const safeValue = (value, decimals = 4) => {
+                if (value === undefined || value === null) return 'N/A';
+                return typeof value === 'number' ? value.toFixed(decimals) : value;
+            };
+            
             let html = `
                 <div class="row">
                     <div class="col-6 mb-3">
                         <div class="technical-indicator text-center">
                             <small>RSI</small>
                             <div class="indicator-value ${momentum.rsi < 30 ? 'price-up' : momentum.rsi > 70 ? 'price-down' : ''}">
-                                ${momentum.rsi ? momentum.rsi.toFixed(1) : 'N/A'}
+                                ${safeValue(momentum.rsi, 1)}
                             </div>
                             <small>${momentum.rsi < 30 ? 'Oversold' : momentum.rsi > 70 ? 'Overbought' : 'Neutral'}</small>
                         </div>
@@ -802,7 +818,7 @@
                         <div class="technical-indicator text-center">
                             <small>MACD</small>
                             <div class="indicator-value ${momentum.macd_histogram > 0 ? 'price-up' : 'price-down'}">
-                                ${momentum.macd ? momentum.macd.toFixed(4) : 'N/A'}
+                                ${safeValue(momentum.macd)}
                             </div>
                             <small>${momentum.macd_histogram > 0 ? 'Bullish' : 'Bearish'}</small>
                         </div>
@@ -820,8 +836,8 @@
                     <div class="col-6 mb-3">
                         <div class="technical-indicator text-center">
                             <small>Volatility</small>
-                            <div class="indicator-value">${volatility.volatility_pct ? volatility.volatility_pct.toFixed(2) + '%' : 'N/A'}</div>
-                            <small>ATR: ${volatility.atr ? volatility.atr.toFixed(4) : 'N/A'}</small>
+                            <div class="indicator-value">${safeValue(volatility.volatility_pct, 2)}%</div>
+                            <small>ATR: ${safeValue(volatility.atr)}</small>
                         </div>
                     </div>
                 </div>
@@ -829,23 +845,23 @@
                 <table class="table table-sm mt-3">
                     <tr>
                         <td>SMA 20:</td>
-                        <td class="text-end">${trend.sma_20 ? trend.sma_20.toFixed(4) : 'N/A'}</td>
+                        <td class="text-end">${safeValue(trend.sma_20)}</td>
                     </tr>
                     <tr>
                         <td>SMA 50:</td>
-                        <td class="text-end">${trend.sma_50 ? trend.sma_50.toFixed(4) : 'N/A'}</td>
+                        <td class="text-end">${safeValue(trend.sma_50)}</td>
                     </tr>
                     <tr>
                         <td>EMA 12:</td>
-                        <td class="text-end">${trend.ema_12 ? trend.ema_12.toFixed(4) : 'N/A'}</td>
+                        <td class="text-end">${safeValue(trend.ema_12)}</td>
                     </tr>
                     <tr>
                         <td>EMA 26:</td>
-                        <td class="text-end">${trend.ema_26 ? trend.ema_26.toFixed(4) : 'N/A'}</td>
+                        <td class="text-end">${safeValue(trend.ema_26)}</td>
                     </tr>
                     <tr>
                         <td>ADX:</td>
-                        <td class="text-end">${trend.adx ? trend.adx.toFixed(1) : 'N/A'}</td>
+                        <td class="text-end">${safeValue(trend.adx, 1)}</td>
                     </tr>
                 </table>
             `;
@@ -889,8 +905,8 @@
             const macdHistogram = [];
             
             let price = currentPrice;
-            const trendDirection = technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
-            const volatility = technical.volatility.volatility_pct / 100 || 0.01;
+            const trendDirection = technical.trend && technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
+            const volatility = (technical.volatility && technical.volatility.volatility_pct / 100) || 0.01;
             
             for (let i = 0; i < period; i++) {
                 // Price movement with trend
@@ -966,13 +982,14 @@
 
         // Render price chart with EMAs
         function renderPriceChart(labels, prices, ema20, ema50, pair) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
+            const ctx = document.getElementById('priceChartCanvas').getContext('2d');
             
-            if (window.priceChart) {
-                window.priceChart.destroy();
+            // Destroy previous chart if exists
+            if (priceChart) {
+                priceChart.destroy();
             }
             
-            window.priceChart = new Chart(ctx, {
+            priceChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -1039,13 +1056,14 @@
 
         // Render RSI chart
         function renderRSIChart(labels, rsi) {
-            const ctx = document.getElementById('rsiChart').getContext('2d');
+            const ctx = document.getElementById('rsiChartCanvas').getContext('2d');
             
-            if (window.rsiChart) {
-                window.rsiChart.destroy();
+            // Destroy previous chart if exists
+            if (rsiChart) {
+                rsiChart.destroy();
             }
             
-            window.rsiChart = new Chart(ctx, {
+            rsiChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -1122,13 +1140,14 @@
 
         // Render MACD chart
         function renderMACDChart(labels, macdLine, macdSignal, macdHistogram) {
-            const ctx = document.getElementById('macdChart').getContext('2d');
+            const ctx = document.getElementById('macdChartCanvas').getContext('2d');
             
-            if (window.macdChart) {
-                window.macdChart.destroy();
+            // Destroy previous chart if exists
+            if (macdChart) {
+                macdChart.destroy();
             }
             
-            window.macdChart = new Chart(ctx, {
+            macdChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
