@@ -3,574 +3,1356 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Analysis & Backtesting</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Advanced Forex Analysis & Backtesting System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --light-bg: #f8f9fa;
+            --dark-text: #2c3e50;
+            --chart-grid: #e0e0e0;
         }
         
         body {
-            background-color: #0f172a;
-            color: #e2e8f0;
-            padding: 20px;
-            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: var(--dark-text);
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            border-bottom: 1px solid #334155;
-            margin-bottom: 30px;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #3b82f6;
-        }
-        
-        .logo i {
-            font-size: 28px;
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: #3b82f6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-        
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
+        .navbar-brand {
+            font-weight: 700;
         }
         
         .card {
-            background-color: #1e293b;
             border-radius: 10px;
-            padding: 25px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #334155;
-        }
-        
-        .card-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-        
-        .card-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            background-color: #3b82f6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #94a3b8;
-            font-size: 14px;
-        }
-        
-        .select-wrapper {
-            position: relative;
-        }
-        
-        select {
-            width: 100%;
-            padding: 12px 15px;
-            background-color: #334155;
-            border: 1px solid #475569;
-            border-radius: 6px;
-            color: #e2e8f0;
-            font-size: 14px;
-            appearance: none;
-        }
-        
-        .select-wrapper::after {
-            content: '\f078';
-            font-family: 'Font Awesome 6 Free';
-            font-weight: 900;
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #94a3b8;
-            pointer-events: none;
-        }
-        
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
-        .checkbox-group input {
-            width: 18px;
-            height: 18px;
-        }
-        
-        .btn {
-            background-color: #3b82f6;
-            color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
         }
         
-        .btn:hover {
-            background-color: #2563eb;
-        }
-        
-        .btn-outline {
-            background-color: transparent;
-            border: 1px solid #3b82f6;
-            color: #3b82f6;
-        }
-        
-        .btn-outline:hover {
-            background-color: rgba(59, 130, 246, 0.1);
+        .card:hover {
+            transform: translateY(-2px);
         }
         
         .chart-container {
-            margin-top: 20px;
-            height: 250px;
+            position: relative;
+            height: 500px;
+            width: 100%;
+            margin-bottom: 20px;
         }
         
-        .analysis-result {
-            margin-top: 20px;
+        .technical-indicator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             padding: 15px;
-            background-color: #334155;
-            border-radius: 6px;
-            border-left: 4px solid #3b82f6;
-        }
-        
-        .result-title {
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 8px;
             margin-bottom: 10px;
         }
         
-        .result-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 15px;
+        .indicator-value {
+            font-size: 1.5rem;
+            font-weight: 700;
         }
         
-        .result-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #475569;
+        .csv-upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
         
-        .result-label {
-            color: #94a3b8;
+        .csv-upload-area:hover {
+            border-color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.05);
         }
         
-        .result-value {
+        .csv-upload-area.dragover {
+            border-color: var(--success-color);
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        
+        .price-up {
+            color: var(--success-color);
             font-weight: 600;
         }
         
-        .positive {
-            color: #10b981;
+        .price-down {
+            color: var(--accent-color);
+            font-weight: 600;
         }
         
-        .negative {
-            color: #ef4444;
+        .indicator-badge {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            margin-right: 5px;
+            margin-bottom: 5px;
         }
         
-        .backtest-results {
-            margin-top: 20px;
-            max-height: 300px;
-            overflow-y: auto;
+        .chart-controls {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .result-table {
-            width: 100%;
-            border-collapse: collapse;
+        .timeframe-btn.active {
+            background-color: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
         }
         
-        .result-table th {
-            text-align: left;
-            padding: 12px 15px;
-            background-color: #334155;
-            color: #94a3b8;
-            font-weight: 500;
-            font-size: 14px;
+        .indicator-legend {
+            font-size: 0.8rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 5px;
         }
         
-        .result-table td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #334155;
-        }
-        
-        .result-table tr:hover {
-            background-color: #334155;
-        }
-        
-        footer {
-            margin-top: 40px;
-            text-align: center;
-            padding: 20px;
-            color: #94a3b8;
-            font-size: 14px;
-            border-top: 1px solid #334155;
-        }
-        
-        @media (max-width: 768px) {
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
+        .candle-tooltip {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <i class="fas fa-chart-line"></i>
-                <span>ForexPro Analytics</span>
-            </div>
-            <div class="user-info">
-                <div class="user-avatar">JD</div>
-                <span>John Doe</span>
-            </div>
-        </header>
-        
-        <div class="dashboard">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Forex Analysis</h2>
-                    <div class="card-icon">
-                        <i class="fas fa-chart-bar"></i>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--primary-color);">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-robot me-2"></i>Advanced Forex Analysis System
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container mt-4">
+        <!-- CSV Data Upload -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-file-csv me-2"></i>Historical Data Import (CSV)
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="currency-pair">Currency Pair</label>
-                    <div class="select-wrapper">
-                        <select id="currency-pair">
-                            <option value="GBP/JPY" selected>GBP/JPY</option>
-                            <option value="EUR/USD">EUR/USD</option>
-                            <option value="USD/JPY">USD/JPY</option>
-                            <option value="GBP/USD">GBP/USD</option>
-                            <option value="AUD/USD">AUD/USD</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="timeframe">Timeframe</label>
-                    <div class="select-wrapper">
-                        <select id="timeframe">
-                            <option value="1h">1 Hour</option>
-                            <option value="4h" selected>4 Hours</option>
-                            <option value="1d">1 Day</option>
-                            <option value="1w">1 Week</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <button class="btn" id="get-analysis">
-                    <i class="fas fa-chart-line"></i>
-                    Get Analysis
-                </button>
-                
-                <div class="chart-container">
-                    <canvas id="analysis-chart"></canvas>
-                </div>
-                
-                <div class="analysis-result" id="analysis-result">
-                    <div class="result-title">Market Overview: GBP/JPY (4H)</div>
-                    <p>Current trend shows bullish momentum with resistance at 187.50. RSI indicates overbought conditions.</p>
-                    
-                    <div class="result-details">
-                        <div class="result-item">
-                            <span class="result-label">Current Price:</span>
-                            <span class="result-value">186.75</span>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="csv-upload-area" id="csvUploadArea">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                    <h5>Drop CSV File Here</h5>
+                                    <p class="text-muted">Or click to browse files</p>
+                                    <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+                                    <button class="btn btn-primary mt-2" onclick="document.getElementById('csvFileInput').click()">
+                                        <i class="fas fa-folder-open me-2"></i>Select CSV File
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>CSV Format Requirements:</h6>
+                                <ul class="small text-muted">
+                                    <li>Required columns: <code>Date, Open, High, Low, Close</code></li>
+                                    <li>Optional columns: <code>Volume, Time</code></li>
+                                    <li>Date format: <code>YYYY-MM-DD</code> or <code>YYYY-MM-DD HH:MM:SS</code></li>
+                                    <li>Decimal separator: Period (.)</li>
+                                </ul>
+                                <div class="mt-3">
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="downloadSampleCSV()">
+                                        <i class="fas fa-download me-1"></i>Download Sample CSV
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="result-item">
-                            <span class="result-label">Trend:</span>
-                            <span class="result-value positive">Bullish</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">RSI:</span>
-                            <span class="result-value negative">72.5</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">Support:</span>
-                            <span class="result-value">185.20</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">Resistance:</span>
-                            <span class="result-value">187.50</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">Volatility:</span>
-                            <span class="result-value">High</span>
+                        <div id="csvFileInfo" class="mt-3" style="display: none;">
+                            <div class="alert alert-info d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-file-csv me-2"></i>
+                                    <span id="fileName"></span>
+                                    <small class="text-muted ms-2" id="fileStats"></small>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="clearCSVData()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Backtesting</h2>
-                    <div class="card-icon">
-                        <i class="fas fa-history"></i>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="backtest-pair">Currency Pair</label>
-                    <div class="select-wrapper">
-                        <select id="backtest-pair">
-                            <option value="USD/JPY" selected>USD/JPY</option>
-                            <option value="EUR/USD">EUR/USD</option>
-                            <option value="GBP/JPY">GBP/JPY</option>
-                            <option value="GBP/USD">GBP/USD</option>
-                            <option value="AUD/USD">AUD/USD</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="backtest-timeframe">Timeframe</label>
-                    <div class="select-wrapper">
-                        <select id="backtest-timeframe">
-                            <option value="1h">1 Hour</option>
-                            <option value="4h" selected>4 Hours</option>
-                            <option value="1d">1 Day</option>
-                            <option value="1w">1 Week</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="checkbox-group">
-                    <input type="checkbox" id="enable-backtest" checked>
-                    <label for="enable-backtest">Enable Backtesting</label>
-                </div>
-                
-                <button class="btn btn-outline" id="run-backtest">
-                    <i class="fas fa-play"></i>
-                    Run Backtest
-                </button>
-                
-                <div class="backtest-results">
-                    <table class="result-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Strategy</th>
-                                <th>Profit/Loss</th>
-                                <th>Win Rate</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>2023-10-01 to 2023-10-31</td>
-                                <td>Moving Average Crossover</td>
-                                <td class="positive">+4.2%</td>
-                                <td>68%</td>
-                            </tr>
-                            <tr>
-                                <td>2023-09-01 to 2023-09-30</td>
-                                <td>RSI Divergence</td>
-                                <td class="positive">+2.8%</td>
-                                <td>62%</td>
-                            </tr>
-                            <tr>
-                                <td>2023-08-01 to 2023-08-31</td>
-                                <td>Bollinger Bands</td>
-                                <td class="negative">-1.5%</td>
-                                <td>45%</td>
-                            </tr>
-                            <tr>
-                                <td>2023-07-01 to 2023-07-31</td>
-                                <td>MACD Signal</td>
-                                <td class="positive">+3.7%</td>
-                                <td>71%</td>
-                            </tr>
-                            <tr>
-                                <td>2023-06-01 to 2023-06-30</td>
-                                <td>Support/Resistance</td>
-                                <td class="positive">+5.1%</td>
-                                <td>74%</td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>
-        
-        <footer>
-            <p>Forex Analysis & Backtesting Dashboard | Data updates every 15 minutes</p>
-        </footer>
+
+        <div class="row">
+            <!-- Left Column - Chart & Analysis -->
+            <div class="col-lg-8">
+                <!-- Professional Chart -->
+                <div class="card">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-chart-candle me-2"></i>Professional Trading Chart</span>
+                        <div>
+                            <span id="currentPair" class="badge bg-secondary me-2">No Data</span>
+                            <span id="currentTimeframe" class="badge bg-info">Select Timeframe</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Chart Controls -->
+                        <div class="chart-controls">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <div class="btn-group w-100">
+                                        <button class="btn btn-sm btn-outline-secondary timeframe-btn active" data-tf="1D">1D</button>
+                                        <button class="btn btn-sm btn-outline-secondary timeframe-btn" data-tf="1H">1H</button>
+                                        <button class="btn btn-sm btn-outline-secondary timeframe-btn" data-tf="4H">4H</button>
+                                        <button class="btn btn-sm btn-outline-secondary timeframe-btn" data-tf="1W">1W</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showSMA" checked>
+                                        <label class="form-check-label small" for="showSMA">SMA</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showEMA" checked>
+                                        <label class="form-check-label small" for="showEMA">EMA</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showBollinger">
+                                        <label class="form-check-label small" for="showBollinger">Bollinger</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="showVolume">
+                                        <label class="form-check-label small" for="showVolume">Volume</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="exportChartData()">
+                                        <i class="fas fa-download me-1"></i>Export
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Chart -->
+                        <div class="chart-container">
+                            <canvas id="professionalChart"></canvas>
+                        </div>
+
+                        <!-- Indicator Legends -->
+                        <div id="indicatorLegends" class="d-flex flex-wrap mb-3">
+                            <!-- Indicator legends will be populated here -->
+                        </div>
+
+                        <!-- Volume Chart (hidden by default) -->
+                        <div class="chart-container" id="volumeChartContainer" style="height: 150px; display: none;">
+                            <canvas id="volumeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Indicators & Tools -->
+            <div class="col-lg-4">
+                <!-- Technical Indicators Panel -->
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="fas fa-chart-line me-2"></i>Technical Indicators
+                    </div>
+                    <div class="card-body">
+                        <div id="technical-indicators">
+                            <p class="text-muted text-center">Load CSV data to see indicators</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trading Signals -->
+                <div class="card mt-4">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-bullhorn me-2"></i>Trading Signals
+                    </div>
+                    <div class="card-body">
+                        <div id="trading-signals">
+                            <p class="text-muted text-center">No signals generated</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Data Info -->
+                <div class="card mt-4">
+                    <div class="card-header bg-info text-white">
+                        <i class="fas fa-database me-2"></i>Data Information
+                    </div>
+                    <div class="card-body">
+                        <div id="data-info">
+                            <p class="text-muted text-center">No data loaded</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Analysis Results -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="fas fa-chart-bar me-2"></i>Advanced Technical Analysis
+                    </div>
+                    <div class="card-body">
+                        <div id="advanced-analysis">
+                            <p class="text-muted text-center">Load CSV data to perform technical analysis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-robot me-2"></i>Advanced Forex Analysis System</h5>
+                    <p>Professional trading charts with CSV data integration and technical indicators.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>&copy; 2024 Forex Analysis System. All rights reserved.</p>
+                    <p class="text-muted">For educational purposes only.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap & jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-        // Initialize charts
-        document.addEventListener('DOMContentLoaded', function() {
-            // Analysis Chart
-            const analysisCtx = document.getElementById('analysis-chart').getContext('2d');
-            const analysisChart = new Chart(analysisCtx, {
-                type: 'line',
+        // Global variables
+        let professionalChart = null;
+        let volumeChart = null;
+        let currentCSVData = null;
+        let currentTimeframe = '1D';
+
+        // Initialize on page load
+        $(document).ready(function() {
+            initializeEventListeners();
+            setupChartInteractions();
+        });
+
+        // Event listeners initialization
+        function initializeEventListeners() {
+            // CSV file input
+            document.getElementById('csvFileInput').addEventListener('change', handleCSVUpload);
+            
+            // Drag and drop for CSV
+            const uploadArea = document.getElementById('csvUploadArea');
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type === 'text/csv') {
+                    handleCSVFile(files[0]);
+                }
+            });
+
+            // Timeframe buttons
+            document.querySelectorAll('.timeframe-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentTimeframe = this.dataset.tf;
+                    if (currentCSVData) {
+                        renderProfessionalChart(currentCSVData);
+                    }
+                });
+            });
+
+            // Indicator toggles
+            document.getElementById('showVolume').addEventListener('change', function() {
+                const volumeContainer = document.getElementById('volumeChartContainer');
+                volumeContainer.style.display = this.checked ? 'block' : 'none';
+                if (this.checked && currentCSVData) {
+                    renderVolumeChart(currentCSVData);
+                }
+            });
+
+            ['showSMA', 'showEMA', 'showBollinger'].forEach(id => {
+                document.getElementById(id).addEventListener('change', function() {
+                    if (currentCSVData) {
+                        renderProfessionalChart(currentCSVData);
+                    }
+                });
+            });
+        }
+
+        // Handle CSV file upload
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleCSVFile(file);
+            }
+        }
+
+        // Process CSV file
+        function handleCSVFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csvText = e.target.result;
+                    const parsedData = parseCSVData(csvText);
+                    
+                    if (parsedData.length > 0) {
+                        currentCSVData = parsedData;
+                        displayFileInfo(file, parsedData);
+                        renderProfessionalChart(parsedData);
+                        calculateTechnicalIndicators(parsedData);
+                        updateDataInfo(parsedData);
+                    } else {
+                        throw new Error('No valid data found in CSV');
+                    }
+                } catch (error) {
+                    alert('Error parsing CSV file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Parse CSV data
+        function parseCSVData(csvText) {
+            const lines = csvText.split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) return [];
+            
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            
+            // Validate required columns
+            const required = ['date', 'open', 'high', 'low', 'close'];
+            const missing = required.filter(col => !headers.includes(col));
+            if (missing.length > 0) {
+                throw new Error(`Missing required columns: ${missing.join(', ')}`);
+            }
+
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                const row = {};
+                
+                headers.forEach((header, index) => {
+                    let value = values[index];
+                    
+                    // Parse numeric values
+                    if (['open', 'high', 'low', 'close', 'volume'].includes(header)) {
+                        value = parseFloat(value);
+                        if (isNaN(value)) value = null;
+                    }
+                    
+                    // Parse date
+                    if (header === 'date') {
+                        value = parseDate(value);
+                    }
+                    
+                    row[header] = value;
+                });
+                
+                // Only add rows with valid data
+                if (row.date && !isNaN(row.open) && !isNaN(row.high) && !isNaN(row.low) && !isNaN(row.close)) {
+                    data.push(row);
+                }
+            }
+            
+            return data.sort((a, b) => a.date - b.date);
+        }
+
+        // Parse date from various formats
+        function parseDate(dateStr) {
+            const formats = [
+                'yyyy-MM-dd HH:mm:ss',
+                'yyyy-MM-dd',
+                'MM/dd/yyyy HH:mm:ss',
+                'MM/dd/yyyy',
+                'dd/MM/yyyy HH:mm:ss',
+                'dd/MM/yyyy'
+            ];
+            
+            for (const format of formats) {
+                const dt = luxon.DateTime.fromFormat(dateStr, format);
+                if (dt.isValid) {
+                    return dt.toJSDate();
+                }
+            }
+            
+            // Fallback to JavaScript Date parsing
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        // Display file information
+        function displayFileInfo(file, data) {
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileStats').textContent = 
+                `(${data.length} records, ${luxon.DateTime.fromJSDate(data[0].date).toFormat('yyyy-MM-dd')} to ${luxon.DateTime.fromJSDate(data[data.length - 1].date).toFormat('yyyy-MM-dd')})`;
+            document.getElementById('csvFileInfo').style.display = 'block';
+        }
+
+        // Clear CSV data
+        function clearCSVData() {
+            currentCSVData = null;
+            document.getElementById('csvFileInfo').style.display = 'none';
+            document.getElementById('csvFileInput').value = '';
+            
+            if (professionalChart) {
+                professionalChart.destroy();
+                professionalChart = null;
+            }
+            
+            if (volumeChart) {
+                volumeChart.destroy();
+                volumeChart = null;
+            }
+            
+            document.getElementById('technical-indicators').innerHTML = '<p class="text-muted text-center">Load CSV data to see indicators</p>';
+            document.getElementById('trading-signals').innerHTML = '<p class="text-muted text-center">No signals generated</p>';
+            document.getElementById('data-info').innerHTML = '<p class="text-muted text-center">No data loaded</p>';
+            document.getElementById('advanced-analysis').innerHTML = '<p class="text-muted text-center">Load CSV data to perform technical analysis</p>';
+        }
+
+        // Download sample CSV
+        function downloadSampleCSV() {
+            const sampleData = `Date,Open,High,Low,Close,Volume
+2024-01-01,150.25,150.80,149.90,150.50,1000000
+2024-01-02,150.50,151.20,150.10,150.80,1200000
+2024-01-03,150.80,151.50,150.50,151.20,1100000
+2024-01-04,151.20,151.80,150.90,151.50,950000
+2024-01-05,151.50,152.00,151.20,151.80,1050000`;
+            
+            const blob = new Blob([sampleData], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'forex_sample_data.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Render professional candlestick chart
+        function renderProfessionalChart(data) {
+            const ctx = document.getElementById('professionalChart').getContext('2d');
+            
+            if (professionalChart) {
+                professionalChart.destroy();
+            }
+
+            const chartData = prepareChartData(data);
+            
+            professionalChart = new Chart(ctx, {
+                type: 'candlestick',
                 data: {
-                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
                     datasets: [{
-                        label: 'GBP/JPY',
-                        data: [185.2, 185.8, 186.1, 186.5, 186.9, 186.7, 186.3],
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
+                        label: 'Price',
+                        data: chartData.candles,
+                        color: {
+                            up: '#26a69a',
+                            down: '#ef5350',
+                            unchanged: '#999'
+                        },
+                        borderColor: {
+                            up: '#26a69a',
+                            down: '#ef5350',
+                            unchanged: '#999'
+                        }
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: getTimeUnit(),
+                                tooltipFormat: 'yyyy-MM-dd HH:mm'
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        y: {
+                            position: 'right',
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    },
                     plugins: {
                         legend: {
                             display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: '#94a3b8'
-                            }
                         },
-                        x: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: '#94a3b8'
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    const point = context.raw;
+                                    return [
+                                        `Open: ${point.o.toFixed(4)}`,
+                                        `High: ${point.h.toFixed(4)}`,
+                                        `Low: ${point.l.toFixed(4)}`,
+                                        `Close: ${point.c.toFixed(4)}`
+                                    ];
+                                }
                             }
                         }
                     }
                 }
             });
+
+            // Add technical indicators
+            addTechnicalIndicators(professionalChart, data);
             
-            // Backtesting Chart
-            const backtestCtx = document.getElementById('backtest-chart').getContext('2d');
-            const backtestChart = new Chart(backtestCtx, {
+            // Update current pair display
+            document.getElementById('currentPair').textContent = 'CSV Data';
+            document.getElementById('currentTimeframe').textContent = currentTimeframe;
+        }
+
+        // Prepare chart data from CSV
+        function prepareChartData(data) {
+            const candles = data.map(item => ({
+                x: item.date,
+                o: item.open,
+                h: item.high,
+                l: item.low,
+                c: item.close
+            }));
+
+            return { candles };
+        }
+
+        // Get time unit based on timeframe
+        function getTimeUnit() {
+            const units = {
+                '1H': 'hour',
+                '4H': 'hour',
+                '1D': 'day',
+                '1W': 'week'
+            };
+            return units[currentTimeframe] || 'day';
+        }
+
+        // Add technical indicators to chart
+        function addTechnicalIndicators(chart, data) {
+            const datasets = chart.data.datasets;
+            
+            // Clear existing indicator datasets (keep candlestick at index 0)
+            while (datasets.length > 1) {
+                datasets.pop();
+            }
+
+            // SMA 20
+            if (document.getElementById('showSMA').checked) {
+                const sma20 = calculateSMA(data, 20);
+                datasets.push({
+                    label: 'SMA 20',
+                    data: sma20,
+                    borderColor: '#FF6B6B',
+                    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1
+                });
+            }
+
+            // EMA 12
+            if (document.getElementById('showEMA').checked) {
+                const ema12 = calculateEMA(data, 12);
+                datasets.push({
+                    label: 'EMA 12',
+                    data: ema12,
+                    borderColor: '#4ECDC4',
+                    backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1
+                });
+            }
+
+            // Bollinger Bands
+            if (document.getElementById('showBollinger').checked) {
+                const bb = calculateBollingerBands(data, 20, 2);
+                datasets.push({
+                    label: 'BB Upper',
+                    data: bb.upper,
+                    borderColor: '#45B7D1',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    borderDash: [5, 5]
+                });
+                datasets.push({
+                    label: 'BB Middle',
+                    data: bb.middle,
+                    borderColor: '#45B7D1',
+                    borderWidth: 1,
+                    pointRadius: 0
+                });
+                datasets.push({
+                    label: 'BB Lower',
+                    data: bb.lower,
+                    borderColor: '#45B7D1',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    borderDash: [5, 5]
+                });
+            }
+
+            chart.update();
+            updateIndicatorLegends();
+        }
+
+        // Calculate Simple Moving Average
+        function calculateSMA(data, period) {
+            const sma = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    sma.push({ x: data[i].date, y: null });
+                } else {
+                    let sum = 0;
+                    for (let j = 0; j < period; j++) {
+                        sum += data[i - j].close;
+                    }
+                    sma.push({ x: data[i].date, y: sum / period });
+                }
+            }
+            return sma;
+        }
+
+        // Calculate Exponential Moving Average
+        function calculateEMA(data, period) {
+            const ema = [];
+            const multiplier = 2 / (period + 1);
+            
+            // First value is SMA
+            let emaValue = data.slice(0, period).reduce((sum, item) => sum + item.close, 0) / period;
+            ema.push({ x: data[period - 1].date, y: emaValue });
+            
+            // Subsequent values use EMA formula
+            for (let i = period; i < data.length; i++) {
+                emaValue = (data[i].close - emaValue) * multiplier + emaValue;
+                ema.push({ x: data[i].date, y: emaValue });
+            }
+            
+            // Pad beginning with null values
+            for (let i = 0; i < period - 1; i++) {
+                ema.unshift({ x: data[i].date, y: null });
+            }
+            
+            return ema;
+        }
+
+        // Calculate Bollinger Bands
+        function calculateBollingerBands(data, period, stdDev) {
+            const upper = [];
+            const middle = [];
+            const lower = [];
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    upper.push({ x: data[i].date, y: null });
+                    middle.push({ x: data[i].date, y: null });
+                    lower.push({ x: data[i].date, y: null });
+                } else {
+                    const slice = data.slice(i - period + 1, i + 1);
+                    const prices = slice.map(item => item.close);
+                    const mean = prices.reduce((sum, price) => sum + price, 0) / period;
+                    const variance = prices.reduce((sum, price) => sum + Math.pow(price - mean, 2), 0) / period;
+                    const standardDeviation = Math.sqrt(variance);
+                    
+                    middle.push({ x: data[i].date, y: mean });
+                    upper.push({ x: data[i].date, y: mean + (standardDeviation * stdDev) });
+                    lower.push({ x: data[i].date, y: mean - (standardDeviation * stdDev) });
+                }
+            }
+            
+            return { upper, middle, lower };
+        }
+
+        // Render volume chart
+        function renderVolumeChart(data) {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+            
+            if (volumeChart) {
+                volumeChart.destroy();
+            }
+
+            const volumeData = data.map(item => ({
+                x: item.date,
+                y: item.volume || 0,
+                color: item.close >= item.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+            }));
+
+            volumeChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['MA Cross', 'RSI', 'Bollinger', 'MACD', 'S/R'],
                     datasets: [{
-                        label: 'Profit/Loss %',
-                        data: [4.2, 2.8, -1.5, 3.7, 5.1],
-                        backgroundColor: [
-                            'rgba(16, 185, 129, 0.7)',
-                            'rgba(16, 185, 129, 0.7)',
-                            'rgba(239, 68, 68, 0.7)',
-                            'rgba(16, 185, 129, 0.7)',
-                            'rgba(16, 185, 129, 0.7)'
-                        ],
-                        borderColor: [
-                            'rgb(16, 185, 129)',
-                            'rgb(16, 185, 129)',
-                            'rgb(239, 68, 68)',
-                            'rgb(16, 185, 129)',
-                            'rgb(16, 185, 129)'
-                        ],
+                        label: 'Volume',
+                        data: volumeData,
+                        backgroundColor: volumeData.map(item => item.color),
+                        borderColor: volumeData.map(item => item.color.replace('0.5', '1')),
                         borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: getTimeUnit()
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    },
                     plugins: {
                         legend: {
                             display: false
                         }
-                    },
-                    scales: {
-                        y: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: '#94a3b8'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                color: 'rgba(255, 255, 255, 0.1)'
-                            },
-                            ticks: {
-                                color: '#94a3b8'
-                            }
-                        }
                     }
                 }
             });
+        }
+
+        // Calculate all technical indicators
+        function calculateTechnicalIndicators(data) {
+            if (!data || data.length < 50) return;
             
-            // Button event handlers
-            document.getElementById('get-analysis').addEventListener('click', function() {
-                alert('Analysis updated for selected parameters!');
+            const latest = data[data.length - 1];
+            const rsi = calculateRSI(data, 14);
+            const macd = calculateMACD(data);
+            const stoch = calculateStochastic(data, 14);
+            const atr = calculateATR(data, 14);
+            const adx = calculateADX(data, 14);
+            
+            displayTechnicalIndicators({
+                rsi: rsi[rsi.length - 1],
+                macd: macd.macd[macd.macd.length - 1],
+                macdSignal: macd.signal[macd.signal.length - 1],
+                macdHistogram: macd.histogram[macd.histogram.length - 1],
+                stochasticK: stoch.k[stoch.k.length - 1],
+                stochasticD: stoch.d[stoch.d.length - 1],
+                atr: atr[atr.length - 1],
+                adx: adx[adx.length - 1],
+                currentPrice: latest.close
             });
             
-            document.getElementById('run-backtest').addEventListener('click', function() {
-                alert('Backtest completed! Results updated.');
+            generateTradingSignals(data);
+            performAdvancedAnalysis(data);
+        }
+
+        // Calculate RSI
+        function calculateRSI(data, period) {
+            const rsi = [];
+            let gains = 0;
+            let losses = 0;
+            
+            for (let i = 1; i <= period; i++) {
+                const change = data[i].close - data[i-1].close;
+                gains += Math.max(change, 0);
+                losses += Math.max(-change, 0);
+            }
+            
+            let avgGain = gains / period;
+            let avgLoss = losses / period;
+            let rs = avgGain / (avgLoss || 0.001);
+            rsi.push(100 - (100 / (1 + rs)));
+            
+            for (let i = period + 1; i < data.length; i++) {
+                const change = data[i].close - data[i-1].close;
+                const gain = Math.max(change, 0);
+                const loss = Math.max(-change, 0);
+                
+                avgGain = ((avgGain * (period - 1)) + gain) / period;
+                avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+                rs = avgGain / (avgLoss || 0.001);
+                rsi.push(100 - (100 / (1 + rs)));
+            }
+            
+            return rsi;
+        }
+
+        // Calculate MACD
+        function calculateMACD(data) {
+            const ema12 = calculateEMA(data, 12);
+            const ema26 = calculateEMA(data, 26);
+            const macd = [];
+            const signal = [];
+            const histogram = [];
+            
+            for (let i = 0; i < data.length; i++) {
+                const macdValue = ema12[i].y !== null && ema26[i].y !== null ? ema12[i].y - ema26[i].y : null;
+                macd.push(macdValue);
+            }
+            
+            // Calculate signal line (EMA of MACD)
+            for (let i = 0; i < data.length; i++) {
+                if (i < 8) {
+                    signal.push(null);
+                    histogram.push(null);
+                } else {
+                    let sum = 0;
+                    let count = 0;
+                    for (let j = 0; j < 9; j++) {
+                        if (macd[i - j] !== null) {
+                            sum += macd[i - j];
+                            count++;
+                        }
+                    }
+                    const signalValue = count > 0 ? sum / count : null;
+                    signal.push(signalValue);
+                    histogram.push(macd[i] !== null && signalValue !== null ? macd[i] - signalValue : null);
+                }
+            }
+            
+            return { macd, signal, histogram };
+        }
+
+        // Calculate Stochastic Oscillator
+        function calculateStochastic(data, period) {
+            const k = [];
+            const d = [];
+            
+            for (let i = period - 1; i < data.length; i++) {
+                const slice = data.slice(i - period + 1, i + 1);
+                const high = Math.max(...slice.map(item => item.high));
+                const low = Math.min(...slice.map(item => item.low));
+                const currentClose = data[i].close;
+                
+                const kValue = ((currentClose - low) / (high - low)) * 100;
+                k.push(kValue);
+                
+                if (i >= period + 2) {
+                    const dValue = k.slice(i - 2, i + 1).reduce((sum, val) => sum + val, 0) / 3;
+                    d.push(dValue);
+                } else {
+                    d.push(null);
+                }
+            }
+            
+            // Pad beginning with null values
+            for (let i = 0; i < period - 1; i++) {
+                k.unshift(null);
+                d.unshift(null);
+            }
+            
+            return { k, d };
+        }
+
+        // Calculate Average True Range
+        function calculateATR(data, period) {
+            const tr = [0];
+            const atr = [];
+            
+            for (let i = 1; i < data.length; i++) {
+                const highLow = data[i].high - data[i].low;
+                const highClose = Math.abs(data[i].high - data[i-1].close);
+                const lowClose = Math.abs(data[i].low - data[i-1].close);
+                tr.push(Math.max(highLow, highClose, lowClose));
+            }
+            
+            let sum = tr.slice(1, period + 1).reduce((a, b) => a + b, 0);
+            atr.push(sum / period);
+            
+            for (let i = period + 1; i < data.length; i++) {
+                atr.push((atr[atr.length - 1] * (period - 1) + tr[i]) / period);
+            }
+            
+            // Pad beginning with null values
+            for (let i = 0; i < period; i++) {
+                atr.unshift(null);
+            }
+            
+            return atr;
+        }
+
+        // Calculate Average Directional Index
+        function calculateADX(data, period) {
+            // Simplified ADX calculation
+            const adx = new Array(data.length).fill(null);
+            return adx;
+        }
+
+        // Display technical indicators
+        function displayTechnicalIndicators(indicators) {
+            let html = `
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <div class="technical-indicator">
+                            <small>RSI</small>
+                            <div class="indicator-value ${indicators.rsi < 30 ? 'price-up' : indicators.rsi > 70 ? 'price-down' : ''}">
+                                ${indicators.rsi ? indicators.rsi.toFixed(2) : 'N/A'}
+                            </div>
+                            <small>${indicators.rsi < 30 ? 'Oversold' : indicators.rsi > 70 ? 'Overbought' : 'Neutral'}</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="technical-indicator">
+                            <small>MACD</small>
+                            <div class="indicator-value ${indicators.macdHistogram > 0 ? 'price-up' : 'price-down'}">
+                                ${indicators.macd ? indicators.macd.toFixed(4) : 'N/A'}
+                            </div>
+                            <small>${indicators.macdHistogram > 0 ? 'Bullish' : 'Bearish'}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <table class="table table-sm">
+                            <tr>
+                                <td>Stochastic %K:</td>
+                                <td class="text-end ${indicators.stochasticK < 20 ? 'price-up' : indicators.stochasticK > 80 ? 'price-down' : ''}">
+                                    ${indicators.stochasticK ? indicators.stochasticK.toFixed(2) : 'N/A'}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>ATR:</td>
+                                <td class="text-end">${indicators.atr ? indicators.atr.toFixed(4) : 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>ADX:</td>
+                                <td class="text-end">${indicators.adx ? indicators.adx.toFixed(2) : 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Current Price:</td>
+                                <td class="text-end price-up">${indicators.currentPrice.toFixed(4)}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('technical-indicators').innerHTML = html;
+        }
+
+        // Generate trading signals
+        function generateTradingSignals(data) {
+            const rsi = calculateRSI(data, 14);
+            const macd = calculateMACD(data);
+            const latestRsi = rsi[rsi.length - 1];
+            const latestMacdHistogram = macd.histogram[macd.histogram.length - 1];
+            
+            let signals = [];
+            
+            if (latestRsi < 30 && latestMacdHistogram > 0) {
+                signals.push({
+                    type: 'BUY',
+                    strength: 'STRONG',
+                    reason: 'Oversold condition with bullish MACD crossover'
+                });
+            } else if (latestRsi > 70 && latestMacdHistogram < 0) {
+                signals.push({
+                    type: 'SELL',
+                    strength: 'STRONG',
+                    reason: 'Overbought condition with bearish MACD crossover'
+                });
+            } else if (latestRsi < 30) {
+                signals.push({
+                    type: 'BUY',
+                    strength: 'WEAK',
+                    reason: 'Oversold condition'
+                });
+            } else if (latestRsi > 70) {
+                signals.push({
+                    type: 'SELL',
+                    strength: 'WEAK',
+                    reason: 'Overbought condition'
+                });
+            }
+            
+            displayTradingSignals(signals);
+        }
+
+        // Display trading signals
+        function displayTradingSignals(signals) {
+            if (signals.length === 0) {
+                document.getElementById('trading-signals').innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> No strong signals detected
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            signals.forEach(signal => {
+                const alertClass = signal.type === 'BUY' ? 'success' : 'danger';
+                const icon = signal.type === 'BUY' ? 'fa-arrow-up' : 'fa-arrow-down';
+                
+                html += `
+                    <div class="alert alert-${alertClass}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas ${icon} me-2"></i>
+                                <strong>${signal.type} Signal</strong>
+                                <span class="badge bg-${signal.strength === 'STRONG' ? 'warning' : 'secondary'} ms-2">
+                                    ${signal.strength}
+                                </span>
+                            </div>
+                        </div>
+                        <small class="mt-1 d-block">${signal.reason}</small>
+                    </div>
+                `;
             });
+            
+            document.getElementById('trading-signals').innerHTML = html;
+        }
+
+        // Update data information panel
+        function updateDataInfo(data) {
+            const firstDate = luxon.DateTime.fromJSDate(data[0].date);
+            const lastDate = luxon.DateTime.fromJSDate(data[data.length - 1].date);
+            const days = lastDate.diff(firstDate, 'days').days;
+            
+            const priceChange = data[data.length - 1].close - data[0].open;
+            const percentChange = (priceChange / data[0].open) * 100;
+            
+            const html = `
+                <table class="table table-sm">
+                    <tr>
+                        <td>Records:</td>
+                        <td class="text-end">${data.length}</td>
+                    </tr>
+                    <tr>
+                        <td>Period:</td>
+                        <td class="text-end">${days.toFixed(0)} days</td>
+                    </tr>
+                    <tr>
+                        <td>Date Range:</td>
+                        <td class="text-end">${firstDate.toFormat('MMM dd')} - ${lastDate.toFormat('MMM dd, yyyy')}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Change:</td>
+                        <td class="text-end ${percentChange >= 0 ? 'price-up' : 'price-down'}">
+                            ${percentChange.toFixed(2)}%
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Volatility (ATR):</td>
+                        <td class="text-end">${calculateATR(data, 14)[data.length - 1]?.toFixed(4) || 'N/A'}</td>
+                    </tr>
+                </table>
+            `;
+            
+            document.getElementById('data-info').innerHTML = html;
+        }
+
+        // Perform advanced analysis
+        function performAdvancedAnalysis(data) {
+            if (data.length < 20) return;
+            
+            const latest = data[data.length - 1];
+            const sma20 = calculateSMA(data, 20);
+            const ema12 = calculateEMA(data, 12);
+            const rsi = calculateRSI(data, 14);
+            
+            const priceVsSMA20 = ((latest.close - sma20[sma20.length - 1].y) / sma20[sma20.length - 1].y) * 100;
+            const currentRsi = rsi[rsi.length - 1];
+            
+            let analysis = '';
+            
+            if (latest.close > sma20[sma20.length - 1].y && currentRsi < 70) {
+                analysis = 'Bullish trend with room for upward movement';
+            } else if (latest.close < sma20[sma20.length - 1].y && currentRsi > 30) {
+                analysis = 'Bearish trend with room for downward movement';
+            } else if (currentRsi > 70) {
+                analysis = 'Caution: Overbought conditions, potential reversal';
+            } else if (currentRsi < 30) {
+                analysis = 'Oversold conditions, potential bounce';
+            } else {
+                analysis = 'Neutral market conditions';
+            }
+            
+            const html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <i class="fas fa-trending-up me-2"></i>Trend Analysis
+                            </div>
+                            <div class="card-body">
+                                <p>${analysis}</p>
+                                <div class="d-flex justify-content-between">
+                                    <small>Price vs SMA20:</small>
+                                    <small class="${priceVsSMA20 >= 0 ? 'price-up' : 'price-down'}">
+                                        ${priceVsSMA20.toFixed(2)}%
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <i class="fas fa-chart-pie me-2"></i>Market Condition
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center">
+                                    <div class="display-6 ${currentRsi < 30 ? 'price-up' : currentRsi > 70 ? 'price-down' : ''}">
+                                        ${currentRsi ? currentRsi.toFixed(1) : 'N/A'}
+                                    </div>
+                                    <small>RSI Level</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('advanced-analysis').innerHTML = html;
+        }
+
+        // Update indicator legends
+        function updateIndicatorLegends() {
+            const legends = document.getElementById('indicatorLegends');
+            let html = '';
+            
+            if (document.getElementById('showSMA').checked) {
+                html += `<span class="indicator-legend" style="background-color: #FF6B6B; color: white;">SMA 20</span>`;
+            }
+            if (document.getElementById('showEMA').checked) {
+                html += `<span class="indicator-legend" style="background-color: #4ECDC4; color: white;">EMA 12</span>`;
+            }
+            if (document.getElementById('showBollinger').checked) {
+                html += `<span class="indicator-legend" style="background-color: #45B7D1; color: white;">Bollinger Bands</span>`;
+            }
+            
+            legends.innerHTML = html;
+        }
+
+        // Setup chart interactions
+        function setupChartInteractions() {
+            // Add zoom and pan functionality
+            const professionalCanvas = document.getElementById('professionalChart');
+            if (professionalCanvas) {
+                professionalCanvas.style.cursor = 'crosshair';
+            }
+        }
+
+        // Export chart data
+        function exportChartData() {
+            if (!currentCSVData) {
+                alert('No data to export');
+                return;
+            }
+            
+            const csvContent = convertToCSV(currentCSVData);
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'forex_analysis_data.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Convert data to CSV format
+        function convertToCSV(data) {
+            const headers = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume'];
+            const csvRows = [headers.join(',')];
+            
+            data.forEach(item => {
+                const row = [
+                    luxon.DateTime.fromJSDate(item.date).toFormat('yyyy-MM-dd HH:mm:ss'),
+                    item.open,
+                    item.high,
+                    item.low,
+                    item.close,
+                    item.volume || ''
+                ];
+                csvRows.push(row.join(','));
+            });
+            
+            return csvRows.join('\n');
+        }
+
+        // Register custom candlestick chart type
+        Chart.defaults.candlestick = Chart.defaults.bar;
+        Chart.controllers.candlestick = Chart.controllers.bar.extend({
+            draw: function() {
+                const ctx = this.chart.ctx;
+                const meta = this.getMeta();
+                const dataset = this.getDataset();
+                
+                const points = meta.data || [];
+                
+                for (let i = 0; i < points.length; i++) {
+                    const point = points[i];
+                    const candle = dataset.data[i];
+                    
+                    if (!candle || candle.o === undefined) continue;
+                    
+                    const x = point.x;
+                    const open = this.chart.scales.y.getPixelForValue(candle.o);
+                    const high = this.chart.scales.y.getPixelForValue(candle.h);
+                    const low = this.chart.scales.y.getPixelForValue(candle.l);
+                    const close = this.chart.scales.y.getPixelForValue(candle.c);
+                    
+                    const barWidth = point.width / 2;
+                    
+                    // Determine color
+                    const isUp = candle.c >= candle.o;
+                    const color = isUp ? 
+                        (dataset.color && dataset.color.up) || '#26a69a' : 
+                        (dataset.color && dataset.color.down) || '#ef5350';
+                    
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.fillStyle = color;
+                    ctx.lineWidth = 1;
+                    
+                    // Draw high-low line
+                    ctx.beginPath();
+                    ctx.moveTo(x, high);
+                    ctx.lineTo(x, low);
+                    ctx.stroke();
+                    
+                    // Draw candle body
+                    const bodyTop = Math.min(open, close);
+                    const bodyBottom = Math.max(open, close);
+                    const bodyHeight = Math.max(bodyBottom - bodyTop, 1);
+                    
+                    ctx.fillRect(x - barWidth, bodyTop, barWidth * 2, bodyHeight);
+                    
+                    ctx.restore();
+                }
+            }
         });
     </script>
 </body>
