@@ -951,60 +951,92 @@ Pertimbangkan:
         }
 # --- inside api_analyze, after technical_analysis and ai_analysis computed ---
 
-    # --- inside api_analyze, after all analyses are done ---
-
-    # Ambil deret harga historis untuk chart (gunakan get_price_data)
+@app.route("/api/analyze", methods=["POST"])
+def api_analyze():
     try:
-        # ambil sampai 200 data terakhir (sesuaikan jika mau lebih)
-        series_df = data_manager.get_price_data(pair, timeframe, days=200)
-        if not series_df.empty:
-            series_df = series_df.sort_values('date')
-            price_series = []
-            for _, row in series_df.iterrows():
-                dt = row['date']
-                try:
-                    dt_iso = dt.isoformat()
-                except Exception:
-                    dt_iso = str(dt)
-                price_series.append({
-                    'date': dt_iso,
-                    'open': float(row['open']),
-                    'high': float(row['high']),
-                    'low': float(row['low']),
-                    'close': float(row['close']),
-                    'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else None
-                })
+        data = request.get_json()
+        pair = data.get("pair", "EURUSD").upper()
+        timeframe = data.get("timeframe", "1H")
+        use_historical = data.get("use_historical", True)
+
+        logger.info(f"Running analysis for {pair}-{timeframe}")
+
+        # === 1. Ambil data harga (historical / realtime) ===
+        if use_historical:
+            df = data_manager.get_price_data(pair, timeframe, days=200)
+            if df.empty:
+                raise ValueError(f"No historical data found for {pair}-{timeframe}")
+            price_data = df
+            real_time_price = float(df["close"].iloc[-1])
         else:
+            real_time_price = twelve_data_client.get_real_time_price(pair)
+            price_data = data_manager.get_price_data(pair, timeframe, days=200)
+
+        # === 2. Analisis teknikal ===
+        technical_analysis = data_manager.perform_technical_analysis(price_data, pair)
+
+        # === 3. Analisis fundamental ===
+        fundamental_news = news_client.get_latest_news(pair)
+
+        # === 4. Analisis AI (DeepSeek API) ===
+        ai_analysis = ai_engine.generate_analysis(pair, technical_analysis, fundamental_news)
+
+        # === 5. Penilaian risiko ===
+        risk_assessment = risk_manager.evaluate(ai_analysis, technical_analysis)
+
+        # === 6. Ambil deret harga historis untuk chart ===
+        try:
+            hist_df = data_manager.get_price_data(pair, timeframe, days=200)
+            if not hist_df.empty:
+                hist_df = hist_df.sort_values("date")
+                price_series = []
+                for _, row in hist_df.iterrows():
+                    date_str = None
+                    try:
+                        date_str = row["date"].isoformat()
+                    except Exception:
+                        date_str = str(row["date"])
+                    price_series.append({
+                        "date": date_str,
+                        "open": float(row["open"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "close": float(row["close"]),
+                        "volume": int(row["volume"]) if "volume" in row and not pd.isna(row["volume"]) else None
+                    })
+            else:
+                price_series = []
+        except Exception as e:
+            logger.error(f"Error preparing price series for {pair}-{timeframe}: {e}")
             price_series = []
+
+        # === 7. Susun hasil respons ===
+        response = {
+            "pair": pair,
+            "timeframe": timeframe,
+            "timestamp": datetime.now().isoformat(),
+            "technical_analysis": technical_analysis,
+            "fundamental_analysis": fundamental_news,
+            "ai_analysis": ai_analysis,
+            "risk_assessment": risk_assessment,
+            "price_data": {
+                "current": real_time_price,
+                "support": technical_analysis["levels"]["support"],
+                "resistance": technical_analysis["levels"]["resistance"],
+                "change_pct": technical_analysis["momentum"]["price_change_pct"]
+            },
+            "price_series": price_series,
+            "analysis_summary": f"{pair} currently trading at {real_time_price:.4f}",
+            "ai_provider": ai_analysis.get("ai_provider", "DeepSeek AI"),
+            "trading_recommendation": "TRADE" if risk_assessment["approved"] else "AVOID",
+            "data_source": "TwelveData Live" if not twelve_data_client.demo_mode else "TwelveData Demo"
+        }
+
+        return jsonify(response)
+
     except Exception as e:
-        logger.error(f"Error serializing price series for {pair}-{timeframe}: {e}")
-        price_series = []
-
-    # Susun respons JSON
-    response = {
-        'pair': pair,
-        'timeframe': timeframe,
-        'timestamp': datetime.now().isoformat(),
-        'technical_analysis': technical_analysis,
-        'fundamental_analysis': fundamental_news,
-        'ai_analysis': ai_analysis,
-        'risk_assessment': risk_assessment,
-        'price_data': {
-            'current': real_time_price,
-            'support': technical_analysis['levels']['support'],
-            'resistance': technical_analysis['levels']['resistance'],
-            'change_pct': technical_analysis['momentum']['price_change_pct']
-        },
-        'price_series': price_series,
-        'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
-        'ai_provider': ai_analysis.get('ai_provider', 'Technical Analysis Engine'),
-        'trading_recommendation': 'TRADE' if risk_assessment['approved'] else 'AVOID',
-        'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
-    }
-
-    return jsonify(response)
-
-
+        logger.error(f"Error in /api/analyze: {e}")
+        return jsonify({"error": str(e)}), 500
 # ==================== DATA MANAGER YANG DIPERBAIKI ====================
 class DataManager:
     def __init__(self):
