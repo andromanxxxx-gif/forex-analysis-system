@@ -951,57 +951,58 @@ Pertimbangkan:
         }
 # --- inside api_analyze, after technical_analysis and ai_analysis computed ---
 
-# Ambil deret harga historis untuk chart (gunakan get_price_data)
-try:
-    # ambil sampai 200 data terakhir (sesuaikan jika mau lebih/kurang)
-    series_df = data_manager.get_price_data(pair, timeframe, days=200)
-    # pastikan sorted by date ascending
-    if not series_df.empty:
-        series_df = series_df.sort_values('date')
-        price_series = []
-        for _, row in series_df.iterrows():
-            # konversi tanggal ke ISO string (jika datetime)
-            dt = row['date']
-            try:
-                dt_iso = dt.isoformat()
-            except Exception:
-                dt_iso = str(dt)
-            price_series.append({
-                'date': dt_iso,
-                'open': float(row['open']),
-                'high': float(row['high']),
-                'low': float(row['low']),
-                'close': float(row['close']),
-                'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else None
-            })
-    else:
-        price_series = []
-except Exception as e:
-    logger.error(f"Error serializing price series for {pair}-{timeframe}: {e}")
-    price_series = []
+    # --- inside api_analyze, after all analyses are done ---
 
-response = {
-    'pair': pair,
-    'timeframe': timeframe,
-    'timestamp': datetime.now().isoformat(),
-    'technical_analysis': technical_analysis,
-    'fundamental_analysis': fundamental_news,
-    'ai_analysis': ai_analysis,
-    'risk_assessment': risk_assessment,
-    'price_data': {
-        'current': real_time_price,
-        'support': technical_analysis['levels']['support'],
-        'resistance': technical_analysis['levels']['resistance'],
-        'change_pct': technical_analysis['momentum']['price_change_pct']
-    },
-    'price_series': price_series,   # <= added: series untuk chart berasal dari historical_data
-    'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
-    'ai_provider': ai_analysis.get('ai_provider', 'Technical Analysis Engine'),
-    'trading_recommendation': 'TRADE' if risk_assessment['approved'] else 'AVOID',
-    'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
-}
+    # Ambil deret harga historis untuk chart (gunakan get_price_data)
+    try:
+        # ambil sampai 200 data terakhir (sesuaikan jika mau lebih)
+        series_df = data_manager.get_price_data(pair, timeframe, days=200)
+        if not series_df.empty:
+            series_df = series_df.sort_values('date')
+            price_series = []
+            for _, row in series_df.iterrows():
+                dt = row['date']
+                try:
+                    dt_iso = dt.isoformat()
+                except Exception:
+                    dt_iso = str(dt)
+                price_series.append({
+                    'date': dt_iso,
+                    'open': float(row['open']),
+                    'high': float(row['high']),
+                    'low': float(row['low']),
+                    'close': float(row['close']),
+                    'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else None
+                })
+        else:
+            price_series = []
+    except Exception as e:
+        logger.error(f"Error serializing price series for {pair}-{timeframe}: {e}")
+        price_series = []
 
-return jsonify(response)
+    # Susun respons JSON
+    response = {
+        'pair': pair,
+        'timeframe': timeframe,
+        'timestamp': datetime.now().isoformat(),
+        'technical_analysis': technical_analysis,
+        'fundamental_analysis': fundamental_news,
+        'ai_analysis': ai_analysis,
+        'risk_assessment': risk_assessment,
+        'price_data': {
+            'current': real_time_price,
+            'support': technical_analysis['levels']['support'],
+            'resistance': technical_analysis['levels']['resistance'],
+            'change_pct': technical_analysis['momentum']['price_change_pct']
+        },
+        'price_series': price_series,
+        'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
+        'ai_provider': ai_analysis.get('ai_provider', 'Technical Analysis Engine'),
+        'trading_recommendation': 'TRADE' if risk_assessment['approved'] else 'AVOID',
+        'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+    }
+
+    return jsonify(response)
 
 
 # ==================== DATA MANAGER YANG DIPERBAIKI ====================
