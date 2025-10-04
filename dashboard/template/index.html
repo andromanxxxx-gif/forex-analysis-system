@@ -3,508 +3,234 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Forex AI Dashboard — Candles + EMA26 + MACD</title>
+  <title>Forex AI Dashboard — Live EMA26 & MACD</title>
 
-  <!-- Bootstrap for quick layout -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Lightweight Charts (fast, interactive candlesticks) -->
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
   <style>
     body {
-      background: #ffffff;
-      color: #111827;
-      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
-      padding: 18px;
+      background:#f8fafc;
+      color:#111827;
+      font-family: "Inter","Segoe UI",sans-serif;
+      padding:18px;
     }
-
     .topbar {
-      display:flex;
-      gap:12px;
-      align-items:center;
-      margin-bottom:14px;
+      display:flex; gap:12px; align-items:center; margin-bottom:14px;
     }
-
     .card-soft {
-      background: #ffffff;
-      border-radius: 10px;
-      box-shadow: 0 6px 18px rgba(17,24,39,0.08);
-      padding: 14px;
-      margin-bottom:14px;
+      background:#fff; border-radius:12px; padding:14px;
+      box-shadow:0 6px 16px rgba(0,0,0,0.05); margin-bottom:14px;
     }
-
-    #chartRoot {
-      height: 520px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #fff;
-    }
-
-    #macdRoot {
-      height: 140px;
-      margin-top: 10px;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #fff;
-    }
-
-    .muted { color: #6b7280; font-size: .95rem; }
-
-    .ai-signal-buy { color: #0f5132; background:#d1fae5; padding:4px 8px; border-radius:6px; font-weight:600; }
-    .ai-signal-sell { color: #6b0f1a; background:#ffe5e5; padding:4px 8px; border-radius:6px; font-weight:600; }
-    .ai-signal-hold { color: #6a5b00; background:#fff7cc; padding:4px 8px; border-radius:6px; font-weight:600; }
-
-    .controls { display:flex; gap:8px; align-items:center; margin-left:auto; }
-
+    #chartRoot { height:520px; border-radius:8px; background:#fff; }
+    #macdRoot { height:140px; margin-top:10px; border-radius:8px; background:#fff; }
+    .muted { color:#6b7280; font-size:.95rem; }
+    .ai-signal-buy { color:#0f5132; background:#d1fae5; padding:3px 8px; border-radius:6px; font-weight:600; }
+    .ai-signal-sell { color:#6b0f1a; background:#ffe5e5; padding:3px 8px; border-radius:6px; font-weight:600; }
+    .ai-signal-hold { color:#6a5b00; background:#fff7cc; padding:3px 8px; border-radius:6px; font-weight:600; }
     .small-muted { color:#6b7280; font-size:.9rem; }
-
-    @media (max-width: 992px) {
-      #chartRoot { height:420px; }
-      #macdRoot { height:120px; }
-    }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <h4 class="m-0">Forex AI Analysis Dashboard</h4>
 
-    <div style="display:flex; gap:8px; align-items:center; margin-left:18px;">
-      <label class="small-muted mb-0">Pair</label>
-      <select id="pairSelect" class="form-select form-select-sm" style="width:120px;">
-        <option>USDJPY</option><option>EURUSD</option><option>GBPJPY</option><option>CHFJPY</option>
-      </select>
+<div class="topbar">
+  <h4 class="m-0">Forex AI Dashboard</h4>
+  <label class="small-muted mb-0 ms-3">Pair</label>
+  <select id="pairSelect" class="form-select form-select-sm" style="width:120px;">
+    <option>USDJPY</option><option>EURUSD</option><option>GBPJPY</option><option>CHFJPY</option>
+  </select>
+  <label class="small-muted mb-0">Timeframe</label>
+  <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
+    <option>1D</option><option>4H</option><option>1H</option>
+  </select>
+  <button id="analyzeBtn" class="btn btn-primary btn-sm ms-2">Analyze</button>
+  <button id="toggleAutoRefresh" class="btn btn-outline-secondary btn-sm">Auto Refresh: OFF</button>
+  <div id="pairTicker" class="ms-3 small-muted" style="font-weight:600; font-size:1.05rem;">
+    USDJPY – 0.0000 (<span id="pairChange" style="color:gray;">0.00%</span>)
+  </div>
+</div>
 
-      <label class="small-muted mb-0">Timeframe</label>
-      <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
-        <option>1D</option><option>4H</option><option>1H</option>
-      </select>
-    </div>
-
-    <div class="controls">
-      <button id="analyzeBtn" class="btn btn-primary btn-sm">Analyze</button>
-      <button id="toggleAutoRefresh" class="btn btn-outline-secondary btn-sm">Auto Refresh: OFF</button>
+<div class="row gx-3">
+  <div class="col-lg-8">
+    <div class="card-soft">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong id="chartTitle">Price Chart</strong>
+          <div class="muted" id="chartSubtitle">Candlestick · EMA26 · MACD</div>
+        </div>
+        <div style="text-align:right">
+          <div class="small-muted">Live Price</div>
+          <div style="font-weight:700; font-size:1.2rem" id="livePrice">-</div>
+        </div>
+      </div>
+      <div id="chartRoot"></div>
+      <div id="macdRoot"></div>
     </div>
   </div>
 
-  <div class="row gx-3">
-    <!-- Left: Chart and MACD -->
-    <div class="col-lg-8">
-      <div class="card-soft">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div>
-            <strong id="chartTitle">Price Chart</strong>
-            <div class="muted" id="chartSubtitle">Candlestick · EMA26 · MACD</div>
-          </div>
-          <div style="text-align:right">
-            <div class="small-muted">Live Price</div>
-            <div style="font-weight:700; font-size:1.2rem" id="livePrice">-</div>
-          </div>
-        </div>
-
-        <div id="chartRoot"></div>
-        <div id="macdRoot"></div>
+  <div class="col-lg-4">
+    <div class="card-soft">
+      <h5>AI Analysis <small class="muted" id="aiProviderTxt"></small></h5>
+      <div id="aiSummary" class="muted">No analysis yet.</div>
+      <div class="mt-2"><strong>Signal:</strong> <span id="aiSignalBadge">-</span></div>
+      <div class="row mt-1">
+        <div class="col"><small class="small-muted">Confidence</small><div id="aiConfidence">-</div></div>
+        <div class="col"><small class="small-muted">Risk</small><div id="aiRisk">-</div></div>
+      </div>
+      <div class="row mt-2">
+        <div class="col"><small class="small-muted">Entry</small><div id="aiEntry">-</div></div>
+        <div class="col"><small class="small-muted">SL</small><div id="aiSL">-</div></div>
+      </div>
+      <div class="row mt-1">
+        <div class="col"><small class="small-muted">TP1</small><div id="aiTP1">-</div></div>
+        <div class="col"><small class="small-muted">TP2</small><div id="aiTP2">-</div></div>
       </div>
     </div>
 
-    <!-- Right: AI, News, Technical -->
-    <div class="col-lg-4">
-      <div class="card-soft">
-        <h5 style="margin-bottom:6px">AI Analysis <small class="muted" id="aiProviderTxt"></small></h5>
-        <div id="aiSummary" class="muted" style="line-height:1.35; margin-bottom:10px;">No analysis yet.</div>
+    <div class="card-soft">
+      <h6>Fundamental News</h6>
+      <div id="fundamentalNews" class="muted">-</div>
+    </div>
 
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-          <div><strong>Signal</strong></div>
-          <div id="aiSignalBadge">-</div>
-        </div>
-
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
-          <div><small class="small-muted">Confidence</small><div id="aiConfidence">-</div></div>
-          <div><small class="small-muted">Risk Level</small><div id="aiRisk">-</div></div>
-        </div>
-
-        <div style="display:flex; gap:8px; margin-bottom:6px;">
-          <div style="flex:1">
-            <small class="small-muted">Entry</small>
-            <div id="aiEntry">-</div>
-          </div>
-          <div style="flex:1">
-            <small class="small-muted">SL</small>
-            <div id="aiSL">-</div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:8px; margin-bottom:8px;">
-          <div style="flex:1">
-            <small class="small-muted">TP1</small>
-            <div id="aiTP1">-</div>
-          </div>
-          <div style="flex:1">
-            <small class="small-muted">TP2</small>
-            <div id="aiTP2">-</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card-soft">
-        <h6>Fundamental News</h6>
-        <div id="fundamentalNews" class="muted">-</div>
-      </div>
-
-      <div class="card-soft">
-        <h6>Technical Overview</h6>
-        <div class="small-muted">RSI: <strong id="rsiVal">-</strong></div>
-        <div class="small-muted">MACD (last): <strong id="macdVal">-</strong></div>
-        <div class="small-muted">ADX: <strong id="adxVal">-</strong></div>
-        <div class="small-muted">ATR: <strong id="atrVal">-</strong></div>
-        <div class="small-muted">Volatility: <strong id="volVal">-</strong></div>
-      </div>
-
+    <div class="card-soft">
+      <h6>Technical Overview</h6>
+      <div class="small-muted">RSI: <strong id="rsiVal">-</strong></div>
+      <div class="small-muted">MACD: <strong id="macdVal">-</strong></div>
+      <div class="small-muted">ADX: <strong id="adxVal">-</strong></div>
+      <div class="small-muted">ATR: <strong id="atrVal">-</strong></div>
+      <div class="small-muted">Volatility: <strong id="volVal">-</strong></div>
     </div>
   </div>
+</div>
 
 <script>
-/* ============================
-   Utilities: EMA, MACD, helpers
-   ============================ */
-
-function calcEMA(values, period) {
-  const k = 2 / (period + 1);
-  const out = [];
-  let prev = values[0];
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i];
-    prev = i === 0 ? v : v * k + prev * (1 - k);
-    out.push(prev);
-  }
-  return out;
+/* ===== Utilities ===== */
+function calcEMA(values, period){
+  const k=2/(period+1);let ema=[values[0]];
+  for(let i=1;i<values.length;i++)ema.push(values[i]*k+ema[i-1]*(1-k));
+  return ema;
 }
-
-function calcMACDSeries(closes, short=12, long=26, signalPeriod=9) {
-  // returns arrays: macdLine[], signalLine[], histogram[]
-  const emaShort = calcEMA(closes, short);
-  const emaLong = calcEMA(closes, long);
-  const macd = closes.map((_,i) => emaShort[i] - emaLong[i]);
-  const signal = calcEMA(macd, signalPeriod);
-  const hist = macd.map((v,i) => v - (signal[i] ?? 0));
-  return { macd, signal, hist };
+function calcMACDSeries(c,short=12,long=26,signal=9){
+  const emaS=calcEMA(c,short),emaL=calcEMA(c,long);
+  const macd=c.map((_,i)=>emaS[i]-emaL[i]);
+  const sig=calcEMA(macd,signal);
+  const hist=macd.map((v,i)=>v-(sig[i]||0));
+  return {macd,sig,hist};
 }
+function fmt(d){const t=new Date(d);return t.toISOString().split('T')[0];}
 
-function toLightWeightTime(dateStr) {
-  // lightweight-charts accepts YYYY-MM-DD or timestamp seconds
-  // Keep YYYY-MM-DD for daily, or use timestamp for intraday
-  // Input may be "2025-02-13T00:00:00" — convert to 'YYYY-MM-DD'
-  if (!dateStr) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d)) return dateStr;
-  return d.toISOString().split('T')[0];
-}
-
-/* ===================================
-   Setup charts: main (candles) + EMA26
-   and MACD subchart (macd line, signal, histogram)
-   =================================== */
-
-const chartRoot = document.getElementById('chartRoot');
-const macdRoot = document.getElementById('macdRoot');
-
-const chart = LightweightCharts.createChart(chartRoot, {
-  layout: { backgroundColor: '#ffffff', textColor: '#111827' },
-  grid: { vertLines: { color: '#f1f5f9' }, horzLines: { color: '#f1f5f9' } },
-  rightPriceScale: { borderColor: '#eee' },
-  timeScale: { borderColor: '#eee' },
-  height: 520,
+/* ===== Chart Setup ===== */
+const chart=LightweightCharts.createChart(document.getElementById('chartRoot'),{
+  layout:{backgroundColor:'#fff',textColor:'#111'},grid:{vertLines:{color:'#f3f4f6'},horzLines:{color:'#f3f4f6'}},
+  timeScale:{borderColor:'#eee'},rightPriceScale:{borderColor:'#eee'}
 });
+const candle=chart.addCandlestickSeries({upColor:'#16a34a',downColor:'#dc2626',borderVisible:true});
+const ema26=chart.addLineSeries({color:'#2563eb',lineWidth:1.5});
+const backtrend=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'',base:0});
 
-const candleSeries = chart.addCandlestickSeries({
-  upColor: '#16a34a', downColor: '#dc2626', borderVisible: true, wickUpColor: '#16a34a', wickDownColor: '#dc2626'
+const macdChart=LightweightCharts.createChart(document.getElementById('macdRoot'),{
+  layout:{backgroundColor:'#fff',textColor:'#111'},
+  grid:{vertLines:{color:'#f3f4f6'},horzLines:{color:'#f3f4f6'}},timeScale:{visible:true,borderColor:'#eee'}
 });
+const macdLine=macdChart.addLineSeries({color:'#0ea5e9'});
+const macdSignal=macdChart.addLineSeries({color:'#f59e0b'});
+const macdHist=macdChart.addHistogramSeries({color:'#a78bfa'});
 
-const ema26Series = chart.addLineSeries({
-  color: '#2563eb', lineWidth: 1.5, priceLineVisible: false
-});
+/* ===== DOM refs ===== */
+const livePriceEl=document.getElementById('livePrice');
+const pairSelect=document.getElementById('pairSelect');
+const timeframeSelect=document.getElementById('timeframeSelect');
+const aiSummaryEl=document.getElementById('aiSummary');
+const aiSignal=document.getElementById('aiSignalBadge');
+const aiConfidence=document.getElementById('aiConfidence');
+const aiRisk=document.getElementById('aiRisk');
+const aiEntry=document.getElementById('aiEntry');
+const aiSL=document.getElementById('aiSL');
+const aiTP1=document.getElementById('aiTP1');
+const aiTP2=document.getElementById('aiTP2');
+const fundNews=document.getElementById('fundamentalNews');
+const rsiEl=document.getElementById('rsiVal');
+const macdValEl=document.getElementById('macdVal');
+const adxEl=document.getElementById('adxVal');
+const atrEl=document.getElementById('atrVal');
+const volEl=document.getElementById('volVal');
+const changeEl=document.getElementById('pairChange');
 
-// create a separate chart for MACD using the same API (lightweight-charts uses separate chart instance)
-const macdChart = LightweightCharts.createChart(macdRoot, {
-  layout: { backgroundColor: '#ffffff', textColor: '#111827' },
-  grid: { vertLines: { color: '#f1f5f9' }, horzLines: { color: '#f1f5f9' } },
-  rightPriceScale: { scaleMargins: { top: 0.2, bottom: 0.1 }, borderColor: '#eee' },
-  timeScale: { borderColor: '#eee', visible: true },
-  height: 140,
-});
-
-const macdLineSeries = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1.2 });
-const macdSignalSeries = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.2 });
-const macdHistSeries = macdChart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '', color: '#a78bfa' });
-
-/* ============================
-   State & intervals
-   ============================ */
-let autoRefreshEnabled = false;
-let autoInterval = null;
-let realtimeInterval = null;
-
-/* ============================
-   DOM references
-   ============================ */
-const analyzeBtn = document.getElementById('analyzeBtn');
-const pairSelect = document.getElementById('pairSelect');
-const timeframeSelect = document.getElementById('timeframeSelect');
-const toggleAutoRefreshBtn = document.getElementById('toggleAutoRefresh');
-
-const livePriceEl = document.getElementById('livePrice');
-const aiProviderTxt = document.getElementById('aiProviderTxt');
-const aiSummaryEl = document.getElementById('aiSummary');
-const aiSignalBadge = document.getElementById('aiSignalBadge');
-const aiConfidenceEl = document.getElementById('aiConfidence');
-const aiRiskEl = document.getElementById('aiRisk');
-const aiEntryEl = document.getElementById('aiEntry');
-const aiSL = document.getElementById('aiSL');
-const aiTP1 = document.getElementById('aiTP1');
-const aiTP2 = document.getElementById('aiTP2');
-
-const fundamentalNewsEl = document.getElementById('fundamentalNews');
-const rsiValEl = document.getElementById('rsiVal');
-const macdValEl = document.getElementById('macdVal');
-const adxValEl = document.getElementById('adxVal');
-const atrValEl = document.getElementById('atrVal');
-const volValEl = document.getElementById('volVal');
-
-/* ============================
-   Main update / rendering
-   ============================ */
-
-async function fetchAnalyze(pair, timeframe) {
-  const url = `/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${encodeURIComponent(timeframe)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Analyze API returned ' + res.status);
-  return res.json();
+/* ===== Data state ===== */
+let lastCandle=null, auto=false;
+function setSignal(sig){
+  aiSignal.textContent=sig;
+  aiSignal.className=sig==='BUY'?'ai-signal-buy':sig==='SELL'?'ai-signal-sell':'ai-signal-hold';
 }
 
-async function fetchRealtime(pair) {
-  const url = `/api/realtime?pair=${encodeURIComponent(pair)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Realtime API returned ' + res.status);
-  return res.json();
+/* ===== Fetch + Render ===== */
+async function analyze(){
+  const pair=pairSelect.value, tf=timeframeSelect.value;
+  const r=await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); const j=await r.json();
+  const ps=j.price_series||[]; const c=ps.map(p=>({time:fmt(p.date),open:+p.open,high:+p.high,low:+p.low,close:+p.close}));
+  candle.setData(c);
+  const closes=c.map(d=>d.close);
+  const ema=calcEMA(closes,26).map((v,i)=>({time:c[i].time,value:v}));
+  ema26.setData(ema);
+  const {macd,sig,hist}=calcMACDSeries(closes);
+  macdLine.setData(macd.map((v,i)=>({time:c[i].time,value:v})));
+  macdSignal.setData(sig.map((v,i)=>({time:c[i].time,value:v})));
+  macdHist.setData(hist.map((v,i)=>({time:c[i].time,value:v})));
+  macdValEl.textContent=macd.at(-1)?.toFixed(3)||'-';
+  lastCandle=c.at(-1);
+  livePriceEl.textContent=j.price_data?.current?.toFixed(4)||lastCandle.close.toFixed(4);
+  aiSummaryEl.textContent=j.ai_analysis?.analysis_summary||'-';
+  setSignal(j.ai_analysis?.signal||'HOLD');
+  aiConfidence.textContent=j.ai_analysis?.confidence+'%'||'-';
+  aiRisk.textContent=j.ai_analysis?.risk_level||'-';
+  aiEntry.textContent=j.ai_analysis?.entry_price||'-';
+  aiSL.textContent=j.ai_analysis?.stop_loss||'-';
+  aiTP1.textContent=j.ai_analysis?.take_profit_1||'-';
+  aiTP2.textContent=j.ai_analysis?.take_profit_2||'-';
+  fundNews.textContent=j.fundamental_analysis||'-';
+  const t=j.technical_analysis||{};
+  rsiEl.textContent=t.momentum?.rsi?.toFixed(2)||'-';
+  adxEl.textContent=t.trend?.adx?.toFixed(2)||'-';
+  atrEl.textContent=t.volatility?.atr?.toFixed(2)||'-';
+  volEl.textContent=t.volatility?.volatility_pct?(t.volatility.volatility_pct*100).toFixed(2)+'%':'-';
+
+  // Backtrend overlay
+  const sig=j.ai_analysis?.signal?.toUpperCase()||'HOLD';
+  const color=sig==='BUY'?'rgba(34,197,94,0.15)':sig==='SELL'?'rgba(239,68,68,0.15)':'rgba(234,179,8,0.15)';
+  backtrend.setData(c.map(d=>({time:d.time,value:d.close,color})));
 }
 
-function updateAISection(data) {
-  aiProviderTxt.textContent = data.ai_provider || data.ai_analysis?.ai_provider || 'AI';
-  aiSummaryEl.textContent = data.ai_analysis?.analysis_summary || data.analysis_summary || '-';
-  const sig = data.ai_analysis?.signal || data.ai_analysis?.signal || 'HOLD';
-  aiSignalBadge.innerHTML = sig;
-  aiSignalBadge.className = (sig === 'BUY') ? 'ai-signal-buy' : (sig === 'SELL') ? 'ai-signal-sell' : 'ai-signal-hold';
-
-  aiConfidenceEl.textContent = (data.ai_analysis?.confidence ?? data.ai_analysis?.confidence ?? '-') + (typeof data.ai_analysis?.confidence === 'number' ? '%' : '');
-  aiRiskEl.textContent = data.ai_analysis?.risk_level || '-';
-  aiEntryEl.textContent = data.ai_analysis?.entry_price || '-';
-  aiSL.textContent = data.ai_analysis?.stop_loss || '-';
-  const tp1 = data.ai_analysis?.take_profit_1 || '-';
-  const tp2 = data.ai_analysis?.take_profit_2 || '-';
-  aiTP1.textContent = tp1;
-  aiTP2.textContent = tp2;
-
-  fundamentalNewsEl.textContent = data.fundamental_analysis || data.fundamental_analysis || '-';
-
-  // Technical quick view
-  const tech = data.technical_analysis || {};
-  rsiValEl.textContent = tech.momentum?.rsi ? tech.momentum.rsi.toFixed(2) : '-';
-  macdValEl.textContent = tech.momentum?.macd ? tech.momentum.macd.toFixed(3) : '-';
-  adxValEl.textContent = tech.trend?.adx ? tech.trend.adx.toFixed(2) : '-';
-  atrValEl.textContent = tech.volatility?.atr ? tech.volatility.atr.toFixed(2) : '-';
-  volValEl.textContent = tech.volatility?.volatility_pct ? (tech.volatility.volatility_pct*100).toFixed(2)+'%' : '-';
-}
-
-function convertSeriesForChart(price_series) {
-  // price_series item: {date, open, high, low, close, volume}
-  const candles = price_series.map(p => ({
-    time: toLightWeightTime(p.date),
-    open: Number(p.open),
-    high: Number(p.high),
-    low: Number(p.low),
-    close: Number(p.close)
-  }));
-  const closes = candles.map(c => c.close);
-  return { candles, closes };
-}
-
-function renderAllFromAnalyze(json) {
-  // update AI panel
-  updateAISection(json);
-
-  // set live price
-  const live = json.price_data?.current ?? (json.price_series?.length ? json.price_series[json.price_series.length-1].close : null);
-  if (live != null) {
-    livePriceEl.textContent = Number(live).toFixed(4);
-  }
-
-  // prepare candles + EMA + MACD
-  const ps = Array.isArray(json.price_series) ? json.price_series : [];
-  const { candles, closes } = convertSeriesForChart(ps);
-
-  // set candle data
-  if (candles.length) {
-    candleSeries.setData(candles);
-
-    // EMA26
-    const ema26 = calcEMA(closes, 26);
-    const ema26Points = ema26.map((v,i) => ({ time: candles[i].time, value: Number(v) }));
-    ema26Series.setData(ema26Points);
-
-    // MACD calculation
-    const { macd, signal, hist } = calcMACDSeries(closes, 12, 26, 9);
-    const macdPoints = macd.map((v,i) => ({ time: candles[i].time, value: Number(v) }));
-    const signalPoints = signal.map((v,i) => ({ time: candles[i].time, value: Number(v) }));
-    const histPoints = hist.map((v,i) => ({ time: candles[i].time, value: Number(v) }));
-
-    macdLineSeries.setData(macdPoints);
-    macdSignalSeries.setData(signalPoints);
-    // histogram: Lightweight-charts histogram series expects {time, value}
-    macdHistSeries.setData(histPoints);
-
-    // update macd last text
-    const lastIndex = macd.length - 1;
-    if (lastIndex >= 0) {
-      document.getElementById('macdVal').textContent = macd[lastIndex].toFixed(3);
-    }
-  } else {
-    // clear
-    candleSeries.setData([]);
-    ema26Series.setData([]);
-    macdLineSeries.setData([]);
-    macdSignalSeries.setData([]);
-    macdHistSeries.setData([]);
-  }
-}
-
-/* ============================
-   Realtime updates: update last candle close (or append)
-   ============================ */
-function applyRealtimePriceToChart(price) {
-  try {
-    const data = candleSeries.data || null;
-    // Lightweight-charts does not expose full data array easily; use timeScale to get last visible time
-    // Simpler: keep last candle from underlying price_series stored in lastCandleRef
-    // We'll attempt to update last candle by reading last point via visibleRange
-    // Fallback: call update using the last time label from the chart by reading last candle from the internal series dataset we've set earlier.
-  } catch (e) {
-    console.warn('realtime chart update error', e);
-  }
-
-  // Simple approach: update last candle by requesting current visible last time via timeScale
-  try {
-    const model = candleSeries._private__parent; // internal; not guaranteed. We'll do a safer approach:
-    // Safer: maintain lastCandle global when we setData.
-  } catch(e){}
-}
-
-// We'll maintain the lastCandle in a variable when rendering analyze data
-let lastCandle = null;
-function updateLastCandleInMemory(candles) {
-  if (candles && candles.length) lastCandle = candles[candles.length-1];
-}
-
-/* ============================
-   Main controller: analyze + intervals
-   ============================ */
-
-async function doAnalyze(showSpinner = false) {
-  const pair = pairSelect.value;
-  const timeframe = timeframeSelect.value;
-  try {
-    const json = await fetchAnalyze(pair, timeframe);
-    renderAllFromAnalyze(json);
-    updateLastCandleInMemory(Array.isArray(json.price_series) ? json.price_series.map(p => ({
-      time: toLightWeightTime(p.date),
-      o: Number(p.open),
-      h: Number(p.high),
-      l: Number(p.low),
-      c: Number(p.close)
-    })) : []);
-    // show live price from price_data
-    if (json.price_data?.current != null) {
-      livePriceEl.textContent = Number(json.price_data.current).toFixed(4);
-    }
-    // if auto refresh enabled, show small subtle highlight
-    if (autoRefreshEnabled) {
-      // flash live price
-      livePriceEl.style.transform = 'scale(1.04)';
-      setTimeout(()=>livePriceEl.style.transform = 'scale(1)', 380);
-    }
-  } catch (err) {
-    console.error('Analyze error', err);
-  }
-}
-
-async function doRealtimeTick() {
-  const pair = pairSelect.value;
-  try {
-    const j = await fetchRealtime(pair);
-    const price = j?.price ?? j?.current_price ?? null;
-    if (price != null) {
-      // update live price field
-      livePriceEl.textContent = Number(price).toFixed(4);
-      // update last candle in-place (if exists)
-      if (lastCandle) {
-        // create an updated candle with changed high/low/close based on new price
-        const updated = {
-          time: lastCandle.time,
-          open: lastCandle.o,
-          high: Math.max(lastCandle.h, Number(price)),
-          low: Math.min(lastCandle.l, Number(price)),
-          close: Number(price)
-        };
-        try {
-          // update series last candle
-          candleSeries.update(updated);
-          // also update EMA26 line and MACD would need recalculation; to keep it lightweight we won't recalc all series every tick
-        } catch (e) {
-          console.warn('update last candle failed', e);
-        }
-      } else {
-        // if no lastCandle, optionally re-run analyze to fetch series
-        // do nothing
+/* ===== Live Price Ticker ===== */
+let prevPrice=null;
+async function tick(){
+  const pair=pairSelect.value;
+  try{
+    const r=await fetch(`/api/realtime?pair=${pair}`);
+    const j=await r.json();
+    const price=j.price??j.current_price??null;
+    if(price){
+      livePriceEl.textContent=price.toFixed(4);
+      const ch=prevPrice?((price-prevPrice)/prevPrice)*100:0;
+      changeEl.textContent=ch.toFixed(2)+'%';
+      changeEl.style.color=ch>=0?'#16a34a':'#dc2626';
+      prevPrice=price;
+      if(lastCandle){
+        const u={time:lastCandle.time,open:lastCandle.open,high:Math.max(lastCandle.high,price),low:Math.min(lastCandle.low,price),close:price};
+        candle.update(u);
       }
     }
-  } catch (e) {
-    // fallback: re-run analyze to refresh data
-    // console.warn('Realtime tick failed', e);
-  }
+  }catch{}
 }
 
-/* ============================
-   Auto refresh & event wiring
-   ============================ */
-
-analyzeBtn.addEventListener('click', () => {
-  doAnalyze(true);
-});
-
-toggleAutoRefreshBtn.addEventListener('click', () => {
-  autoRefreshEnabled = !autoRefreshEnabled;
-  toggleAutoRefreshBtn.textContent = `Auto Refresh: ${autoRefreshEnabled ? 'ON' : 'OFF'}`;
-  if (autoRefreshEnabled) {
-    // run once immediately (no spinner)
-    doAnalyze(false);
-    // every 30s re-run analysis
-    autoInterval = setInterval(() => doAnalyze(false), 30000);
-  } else {
-    clearInterval(autoInterval);
-  }
-});
-
-// start realtime polling every 5s
-function startRealtimePolling(){
-  if (realtimeInterval) clearInterval(realtimeInterval);
-  realtimeInterval = setInterval(()=>doRealtimeTick(), 5000);
-}
-
-// start initial
-doAnalyze(true);
-startRealtimePolling();
-
-/* Resize handling */
-window.addEventListener('resize', () => { chart.applyOptions({ width: chartRoot.clientWidth }); macdChart.applyOptions({ width: macdRoot.clientWidth }); });
+/* ===== Events ===== */
+document.getElementById('analyzeBtn').onclick=analyze;
+document.getElementById('toggleAutoRefresh').onclick=()=>{
+  auto=!auto;
+  toggleAutoRefresh.textContent='Auto Refresh: '+(auto?'ON':'OFF');
+  if(auto)setInterval(analyze,30000);
+};
+analyze();
+setInterval(tick,5000);
 </script>
 </body>
 </html>
