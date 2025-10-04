@@ -951,92 +951,101 @@ Pertimbangkan:
         }
 # --- inside api_analyze, after technical_analysis and ai_analysis computed ---
 
-@app.route("/api/analyze", methods=["POST"])
+@app.route('/api/analyze')
 def api_analyze():
+    """Endpoint untuk analisis market real-time dengan AI dan TwelveData.
+    Mengembalikan juga price_series (historical CSV) untuk chart frontend.
+    """
     try:
-        data = request.get_json()
-        pair = data.get("pair", "EURUSD").upper()
-        timeframe = data.get("timeframe", "1H")
-        use_historical = data.get("use_historical", True)
-
-        logger.info(f"Running analysis for {pair}-{timeframe}")
-
-        # === 1. Ambil data harga (historical / realtime) ===
-        if use_historical:
-            df = data_manager.get_price_data(pair, timeframe, days=200)
-            if df.empty:
-                raise ValueError(f"No historical data found for {pair}-{timeframe}")
-            price_data = df
-            real_time_price = float(df["close"].iloc[-1])
-        else:
-            real_time_price = twelve_data_client.get_real_time_price(pair)
-            price_data = data_manager.get_price_data(pair, timeframe, days=200)
-
-        # === 2. Analisis teknikal ===
-        technical_analysis = data_manager.perform_technical_analysis(price_data, pair)
-
-        # === 3. Analisis fundamental ===
-        fundamental_news = news_client.get_latest_news(pair)
-
-        # === 4. Analisis AI (DeepSeek API) ===
-        ai_analysis = ai_engine.generate_analysis(pair, technical_analysis, fundamental_news)
-
-        # === 5. Penilaian risiko ===
-        risk_assessment = risk_manager.evaluate(ai_analysis, technical_analysis)
-
-        # === 6. Ambil deret harga historis untuk chart ===
+        pair = request.args.get('pair', 'USDJPY').upper()
+        timeframe = request.args.get('timeframe', '4H').upper()
+        
+        # Validasi pair
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        # 1) Ambil harga realtime (TwelveData) — tetap seperti semula
+        real_time_price = twelve_data_client.get_real_time_price(pair)
+        
+        # 2) Ambil data harga historis untuk analisis teknikal (gunakan DataManager)
+        price_data = data_manager.get_price_data(pair, timeframe, days=60)
+        if price_data.empty:
+            return jsonify({'error': 'No price data available'}), 400
+        
+        # 3) Analisis teknikal (pakai engine asli)
+        technical_analysis = tech_engine.calculate_all_indicators(price_data)
+        
+        # override current price dengan realtime untuk konsistensi keputusan
+        if 'levels' not in technical_analysis:
+            technical_analysis.setdefault('levels', {})
+        technical_analysis['levels']['current_price'] = real_time_price
+        
+        # 4) Analisis fundamental (news per-pair)
+        fundamental_news = fundamental_engine.get_forex_news(pair)
+        
+        # 5) Analisis AI via DeepSeek (tetap gunakan analyzer asli)
+        ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
+        
+        # 6) Risk assessment (tetap pakai risk_manager asli)
+        risk_assessment = risk_manager.validate_trade(
+            pair=pair,
+            signal=ai_analysis.get('signal', 'HOLD'),
+            confidence=ai_analysis.get('confidence', 50),
+            proposed_lot_size=0.1,
+            account_balance=getattr(config, 'INITIAL_BALANCE', 1000),
+            current_price=real_time_price,
+            open_positions=[]
+        )
+        
+        # 7) Siapkan price_series dari CSV historical_data (untuk chart)
+        price_series = []
         try:
             hist_df = data_manager.get_price_data(pair, timeframe, days=200)
             if not hist_df.empty:
-                hist_df = hist_df.sort_values("date")
-                price_series = []
+                hist_df = hist_df.sort_values('date')
                 for _, row in hist_df.iterrows():
-                    date_str = None
                     try:
-                        date_str = row["date"].isoformat()
+                        date_str = row['date'].isoformat()
                     except Exception:
-                        date_str = str(row["date"])
+                        date_str = str(row['date'])
                     price_series.append({
-                        "date": date_str,
-                        "open": float(row["open"]),
-                        "high": float(row["high"]),
-                        "low": float(row["low"]),
-                        "close": float(row["close"]),
-                        "volume": int(row["volume"]) if "volume" in row and not pd.isna(row["volume"]) else None
+                        'date': date_str,
+                        'open': float(row['open']),
+                        'high': float(row['high']),
+                        'low': float(row['low']),
+                        'close': float(row['close']),
+                        'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else None
                     })
-            else:
-                price_series = []
         except Exception as e:
             logger.error(f"Error preparing price series for {pair}-{timeframe}: {e}")
             price_series = []
-
-        # === 7. Susun hasil respons ===
+        
+        # 8) Susun response (preserve semua fields yang ada di backend awal)
         response = {
-            "pair": pair,
-            "timeframe": timeframe,
-            "timestamp": datetime.now().isoformat(),
-            "technical_analysis": technical_analysis,
-            "fundamental_analysis": fundamental_news,
-            "ai_analysis": ai_analysis,
-            "risk_assessment": risk_assessment,
-            "price_data": {
-                "current": real_time_price,
-                "support": technical_analysis["levels"]["support"],
-                "resistance": technical_analysis["levels"]["resistance"],
-                "change_pct": technical_analysis["momentum"]["price_change_pct"]
+            'pair': pair,
+            'timeframe': timeframe,
+            'timestamp': datetime.now().isoformat(),
+            'technical_analysis': technical_analysis,
+            'fundamental_analysis': fundamental_news,
+            'ai_analysis': ai_analysis,
+            'risk_assessment': risk_assessment,
+            'price_data': {
+                'current': real_time_price,
+                'support': technical_analysis.get('levels', {}).get('support'),
+                'resistance': technical_analysis.get('levels', {}).get('resistance'),
+                'change_pct': technical_analysis.get('momentum', {}).get('price_change_pct') if isinstance(technical_analysis.get('momentum'), dict) else None
             },
-            "price_series": price_series,
-            "analysis_summary": f"{pair} currently trading at {real_time_price:.4f}",
-            "ai_provider": ai_analysis.get("ai_provider", "DeepSeek AI"),
-            "trading_recommendation": "TRADE" if risk_assessment["approved"] else "AVOID",
-            "data_source": "TwelveData Live" if not twelve_data_client.demo_mode else "TwelveData Demo"
+            'price_series': price_series,   # <= tambahan untuk chart
+            'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
+            'ai_provider': ai_analysis.get('ai_provider', 'DeepSeek AI'),
+            'data_source': 'TwelveData Live' if not getattr(twelve_data_client, 'demo_mode', True) else 'TwelveData Demo'
         }
-
+        
         return jsonify(response)
-
+    
     except Exception as e:
-        logger.error(f"Error in /api/analyze: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Analysis error: {e}", exc_info=True)
+        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 # ==================== DATA MANAGER YANG DIPERBAIKI ====================
 class DataManager:
     def __init__(self):
