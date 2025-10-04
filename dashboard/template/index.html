@@ -1,1192 +1,321 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex Analysis & Backtesting System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #e74c3c;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --light-bg: #f8f9fa;
-            --dark-text: #2c3e50;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f7fa;
-            color: var(--dark-text);
-        }
-        
-        .navbar-brand {
-            font-weight: 700;
-        }
-        
-        .card {
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            border: none;
-            margin-bottom: 20px;
-            transition: transform 0.3s ease;
-        }
-        
-        .card:hover {
-            transform: translateY(-2px);
-        }
-        
-        .card-header {
-            border-radius: 10px 10px 0 0 !important;
-            font-weight: 600;
-        }
-        
-        .btn-primary {
-            background-color: var(--secondary-color);
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        
-        .btn-warning {
-            background-color: var(--warning-color);
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        
-        .price-up {
-            color: var(--success-color);
-            font-weight: 600;
-        }
-        
-        .price-down {
-            color: var(--accent-color);
-            font-weight: 600;
-        }
-        
-        .signal-buy {
-            background-color: rgba(39, 174, 96, 0.1);
-            border-left: 4px solid var(--success-color);
-            padding: 15px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .signal-sell {
-            background-color: rgba(231, 76, 60, 0.1);
-            border-left: 4px solid var(--accent-color);
-            padding: 15px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .signal-hold {
-            background-color: rgba(243, 156, 18, 0.1);
-            border-left: 4px solid var(--warning-color);
-            padding: 15px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .confidence-high {
-            color: var(--success-color);
-            font-weight: 700;
-        }
-        
-        .confidence-medium {
-            color: var(--warning-color);
-            font-weight: 700;
-        }
-        
-        .confidence-low {
-            color: var(--accent-color);
-            font-weight: 700;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-        }
-        
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-        }
-        
-        .technical-indicator {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-        }
-        
-        .indicator-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        
-        .news-card {
-            background-color: #f8f9fa;
-            border-left: 4px solid var(--secondary-color);
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        
-        .backtest-summary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .summary-value {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-        
-        .trade-row {
-            border-left: 4px solid transparent;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 0 6px 6px 0;
-        }
-        
-        .trade-profit {
-            font-weight: 600;
-        }
-        
-        .robot-logo {
-            font-size: 2rem;
-            color: var(--secondary-color);
-            margin-right: 10px;
-        }
-        
-        .chart-tabs .nav-link {
-            color: var(--dark-text);
-            font-weight: 500;
-        }
-        
-        .chart-tabs .nav-link.active {
-            background-color: var(--secondary-color);
-            color: white;
-            border-color: var(--secondary-color);
-        }
-        
-        .indicator-line {
-            border-width: 2px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forex Intelligence Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+  <style>
+    body {
+      background-color: #0b0f19;
+      color: #fff;
+      font-family: "Segoe UI", sans-serif;
+    }
+    .card {
+      background-color: #141a28;
+      border: 1px solid #2a3244;
+      border-radius: 12px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+    }
+    canvas {
+      width: 100% !important;
+      height: 350px !important;
+    }
+    .loading-spinner {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .loading-spinner.show {
+      display: block;
+    }
+  </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--primary-color);">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-robot robot-logo"></i>Forex Analysis & Backtesting
-            </a>
-        </div>
-    </nav>
+  <div class="container-fluid py-3">
+    <h2 class="text-center mb-3">Forex Intelligence Dashboard</h2>
 
-    <!-- Main Container -->
-    <div class="container mt-4">
-        <!-- Market Overview -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-chart-line me-2"></i> Market Overview</span>
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadMarketOverview()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="row" id="marketOverview">
-                            <!-- Market overview will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <!-- Left Column - Analysis & Backtesting -->
-            <div class="col-lg-8">
-                <!-- Analysis Section -->
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <i class="fas fa-chart-bar me-2"></i>Forex Analysis
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label for="pair-select" class="form-label">Currency Pair</label>
-                                <select class="form-select" id="pair-select">
-                                    <option value="USDJPY">USD/JPY</option>
-                                    <option value="GBPJPY">GBP/JPY</option>
-                                    <option value="EURJPY">EUR/JPY</option>
-                                    <option value="CHFJPY">CHF/JPY</option>
-                                    <option value="EURUSD">EUR/USD</option>
-                                    <option value="GBPUSD">GBP/USD</option>
-                                    <option value="USDCHF">USD/CHF</option>
-                                    <option value="AUDUSD">AUD/USD</option>
-                                    <option value="USDCAD">USD/CAD</option>
-                                    <option value="NZDUSD">NZD/USD</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="timeframe-select" class="form-label">Timeframe</label>
-                                <select class="form-select" id="timeframe-select">
-                                    <option value="1H">1 Hour</option>
-                                    <option value="4H" selected>4 Hours</option>
-                                    <option value="1D">Daily</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="d-grid">
-                                    <button class="btn btn-primary" onclick="getAnalysis()">
-                                        <i class="fas fa-search me-2"></i>Get Analysis
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Loading Indicator -->
-                        <div class="loading" id="analysis-loading" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Analyzing market data...</p>
-                        </div>
-                        
-                        <!-- Analysis Results -->
-                        <div id="analysis-results"></div>
-                    </div>
-                </div>
-                
-                <!-- Backtesting Section -->
-                <div class="card mt-4">
-                    <div class="card-header bg-warning text-dark">
-                        <i class="fas fa-history me-2"></i>Backtesting
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <label for="backtest-pair" class="form-label">Currency Pair</label>
-                                <select class="form-select" id="backtest-pair">
-                                    <option value="USDJPY">USD/JPY</option>
-                                    <option value="GBPJPY">GBP/JPY</option>
-                                    <option value="EURJPY">EUR/JPY</option>
-                                    <option value="CHFJPY">CHF/JPY</option>
-                                    <option value="EURUSD">EUR/USD</option>
-                                    <option value="GBPUSD">GBP/USD</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="backtest-timeframe" class="form-label">Timeframe</label>
-                                <select class="form-select" id="backtest-timeframe">
-                                    <option value="4H" selected>4 Hours</option>
-                                    <option value="1D">Daily</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="backtest-days" class="form-label">Period (Days)</label>
-                                <select class="form-select" id="backtest-days">
-                                    <option value="7">7 Days</option>
-                                    <option value="30" selected>30 Days</option>
-                                    <option value="60">60 Days</option>
-                                    <option value="90">90 Days</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="d-grid">
-                                    <button class="btn btn-warning" onclick="runAdvancedBacktest()">
-                                        <i class="fas fa-play-circle me-2"></i>Run Backtest
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Backtest Loading -->
-                        <div class="loading" id="backtest-loading" style="display: none;">
-                            <div class="spinner-border text-warning" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Running backtest simulation...</p>
-                        </div>
-                        
-                        <!-- Backtest Results -->
-                        <div id="backtest-results"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Right Column - Info & Status -->
-            <div class="col-lg-4">
-                <!-- System Status -->
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <i class="fas fa-robot me-2"></i>System Status
-                    </div>
-                    <div class="card-body">
-                        <div id="system-status">
-                            <div class="text-center">
-                                <div class="spinner-border text-info" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="mt-2">Checking system status...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Technical Indicators -->
-                <div class="card mt-4">
-                    <div class="card-header bg-secondary text-white">
-                        <i class="fas fa-chart-line me-2"></i>Technical Indicators
-                    </div>
-                    <div class="card-body">
-                        <div id="technical-indicators">
-                            <p class="text-muted text-center">Run analysis to see indicators</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Fundamental News -->
-                <div class="card mt-4">
-                    <div class="card-header bg-success text-white">
-                        <i class="fas fa-newspaper me-2"></i>Market News
-                    </div>
-                    <div class="card-body">
-                        <div id="fundamental-news">
-                            <p class="text-muted text-center">Run analysis to see news</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Risk Dashboard -->
-                <div class="card mt-4">
-                    <div class="card-header bg-danger text-white">
-                        <i class="fas fa-shield-alt me-2"></i>Risk Dashboard
-                    </div>
-                    <div class="card-body">
-                        <div id="risk-dashboard">
-                            <p class="text-muted text-center">Loading risk metrics...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <label>Pair:</label>
+        <select id="pairSelect" class="form-select">
+          <option>USDJPY</option><option>GBPJPY</option><option>EURJPY</option>
+          <option>CHFJPY</option><option>EURUSD</option><option>GBPUSD</option>
+          <option>USDCHF</option><option>AUDUSD</option><option>USDCAD</option><option>NZDUSD</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label>Timeframe:</label>
+        <select id="timeframeSelect" class="form-select">
+          <option>1H</option><option>4H</option><option>1D</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-primary w-100" id="analyzeBtn">Analyze Market</button>
+      </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="bg-dark text-light py-4 mt-5">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5><i class="fas fa-robot me-2"></i>Forex Analysis & Backtesting System</h5>
-                    <p>Advanced technical analysis with comprehensive backtesting capabilities.</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p>&copy; 2024 Forex Analysis System. All rights reserved.</p>
-                    <p class="text-muted">For educational purposes only.</p>
-                </div>
-            </div>
+    <div class="loading-spinner" id="loadingSpinner">
+      <div class="spinner-border text-light"></div>
+      <p>Analyzing market data...</p>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card p-3 mb-3">
+          <h5>AI Market Summary</h5>
+          <p id="aiSummary">No analysis yet.</p>
+          <p><b>Recommendation:</b> <span id="tradeRecommendation">-</span></p>
+          <p><b>Confidence:</b> <span id="aiConfidence">-</span></p>
         </div>
-    </footer>
+        <div class="card p-3 mb-3">
+          <h5>Technical Indicators</h5>
+          <pre id="technicalDetails" style="color:#ccc"></pre>
+        </div>
+        <div class="card p-3 mb-3">
+          <h5>Risk Assessment</h5>
+          <pre id="riskDetails" style="color:#ccc"></pre>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card p-3 mb-3">
+          <h5>Price Chart (with Volume)</h5>
+          <canvas id="priceChart"></canvas>
+        </div>
+        <div class="card p-3 mb-3">
+          <h5>RSI Chart</h5>
+          <canvas id="rsiChart"></canvas>
+        </div>
+        <div class="card p-3 mb-3">
+          <h5>MACD Chart</h5>
+          <canvas id="macdChart"></canvas>
+        </div>
+      </div>
+    </div>
 
-    <!-- Bootstrap & jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="card p-3 mb-3">
+      <h5>Latest Fundamental News</h5>
+      <ul id="newsList"></ul>
+    </div>
+  </div>
 
-    <script>
-        // Global variables for charts
-        let priceChart = null;
-        let rsiChart = null;
-        let macdChart = null;
+  <script>
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const loadingSpinner = document.getElementById("loadingSpinner");
 
-        // Initialize on page load
-        $(document).ready(function() {
-            loadMarketOverview();
-            checkSystemStatus();
-            loadRiskDashboard();
-            
-            // Auto-refresh market overview every 2 minutes
-            setInterval(loadMarketOverview, 120000);
-            setInterval(checkSystemStatus, 30000);
-            setInterval(loadRiskDashboard, 60000);
+    analyzeBtn.addEventListener("click", () => {
+      const pair = document.getElementById("pairSelect").value;
+      const timeframe = document.getElementById("timeframeSelect").value;
+      runAnalysis(pair, timeframe);
+    });
+
+    async function runAnalysis(pair, timeframe) {
+      loadingSpinner.classList.add("show");
+      try {
+        const res = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
+        const data = await res.json();
+        displayAnalysisResults(data);
+      } catch (err) {
+        alert("Error: " + err);
+      } finally {
+        loadingSpinner.classList.remove("show");
+      }
+    }
+
+    function displayAnalysisResults(data) {
+      document.getElementById("aiSummary").textContent = data.ai_analysis?.summary || "No AI summary.";
+      document.getElementById("tradeRecommendation").textContent = data.trading_recommendation || "-";
+      document.getElementById("aiConfidence").textContent = data.ai_analysis?.confidence ? (data.ai_analysis.confidence * 100).toFixed(1) + "%" : "-";
+
+      const tech = data.technical_analysis || {};
+      document.getElementById("technicalDetails").textContent = JSON.stringify(tech, null, 2);
+
+      const risk = data.risk_assessment || {};
+      document.getElementById("riskDetails").textContent = JSON.stringify(risk, null, 2);
+
+      const newsList = document.getElementById("newsList");
+      newsList.innerHTML = "";
+      if (Array.isArray(data.fundamental_analysis)) {
+        data.fundamental_analysis.forEach(n => {
+          const li = document.createElement("li");
+          li.textContent = `${n.headline} (${n.source}) - ${n.sentiment}`;
+          newsList.appendChild(li);
         });
+      }
 
-        // Load market overview
-        async function loadMarketOverview() {
-            $('#marketOverview').html(`
-                <div class="col-12 text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Loading market data...</p>
-                </div>
-            `);
-            
-            try {
-                const response = await fetch('/api/market_overview');
-                const data = await response.json();
-                
-                let html = '';
-                for (const [pair, info] of Object.entries(data)) {
-                    const changeClass = info.change > 0 ? 'price-up' : (info.change < 0 ? 'price-down' : '');
-                    const trendIcon = info.change > 0 ? 'fa-arrow-up' : (info.change < 0 ? 'fa-arrow-down' : 'fa-minus');
-                    const recommendationClass = info.recommendation === 'BUY' ? 'success' : 
-                                              info.recommendation === 'SELL' ? 'danger' : 'warning';
-                    
-                    html += `
-                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center p-2">
-                                <h6 class="card-title mb-1">${pair}</h6>
-                                <h5 class="card-text ${changeClass} mb-1">${info.price ? info.price.toFixed(4) : 'N/A'}</h5>
-                                <p class="card-text ${changeClass} mb-1 small">
-                                    <i class="fas ${trendIcon} me-1"></i> ${info.change ? info.change.toFixed(2) + '%' : '0%'}
-                                </p>
-                                <span class="badge bg-${recommendationClass} mb-1">${info.recommendation || 'HOLD'}</span>
-                                <div class="mt-1">
-                                    <small class="text-muted d-block">RSI: ${info.rsi ? info.rsi.toFixed(1) : 'N/A'}</small>
-                                    <small class="text-muted">${info.trend || 'N/A'}</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    `;
-                }
-                $('#marketOverview').html(html);
-            } catch (error) {
-                $('#marketOverview').html(`
-                    <div class="col-12 text-center">
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i> Failed to load market data
-                        </div>
-                    </div>
-                `);
-            }
-        }
+      const priceData = data.price_data || {};
+      const priceSeries = data.price_series || [];
 
-        // Check system status
-        async function checkSystemStatus() {
-            try {
-                const response = await fetch('/api/system_status');
-                const data = await response.json();
-                
-                $('#system-status').html(`
-                    <div class="text-center">
-                        <h4><i class="fas fa-check-circle text-success"></i> System Online</h4>
-                        <div class="mt-3">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Historical Data:</span>
-                                <span class="badge bg-success">${data.historical_data}</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Supported Pairs:</span>
-                                <span class="badge bg-primary">${data.supported_pairs ? data.supported_pairs.length : 0}</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>DeepSeek AI:</span>
-                                <span class="badge ${data.deepseek_ai === 'ENABLED' ? 'bg-success' : 'bg-secondary'}">${data.deepseek_ai}</span>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <span>Server Time:</span>
-                                <small>${new Date(data.server_time).toLocaleTimeString()}</small>
-                            </div>
-                        </div>
-                    </div>
-                `);
-            } catch (error) {
-                $('#system-status').html(`
-                    <div class="text-center">
-                        <h4><i class="fas fa-exclamation-triangle text-danger"></i> System Offline</h4>
-                        <p class="text-muted">Unable to connect to server</p>
-                    </div>
-                `);
-            }
-        }
-
-        // Load risk dashboard
-        async function loadRiskDashboard() {
-            try {
-                const response = await fetch('/api/risk_dashboard');
-                const data = await response.json();
-                
-                if (data.error) {
-                    $('#risk-dashboard').html('<p class="text-muted text-center">Risk data unavailable</p>');
-                    return;
-                }
-                
-                const risk = data.risk_management || {};
-                const market = data.market_conditions || {};
-                
-                let html = `
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>Overall Risk:</span>
-                            <span class="badge ${risk.current_risk_level === 'HIGH' ? 'bg-danger' : risk.current_risk_level === 'MEDIUM' ? 'bg-warning' : 'bg-success'}">
-                                ${risk.current_risk_level || 'LOW'}
-                            </span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>Trades Today:</span>
-                            <span>${risk.daily_metrics ? risk.daily_metrics.trades_today : 0}/${risk.daily_metrics ? risk.daily_metrics.daily_trade_limit : 0}</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>Daily P&L:</span>
-                            <span class="${risk.daily_metrics && risk.daily_metrics.daily_pnl < 0 ? 'price-down' : 'price-up'}">
-                                $${risk.daily_metrics ? risk.daily_metrics.daily_pnl.toFixed(2) : '0.00'}
-                            </span>
-                        </div>
-                    </div>
-                `;
-                
-                // Add warnings if any
-                if (risk.warnings && risk.warnings.length > 0) {
-                    html += `<div class="alert alert-warning p-2 small">`;
-                    risk.warnings.forEach(warning => {
-                        html += `<div><i class="fas fa-exclamation-triangle me-1"></i> ${warning}</div>`;
-                    });
-                    html += `</div>`;
-                }
-                
-                $('#risk-dashboard').html(html);
-                
-            } catch (error) {
-                $('#risk-dashboard').html('<p class="text-muted text-center">Risk data unavailable</p>');
-            }
-        }
-
-        // Get analysis for selected pair and timeframe
-        async function getAnalysis() {
-            const pair = $('#pair-select').val();
-            const timeframe = $('#timeframe-select').val();
-            
-            $('#analysis-loading').show();
-            $('#analysis-results').html('');
-            $('#technical-indicators').html('<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading indicators...</div>');
-            $('#fundamental-news').html('<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading news...</div>');
-            
-            try {
-                const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-                const data = await response.json();
-                
-                $('#analysis-loading').hide();
-                
-                if (data.error) {
-                    $('#analysis-results').html(`
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i> ${data.error}
-                        </div>
-                    `);
-                    return;
-                }
-                
-                displayAnalysisResults(data);
-                displayTechnicalIndicators(data.technical_analysis);
-                displayFundamentalNews(data.fundamental_analysis);
-                
-            } catch (error) {
-                $('#analysis-loading').hide();
-                $('#analysis-results').html(`
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i> Analysis failed: ${error.message}
-                    </div>
-                `);
-            }
-        }
-
-        // Display analysis results
-        function displayAnalysisResults(data) {
-            const aiAnalysis = data.ai_analysis || {};
-            const technical = data.technical_analysis || {};
-            const priceData = data.price_data || {};
-            const riskAssessment = data.risk_assessment || {};
-            
-            // Determine signal class
-            let signalClass = 'signal-hold';
-            let signalText = 'HOLD';
-            if (aiAnalysis.signal === 'BUY') {
-                signalClass = 'signal-buy';
-                signalText = 'BUY';
-            } else if (aiAnalysis.signal === 'SELL') {
-                signalClass = 'signal-sell';
-                signalText = 'SELL';
-            }
-            
-            // Determine confidence level
-            const confidence = aiAnalysis.confidence || 50;
-            const confidenceLevel = confidence >= 70 ? 'high' : (confidence >= 50 ? 'medium' : 'low');
-            
-            // Format trading levels
-            const entryPrice = aiAnalysis.entry_price || (priceData.current ? priceData.current.toFixed(4) : 'N/A');
-            const stopLoss = aiAnalysis.stop_loss || 'N/A';
-            const takeProfit1 = aiAnalysis.take_profit_1 || 'N/A';
-            const takeProfit2 = aiAnalysis.take_profit_2 || 'N/A';
-            
-            let html = `
-            <div class="${signalClass}">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h3 class="mb-2">${signalText} SIGNAL</h3>
-                        <p class="mb-1"><strong>Current Price:</strong> ${priceData.current ? priceData.current.toFixed(4) : 'N/A'}</p>
-                        <p class="mb-1"><strong>Analysis:</strong> ${aiAnalysis.analysis_summary || 'Analysis not available'}</p>
-                        <p class="mb-0"><strong>Timeframe:</strong> ${aiAnalysis.timeframe_suggestion || data.timeframe || 'N/A'}</p>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <div class="confidence-${confidenceLevel} display-4">${confidence}%</div>
-                        <small>Confidence Level</small>
-                        <div class="mt-2">
-                            <span class="badge ${riskAssessment.approved ? 'bg-success' : 'bg-danger'}">
-                                ${riskAssessment.approved ? 'TRADE APPROVED' : 'TRADE REJECTED'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="row mt-4">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-light">
-                            <i class="fas fa-target me-2"></i>Trading Levels
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-6">
-                                    <strong>Entry Price:</strong><br>
-                                    <span class="${entryPrice !== 'N/A' ? 'price-up' : ''}">${entryPrice}</span>
-                                </div>
-                                <div class="col-6">
-                                    <strong>Stop Loss:</strong><br>
-                                    <span class="${stopLoss !== 'N/A' ? 'price-down' : ''}">${stopLoss}</span>
-                                </div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-6">
-                                    <strong>Take Profit 1:</strong><br>
-                                    <span class="${takeProfit1 !== 'N/A' ? 'price-up' : ''}">${takeProfit1}</span>
-                                </div>
-                                <div class="col-6">
-                                    <strong>Take Profit 2:</strong><br>
-                                    <span class="${takeProfit2 !== 'N/A' ? 'price-up' : ''}">${takeProfit2}</span>
-                                </div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-12">
-                                    <strong>Risk Level:</strong>
-                                    <span class="badge ${aiAnalysis.risk_level === 'HIGH' ? 'bg-danger' : aiAnalysis.risk_level === 'MEDIUM' ? 'bg-warning' : 'bg-success'}">
-                                        ${aiAnalysis.risk_level || 'MEDIUM'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-light">
-                            <i class="fas fa-mountain me-2"></i>Key Levels
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-6">
-                                    <strong>Support:</strong><br>
-                                    ${priceData.support ? priceData.support.toFixed(4) : 'N/A'}
-                                </div>
-                                <div class="col-6">
-                                    <strong>Resistance:</strong><br>
-                                    ${priceData.resistance ? priceData.resistance.toFixed(4) : 'N/A'}
-                                </div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-12">
-                                    <strong>Key Levels to Watch:</strong><br>
-                                    <small>${aiAnalysis.key_levels || 'Monitor support and resistance breaks'}</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-chart-line me-2"></i>Technical Analysis Charts</span>
-                            <small class="text-muted">AI Provider: ${aiAnalysis.ai_provider || 'Technical Analysis'}</small>
-                        </div>
-                        <div class="card-body">
-                            <ul class="nav nav-pills chart-tabs mb-3" id="chartTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="price-tab" data-bs-toggle="pill" data-bs-target="#price-chart" type="button" role="tab">Price & MA</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="rsi-tab" data-bs-toggle="pill" data-bs-target="#rsi-chart" type="button" role="tab">RSI</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="macd-tab" data-bs-toggle="pill" data-bs-target="#macd-chart" type="button" role="tab">MACD</button>
-                                </li>
-                            </ul>
-                            <div class="tab-content" id="chartTabsContent">
-                                <div class="tab-pane fade show active" id="price-chart" role="tabpanel">
-                                    <div class="chart-container">
-                                        <canvas id="priceChartCanvas"></canvas>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="rsi-chart" role="tabpanel">
-                                    <div class="chart-container">
-                                        <canvas id="rsiChartCanvas"></canvas>
-                                    </div>
-                                </div>
-                                <div class="tab-pane fade" id="macd-chart" role="tabpanel">
-                                    <div class="chart-container">
-                                        <canvas id="macdChartCanvas"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            `;
-            
-            $('#analysis-results').html(html);
-            
-            // Initialize Bootstrap tabs
-            const triggerTabList = [].slice.call(document.querySelectorAll('#chartTabs button'));
-            triggerTabList.forEach(function (triggerEl) {
-                var tabTrigger = new bootstrap.Tab(triggerEl);
-                triggerEl.addEventListener('click', function (event) {
-                    event.preventDefault();
-                    tabTrigger.show();
-                });
-            });
-            
-            // Render technical charts
-            renderTechnicalCharts(technical, priceData, data.pair);
-        }
-
-        // Display technical indicators
-        function displayTechnicalIndicators(technical) {
-            if (!technical || Object.keys(technical).length === 0) {
-                $('#technical-indicators').html('<p class="text-muted text-center">No technical data available</p>');
-                return;
-            }
-            
-            const trend = technical.trend || {};
-            const momentum = technical.momentum || {};
-            const volatility = technical.volatility || {};
-            const levels = technical.levels || {};
-            
-            // Safe value formatting function
-            const safeValue = (value, decimals = 4) => {
-                if (value === undefined || value === null) return 'N/A';
-                return typeof value === 'number' ? value.toFixed(decimals) : value;
-            };
-            
-            let html = `
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <div class="technical-indicator text-center">
-                            <small>RSI</small>
-                            <div class="indicator-value ${momentum.rsi < 30 ? 'price-up' : momentum.rsi > 70 ? 'price-down' : ''}">
-                                ${safeValue(momentum.rsi, 1)}
-                            </div>
-                            <small>${momentum.rsi < 30 ? 'Oversold' : momentum.rsi > 70 ? 'Overbought' : 'Neutral'}</small>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="technical-indicator text-center">
-                            <small>MACD</small>
-                            <div class="indicator-value ${momentum.macd_histogram > 0 ? 'price-up' : 'price-down'}">
-                                ${safeValue(momentum.macd)}
-                            </div>
-                            <small>${momentum.macd_histogram > 0 ? 'Bullish' : 'Bearish'}</small>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <div class="technical-indicator text-center">
-                            <small>Trend</small>
-                            <div class="indicator-value">${trend.trend_direction || 'N/A'}</div>
-                            <small>Strength: ${trend.trend_strength || 'N/A'}</small>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="technical-indicator text-center">
-                            <small>Volatility</small>
-                            <div class="indicator-value">${safeValue(volatility.volatility_pct, 2)}%</div>
-                            <small>ATR: ${safeValue(volatility.atr)}</small>
-                        </div>
-                    </div>
-                </div>
-                
-                <table class="table table-sm mt-3">
-                    <tr>
-                        <td>SMA 20:</td>
-                        <td class="text-end">${safeValue(trend.sma_20)}</td>
-                    </tr>
-                    <tr>
-                        <td>SMA 50:</td>
-                        <td class="text-end">${safeValue(trend.sma_50)}</td>
-                    </tr>
-                    <tr>
-                        <td>EMA 12:</td>
-                        <td class="text-end">${safeValue(trend.ema_12)}</td>
-                    </tr>
-                    <tr>
-                        <td>EMA 26:</td>
-                        <td class="text-end">${safeValue(trend.ema_26)}</td>
-                    </tr>
-                    <tr>
-                        <td>ADX:</td>
-                        <td class="text-end">${safeValue(trend.adx, 1)}</td>
-                    </tr>
-                </table>
-            `;
-            
-            $('#technical-indicators').html(html);
-        }
-
-        // Display fundamental news
-        function displayFundamentalNews(news) {
-            if (!news) {
-                $('#fundamental-news').html('<p class="text-muted text-center">No news available</p>');
-                return;
-            }
-            
-            let html = `
-                <div class="news-card">
-                    <i class="fas fa-newspaper me-2 text-primary"></i>
-                    <span>${news}</span>
-                </div>
-                <div class="text-center mt-2">
-                    <small class="text-muted">Market news and fundamental analysis</small>
-                </div>
-            `;
-            
-            $('#fundamental-news').html(html);
-        }
-
-        // Render technical charts with indicators
-      // Render technical charts with indicators (use real historical series if available)
-function renderTechnicalCharts(technical, priceData, pair) {
-    // Try to use historical series returned by backend first
-    const series = priceData.series || priceData.price_series || null; // support common keys
-    let labels = [];
-    let closes = [];
-
-    if (Array.isArray(series) && series.length > 10) {
-        // Use provided historical data
-        series.forEach(item => {
-            // Friendly label: short date/time
-            const d = new Date(item.date);
-            labels.push(d.toLocaleString()); // or toLocaleDateString() for daily
-            closes.push(Number(item.close));
-        });
-    } else {
-        // Fallback: previous simulation logic (kept for safety)
-        const currentPrice = priceData.current || 150.0;
-        const period = 50;
-        let price = currentPrice;
-        const trendDirection = technical.trend && technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
-        const volatility = (technical.volatility && technical.volatility.volatility_pct / 100) || 0.01;
-        for (let i = 0; i < period; i++) {
-            const randomChange = (Math.random() - 0.5 + trendDirection * 0.2) * volatility;
-            price = price * (1 + randomChange);
-            closes.push(price);
-            labels.push(`T-${period - i}`);
-        }
+      renderTechnicalCharts(tech, priceData, data.pair, priceSeries);
     }
 
-    // Compute EMA20/EMA50, RSI and MACD from closes array (simple implementations)
-    const prices = closes.slice(); // copy
-    const ema20 = [];
-    const ema50 = [];
+    // ==========================================================
+    // Render Technical Charts (Enhanced with Volume)
+    // ==========================================================
+    function renderTechnicalCharts(technical, priceData, pair, priceSeries = []) {
+      if (Array.isArray(priceSeries) && priceSeries.length > 10) {
+        const labels = priceSeries.map(p => new Date(p.date).toLocaleString());
+        const closes = priceSeries.map(p => Number(p.close));
+        const volumes = priceSeries.map(p => Number(p.volume || Math.random() * 1000)); // jika volume tidak ada, generate random
 
-    // Simple SMA-based EMA approximation for display
-    for (let i = 0; i < prices.length; i++) {
-        if (i < 20) {
-            ema20.push(null);
-        } else {
-            const slice = prices.slice(i - 19, i + 1);
-            ema20.push(slice.reduce((a, b) => a + b, 0) / slice.length);
-        }
-        if (i < 50) {
-            ema50.push(null);
-        } else {
-            const slice2 = prices.slice(i - 49, i + 1);
-            ema50.push(slice2.reduce((a, b) => a + b, 0) / slice2.length);
-        }
+        const calcEMA = (data, period) => {
+          const k = 2 / (period + 1);
+          let emaArr = [];
+          let emaPrev = data[0];
+          data.forEach((val, i) => {
+            emaPrev = i === 0 ? val : val * k + emaPrev * (1 - k);
+            emaArr.push(emaPrev);
+          });
+          return emaArr;
+        };
+
+        const ema20 = calcEMA(closes, 20);
+        const ema50 = calcEMA(closes, 50);
+
+        renderPriceChart(labels, closes, ema20, ema50, volumes, pair);
+        renderRSIChart(labels, []);
+        renderMACDChart(labels, [], [], []);
+        return;
+      }
+
+      // fallback simulasi
+      const currentPrice = priceData.current || 150.0;
+      const period = 50;
+      const prices = [];
+      const ema20 = [];
+      const ema50 = [];
+      const volumes = [];
+      let price = currentPrice;
+      const trendDirection = technical.trend && technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
+      const volatility = (technical.volatility && technical.volatility.volatility_pct / 100) || 0.01;
+
+      for (let i = 0; i < period; i++) {
+        const randomChange = (Math.random() - 0.5 + trendDirection * 0.2) * volatility;
+        price = price * (1 + randomChange);
+        prices.push(price);
+        volumes.push(Math.random() * 1000);
+
+        if (i < 20) ema20.push(null);
+        else ema20.push(prices.slice(i - 19, i + 1).reduce((a, b) => a + b, 0) / 20);
+
+        if (i < 50) ema50.push(null);
+        else ema50.push(prices.slice(i - 49, i + 1).reduce((a, b) => a + b, 0) / 50);
+      }
+
+      const labels = Array.from({ length: period }, (_, i) => `T-${period - i}`);
+      renderPriceChart(labels, prices, ema20, ema50, volumes, pair);
+      renderRSIChart(labels, []);
+      renderMACDChart(labels, [], [], []);
     }
 
-    // RSI (14)
-    const rsi = [];
-    for (let i = 0; i < prices.length; i++) {
-        if (i < 14) { rsi.push(null); continue; }
-        const recent = prices.slice(i - 13, i + 1);
-        let gains = 0, losses = 0;
-        for (let j = 1; j < recent.length; j++) {
-            const diff = recent[j] - recent[j - 1];
-            if (diff > 0) gains += diff; else losses -= diff;
-        }
-        const avgGain = gains / 14;
-        const avgLoss = losses / 14 || 0.00001;
-        const rs = avgGain / avgLoss;
-        rsi.push(100 - (100 / (1 + rs)));
+    // ==========================================================
+    // Chart.js Generators
+    // ==========================================================
+    let priceChart, rsiChart, macdChart;
+
+    function renderPriceChart(labels, prices, ema20, ema50, volumes, pair) {
+      if (priceChart) priceChart.destroy();
+      const ctx = document.getElementById("priceChart").getContext("2d");
+
+      const volumeColor = volumes.map(v => "rgba(0, 200, 255, 0.3)");
+
+      priceChart = new Chart(ctx, {
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              type: "bar",
+              label: "Volume",
+              data: volumes,
+              yAxisID: "y1",
+              backgroundColor: volumeColor,
+              borderWidth: 0,
+            },
+            {
+              type: "line",
+              label: `${pair} Close`,
+              data: prices,
+              borderColor: "rgba(0, 200, 255, 0.9)",
+              borderWidth: 1.5,
+              tension: 0.3,
+              pointRadius: 0,
+              yAxisID: "y",
+            },
+            {
+              type: "line",
+              label: "EMA 20",
+              data: ema20,
+              borderColor: "rgba(255, 255, 0, 0.9)",
+              borderWidth: 1,
+              tension: 0.3,
+              pointRadius: 0,
+              yAxisID: "y",
+            },
+            {
+              type: "line",
+              label: "EMA 50",
+              data: ema50,
+              borderColor: "rgba(255, 0, 150, 0.9)",
+              borderWidth: 1,
+              tension: 0.3,
+              pointRadius: 0,
+              yAxisID: "y",
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            legend: { labels: { color: "#fff" } },
+          },
+          scales: {
+            x: { ticks: { color: "#aaa" } },
+            y: {
+              position: "left",
+              ticks: { color: "#aaa" },
+              grid: { drawOnChartArea: false },
+            },
+            y1: {
+              position: "right",
+              ticks: { display: false },
+              grid: { drawOnChartArea: false },
+            },
+          },
+        },
+      });
     }
 
-    // Simple MACD: EMA12 - EMA26 approximated by SMA windows (display only)
-    const macdLine = [];
-    const macdSignal = [];
-    const macdHist = [];
-    for (let i = 0; i < prices.length; i++) {
-        if (i < 26) { macdLine.push(null); macdSignal.push(null); macdHist.push(null); continue; }
-        const ema12 = prices.slice(Math.max(0, i - 11), i + 1).reduce((a, b) => a + b, 0) / Math.min(12, i + 1);
-        const ema26 = prices.slice(Math.max(0, i - 25), i + 1).reduce((a, b) => a + b, 0) / Math.min(26, i + 1);
-        const macd = ema12 - ema26;
-        macdLine.push(macd);
-        // signal: 9-period SMA of macdLine
-        if (i < 34) { macdSignal.push(null); macdHist.push(null); }
-        else {
-            const sig = macdLine.slice(i - 8, i + 1).reduce((a, b) => a + b, 0) / 9;
-            macdSignal.push(sig);
-            macdHist.push(macd - sig);
-        }
+    function renderRSIChart(labels, rsi) {
+      if (rsiChart) rsiChart.destroy();
+      const ctx = document.getElementById("rsiChart").getContext("2d");
+      rsiChart = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets: [{ label: "RSI(14)", data: rsi, borderColor: "#ff9900", borderWidth: 1 }] },
+        options: {
+          plugins: { legend: { labels: { color: "#fff" } } },
+          scales: { x: { ticks: { color: "#aaa" } }, y: { ticks: { color: "#aaa" } } },
+        },
+      });
     }
 
-    // Prepare labels/prices for Chart.js (if dataset lengths mismatch, pad with nulls)
-    const periodLen = prices.length;
-    // Render charts (reuse existing renderPriceChart, renderRSIChart, renderMACDChart)
-    renderPriceChart(labels, prices, ema20, ema50, pair);
-    renderRSIChart(labels, rsi);
-    renderMACDChart(labels, macdLine, macdSignal, macdHist);
-}
-
-
-        // Run advanced backtest
-        async function runAdvancedBacktest() {
-            const pair = $('#backtest-pair').val();
-            const timeframe = $('#backtest-timeframe').val();
-            const days = $('#backtest-days').val();
-            
-            $('#backtest-loading').show();
-            $('#backtest-results').html('');
-            
-            try {
-                const response = await fetch('/api/advanced_backtest', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        pair: pair,
-                        timeframe: timeframe,
-                        days: parseInt(days),
-                        initial_balance: 10000
-                    })
-                });
-                
-                const data = await response.json();
-                $('#backtest-loading').hide();
-                
-                if (data.error) {
-                    $('#backtest-results').html(`
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i> ${data.error}
-                        </div>
-                    `);
-                    return;
-                }
-                
-                displayBacktestResults(data);
-                
-            } catch (error) {
-                $('#backtest-loading').hide();
-                $('#backtest-results').html(`
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i> Backtest failed: ${error.message}
-                    </div>
-                `);
-            }
-        }
-
-        // Display backtest results
-        function displayBacktestResults(data) {
-            const summary = data.summary || {};
-            const tradeHistory = data.trade_history || [];
-            const metadata = data.metadata || {};
-            const tradeAnalysis = data.trade_analysis || {};
-            const performanceGrade = data.performance_grade || 'N/A';
-            
-            let html = `
-                <div class="backtest-summary">
-                    <div class="row text-center">
-                        <div class="col-md-3 mb-3">
-                            <div class="summary-value ${summary.win_rate > 50 ? 'price-up' : 'price-down'}">
-                                ${summary.win_rate ? summary.win_rate.toFixed(1) + '%' : '0%'}
-                            </div>
-                            <small>Win Rate</small>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="summary-value ${summary.total_profit > 0 ? 'price-up' : 'price-down'}">
-                                $${summary.total_profit ? summary.total_profit.toFixed(2) : '0.00'}
-                            </div>
-                            <small>Total Profit</small>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="summary-value">
-                                ${summary.total_trades || 0}
-                            </div>
-                            <small>Total Trades</small>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="summary-value ${summary.return_percentage > 0 ? 'price-up' : 'price-down'}">
-                                ${summary.return_percentage ? summary.return_percentage.toFixed(2) + '%' : '0%'}
-                            </div>
-                            <small>Return</small>
-                        </div>
-                    </div>
-                    <div class="row text-center mt-2">
-                        <div class="col-12">
-                            <span class="badge bg-${performanceGrade === 'A' || performanceGrade === 'A+' ? 'success' : 
-                                            performanceGrade === 'B' ? 'warning' : 'danger'} fs-6">
-                                Performance Grade: ${performanceGrade}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Additional metrics
-            html += `
-                <div class="row text-center mb-4 mt-3">
-                    <div class="col-md-2 col-6 mb-2">
-                        <small>Max Drawdown</small>
-                        <div class="${summary.max_drawdown > 10 ? 'price-down' : ''}">
-                            ${summary.max_drawdown ? summary.max_drawdown.toFixed(2) + '%' : 'N/A'}
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-6 mb-2">
-                        <small>Profit Factor</small>
-                        <div>${summary.profit_factor ? summary.profit_factor.toFixed(2) : 'N/A'}</div>
-                    </div>
-                    <div class="col-md-2 col-6 mb-2">
-                        <small>Sharpe Ratio</small>
-                        <div>${summary.sharpe_ratio ? summary.sharpe_ratio.toFixed(2) : 'N/A'}</div>
-                    </div>
-                    <div class="col-md-2 col-6 mb-2">
-                        <small>Avg Profit</small>
-                        <div class="${summary.avg_trade > 0 ? 'price-up' : 'price-down'}">
-                            $${summary.avg_trade ? summary.avg_trade.toFixed(2) : '0.00'}
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-6 mb-2">
-                        <small>Long Win Rate</small>
-                        <div>${tradeAnalysis.long_win_rate ? tradeAnalysis.long_win_rate.toFixed(1) + '%' : 'N/A'}</div>
-                    </div>
-                    <div class="col-md-2 col-6 mb-2">
-                        <small>Short Win Rate</small>
-                        <div>${tradeAnalysis.short_win_rate ? tradeAnalysis.short_win_rate.toFixed(1) + '%' : 'N/A'}</div>
-                    </div>
-                </div>
-            `;
-            
-            // Trade history
-            if (tradeHistory.length > 0) {
-                html += `
-                    <h6 class="mt-4 mb-3">
-                        <i class="fas fa-history me-2"></i>Trade History (Last ${Math.min(20, tradeHistory.length)} Trades)
-                        <span class="badge bg-primary">${summary.total_trades} Total</span>
-                    </h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Action</th>
-                                    <th>Entry</th>
-                                    <th>P&L</th>
-                                    <th>Confidence</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                
-                // Show last 20 trades
-                const recentTrades = tradeHistory.slice(-20);
-                
-                recentTrades.forEach(trade => {
-                    html += `
-                        <tr>
-                            <td class="small">${trade.entry_date || 'N/A'}</td>
-                            <td>
-                                <span class="badge ${trade.action === 'BUY' ? 'bg-success' : 'bg-danger'}">
-                                    ${trade.action}
-                                </span>
-                            </td>
-                            <td>${trade.entry_price ? trade.entry_price.toFixed(4) : 'N/A'}</td>
-                            <td class="trade-profit ${trade.profit > 0 ? 'price-up' : 'price-down'}">
-                                $${trade.profit ? trade.profit.toFixed(2) : '0.00'}
-                            </td>
-                            <td>
-                                <span class="badge ${trade.confidence >= 70 ? 'bg-success' : trade.confidence >= 50 ? 'bg-warning' : 'bg-secondary'}">
-                                    ${trade.confidence || 0}%
-                                </span>
-                            </td>
-                        </tr>
-                    `;
-                });
-                
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            } else {
-                html += `
-                    <div class="alert alert-info mt-4">
-                        <i class="fas fa-info-circle me-2"></i> No trades were executed during this backtest period.
-                        Try increasing the backtest period or selecting a different currency pair.
-                    </div>
-                `;
-            }
-            
-            // Metadata
-            html += `
-                <div class="mt-3 text-center">
-                    <small class="text-muted">
-                        Backtest for ${metadata.pair || 'N/A'} - ${metadata.timeframe || 'N/A'} | 
-                        Period: ${metadata.total_days || 0} days |
-                        Initial Balance: $${metadata.initial_balance || '10000'} |
-                        ${metadata.testing_date ? new Date(metadata.testing_date).toLocaleString() : ''}
-                    </small>
-                </div>
-            `;
-            
-            $('#backtest-results').html(html);
-        }
-    </script>
+    function renderMACDChart(labels, macd, signal, hist) {
+      if (macdChart) macdChart.destroy();
+      const ctx = document.getElementById("macdChart").getContext("2d");
+      macdChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "MACD", data: macd, borderColor: "#00ffcc", borderWidth: 1 },
+            { label: "Signal", data: signal, borderColor: "#ff0066", borderWidth: 1 },
+          ],
+        },
+        options: {
+          plugins: { legend: { labels: { color: "#fff" } } },
+          scales: { x: { ticks: { color: "#aaa" } }, y: { ticks: { color: "#aaa" } } },
+        },
+      });
+    }
+  </script>
 </body>
 </html>
