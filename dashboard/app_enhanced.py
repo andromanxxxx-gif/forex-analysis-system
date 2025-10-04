@@ -1,4 +1,3 @@
-[file content start]
 # [FILE: app_enhanced.py]
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
