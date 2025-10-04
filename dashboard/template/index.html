@@ -890,333 +890,100 @@
         }
 
         // Render technical charts with indicators
-        function renderTechnicalCharts(technical, priceData, pair) {
-            // Generate sample data based on technical indicators
-            const currentPrice = priceData.current || 150.0;
-            const period = 50;
-            
-            // Generate price data with trend
-            const prices = [];
-            const ema20 = [];
-            const ema50 = [];
-            const rsi = [];
-            const macdLine = [];
-            const macdSignal = [];
-            const macdHistogram = [];
-            
-            let price = currentPrice;
-            const trendDirection = technical.trend && technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
-            const volatility = (technical.volatility && technical.volatility.volatility_pct / 100) || 0.01;
-            
-            for (let i = 0; i < period; i++) {
-                // Price movement with trend
-                const randomChange = (Math.random() - 0.5 + trendDirection * 0.2) * volatility;
-                price = price * (1 + randomChange);
-                prices.push(price);
-                
-                // Calculate EMAs (simplified)
-                if (i < 20) {
-                    ema20.push(null);
-                } else {
-                    ema20.push(prices.slice(i-19, i+1).reduce((a, b) => a + b, 0) / 20);
-                }
-                
-                if (i < 50) {
-                    ema50.push(null);
-                } else {
-                    ema50.push(prices.slice(i-49, i+1).reduce((a, b) => a + b, 0) / 50);
-                }
-                
-                // RSI simulation
-                if (i < 14) {
-                    rsi.push(null);
-                } else {
-                    const recentPrices = prices.slice(i-13, i+1);
-                    const gains = [];
-                    const losses = [];
-                    
-                    for (let j = 1; j < recentPrices.length; j++) {
-                        const change = recentPrices[j] - recentPrices[j-1];
-                        gains.push(change > 0 ? change : 0);
-                        losses.push(change < 0 ? Math.abs(change) : 0);
-                    }
-                    
-                    const avgGain = gains.reduce((a, b) => a + b, 0) / 14;
-                    const avgLoss = losses.reduce((a, b) => a + b, 0) / 14;
-                    const rs = avgGain / (avgLoss || 0.001);
-                    rsi.push(100 - (100 / (1 + rs)));
-                }
-                
-                // MACD simulation
-                if (i < 26) {
-                    macdLine.push(null);
-                    macdSignal.push(null);
-                    macdHistogram.push(null);
-                } else {
-                    const ema12 = prices.slice(i-11, i+1).reduce((a, b) => a + b, 0) / 12;
-                    const ema26 = prices.slice(i-25, i+1).reduce((a, b) => a + b, 0) / 26;
-                    macdLine.push(ema12 - ema26);
-                    
-                    if (i >= 34) {
-                        const signal = macdLine.slice(i-8, i+1).reduce((a, b) => a + b, 0) / 9;
-                        macdSignal.push(signal);
-                        macdHistogram.push(macdLine[i] - signal);
-                    } else {
-                        macdSignal.push(null);
-                        macdHistogram.push(null);
-                    }
-                }
-            }
-            
-            const labels = Array.from({length: period}, (_, i) => `T-${period - i}`);
-            
-            // Render Price Chart with EMAs
-            renderPriceChart(labels, prices, ema20, ema50, pair);
-            
-            // Render RSI Chart
-            renderRSIChart(labels, rsi);
-            
-            // Render MACD Chart
-            renderMACDChart(labels, macdLine, macdSignal, macdHistogram);
-        }
+      // Render technical charts with indicators (use real historical series if available)
+function renderTechnicalCharts(technical, priceData, pair) {
+    // Try to use historical series returned by backend first
+    const series = priceData.series || priceData.price_series || null; // support common keys
+    let labels = [];
+    let closes = [];
 
-        // Render price chart with EMAs
-        function renderPriceChart(labels, prices, ema20, ema50, pair) {
-            const ctx = document.getElementById('priceChartCanvas').getContext('2d');
-            
-            // Destroy previous chart if exists
-            if (priceChart) {
-                priceChart.destroy();
-            }
-            
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Price',
-                            data: prices,
-                            borderColor: '#3498db',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'EMA 20',
-                            data: ema20,
-                            borderColor: '#e74c3c',
-                            borderWidth: 1.5,
-                            borderDash: [5, 5],
-                            fill: false
-                        },
-                        {
-                            label: 'EMA 50',
-                            data: ema50,
-                            borderColor: '#2ecc71',
-                            borderWidth: 1.5,
-                            borderDash: [5, 5],
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'Time'
-                            }
-                        },
-                        y: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'Price'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        title: {
-                            display: true,
-                            text: `${pair} - Price with Moving Averages`
-                        }
-                    }
-                }
-            });
+    if (Array.isArray(series) && series.length > 10) {
+        // Use provided historical data
+        series.forEach(item => {
+            // Friendly label: short date/time
+            const d = new Date(item.date);
+            labels.push(d.toLocaleString()); // or toLocaleDateString() for daily
+            closes.push(Number(item.close));
+        });
+    } else {
+        // Fallback: previous simulation logic (kept for safety)
+        const currentPrice = priceData.current || 150.0;
+        const period = 50;
+        let price = currentPrice;
+        const trendDirection = technical.trend && technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
+        const volatility = (technical.volatility && technical.volatility.volatility_pct / 100) || 0.01;
+        for (let i = 0; i < period; i++) {
+            const randomChange = (Math.random() - 0.5 + trendDirection * 0.2) * volatility;
+            price = price * (1 + randomChange);
+            closes.push(price);
+            labels.push(`T-${period - i}`);
         }
+    }
 
-        // Render RSI chart
-        function renderRSIChart(labels, rsi) {
-            const ctx = document.getElementById('rsiChartCanvas').getContext('2d');
-            
-            // Destroy previous chart if exists
-            if (rsiChart) {
-                rsiChart.destroy();
-            }
-            
-            rsiChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'RSI',
-                            data: rsi,
-                            borderColor: '#9b59b6',
-                            backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'Overbought (70)',
-                            data: Array(labels.length).fill(70),
-                            borderColor: '#e74c3c',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
-                            fill: false
-                        },
-                        {
-                            label: 'Oversold (30)',
-                            data: Array(labels.length).fill(30),
-                            borderColor: '#2ecc71',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
-                            fill: false
-                        },
-                        {
-                            label: 'Middle (50)',
-                            data: Array(labels.length).fill(50),
-                            borderColor: '#95a5a6',
-                            borderWidth: 0.5,
-                            borderDash: [2, 2],
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'Time'
-                            }
-                        },
-                        y: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'RSI'
-                            },
-                            min: 0,
-                            max: 100
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Relative Strength Index (RSI)'
-                        }
-                    }
-                }
-            });
-        }
+    // Compute EMA20/EMA50, RSI and MACD from closes array (simple implementations)
+    const prices = closes.slice(); // copy
+    const ema20 = [];
+    const ema50 = [];
 
-        // Render MACD chart
-        function renderMACDChart(labels, macdLine, macdSignal, macdHistogram) {
-            const ctx = document.getElementById('macdChartCanvas').getContext('2d');
-            
-            // Destroy previous chart if exists
-            if (macdChart) {
-                macdChart.destroy();
-            }
-            
-            macdChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'MACD Histogram',
-                            data: macdHistogram,
-                            backgroundColor: macdHistogram.map(val => 
-                                val === null ? 'rgba(149, 165, 166, 0.5)' : 
-                                val >= 0 ? 'rgba(46, 204, 113, 0.7)' : 'rgba(231, 76, 60, 0.7)'),
-                            borderColor: macdHistogram.map(val => 
-                                val === null ? 'rgba(149, 165, 166, 1)' : 
-                                val >= 0 ? 'rgba(46, 204, 113, 1)' : 'rgba(231, 76, 60, 1)'),
-                            borderWidth: 1,
-                            type: 'bar',
-                            order: 1
-                        },
-                        {
-                            label: 'MACD Line',
-                            data: macdLine,
-                            borderColor: '#3498db',
-                            borderWidth: 2,
-                            fill: false,
-                            type: 'line',
-                            order: 2
-                        },
-                        {
-                            label: 'Signal Line',
-                            data: macdSignal,
-                            borderColor: '#e74c3c',
-                            borderWidth: 1.5,
-                            fill: false,
-                            type: 'line',
-                            order: 3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'Time'
-                            }
-                        },
-                        y: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: 'MACD'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Moving Average Convergence Divergence (MACD)'
-                        }
-                    }
-                }
-            });
+    // Simple SMA-based EMA approximation for display
+    for (let i = 0; i < prices.length; i++) {
+        if (i < 20) {
+            ema20.push(null);
+        } else {
+            const slice = prices.slice(i - 19, i + 1);
+            ema20.push(slice.reduce((a, b) => a + b, 0) / slice.length);
         }
+        if (i < 50) {
+            ema50.push(null);
+        } else {
+            const slice2 = prices.slice(i - 49, i + 1);
+            ema50.push(slice2.reduce((a, b) => a + b, 0) / slice2.length);
+        }
+    }
+
+    // RSI (14)
+    const rsi = [];
+    for (let i = 0; i < prices.length; i++) {
+        if (i < 14) { rsi.push(null); continue; }
+        const recent = prices.slice(i - 13, i + 1);
+        let gains = 0, losses = 0;
+        for (let j = 1; j < recent.length; j++) {
+            const diff = recent[j] - recent[j - 1];
+            if (diff > 0) gains += diff; else losses -= diff;
+        }
+        const avgGain = gains / 14;
+        const avgLoss = losses / 14 || 0.00001;
+        const rs = avgGain / avgLoss;
+        rsi.push(100 - (100 / (1 + rs)));
+    }
+
+    // Simple MACD: EMA12 - EMA26 approximated by SMA windows (display only)
+    const macdLine = [];
+    const macdSignal = [];
+    const macdHist = [];
+    for (let i = 0; i < prices.length; i++) {
+        if (i < 26) { macdLine.push(null); macdSignal.push(null); macdHist.push(null); continue; }
+        const ema12 = prices.slice(Math.max(0, i - 11), i + 1).reduce((a, b) => a + b, 0) / Math.min(12, i + 1);
+        const ema26 = prices.slice(Math.max(0, i - 25), i + 1).reduce((a, b) => a + b, 0) / Math.min(26, i + 1);
+        const macd = ema12 - ema26;
+        macdLine.push(macd);
+        // signal: 9-period SMA of macdLine
+        if (i < 34) { macdSignal.push(null); macdHist.push(null); }
+        else {
+            const sig = macdLine.slice(i - 8, i + 1).reduce((a, b) => a + b, 0) / 9;
+            macdSignal.push(sig);
+            macdHist.push(macd - sig);
+        }
+    }
+
+    // Prepare labels/prices for Chart.js (if dataset lengths mismatch, pad with nulls)
+    const periodLen = prices.length;
+    // Render charts (reuse existing renderPriceChart, renderRSIChart, renderMACDChart)
+    renderPriceChart(labels, prices, ema20, ema50, pair);
+    renderRSIChart(labels, rsi);
+    renderMACDChart(labels, macdLine, macdSignal, macdHist);
+}
+
 
         // Run advanced backtest
         async function runAdvancedBacktest() {
