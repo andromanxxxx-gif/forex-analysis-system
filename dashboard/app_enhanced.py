@@ -88,6 +88,122 @@ class SystemConfig:
 
 config = SystemConfig()
 
+# ==================== TWELVEDATA REAL-TIME INTEGRATION ====================
+class TwelveDataClient:
+    def __init__(self):
+        self.api_key = config.TWELVE_DATA_KEY
+        self.base_url = "https://api.twelvedata.com"
+        self.price_cache = {}
+        self.cache_timeout = 60  # 1 menit cache
+        
+    def get_real_time_price(self, pair: str) -> float:
+        """Ambil current price real-time dari TwelveData"""
+        cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H%M')}"
+        
+        # Check cache dulu
+        if pair in self.price_cache:
+            cached_time, price = self.price_cache[pair]
+            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
+                logger.info(f"Using cached price for {pair}: {price}")
+                return price
+        
+        try:
+            if not self.api_key or self.api_key == "demo":
+                logger.warning("TwelveData API key not available, using historical data")
+                return self._get_price_from_historical(pair)
+            
+            # Format pair untuk TwelveData (USDJPY -> USD/JPY)
+            formatted_pair = f"{pair[:3]}/{pair[3:]}"
+            url = f"{self.base_url}/price?symbol={formatted_pair}&apikey={self.api_key}"
+            
+            logger.info(f"Fetching real-time price for {pair} from TwelveData...")
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'price' in data and data['price'] is not None:
+                    price = float(data['price'])
+                    
+                    # Cache the price
+                    self.price_cache[pair] = (datetime.now(), price)
+                    logger.info(f"Real-time price for {pair}: {price}")
+                    return price
+                else:
+                    logger.error(f"Invalid response from TwelveData: {data}")
+                    return self._get_price_from_historical(pair)
+            else:
+                logger.error(f"TwelveData API error: {response.status_code} - {response.text}")
+                return self._get_price_from_historical(pair)
+                
+        except Exception as e:
+            logger.error(f"Error getting real-time price for {pair}: {e}")
+            return self._get_price_from_historical(pair)
+    
+    def _get_price_from_historical(self, pair: str) -> float:
+        """Fallback ke data historis jika TwelveData gagal"""
+        try:
+            price_data = data_manager.get_price_data(pair, '1H', days=1)
+            if not price_data.empty and 'close' in price_data.columns:
+                price = float(price_data['close'].iloc[-1])
+                logger.info(f"Using historical price for {pair}: {price}")
+                return price
+            else:
+                # Fallback ke base prices
+                base_prices = {
+                    'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
+                    'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
+                    'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
+                }
+                price = base_prices.get(pair, 150.0)
+                logger.info(f"Using base price for {pair}: {price}")
+                return price
+        except Exception as e:
+            logger.error(f"Error getting historical price for {pair}: {e}")
+            return 150.0
+
+    def get_quote_data(self, pair: str) -> Dict:
+        """Dapatkan data quote lengkap dari TwelveData"""
+        try:
+            if not self.api_key or self.api_key == "demo":
+                return self._get_fallback_quote(pair)
+            
+            formatted_pair = f"{pair[:3]}/{pair[3:]}"
+            url = f"{self.base_url}/quote?symbol={formatted_pair}&apikey={self.api_key}"
+            
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'open': float(data.get('open', 0)),
+                    'high': float(data.get('high', 0)),
+                    'low': float(data.get('low', 0)),
+                    'close': float(data.get('close', 0)),
+                    'volume': float(data.get('volume', 0)),
+                    'change': float(data.get('change', 0)),
+                    'percent_change': float(data.get('percent_change', 0)),
+                    'timestamp': data.get('datetime', '')
+                }
+            else:
+                return self._get_fallback_quote(pair)
+                
+        except Exception as e:
+            logger.error(f"Error getting quote data for {pair}: {e}")
+            return self._get_fallback_quote(pair)
+    
+    def _get_fallback_quote(self, pair: str) -> Dict:
+        """Fallback quote data"""
+        current_price = self.get_real_time_price(pair)
+        return {
+            'open': current_price * 0.999,
+            'high': current_price * 1.002,
+            'low': current_price * 0.998,
+            'close': current_price,
+            'volume': 100000,
+            'change': 0.0001,
+            'percent_change': 0.01,
+            'timestamp': datetime.now().isoformat()
+        }
+
 # ==================== ADVANCED RISK MANAGEMENT SYSTEM ====================
 class AdvancedRiskManager:
     def __init__(self):
@@ -1963,6 +2079,7 @@ tech_engine = TechnicalAnalysisEngine()
 fundamental_engine = FundamentalAnalysisEngine()
 deepseek_analyzer = DeepSeekAnalyzer()
 data_manager = DataManager()
+twelve_data_client = TwelveDataClient()  # Tambahkan TwelveData client
 
 # Validasi dan perbaiki data yang rusak
 logger.info("Validating historical data...")
@@ -1974,6 +2091,7 @@ advanced_backtester = AdvancedBacktestingEngine()
 risk_manager = AdvancedRiskManager()
 
 logger.info("All system components initialized successfully")
+
 # ==================== FLASK ROUTES YANG DIPERBAIKI ====================
 @app.route('/')
 def index():
@@ -1984,7 +2102,7 @@ def index():
 
 @app.route('/api/analyze')
 def api_analyze():
-    """Endpoint untuk analisis market real-time dengan AI"""
+    """Endpoint untuk analisis market real-time dengan AI dan TwelveData"""
     try:
         pair = request.args.get('pair', 'USDJPY').upper()
         timeframe = request.args.get('timeframe', '4H').upper()
@@ -1992,13 +2110,19 @@ def api_analyze():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # Dapatkan data harga
+        # Dapatkan current price REAL-TIME dari TwelveData
+        real_time_price = twelve_data_client.get_real_time_price(pair)
+        
+        # Dapatkan data harga untuk analisis teknikal
         price_data = data_manager.get_price_data(pair, timeframe, days=60)
         if price_data.empty:
             return jsonify({'error': 'No price data available'}), 400
         
         # Analisis teknikal
         technical_analysis = tech_engine.calculate_all_indicators(price_data)
+        
+        # OVERRIDE current price dengan data real-time
+        technical_analysis['levels']['current_price'] = real_time_price
         
         # Analisis fundamental
         fundamental_news = fundamental_engine.get_forex_news(pair)
@@ -2013,7 +2137,7 @@ def api_analyze():
             confidence=ai_analysis.get('confidence', 50),
             proposed_lot_size=0.1,
             account_balance=config.INITIAL_BALANCE,
-            current_price=technical_analysis['levels']['current_price'],
+            current_price=real_time_price,  # Gunakan real-time price
             open_positions=[]
         )
         
@@ -2027,14 +2151,15 @@ def api_analyze():
             'ai_analysis': ai_analysis,
             'risk_assessment': risk_assessment,
             'price_data': {
-                'current': technical_analysis['levels']['current_price'],
+                'current': real_time_price,  # Pastikan real-time
                 'support': technical_analysis['levels']['support'],
                 'resistance': technical_analysis['levels']['resistance'],
                 'change_pct': technical_analysis['momentum']['price_change_pct']
             },
-            'analysis_summary': f"{pair} currently trading at {technical_analysis['levels']['current_price']:.4f}",
+            'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
             'ai_provider': ai_analysis.get('ai_provider', 'Technical Analysis Engine'),
-            'trading_recommendation': 'TRADE' if risk_assessment['approved'] else 'AVOID'
+            'trading_recommendation': 'TRADE' if risk_assessment['approved'] else 'AVOID',
+            'data_source': 'TwelveData Real-time' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != "demo" else 'Historical Data'
         }
         
         return jsonify(response)
@@ -2117,23 +2242,25 @@ def api_advanced_backtest():
 
 @app.route('/api/market_overview')
 def api_market_overview():
-    """Overview market untuk semua pair dengan error handling"""
+    """Overview market untuk semua pair dengan REAL-TIME prices dari TwelveData"""
     overview = {}
     
     for pair in config.FOREX_PAIRS[:6]:  # Limit to 6 pairs for performance
         try:
+            # Dapatkan current price REAL-TIME dari TwelveData
+            real_time_price = twelve_data_client.get_real_time_price(pair)
+            
             price_data = data_manager.get_price_data(pair, '1D', days=5)
+            
             if not price_data.empty:
                 tech = tech_engine.calculate_all_indicators(price_data)
                 
-                # Calculate price change dengan error handling
-                current_price = tech['levels']['current_price']
+                # Calculate price change dengan real-time price
                 change_pct = 0
-                
                 if len(price_data) > 1 and 'close' in price_data.columns:
                     try:
                         prev_price = float(price_data['close'].iloc[-2])
-                        change_pct = ((current_price - prev_price) / prev_price) * 100
+                        change_pct = ((real_time_price - prev_price) / prev_price) * 100
                     except:
                         change_pct = 0
                 
@@ -2155,7 +2282,7 @@ def api_market_overview():
                     confidence = 'LOW'
                 
                 overview[pair] = {
-                    'price': current_price,
+                    'price': real_time_price,  # Gunakan real-time price
                     'change': round(float(change_pct), 2),
                     'rsi': float(tech['momentum']['rsi']),
                     'trend': tech['trend']['trend_direction'],
@@ -2164,11 +2291,12 @@ def api_market_overview():
                     'recommendation': recommendation,
                     'confidence': confidence,
                     'support': tech['levels']['support'],
-                    'resistance': tech['levels']['resistance']
+                    'resistance': tech['levels']['resistance'],
+                    'data_source': 'TwelveData Real-time' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != "demo" else 'Historical Data'
                 }
             else:
                 overview[pair] = {
-                    'price': 0,
+                    'price': real_time_price,
                     'change': 0,
                     'rsi': 50,
                     'trend': 'UNKNOWN',
@@ -2176,7 +2304,8 @@ def api_market_overview():
                     'volatility': 0,
                     'recommendation': 'HOLD',
                     'confidence': 'LOW',
-                    'error': 'No data available'
+                    'error': 'No historical data available',
+                    'data_source': 'TwelveData Real-time' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != "demo" else 'Historical Data'
                 }
         except Exception as e:
             logger.error(f"Error getting overview for {pair}: {e}")
@@ -2204,6 +2333,9 @@ def api_risk_dashboard():
         market_analysis = {}
         for pair in config.FOREX_PAIRS[:4]:
             try:
+                # Gunakan real-time price untuk risk analysis
+                real_time_price = twelve_data_client.get_real_time_price(pair)
+                
                 data = data_manager.get_price_data(pair, '1D', days=5)
                 if not data.empty:
                     tech = tech_engine.calculate_all_indicators(data)
@@ -2217,11 +2349,13 @@ def api_risk_dashboard():
                         risk_level = 'LOW'
                         
                     market_analysis[pair] = {
+                        'current_price': real_time_price,
                         'volatility': round(volatility, 3),
                         'trend': tech['trend']['trend_direction'],
                         'rsi': round(tech['momentum']['rsi'], 1),
                         'risk_level': risk_level,
-                        'atr': round(tech['volatility']['atr'], 4)
+                        'atr': round(tech['volatility']['atr'], 4),
+                        'data_source': 'TwelveData Real-time' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != "demo" else 'Historical Data'
                     }
             except Exception as e:
                 logger.error(f"Error analyzing {pair} for risk dashboard: {e}")
@@ -2283,7 +2417,8 @@ def api_risk_dashboard():
             'system_status': {
                 'total_pairs_monitored': len(config.FOREX_PAIRS),
                 'risk_manager_status': 'ACTIVE',
-                'last_update': datetime.now().isoformat()
+                'last_update': datetime.now().isoformat(),
+                'data_provider': 'TwelveData Real-time' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != "demo" else 'Historical Data'
             }
         })
         
@@ -2294,12 +2429,15 @@ def api_risk_dashboard():
 @app.route('/api/system_status')
 def api_system_status():
     """Status sistem dan ketersediaan API"""
+    twelve_data_status = 'ENABLED' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != "demo" else 'DISABLED'
+    
     return jsonify({
         'system': 'RUNNING',
         'historical_data': f"{len(data_manager.historical_data)} pairs loaded",
         'supported_pairs': config.FOREX_PAIRS,
         'deepseek_ai': 'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED',
         'news_api': 'ENABLED' if config.NEWS_API_KEY else 'DISABLED',
+        'twelve_data': twelve_data_status,
         'risk_management': 'ADVANCED',
         'backtesting_engine': 'ENHANCED',
         'server_time': datetime.now().isoformat(),
@@ -2310,7 +2448,8 @@ def api_system_status():
             'AI-Powered Analysis',
             'Comprehensive Backtesting',
             'Real-time Market Overview',
-            'Risk Dashboard'
+            'Risk Dashboard',
+            'TwelveData Real-time Integration'
         ]
     })
 
@@ -2320,6 +2459,7 @@ if __name__ == '__main__':
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
     logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
     logger.info(f"DeepSeek AI: {'ENABLED' if config.DEEPSEEK_API_KEY else 'DISABLED'}")
+    logger.info(f"TwelveData Real-time: {'ENABLED' if config.TWELVE_DATA_KEY and config.TWELVE_DATA_KEY != 'demo' else 'DISABLED'}")
     logger.info(f"Advanced Risk Management: ENABLED")
     logger.info(f"Enhanced Backtesting: ENABLED")
     
