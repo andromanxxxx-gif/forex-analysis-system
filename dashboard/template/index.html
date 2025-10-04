@@ -830,15 +830,888 @@
             `);
         }
 
-        // [Rest of the JavaScript functions remain the same as in the previous enhanced version]
-        // displayAnalysisResults(), displayTechnicalIndicators(), displayFundamentalNews(),
-        // renderTechnicalCharts(), and all chart-related functions...
+        // Display analysis results
+        function displayAnalysisResults(data) {
+            const aiAnalysis = data.ai_analysis || {};
+            const technical = data.technical_analysis || {};
+            const priceData = data.price_data || {};
+            const riskAssessment = data.risk_assessment || {};
+            
+            // Determine signal class
+            let signalClass = 'signal-hold';
+            let signalText = 'HOLD';
+            if (aiAnalysis.signal === 'BUY') {
+                signalClass = 'signal-buy';
+                signalText = 'BUY';
+            } else if (aiAnalysis.signal === 'SELL') {
+                signalClass = 'signal-sell';
+                signalText = 'SELL';
+            }
+            
+            // Determine confidence level
+            const confidence = aiAnalysis.confidence || 50;
+            const confidenceLevel = confidence >= 70 ? 'high' : (confidence >= 50 ? 'medium' : 'low');
+            
+            // Format trading levels
+            const entryPrice = aiAnalysis.entry_price || (priceData.current ? priceData.current.toFixed(4) : 'N/A');
+            const stopLoss = aiAnalysis.stop_loss || 'N/A';
+            const takeProfit1 = aiAnalysis.take_profit_1 || 'N/A';
+            const takeProfit2 = aiAnalysis.take_profit_2 || 'N/A';
+            
+            let html = `
+            <div class="${signalClass}">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h3 class="mb-2">${signalText} SIGNAL</h3>
+                        <p class="mb-1"><strong>Current Price:</strong> ${priceData.current ? priceData.current.toFixed(4) : 'N/A'}</p>
+                        <p class="mb-1"><strong>Analysis:</strong> ${aiAnalysis.analysis_summary || 'Analysis not available'}</p>
+                        <p class="mb-0"><strong>Timeframe:</strong> ${aiAnalysis.timeframe_suggestion || data.timeframe || 'N/A'}</p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="confidence-${confidenceLevel} display-4">${confidence}%</div>
+                        <small>Confidence Level</small>
+                        <div class="mt-2">
+                            <span class="badge ${riskAssessment.approved ? 'bg-success' : 'bg-danger'}">
+                                ${riskAssessment.approved ? 'TRADE APPROVED' : 'TRADE REJECTED'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-target me-2"></i>Trading Levels
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Entry Price:</strong><br>
+                                    <span class="${entryPrice !== 'N/A' ? 'price-up' : ''}">${entryPrice}</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Stop Loss:</strong><br>
+                                    <span class="${stopLoss !== 'N/A' ? 'price-down' : ''}">${stopLoss}</span>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-6">
+                                    <strong>Take Profit 1:</strong><br>
+                                    <span class="${takeProfit1 !== 'N/A' ? 'price-up' : ''}">${takeProfit1}</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Take Profit 2:</strong><br>
+                                    <span class="${takeProfit2 !== 'N/A' ? 'price-up' : ''}">${takeProfit2}</span>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <strong>Risk Level:</strong>
+                                    <span class="badge ${aiAnalysis.risk_level === 'HIGH' ? 'bg-danger' : aiAnalysis.risk_level === 'MEDIUM' ? 'bg-warning' : 'bg-success'}">
+                                        ${aiAnalysis.risk_level || 'MEDIUM'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <i class="fas fa-mountain me-2"></i>Key Levels
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Support:</strong><br>
+                                    ${priceData.support ? priceData.support.toFixed(4) : 'N/A'}
+                                </div>
+                                <div class="col-6">
+                                    <strong>Resistance:</strong><br>
+                                    ${priceData.resistance ? priceData.resistance.toFixed(4) : 'N/A'}
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <strong>Key Levels to Watch:</strong><br>
+                                    <small>${aiAnalysis.key_levels || 'Monitor support and resistance breaks'}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-chart-line me-2"></i>Technical Analysis Charts</span>
+                            <small class="text-muted">AI Provider: ${aiAnalysis.ai_provider || 'Technical Analysis'}</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-controls">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input indicator-checkbox" type="checkbox" id="showSMA" checked>
+                                            <label class="form-check-label" for="showSMA">SMA</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input indicator-checkbox" type="checkbox" id="showEMA" checked>
+                                            <label class="form-check-label" for="showEMA">EMA</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input indicator-checkbox" type="checkbox" id="showBollinger">
+                                            <label class="form-check-label" for="showBollinger">Bollinger Bands</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <div class="btn-group timeframe-buttons" role="group">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changeChartTimeframe('1D')">1D</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changeChartTimeframe('1W')">1W</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changeChartTimeframe('1M')">1M</button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="changeChartTimeframe('ALL')">ALL</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <ul class="nav nav-pills chart-tabs mb-3" id="chartTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="price-tab" data-bs-toggle="pill" data-bs-target="#price-chart" type="button" role="tab">Price & Indicators</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="rsi-tab" data-bs-toggle="pill" data-bs-target="#rsi-chart" type="button" role="tab">RSI</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="macd-tab" data-bs-toggle="pill" data-bs-target="#macd-chart" type="button" role="tab">MACD</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content" id="chartTabsContent">
+                                <div class="tab-pane fade show active" id="price-chart" role="tabpanel">
+                                    <div class="chart-container">
+                                        <canvas id="priceChartCanvas"></canvas>
+                                    </div>
+                                    <div class="chart-legend" id="price-chart-legend"></div>
+                                </div>
+                                <div class="tab-pane fade" id="rsi-chart" role="tabpanel">
+                                    <div class="chart-container">
+                                        <canvas id="rsiChartCanvas"></canvas>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="macd-chart" role="tabpanel">
+                                    <div class="chart-container">
+                                        <canvas id="macdChartCanvas"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            $('#analysis-results').html(html);
+            
+            // Initialize Bootstrap tabs
+            const triggerTabList = [].slice.call(document.querySelectorAll('#chartTabs button'));
+            triggerTabList.forEach(function (triggerEl) {
+                var tabTrigger = new bootstrap.Tab(triggerEl);
+                triggerEl.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    tabTrigger.show();
+                });
+            });
+            
+            // Add event listeners to indicator checkboxes
+            $('.indicator-checkbox').change(function() {
+                if (currentChartData) {
+                    renderTechnicalCharts(currentChartData.technical_analysis, currentChartData.price_data, data.pair);
+                }
+            });
+            
+            // Render technical charts
+            currentChartData = data;
+            renderTechnicalCharts(technical, priceData, data.pair);
+        }
 
-        // Note: The rest of the JavaScript code from the previous enhanced version 
-        // should be included here. I'm omitting it for brevity since it's quite long,
-        // but all the chart rendering, indicator calculations, and backtesting functions
-        // should be maintained.
+        // Display technical indicators
+        function displayTechnicalIndicators(technical) {
+            if (!technical || Object.keys(technical).length === 0) {
+                $('#technical-indicators').html('<p class="text-muted text-center">No technical data available</p>');
+                return;
+            }
+            
+            const trend = technical.trend || {};
+            const momentum = technical.momentum || {};
+            const volatility = technical.volatility || {};
+            const levels = technical.levels || {};
+            
+            // Safe value formatting function
+            const safeValue = (value, decimals = 4) => {
+                if (value === undefined || value === null) return 'N/A';
+                return typeof value === 'number' ? value.toFixed(decimals) : value;
+            };
+            
+            let html = `
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <div class="technical-indicator text-center">
+                            <small>RSI</small>
+                            <div class="indicator-value ${momentum.rsi < 30 ? 'price-up' : momentum.rsi > 70 ? 'price-down' : ''}">
+                                ${safeValue(momentum.rsi, 1)}
+                            </div>
+                            <small>${momentum.rsi < 30 ? 'Oversold' : momentum.rsi > 70 ? 'Overbought' : 'Neutral'}</small>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="technical-indicator text-center">
+                            <small>MACD</small>
+                            <div class="indicator-value ${momentum.macd_histogram > 0 ? 'price-up' : 'price-down'}">
+                                ${safeValue(momentum.macd)}
+                            </div>
+                            <small>${momentum.macd_histogram > 0 ? 'Bullish' : 'Bearish'}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <div class="technical-indicator text-center">
+                            <small>Trend</small>
+                            <div class="indicator-value">${trend.trend_direction || 'N/A'}</div>
+                            <small>Strength: ${trend.trend_strength || 'N/A'}</small>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="technical-indicator text-center">
+                            <small>Volatility</small>
+                            <div class="indicator-value">${safeValue(volatility.volatility_pct, 2)}%</div>
+                            <small>ATR: ${safeValue(volatility.atr)}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <table class="table table-sm mt-3">
+                    <tr>
+                        <td>SMA 20:</td>
+                        <td class="text-end">${safeValue(trend.sma_20)}</td>
+                    </tr>
+                    <tr>
+                        <td>SMA 50:</td>
+                        <td class="text-end">${safeValue(trend.sma_50)}</td>
+                    </tr>
+                    <tr>
+                        <td>EMA 12:</td>
+                        <td class="text-end">${safeValue(trend.ema_12)}</td>
+                    </tr>
+                    <tr>
+                        <td>EMA 26:</td>
+                        <td class="text-end">${safeValue(trend.ema_26)}</td>
+                    </tr>
+                    <tr>
+                        <td>ADX:</td>
+                        <td class="text-end">${safeValue(trend.adx, 1)}</td>
+                    </tr>
+                </table>
+            `;
+            
+            $('#technical-indicators').html(html);
+        }
 
+        // Display fundamental news
+        function displayFundamentalNews(news) {
+            if (!news) {
+                $('#fundamental-news').html('<p class="text-muted text-center">No news available</p>');
+                return;
+            }
+            
+            let html = `
+                <div class="news-card">
+                    <i class="fas fa-newspaper me-2 text-primary"></i>
+                    <span>${news}</span>
+                </div>
+                <div class="text-center mt-2">
+                    <small class="text-muted">Market news and fundamental analysis</small>
+                </div>
+            `;
+            
+            $('#fundamental-news').html(html);
+        }
+
+        // Change chart timeframe
+        function changeChartTimeframe(timeframe) {
+            if (currentChartData) {
+                // Update the timeframe buttons
+                $('.timeframe-buttons .btn').removeClass('btn-primary').addClass('btn-outline-secondary');
+                $(`.timeframe-buttons .btn:contains('${timeframe}')`).removeClass('btn-outline-secondary').addClass('btn-primary');
+                
+                // Re-render charts with new timeframe
+                renderTechnicalCharts(currentChartData.technical_analysis, currentChartData.price_data, currentChartData.pair, timeframe);
+            }
+        }
+
+        // Enhanced function to render professional charts with indicators
+        function renderTechnicalCharts(technical, priceData, pair, timeframe = 'ALL') {
+            // For now, we'll use sample data since we don't have real historical data
+            // In a real implementation, you would fetch this from your backend
+            const currentPrice = priceData.current || 150.0;
+            const period = timeframe === '1D' ? 24 : timeframe === '1W' ? 168 : timeframe === '1M' ? 720 : 100;
+            
+            // Generate sample OHLC data
+            const ohlcData = [];
+            const timestamps = [];
+            
+            let basePrice = currentPrice * 0.95;
+            
+            for (let i = 0; i < period; i++) {
+                const date = new Date();
+                date.setHours(date.getHours() - (period - i));
+                timestamps.push(date);
+                
+                const open = i === 0 ? basePrice : ohlcData[i-1].close;
+                const change = (Math.random() - 0.5) * 0.01 * open;
+                const close = open + change;
+                const high = Math.max(open, close) + Math.random() * Math.abs(change) * 0.5;
+                const low = Math.min(open, close) - Math.random() * Math.abs(change) * 0.5;
+                
+                ohlcData.push({
+                    x: date,
+                    o: open,
+                    h: high,
+                    l: low,
+                    c: close
+                });
+                
+                basePrice = close;
+            }
+            
+            // Calculate technical indicators
+            const sma20 = calculateSMA(ohlcData, 20);
+            const sma50 = calculateSMA(ohlcData, 50);
+            const ema12 = calculateEMA(ohlcData, 12);
+            const ema26 = calculateEMA(ohlcData, 26);
+            const rsi = calculateRSI(ohlcData, 14);
+            const macd = calculateMACD(ohlcData);
+            const bollingerBands = calculateBollingerBands(ohlcData, 20);
+            
+            // Render charts
+            renderEnhancedPriceChart(ohlcData, sma20, sma50, ema12, ema26, bollingerBands, pair, timeframe);
+            renderEnhancedRSIChart(timestamps, rsi);
+            renderEnhancedMACDChart(timestamps, macd);
+        }
+
+        // Technical indicator calculation functions
+        function calculateSMA(data, period) {
+            const sma = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    sma.push(null);
+                } else {
+                    let sum = 0;
+                    for (let j = 0; j < period; j++) {
+                        sum += data[i - j].c;
+                    }
+                    sma.push(sum / period);
+                }
+            }
+            return sma;
+        }
+
+        function calculateEMA(data, period) {
+            const ema = [];
+            const multiplier = 2 / (period + 1);
+            
+            let sum = 0;
+            for (let i = 0; i < period; i++) {
+                sum += data[i].c;
+                if (i < period - 1) {
+                    ema.push(null);
+                }
+            }
+            
+            let emaValue = sum / period;
+            ema.push(emaValue);
+            
+            for (let i = period; i < data.length; i++) {
+                emaValue = (data[i].c - emaValue) * multiplier + emaValue;
+                ema.push(emaValue);
+            }
+            
+            return ema;
+        }
+
+        function calculateRSI(data, period) {
+            const rsi = [];
+            const gains = [];
+            const losses = [];
+            
+            for (let i = 1; i < data.length; i++) {
+                const change = data[i].c - data[i-1].c;
+                gains.push(change > 0 ? change : 0);
+                losses.push(change < 0 ? Math.abs(change) : 0);
+            }
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i < period) {
+                    rsi.push(null);
+                } else {
+                    let avgGain = 0;
+                    let avgLoss = 0;
+                    
+                    for (let j = 0; j < period; j++) {
+                        avgGain += gains[i - period + j];
+                        avgLoss += losses[i - period + j];
+                    }
+                    
+                    avgGain /= period;
+                    avgLoss /= period;
+                    
+                    if (avgLoss === 0) {
+                        rsi.push(100);
+                    } else {
+                        const rs = avgGain / avgLoss;
+                        rsi.push(100 - (100 / (1 + rs)));
+                    }
+                }
+            }
+            
+            return rsi;
+        }
+
+        function calculateMACD(data) {
+            const ema12 = calculateEMA(data, 12);
+            const ema26 = calculateEMA(data, 26);
+            const macdLine = [];
+            const signalLine = [];
+            const histogram = [];
+            
+            for (let i = 0; i < data.length; i++) {
+                if (ema12[i] !== null && ema26[i] !== null) {
+                    macdLine.push(ema12[i] - ema26[i]);
+                } else {
+                    macdLine.push(null);
+                }
+            }
+            
+            const signalPeriod = 9;
+            for (let i = 0; i < macdLine.length; i++) {
+                if (i < signalPeriod - 1) {
+                    signalLine.push(null);
+                } else {
+                    let sum = 0;
+                    let count = 0;
+                    for (let j = 0; j < signalPeriod; j++) {
+                        if (macdLine[i - j] !== null) {
+                            sum += macdLine[i - j];
+                            count++;
+                        }
+                    }
+                    signalLine.push(count > 0 ? sum / count : null);
+                }
+            }
+            
+            for (let i = 0; i < macdLine.length; i++) {
+                if (macdLine[i] !== null && signalLine[i] !== null) {
+                    histogram.push(macdLine[i] - signalLine[i]);
+                } else {
+                    histogram.push(null);
+                }
+            }
+            
+            return {
+                macdLine,
+                signalLine,
+                histogram
+            };
+        }
+
+        function calculateBollingerBands(data, period) {
+            const upperBand = [];
+            const middleBand = [];
+            const lowerBand = [];
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    upperBand.push(null);
+                    middleBand.push(null);
+                    lowerBand.push(null);
+                } else {
+                    let sum = 0;
+                    for (let j = 0; j < period; j++) {
+                        sum += data[i - j].c;
+                    }
+                    const mean = sum / period;
+                    
+                    let variance = 0;
+                    for (let j = 0; j < period; j++) {
+                        variance += Math.pow(data[i - j].c - mean, 2);
+                    }
+                    const stdDev = Math.sqrt(variance / period);
+                    
+                    middleBand.push(mean);
+                    upperBand.push(mean + 2 * stdDev);
+                    lowerBand.push(mean - 2 * stdDev);
+                }
+            }
+            
+            return {
+                upperBand,
+                middleBand,
+                lowerBand
+            };
+        }
+
+        // Chart rendering functions
+        function renderEnhancedPriceChart(ohlcData, sma20, sma50, ema12, ema26, bollingerBands, pair, timeframe) {
+            const ctx = document.getElementById('priceChartCanvas').getContext('2d');
+            
+            if (priceChart) {
+                priceChart.destroy();
+            }
+            
+            const datasets = [
+                {
+                    label: `${pair} Price`,
+                    data: ohlcData,
+                    type: 'line',
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }
+            ];
+            
+            if ($('#showSMA').is(':checked')) {
+                datasets.push({
+                    label: 'SMA 20',
+                    data: sma20.map((value, index) => ({
+                        x: ohlcData[index].x,
+                        y: value
+                    })),
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    fill: false
+                });
+                
+                datasets.push({
+                    label: 'SMA 50',
+                    data: sma50.map((value, index) => ({
+                        x: ohlcData[index].x,
+                        y: value
+                    })),
+                    borderColor: 'rgba(155, 89, 182, 1)',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    fill: false
+                });
+            }
+            
+            if ($('#showEMA').is(':checked')) {
+                datasets.push({
+                    label: 'EMA 12',
+                    data: ema12.map((value, index) => ({
+                        x: ohlcData[index].x,
+                        y: value
+                    })),
+                    borderColor: 'rgba(241, 196, 15, 1)',
+                    borderWidth: 1.5,
+                    fill: false
+                });
+            }
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm'
+                                }
+                            }
+                        },
+                        y: {
+                            position: 'right'
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: `${pair} - Price Chart`
+                        }
+                    }
+                }
+            });
+            
+            updateChartLegend();
+        }
+
+        function updateChartLegend() {
+            const legendHtml = `
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3498db;"></div>
+                    <span>Price</span>
+                </div>
+                ${$('#showSMA').is(':checked') ? `
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: rgba(52, 152, 219, 1);"></div>
+                    <span>SMA 20</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: rgba(155, 89, 182, 1);"></div>
+                    <span>SMA 50</span>
+                </div>
+                ` : ''}
+                ${$('#showEMA').is(':checked') ? `
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: rgba(241, 196, 15, 1);"></div>
+                    <span>EMA 12</span>
+                </div>
+                ` : ''}
+            `;
+            
+            $('#price-chart-legend').html(legendHtml);
+        }
+
+        function renderEnhancedRSIChart(timestamps, rsi) {
+            const ctx = document.getElementById('rsiChartCanvas').getContext('2d');
+            
+            if (rsiChart) {
+                rsiChart.destroy();
+            }
+            
+            rsiChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: 'RSI',
+                            data: rsi.map((value, index) => ({
+                                x: timestamps[index],
+                                y: value
+                            })),
+                            borderColor: '#9b59b6',
+                            backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                            borderWidth: 2,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderEnhancedMACDChart(timestamps, macd) {
+            const ctx = document.getElementById('macdChartCanvas').getContext('2d');
+            
+            if (macdChart) {
+                macdChart.destroy();
+            }
+            
+            macdChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [
+                        {
+                            label: 'MACD',
+                            data: macd.macdLine.map((value, index) => ({
+                                x: timestamps[index],
+                                y: value
+                            })),
+                            borderColor: '#3498db',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Signal',
+                            data: macd.signalLine.map((value, index) => ({
+                                x: timestamps[index],
+                                y: value
+                            })),
+                            borderColor: '#e74c3c',
+                            borderWidth: 1.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        // Backtesting function
+        async function runAdvancedBacktest() {
+            if (!systemOnline) {
+                showSystemOfflineAlert();
+                return;
+            }
+
+            const pair = $('#backtest-pair').val();
+            const timeframe = $('#backtest-timeframe').val();
+            const days = $('#backtest-days').val();
+            
+            $('#backtest-loading').show();
+            $('#backtest-results').html('');
+            $('#backtest-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Running...');
+            
+            try {
+                const response = await fetch('/api/advanced_backtest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pair: pair,
+                        timeframe: timeframe,
+                        days: parseInt(days),
+                        initial_balance: 10000
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                $('#backtest-loading').hide();
+                $('#backtest-btn').prop('disabled', false).html('<i class="fas fa-play-circle me-2"></i>Run Backtest');
+                
+                if (data.error) {
+                    $('#backtest-results').html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i> ${data.error}
+                        </div>
+                    `);
+                    return;
+                }
+                
+                displayBacktestResults(data);
+                
+            } catch (error) {
+                console.error('Backtest error:', error);
+                $('#backtest-loading').hide();
+                $('#backtest-btn').prop('disabled', false).html('<i class="fas fa-play-circle me-2"></i>Run Backtest');
+                
+                $('#backtest-results').html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Backtest failed: ${error.message}
+                        <button class="btn btn-sm btn-outline-danger mt-2" onclick="runAdvancedBacktest()">
+                            <i class="fas fa-redo"></i> Try Again
+                        </button>
+                    </div>
+                `);
+            }
+        }
+
+        // Display backtest results
+        function displayBacktestResults(data) {
+            const summary = data.summary || {};
+            const tradeHistory = data.trade_history || [];
+            const metadata = data.metadata || {};
+            
+            let html = `
+                <div class="backtest-summary">
+                    <div class="row text-center">
+                        <div class="col-md-3 mb-3">
+                            <div class="summary-value ${summary.win_rate > 50 ? 'price-up' : 'price-down'}">
+                                ${summary.win_rate ? summary.win_rate.toFixed(1) + '%' : '0%'}
+                            </div>
+                            <small>Win Rate</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="summary-value ${summary.total_profit > 0 ? 'price-up' : 'price-down'}">
+                                $${summary.total_profit ? summary.total_profit.toFixed(2) : '0.00'}
+                            </div>
+                            <small>Total Profit</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="summary-value">
+                                ${summary.total_trades || 0}
+                            </div>
+                            <small>Total Trades</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="summary-value ${summary.return_percentage > 0 ? 'price-up' : 'price-down'}">
+                                ${summary.return_percentage ? summary.return_percentage.toFixed(2) + '%' : '0%'}
+                            </div>
+                            <small>Return</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (tradeHistory.length > 0) {
+                html += `
+                    <h6 class="mt-4 mb-3">
+                        <i class="fas fa-history me-2"></i>Trade History (Last ${Math.min(10, tradeHistory.length)} Trades)
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                    <th>Entry</th>
+                                    <th>P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                const recentTrades = tradeHistory.slice(-10);
+                
+                recentTrades.forEach(trade => {
+                    html += `
+                        <tr>
+                            <td class="small">${trade.entry_date || 'N/A'}</td>
+                            <td>
+                                <span class="badge ${trade.action === 'BUY' ? 'bg-success' : 'bg-danger'}">
+                                    ${trade.action}
+                                </span>
+                            </td>
+                            <td>${trade.entry_price ? trade.entry_price.toFixed(4) : 'N/A'}</td>
+                            <td class="trade-profit ${trade.profit > 0 ? 'price-up' : 'price-down'}">
+                                $${trade.profit ? trade.profit.toFixed(2) : '0.00'}
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            $('#backtest-results').html(html);
+        }
     </script>
 </body>
 </html>
