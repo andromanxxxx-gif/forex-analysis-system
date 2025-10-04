@@ -7,46 +7,35 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
   <style>
-    body {
-      background-color: #0b0f19;
-      color: #fff;
-      font-family: "Segoe UI", sans-serif;
-    }
-    .card {
-      background-color: #141a28;
-      border: 1px solid #2a3244;
-      border-radius: 12px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.4);
-    }
-    canvas {
-      width: 100% !important;
-      height: 350px !important;
-    }
-    .loading-spinner {
-      display: none;
-      text-align: center;
-      margin-top: 20px;
-    }
-    .loading-spinner.show {
-      display: block;
-    }
+    body { background-color: #0b0f19; color: #fff; font-family: "Segoe UI", sans-serif; transition: background 1s ease; }
+    .card { background-color: #141a28; border: 1px solid #2a3244; border-radius: 12px; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
+    canvas { width: 100% !important; height: 380px !important; transition: opacity 0.5s ease; }
+    .loading-spinner { display: none; text-align: center; margin-top: 10px; }
+    .loading-spinner.show { display: block; }
+    #realtimePrice { font-size: 1.3rem; font-weight: 600; color: #00ffc3; transition: color 0.5s ease, transform 0.3s ease; }
+    #realtimePrice.pulse { color: #00bfff; transform: scale(1.05); }
+    .fade-in { animation: fadeIn 0.6s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .badge-profit { background-color: #00b050; }
+    .badge-loss { background-color: #ff4c4c; }
   </style>
 </head>
 <body>
   <div class="container-fluid py-3">
-    <h2 class="text-center mb-3">Forex Intelligence Dashboard</h2>
+    <h3 class="text-center mb-4">Forex Intelligence Dashboard</h3>
 
+    <!-- CONTROL PANEL -->
     <div class="row mb-3">
       <div class="col-md-3">
-        <label>Pair:</label>
+        <label>Pair</label>
         <select id="pairSelect" class="form-select">
-          <option>USDJPY</option><option>GBPJPY</option><option>EURJPY</option>
-          <option>CHFJPY</option><option>EURUSD</option><option>GBPUSD</option>
-          <option>USDCHF</option><option>AUDUSD</option><option>USDCAD</option><option>NZDUSD</option>
+          <option>USDJPY</option><option>GBPJPY</option><option>EURJPY</option><option>CHFJPY</option>
+          <option>EURUSD</option><option>GBPUSD</option><option>USDCHF</option>
+          <option>AUDUSD</option><option>USDCAD</option><option>NZDUSD</option>
         </select>
       </div>
       <div class="col-md-3">
-        <label>Timeframe:</label>
+        <label>Timeframe</label>
         <select id="timeframeSelect" class="form-select">
           <option>1H</option><option>4H</option><option>1D</option>
         </select>
@@ -54,46 +43,40 @@
       <div class="col-md-3 d-flex align-items-end">
         <button class="btn btn-primary w-100" id="analyzeBtn">Analyze Market</button>
       </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-outline-light w-100" id="toggleAutoRefresh">Auto Refresh: OFF</button>
+      </div>
     </div>
 
-    <div class="loading-spinner" id="loadingSpinner">
+    <!-- LOADING -->
+    <div id="loadingSpinner" class="loading-spinner">
       <div class="spinner-border text-light"></div>
       <p>Analyzing market data...</p>
     </div>
 
-    <div class="row">
-      <div class="col-md-6">
-        <div class="card p-3 mb-3">
-          <h5>AI Market Summary</h5>
-          <p id="aiSummary">No analysis yet.</p>
-          <p><b>Recommendation:</b> <span id="tradeRecommendation">-</span></p>
-          <p><b>Confidence:</b> <span id="aiConfidence">-</span></p>
-        </div>
-        <div class="card p-3 mb-3">
-          <h5>Technical Indicators</h5>
-          <pre id="technicalDetails" style="color:#ccc"></pre>
-        </div>
-        <div class="card p-3 mb-3">
-          <h5>Risk Assessment</h5>
-          <pre id="riskDetails" style="color:#ccc"></pre>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card p-3 mb-3">
-          <h5>Price Chart (with Volume)</h5>
-          <canvas id="priceChart"></canvas>
-        </div>
-        <div class="card p-3 mb-3">
-          <h5>RSI Chart</h5>
-          <canvas id="rsiChart"></canvas>
-        </div>
-        <div class="card p-3 mb-3">
-          <h5>MACD Chart</h5>
-          <canvas id="macdChart"></canvas>
-        </div>
-      </div>
+    <!-- AI ANALYSIS -->
+    <div class="card p-3 mb-3">
+      <h5>AI Market Summary</h5>
+      <p id="aiSummary" class="fade-in">No analysis yet.</p>
+      <p><b>Recommendation:</b> <span id="tradeRecommendation">-</span></p>
+      <p><b>Confidence:</b> <span id="aiConfidence">-</span></p>
+      <p><b>Live Price:</b> <span id="realtimePrice">-</span></p>
     </div>
 
+    <!-- PRICE CHART -->
+    <div class="card p-3 mb-3">
+      <h5>Price Chart (Historical + Realtime)</h5>
+      <canvas id="priceChart" class="fade-in"></canvas>
+    </div>
+
+    <!-- BACKTEST RESULT -->
+    <div class="card p-3 mb-3">
+      <h5>Backtest Performance</h5>
+      <div id="backtestStats">No backtest data.</div>
+      <canvas id="backtestChart" class="fade-in"></canvas>
+    </div>
+
+    <!-- FUNDAMENTAL NEWS -->
     <div class="card p-3 mb-3">
       <h5>Latest Fundamental News</h5>
       <ul id="newsList"></ul>
@@ -102,218 +85,178 @@
 
   <script>
     const analyzeBtn = document.getElementById("analyzeBtn");
-    const loadingSpinner = document.getElementById("loadingSpinner");
+    const spinner = document.getElementById("loadingSpinner");
+    const toggleAutoRefresh = document.getElementById("toggleAutoRefresh");
+    let realtimeInterval = null;
+    let autoRefreshInterval = null;
+    let autoRefreshEnabled = false;
 
-    analyzeBtn.addEventListener("click", () => {
+    analyzeBtn.addEventListener("click", analyzeMarket);
+    toggleAutoRefresh.addEventListener("click", toggleAutoRefreshMode);
+
+    async function analyzeMarket(showLoading = true) {
       const pair = document.getElementById("pairSelect").value;
       const timeframe = document.getElementById("timeframeSelect").value;
-      runAnalysis(pair, timeframe);
-    });
+      if (showLoading) spinner.classList.add("show");
 
-    async function runAnalysis(pair, timeframe) {
-      loadingSpinner.classList.add("show");
       try {
         const res = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
         const data = await res.json();
-        displayAnalysisResults(data);
+        displayResults(data);
+        startRealtimePrice(pair);
       } catch (err) {
-        alert("Error: " + err);
+        alert("Error fetching data: " + err);
       } finally {
-        loadingSpinner.classList.remove("show");
+        spinner.classList.remove("show");
       }
     }
 
-    function displayAnalysisResults(data) {
-      document.getElementById("aiSummary").textContent = data.ai_analysis?.summary || "No AI summary.";
+    function toggleAutoRefreshMode() {
+      autoRefreshEnabled = !autoRefreshEnabled;
+      toggleAutoRefresh.textContent = `Auto Refresh: ${autoRefreshEnabled ? "ON" : "OFF"}`;
+
+      if (autoRefreshEnabled) {
+        analyzeMarket(false);
+        autoRefreshInterval = setInterval(() => analyzeMarket(false), 30000);
+      } else {
+        clearInterval(autoRefreshInterval);
+      }
+    }
+
+    function displayResults(data) {
+      document.getElementById("aiSummary").textContent = data.ai_analysis?.summary || "No summary.";
       document.getElementById("tradeRecommendation").textContent = data.trading_recommendation || "-";
-      document.getElementById("aiConfidence").textContent = data.ai_analysis?.confidence ? (data.ai_analysis.confidence * 100).toFixed(1) + "%" : "-";
+      document.getElementById("aiConfidence").textContent = data.ai_analysis?.confidence
+        ? (data.ai_analysis.confidence * 100).toFixed(1) + "%"
+        : "-";
 
-      const tech = data.technical_analysis || {};
-      document.getElementById("technicalDetails").textContent = JSON.stringify(tech, null, 2);
-
-      const risk = data.risk_assessment || {};
-      document.getElementById("riskDetails").textContent = JSON.stringify(risk, null, 2);
+      const aiSummary = document.getElementById("aiSummary");
+      aiSummary.classList.remove("fade-in");
+      void aiSummary.offsetWidth; // restart animation
+      aiSummary.classList.add("fade-in");
 
       const newsList = document.getElementById("newsList");
       newsList.innerHTML = "";
       if (Array.isArray(data.fundamental_analysis)) {
-        data.fundamental_analysis.forEach(n => {
+        data.fundamental_analysis.forEach((n) => {
           const li = document.createElement("li");
           li.textContent = `${n.headline} (${n.source}) - ${n.sentiment}`;
           newsList.appendChild(li);
         });
       }
 
-      const priceData = data.price_data || {};
-      const priceSeries = data.price_series || [];
-
-      renderTechnicalCharts(tech, priceData, data.pair, priceSeries);
+      renderChart(data);
+      renderBacktest(data.backtest_results || {});
     }
 
-    // ==========================================================
-    // Render Technical Charts (Enhanced with Volume)
-    // ==========================================================
-    function renderTechnicalCharts(technical, priceData, pair, priceSeries = []) {
-      if (Array.isArray(priceSeries) && priceSeries.length > 10) {
-        const labels = priceSeries.map(p => new Date(p.date).toLocaleString());
-        const closes = priceSeries.map(p => Number(p.close));
-        const volumes = priceSeries.map(p => Number(p.volume || Math.random() * 1000)); // jika volume tidak ada, generate random
+    async function startRealtimePrice(pair) {
+      const priceText = document.getElementById("realtimePrice");
+      clearInterval(realtimeInterval);
 
-        const calcEMA = (data, period) => {
+      realtimeInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/realtime?pair=${pair}`);
+          const data = await res.json();
+          const price = data?.price || data?.current_price || "-";
+          if (price !== "-") {
+            priceText.textContent = parseFloat(price).toFixed(4);
+            priceText.classList.add("pulse");
+            setTimeout(() => priceText.classList.remove("pulse"), 400);
+            updateChartRealtime(parseFloat(price));
+          }
+        } catch (err) {
+          console.warn("Realtime update failed:", err);
+        }
+      }, 5000);
+    }
+
+    function renderChart(data) {
+      const priceSeries = data.price_series || [];
+      const pair = data.pair || "PAIR";
+      const ctx = document.getElementById("priceChart").getContext("2d");
+      if (window.priceChart instanceof Chart) window.priceChart.destroy();
+
+      if (priceSeries.length > 0) {
+        const labels = priceSeries.map(p => new Date(p.date).toLocaleDateString());
+        const closes = priceSeries.map(p => parseFloat(p.close));
+
+        function calcEMA(values, period) {
           const k = 2 / (period + 1);
-          let emaArr = [];
-          let emaPrev = data[0];
-          data.forEach((val, i) => {
-            emaPrev = i === 0 ? val : val * k + emaPrev * (1 - k);
-            emaArr.push(emaPrev);
+          let ema = [], prev = values[0];
+          values.forEach((v, i) => {
+            prev = i === 0 ? v : v * k + prev * (1 - k);
+            ema.push(prev);
           });
-          return emaArr;
-        };
+          return ema;
+        }
 
         const ema20 = calcEMA(closes, 20);
         const ema50 = calcEMA(closes, 50);
 
-        renderPriceChart(labels, closes, ema20, ema50, volumes, pair);
-        renderRSIChart(labels, []);
-        renderMACDChart(labels, [], [], []);
+        window.priceChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: `${pair} Close`, data: closes, borderColor: "rgba(0,200,255,1)", borderWidth: 2, tension: 0.3, fill: true, backgroundColor: "rgba(0,200,255,0.1)" },
+              { label: "EMA 20", data: ema20, borderColor: "rgba(255,255,0,0.8)", borderWidth: 1, tension: 0.3, pointRadius: 0 },
+              { label: "EMA 50", data: ema50, borderColor: "rgba(255,100,200,0.8)", borderWidth: 1, tension: 0.3, pointRadius: 0 }
+            ]
+          },
+          options: {
+            plugins: { legend: { labels: { color: "#fff" } } },
+            scales: { x: { ticks: { color: "#aaa" } }, y: { ticks: { color: "#aaa" } } },
+            animation: { duration: 800, easing: 'easeInOutQuad' }
+          }
+        });
+      }
+    }
+
+    function updateChartRealtime(price) {
+      if (window.priceChart && window.priceChart.data) {
+        const chart = window.priceChart;
+        const labels = chart.data.labels;
+        const data = chart.data.datasets[0].data;
+        const now = new Date().toLocaleTimeString();
+        labels.push(now);
+        data.push(price);
+        if (labels.length > 100) { labels.shift(); data.shift(); }
+        chart.update('active');
+      }
+    }
+
+    function renderBacktest(backtest) {
+      const div = document.getElementById("backtestStats");
+      const ctx = document.getElementById("backtestChart").getContext("2d");
+      if (window.backtestChart instanceof Chart) window.backtestChart.destroy();
+
+      if (!backtest || Object.keys(backtest).length === 0) {
+        div.textContent = "No backtest data available.";
         return;
       }
 
-      // fallback simulasi
-      const currentPrice = priceData.current || 150.0;
-      const period = 50;
-      const prices = [];
-      const ema20 = [];
-      const ema50 = [];
-      const volumes = [];
-      let price = currentPrice;
-      const trendDirection = technical.trend && technical.trend.trend_direction === 'BULLISH' ? 1 : -1;
-      const volatility = (technical.volatility && technical.volatility.volatility_pct / 100) || 0.01;
+      div.innerHTML = `
+        <p>Win Rate: <span class="badge bg-success">${backtest.win_rate || 0}%</span> |
+           Profit Factor: ${backtest.profit_factor || "N/A"} |
+           Net Profit: <span class="badge ${backtest.net_profit > 0 ? 'badge-profit' : 'badge-loss'}">${backtest.net_profit}</span></p>
+      `;
 
-      for (let i = 0; i < period; i++) {
-        const randomChange = (Math.random() - 0.5 + trendDirection * 0.2) * volatility;
-        price = price * (1 + randomChange);
-        prices.push(price);
-        volumes.push(Math.random() * 1000);
+      const labels = backtest.equity_curve?.map((_, i) => `Trade ${i + 1}`) || [];
+      const equity = backtest.equity_curve || [];
 
-        if (i < 20) ema20.push(null);
-        else ema20.push(prices.slice(i - 19, i + 1).reduce((a, b) => a + b, 0) / 20);
-
-        if (i < 50) ema50.push(null);
-        else ema50.push(prices.slice(i - 49, i + 1).reduce((a, b) => a + b, 0) / 50);
-      }
-
-      const labels = Array.from({ length: period }, (_, i) => `T-${period - i}`);
-      renderPriceChart(labels, prices, ema20, ema50, volumes, pair);
-      renderRSIChart(labels, []);
-      renderMACDChart(labels, [], [], []);
-    }
-
-    // ==========================================================
-    // Chart.js Generators
-    // ==========================================================
-    let priceChart, rsiChart, macdChart;
-
-    function renderPriceChart(labels, prices, ema20, ema50, volumes, pair) {
-      if (priceChart) priceChart.destroy();
-      const ctx = document.getElementById("priceChart").getContext("2d");
-
-      const volumeColor = volumes.map(v => "rgba(0, 200, 255, 0.3)");
-
-      priceChart = new Chart(ctx, {
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              type: "bar",
-              label: "Volume",
-              data: volumes,
-              yAxisID: "y1",
-              backgroundColor: volumeColor,
-              borderWidth: 0,
-            },
-            {
-              type: "line",
-              label: `${pair} Close`,
-              data: prices,
-              borderColor: "rgba(0, 200, 255, 0.9)",
-              borderWidth: 1.5,
-              tension: 0.3,
-              pointRadius: 0,
-              yAxisID: "y",
-            },
-            {
-              type: "line",
-              label: "EMA 20",
-              data: ema20,
-              borderColor: "rgba(255, 255, 0, 0.9)",
-              borderWidth: 1,
-              tension: 0.3,
-              pointRadius: 0,
-              yAxisID: "y",
-            },
-            {
-              type: "line",
-              label: "EMA 50",
-              data: ema50,
-              borderColor: "rgba(255, 0, 150, 0.9)",
-              borderWidth: 1,
-              tension: 0.3,
-              pointRadius: 0,
-              yAxisID: "y",
-            },
-          ],
-        },
-        options: {
-          plugins: {
-            legend: { labels: { color: "#fff" } },
-          },
-          scales: {
-            x: { ticks: { color: "#aaa" } },
-            y: {
-              position: "left",
-              ticks: { color: "#aaa" },
-              grid: { drawOnChartArea: false },
-            },
-            y1: {
-              position: "right",
-              ticks: { display: false },
-              grid: { drawOnChartArea: false },
-            },
-          },
-        },
-      });
-    }
-
-    function renderRSIChart(labels, rsi) {
-      if (rsiChart) rsiChart.destroy();
-      const ctx = document.getElementById("rsiChart").getContext("2d");
-      rsiChart = new Chart(ctx, {
-        type: "line",
-        data: { labels, datasets: [{ label: "RSI(14)", data: rsi, borderColor: "#ff9900", borderWidth: 1 }] },
-        options: {
-          plugins: { legend: { labels: { color: "#fff" } } },
-          scales: { x: { ticks: { color: "#aaa" } }, y: { ticks: { color: "#aaa" } } },
-        },
-      });
-    }
-
-    function renderMACDChart(labels, macd, signal, hist) {
-      if (macdChart) macdChart.destroy();
-      const ctx = document.getElementById("macdChart").getContext("2d");
-      macdChart = new Chart(ctx, {
+      window.backtestChart = new Chart(ctx, {
         type: "line",
         data: {
           labels,
           datasets: [
-            { label: "MACD", data: macd, borderColor: "#00ffcc", borderWidth: 1 },
-            { label: "Signal", data: signal, borderColor: "#ff0066", borderWidth: 1 },
-          ],
+            { label: "Equity Curve", data: equity, borderColor: "rgba(0,255,120,1)", borderWidth: 2, tension: 0.3, fill: true, backgroundColor: "rgba(0,255,120,0.1)" }
+          ]
         },
         options: {
           plugins: { legend: { labels: { color: "#fff" } } },
           scales: { x: { ticks: { color: "#aaa" } }, y: { ticks: { color: "#aaa" } } },
-        },
+          animation: { duration: 700, easing: 'easeOutCubic' }
+        }
       });
     }
   </script>
