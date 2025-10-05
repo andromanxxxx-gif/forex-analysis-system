@@ -8,7 +8,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
@@ -23,16 +22,6 @@
       --bg-primary: #f8fafc;
       --bg-card: #ffffff;
       --border-radius: 12px;
-      --dark-bg: #0f172a;
-      --dark-card: #1e293b;
-      --dark-text: #e2e8f0;
-    }
-
-    [data-theme="dark"] {
-      --bg-primary: #0f172a;
-      --bg-card: #1e293b;
-      --text-primary: #e2e8f0;
-      --text-secondary: #94a3b8;
     }
 
     body {
@@ -40,7 +29,6 @@
       color: var(--text-primary);
       font-family: "Inter", "Segoe UI", sans-serif;
       padding: 18px;
-      transition: all 0.3s ease;
     }
 
     .topbar {
@@ -53,7 +41,6 @@
       background: var(--bg-card);
       border-radius: var(--border-radius);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      border: 1px solid rgba(0, 0, 0, 0.05);
     }
 
     .brand-logo {
@@ -76,7 +63,6 @@
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
       margin-bottom: 20px;
       border: 1px solid rgba(0, 0, 0, 0.05);
-      transition: all 0.3s ease;
     }
 
     .section-title {
@@ -294,200 +280,15 @@
       border-left: 4px solid var(--deepseek-secondary);
     }
 
-    /* New Enhanced Styles */
-    .market-overview {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .market-card {
-      background: var(--bg-card);
-      padding: 15px;
-      border-radius: var(--border-radius);
-      text-align: center;
-      border-left: 4px solid var(--deepseek-primary);
-    }
-
-    .market-card h5 {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-
-    .market-card .value {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--deepseek-primary);
-    }
-
-    .market-card .change {
-      font-size: 0.9rem;
-      margin-top: 5px;
-    }
-
-    .order-book {
-      background: var(--bg-card);
-      border-radius: var(--border-radius);
-      padding: 15px;
-      margin-bottom: 20px;
-    }
-
-    .order-book table {
-      width: 100%;
-      font-size: 0.85rem;
-    }
-
-    .order-book th {
-      color: var(--text-secondary);
-      font-weight: 600;
-      padding: 8px 5px;
-      text-align: center;
-    }
-
-    .order-book td {
-      padding: 6px 5px;
-      text-align: center;
-    }
-
-    .bid-row {
-      background: rgba(16, 185, 129, 0.1);
-    }
-
-    .ask-row {
-      background: rgba(239, 68, 68, 0.1);
-    }
-
-    .trading-view {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-
-    .position-management {
-      background: var(--bg-card);
-      border-radius: var(--border-radius);
-      padding: 20px;
-    }
-
-    .position-card {
-      background: var(--bg-primary);
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
-      border-left: 4px solid var(--deepseek-secondary);
-    }
-
-    .position-header {
+    /* Enhanced Trading Styles */
+    .timeframe-controls {
       display: flex;
-      justify-content: between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .position-type {
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-
-    .position-long {
-      background: rgba(16, 185, 129, 0.2);
-      color: var(--signal-buy);
-    }
-
-    .position-short {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--signal-sell);
-    }
-
-    .economic-calendar {
-      background: var(--bg-card);
-      border-radius: var(--border-radius);
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .calendar-event {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    }
-
-    .event-impact {
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-weight: 600;
-    }
-
-    .impact-high { background: #fee2e2; color: #dc2626; }
-    .impact-medium { background: #fef3c7; color: #d97706; }
-    .impact-low { background: #d1fae5; color: #059669; }
-
-    .performance-metrics {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .metric-box {
-      background: var(--bg-card);
-      padding: 15px;
-      border-radius: var(--border-radius);
-      text-align: center;
-    }
-
-    .metric-box .label {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-bottom: 5px;
-    }
-
-    .metric-box .value {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: var(--deepseek-primary);
-    }
-
-    .sentiment-indicator {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 10px 0;
-    }
-
-    .sentiment-bar {
-      flex-grow: 1;
-      height: 8px;
-      background: #e5e7eb;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .sentiment-fill {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
-
-    .sentiment-bullish { background: var(--signal-buy); }
-    .sentiment-bearish { background: var(--signal-sell); }
-
-    .advanced-chart-controls {
-      display: flex;
-      gap: 10px;
+      gap: 8px;
       margin-bottom: 15px;
       flex-wrap: wrap;
     }
 
-    .chart-type-btn {
+    .timeframe-btn {
       padding: 6px 12px;
       border: 1px solid var(--deepseek-secondary);
       border-radius: 6px;
@@ -498,49 +299,145 @@
       transition: all 0.3s ease;
     }
 
-    .chart-type-btn.active {
+    .timeframe-btn.active {
       background: var(--deepseek-secondary);
       color: white;
     }
 
-    .theme-toggle {
-      background: transparent;
-      border: 1px solid var(--deepseek-secondary);
-      color: var(--deepseek-secondary);
+    .data-period-selector {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .chart-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .indicator-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .price-levels-panel {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 15px;
+    }
+
+    .price-level-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
       border-radius: 6px;
-      padding: 6px 12px;
+      margin-bottom: 5px;
+      border-left: 4px solid transparent;
+    }
+
+    .price-level-support {
+      background: rgba(16, 185, 129, 0.05);
+      border-left-color: var(--signal-buy);
+    }
+
+    .price-level-resistance {
+      background: rgba(239, 68, 68, 0.05);
+      border-left-color: var(--signal-sell);
+    }
+
+    .price-level-pivot {
+      background: rgba(79, 70, 229, 0.05);
+      border-left-color: #4f46e5;
+    }
+
+    .level-strength {
+      font-size: 0.8rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .strength-strong { background: #fee2e2; color: #dc2626; }
+    .strength-medium { background: #fef3c7; color: #d97706; }
+    .strength-weak { background: #d1fae5; color: #059669; }
+
+    .analysis-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .analysis-tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
       cursor: pointer;
-      transition: all 0.3s ease;
+      font-weight: 500;
     }
 
-    .theme-toggle:hover {
-      background: var(--deepseek-secondary);
-      color: white;
+    .analysis-tab.active {
+      border-bottom-color: var(--deepseek-primary);
+      color: var(--deepseek-primary);
     }
 
-    /* Dark theme adjustments */
-    [data-theme="dark"] .card-soft {
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    .historical-performance {
+      margin-top: 20px;
     }
 
-    [data-theme="dark"] .market-card,
-    [data-theme="dark"] .order-book,
-    [data-theme="dark"] .position-management,
-    [data-theme="dark"] .economic-calendar,
-    [data-theme="dark"] .metric-box {
-      background: var(--dark-card);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+    .performance-metric {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
     }
 
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      .trading-view {
-        grid-template-columns: 1fr;
-      }
-      
-      .market-overview {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    .performance-bar {
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      margin: 5px 0;
+      overflow: hidden;
+    }
+
+    .performance-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .trend-analysis {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .trend-card {
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .trend-up {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .trend-down {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .trend-neutral {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
     }
   </style>
 </head>
@@ -553,10 +450,6 @@
   </div>
   
   <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
-    <button id="themeToggle" class="theme-toggle">
-      <i class="fas fa-moon"></i>
-    </button>
-    
     <div class="d-flex align-items-center">
       <label class="small-muted mb-0 me-2">Pair</label>
       <select id="pairSelect" class="form-select form-select-sm" style="width:130px;">
@@ -573,14 +466,13 @@
     </div>
     
     <div class="d-flex align-items-center">
-      <label class="small-muted mb-0 me-2">Timeframe</label>
-      <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
-        <option>1D</option>
-        <option>4H</option>
-        <option>1H</option>
-        <option>M30</option>
-        <option>M15</option>
-        <option>M5</option>
+      <label class="small-muted mb-0 me-2">Data Period</label>
+      <select id="periodSelect" class="form-select form-select-sm" style="width:140px;">
+        <option value="1M">1 Month (1H)</option>
+        <option value="3M">3 Months (1H/4H)</option>
+        <option value="6M" selected>6 Months (4H)</option>
+        <option value="1Y">1 Year (1D)</option>
+        <option value="2Y">2 Years (1D)</option>
       </select>
     </div>
     
@@ -594,47 +486,17 @@
     
     <div id="pairTicker" class="d-flex align-items-center ms-3">
       <span class="price-ticker me-2">USDJPY –</span>
-      <span id="livePrice" class="price-ticker">0.0000</span>
-      <span id="pairChange" class="price-change ms-2">(0.00%)</span>
-      <span id="statusIndicator" class="status-indicator status-offline ms-2"></span>
+      <span id="livePrice" class="price-ticker">147.3990</span>
+      <span id="pairChange" class="price-change change-negative ms-2">(-0.25%)</span>
+      <span id="statusIndicator" class="status-indicator status-live ms-2"></span>
     </div>
-  </div>
-</div>
-
-<!-- Market Overview -->
-<div class="market-overview">
-  <div class="market-card">
-    <h5>USD/JPY</h5>
-    <div class="value">147.3990</div>
-    <div class="change change-positive">+0.25%</div>
-  </div>
-  <div class="market-card">
-    <h5>EUR/USD</h5>
-    <div class="value">1.0855</div>
-    <div class="change change-negative">-0.12%</div>
-  </div>
-  <div class="market-card">
-    <h5>GBP/USD</h5>
-    <div class="value">1.2702</div>
-    <div class="change change-positive">+0.08%</div>
-  </div>
-  <div class="market-card">
-    <h5>USD/CHF</h5>
-    <div class="value">0.8834</div>
-    <div class="change change-negative">-0.05%</div>
-  </div>
-  <div class="market-card">
-    <h5>Gold</h5>
-    <div class="value">2,015.40</div>
-    <div class="change change-positive">+0.35%</div>
   </div>
 </div>
 
 <div class="row g-4">
   <div class="col-lg-8">
-    <!-- Enhanced Chart Section -->
     <div class="card-soft">
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="chart-controls">
         <div>
           <div class="section-title">
             <i class="fas fa-chart-candlestick"></i>
@@ -644,170 +506,228 @@
         </div>
         <div class="text-end">
           <div class="small-muted">Current Price</div>
-          <div class="price-ticker" id="currentPrice">-</div>
+          <div class="price-ticker" id="currentPrice">147.3990</div>
         </div>
       </div>
       
-      <!-- Advanced Chart Controls -->
-      <div class="advanced-chart-controls">
-        <button class="chart-type-btn active" data-type="candlestick">Candlestick</button>
-        <button class="chart-type-btn" data-type="line">Line</button>
-        <button class="chart-type-btn" data-type="area">Area</button>
-        <button class="chart-type-btn" data-type="bars">Bars</button>
-        <div class="ms-auto">
-          <button class="chart-type-btn" id="drawingToolsBtn">
-            <i class="fas fa-pencil-alt me-1"></i>Drawing Tools
-          </button>
+      <!-- Timeframe Controls -->
+      <div class="timeframe-controls">
+        <button class="timeframe-btn active" data-tf="1D">1D</button>
+        <button class="timeframe-btn" data-tf="4H">4H</button>
+        <button class="timeframe-btn" data-tf="1H">1H</button>
+        <button class="timeframe-btn" data-tf="30M">30M</button>
+        <button class="timeframe-btn" data-tf="15M">15M</button>
+        <button class="timeframe-btn" data-tf="5M">5M</button>
+      </div>
+      
+      <!-- Chart Indicators Toggle -->
+      <div class="d-flex gap-4 mb-3">
+        <div class="indicator-toggle">
+          <input type="checkbox" id="toggleEMA" checked>
+          <label for="toggleEMA" class="small-muted">EMA (26,50,100)</label>
+        </div>
+        <div class="indicator-toggle">
+          <input type="checkbox" id="toggleBollinger" checked>
+          <label for="toggleBollinger" class="small-muted">Bollinger Bands</label>
+        </div>
+        <div class="indicator-toggle">
+          <input type="checkbox" id="toggleVolume" checked>
+          <label for="toggleVolume" class="small-muted">Volume</label>
         </div>
       </div>
       
       <div id="chartRoot"></div>
       <div id="macdRoot"></div>
       
-      <!-- Technical Analysis Summary -->
-      <div class="mt-3">
+      <!-- Price Levels Panel -->
+      <div class="price-levels-panel">
         <div class="section-title">
-          <i class="fas fa-chart-bar"></i>
-          <span>Technical Summary</span>
+          <i class="fas fa-layer-group"></i>
+          <span>Key Price Levels</span>
         </div>
+        
+        <div class="price-level-item price-level-resistance">
+          <div>
+            <strong>Resistance 3</strong>
+            <div class="small-muted">Strong Resistance</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">149.2540</div>
+            <span class="level-strength strength-strong">Strong</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-resistance">
+          <div>
+            <strong>Resistance 2</strong>
+            <div class="small-muted">Stop Loss Level</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">148.1000</div>
+            <span class="level-strength strength-medium">Medium</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-resistance">
+          <div>
+            <strong>Resistance 1</strong>
+            <div class="small-muted">Minor Resistance</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">147.8000</div>
+            <span class="level-strength strength-weak">Weak</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-pivot">
+          <div>
+            <strong>Current Price</strong>
+            <div class="small-muted">Market Price</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">147.3990</div>
+            <span class="level-strength strength-weak">Live</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-support">
+          <div>
+            <strong>Support 1</strong>
+            <div class="small-muted">Take Profit 1</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">146.8000</div>
+            <span class="level-strength strength-weak">Weak</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-support">
+          <div>
+            <strong>Support 2</strong>
+            <div class="small-muted">Take Profit 2</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">146.5870</div>
+            <span class="level-strength strength-medium">Medium</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-support">
+          <div>
+            <strong>Support 3</strong>
+            <div class="small-muted">Strong Support</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold">145.9200</div>
+            <span class="level-strength strength-strong">Strong</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Analysis Tabs -->
+    <div class="card-soft">
+      <div class="analysis-tabs">
+        <button class="analysis-tab active" data-tab="technical">Technical Analysis</button>
+        <button class="analysis-tab" data-tab="fundamental">Fundamental Analysis</button>
+        <button class="analysis-tab" data-tab="sentiment">Market Sentiment</button>
+        <button class="analysis-tab" data-tab="historical">Historical Performance</button>
+      </div>
+      
+      <div id="technicalAnalysis" class="analysis-content">
         <div class="row">
           <div class="col-md-6">
-            <div class="sentiment-indicator">
-              <span class="small-muted">Bullish</span>
-              <div class="sentiment-bar">
-                <div class="sentiment-fill sentiment-bullish" style="width: 35%"></div>
+            <div class="section-title">
+              <i class="fas fa-chart-line"></i>
+              <span>Trend Analysis</span>
+            </div>
+            
+            <div class="trend-analysis">
+              <div class="trend-card trend-down">
+                <div class="small-muted">Primary Trend</div>
+                <div class="fw-bold">Bearish</div>
+                <div class="small-muted">4H & 1D Timeframe</div>
               </div>
-              <span class="small-muted">Bearish</span>
+              <div class="trend-card trend-neutral">
+                <div class="small-muted">Secondary Trend</div>
+                <div class="fw-bold">Neutral</div>
+                <div class="small-muted">1H Timeframe</div>
+              </div>
+              <div class="trend-card trend-down">
+                <div class="small-muted">Momentum</div>
+                <div class="fw-bold">Bearish</div>
+                <div class="small-muted">RSI & MACD</div>
+              </div>
+              <div class="trend-card trend-up">
+                <div class="small-muted">Volatility</div>
+                <div class="fw-bold">Increasing</div>
+                <div class="small-muted">ATR Rising</div>
+              </div>
             </div>
           </div>
+          
           <div class="col-md-6">
-            <div class="d-flex justify-content-between">
-              <span class="small-muted">Trend:</span>
-              <span class="indicator-value change-negative">Bearish</span>
+            <div class="section-title">
+              <i class="fas fa-ruler-combined"></i>
+              <span>Pattern Recognition</span>
             </div>
-            <div class="d-flex justify-content-between">
-              <span class="small-muted">Momentum:</span>
-              <span class="indicator-value change-negative">Weak</span>
+            
+            <div class="tech-indicator">
+              <span class="small-muted">Chart Pattern</span>
+              <span class="indicator-value">Descending Triangle</span>
             </div>
-            <div class="d-flex justify-content-between">
-              <span class="small-muted">Volatility:</span>
-              <span class="indicator-value">Medium</span>
+            <div class="tech-indicator">
+              <span class="small-muted">Fibonacci Level</span>
+              <span class="indicator-value">61.8% Retracement</span>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Trading View with Order Book -->
-    <div class="trading-view">
-      <!-- Order Book -->
-      <div class="order-book">
-        <div class="section-title">
-          <i class="fas fa-book"></i>
-          <span>Order Book</span>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Price</th>
-              <th>Size</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody id="orderBookBody">
-            <!-- Order book will be populated by JavaScript -->
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Position Management -->
-      <div class="position-management">
-        <div class="section-title">
-          <i class="fas fa-wallet"></i>
-          <span>Position Management</span>
-        </div>
-        
-        <div class="position-card">
-          <div class="position-header">
-            <span class="small-muted">Current Position</span>
-            <span class="position-type position-short">SHORT</span>
-          </div>
-          <div class="d-flex justify-content-between">
-            <div>
-              <div class="small-muted">Size</div>
-              <div class="metric-value">0.5 Lots</div>
+            <div class="tech-indicator">
+              <span class="small-muted">Support Break</span>
+              <span class="indicator-value change-negative">Confirmed</span>
             </div>
-            <div>
-              <div class="small-muted">Entry</div>
-              <div class="metric-value">147.50</div>
-            </div>
-            <div>
-              <div class="small-muted">P/L</div>
-              <div class="metric-value change-positive">+$127</div>
+            <div class="tech-indicator">
+              <span class="small-muted">Volume Trend</span>
+              <span class="indicator-value">Below Average</span>
             </div>
           </div>
         </div>
         
-        <div class="mb-3">
-          <div class="small-muted mb-2">QUICK TRADE</div>
-          <div class="d-grid gap-2">
-            <button class="btn btn-success">
-              <i class="fas fa-arrow-up me-2"></i>BUY
-            </button>
-            <button class="btn btn-danger">
-              <i class="fas fa-arrow-down me-2"></i>SELL
-            </button>
+        <div class="historical-performance">
+          <div class="section-title">
+            <i class="fas fa-chart-bar"></i>
+            <span>Historical Performance</span>
           </div>
-        </div>
-        
-        <div class="mb-3">
-          <div class="small-muted mb-2">TRADE SIZE</div>
-          <input type="range" class="form-range" min="0.1" max="5" step="0.1" value="0.5">
-          <div class="d-flex justify-content-between">
-            <span class="small-muted">0.1 Lots</span>
-            <span class="small-muted">5.0 Lots</span>
+          
+          <div class="performance-metric">
+            <span class="small-muted">1 Week Performance</span>
+            <span class="change-negative">-1.2%</span>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Economic Calendar -->
-    <div class="economic-calendar">
-      <div class="section-title">
-        <i class="fas fa-calendar-alt"></i>
-        <span>Economic Calendar</span>
-      </div>
-      
-      <div class="calendar-event">
-        <div>
-          <div class="fw-bold">USD Core CPI (YoY)</div>
-          <div class="small-muted">Today, 13:30 GMT</div>
-        </div>
-        <div class="text-end">
-          <div class="event-impact impact-high">High Impact</div>
-          <div class="small-muted">Forecast: 3.7%</div>
-        </div>
-      </div>
-      
-      <div class="calendar-event">
-        <div>
-          <div class="fw-bold">BoJ Monetary Policy Statement</div>
-          <div class="small-muted">Tomorrow, 03:00 GMT</div>
-        </div>
-        <div class="text-end">
-          <div class="event-impact impact-medium">Medium Impact</div>
-          <div class="small-muted">No Change Expected</div>
-        </div>
-      </div>
-      
-      <div class="calendar-event">
-        <div>
-          <div class="fw-bold">EUR German ZEW Economic Sentiment</div>
-          <div class="small-muted">Tomorrow, 10:00 GMT</div>
-        </div>
-        <div class="text-end">
-          <div class="event-impact impact-medium">Medium Impact</div>
-          <div class="small-muted">Forecast: 12.5</div>
+          <div class="performance-bar">
+            <div class="performance-fill" style="width: 40%; background: #ef4444;"></div>
+          </div>
+          
+          <div class="performance-metric">
+            <span class="small-muted">1 Month Performance</span>
+            <span class="change-negative">-2.8%</span>
+          </div>
+          <div class="performance-bar">
+            <div class="performance-fill" style="width: 60%; background: #ef4444;"></div>
+          </div>
+          
+          <div class="performance-metric">
+            <span class="small-muted">3 Month Performance</span>
+            <span class="change-positive">+3.5%</span>
+          </div>
+          <div class="performance-bar">
+            <div class="performance-fill" style="width: 30%; background: #10b981;"></div>
+          </div>
+          
+          <div class="performance-metric">
+            <span class="small-muted">1 Year Performance</span>
+            <span class="change-positive">+12.3%</span>
+          </div>
+          <div class="performance-bar">
+            <div class="performance-fill" style="width: 70%; background: #10b981;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -821,7 +741,11 @@
         <span>AI Trading Signal</span>
       </div>
       
-      <div id="aiSummary" class="muted mb-3">USDJPY menunjukkan momentum bearish dengan MACD masih di bawah garis signal dan RSI netral cenderung lemah. Meskipun volatilitas rendah, kondisi teknikal mendukung penurunan lebih lanjut menuju support 146.5870.</div>
+      <div id="aiSummary" class="muted mb-3">
+        USDJPY menunjukkan momentum bearish dengan MACD masih di bawah garis signal dan RSI netral cenderung lemah. 
+        Meskipun volatilitas rendah, kondisi teknikal mendukung penurunan lebih lanjut menuju support 146.5870. 
+        Fundamental dengan risiko stabilitas keuangan global dan ketegangan geopolitik dapat mendukung safe-haven JPY.
+      </div>
       
       <div class="mb-3">
         <div class="small-muted mb-2">TRADING SIGNAL</div>
@@ -858,25 +782,78 @@
           <i class="fas fa-bullseye me-2"></i>Take Profit 2: <span id="aiTP2">146.5870</span>
         </div>
       </div>
+      
+      <div class="mt-3">
+        <div class="small-muted mb-2">POSITION SIZING CALCULATOR</div>
+        <div class="mb-2">
+          <label class="small-muted">Account Balance ($)</label>
+          <input type="number" class="form-control" value="10000">
+        </div>
+        <div class="mb-2">
+          <label class="small-muted">Risk Percentage (%)</label>
+          <input type="number" class="form-control" value="2" step="0.1">
+        </div>
+        <div class="metric-card">
+          <div class="small-muted">Recommended Position Size</div>
+          <div class="metric-value">0.85 Lots</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Performance Metrics -->
-    <div class="performance-metrics">
-      <div class="metric-box">
-        <div class="label">Win Rate</div>
-        <div class="value">72.5%</div>
+    <!-- Technical Indicators -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-chart-bar"></i>
+        <span>Technical Indicators</span>
       </div>
-      <div class="metric-box">
-        <div class="label">Avg. Profit</div>
-        <div class="value">$145</div>
+      
+      <div class="tech-indicator">
+        <span class="small-muted">RSI (14)</span>
+        <span class="indicator-value" id="rsiVal">42.35</span>
       </div>
-      <div class="metric-box">
-        <div class="label">Sharpe Ratio</div>
-        <div class="value">1.85</div>
+      <div class="tech-indicator">
+        <span class="small-muted">MACD Line</span>
+        <span class="indicator-value" id="macdVal">-0.0023</span>
       </div>
-      <div class="metric-box">
-        <div class="label">Max Drawdown</div>
-        <div class="value">-8.2%</div>
+      <div class="tech-indicator">
+        <span class="small-muted">MACD Signal</span>
+        <span class="indicator-value" id="macdSignalVal">-0.0015</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">MACD Histogram</span>
+        <span class="indicator-value" id="macdHistVal">-0.0008</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Stochastic %K</span>
+        <span class="indicator-value" id="stochK">35.2</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Stochastic %D</span>
+        <span class="indicator-value" id="stochD">42.1</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Williams %R</span>
+        <span class="indicator-value" id="williamsR">-68.5</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">CCI</span>
+        <span class="indicator-value" id="cciVal">-45.3</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">ADX</span>
+        <span class="indicator-value" id="adxVal">28.45</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">ATR (14)</span>
+        <span class="indicator-value" id="atrVal">0.6540</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Bollinger Position</span>
+        <span class="indicator-value" id="bollingerPos">Lower Band</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Ichimoku Cloud</span>
+        <span class="indicator-value change-negative" id="ichimoku">Below Cloud</span>
       </div>
     </div>
 
@@ -902,179 +879,45 @@
         </div>
       </div>
 
-      <!-- Risk Score Visualization -->
       <div class="mb-4">
-        <div class="small-muted mb-2">RISK SCORE BREAKDOWN</div>
-        <div class="risk-score-container">
-          <div class="risk-meter mb-3">
-            <div class="d-flex justify-content-between mb-1">
-              <span class="small">Low Risk</span>
-              <span class="small">High Risk</span>
-            </div>
-            <div class="risk-meter-bar">
-              <div id="riskMeterFill" class="risk-meter-fill" style="width: 60%; background: #f59e0b"></div>
-            </div>
-            <div class="risk-meter-labels">
-              <span>0</span>
-              <span>2</span>
-              <span>4</span>
-              <span>6</span>
-              <span>8</span>
-              <span>10</span>
-            </div>
-          </div>
+        <div class="small-muted mb-2">RISK METRICS</div>
+        <div class="tech-indicator">
+          <span class="small-muted">Risk/Reward Ratio</span>
+          <span class="indicator-value">1:1.8</span>
         </div>
-      </div>
-
-      <!-- Risk Factors Grid -->
-      <div class="mb-4">
-        <div class="small-muted mb-2">RISK FACTORS</div>
-        <div id="riskFactors" class="row g-2">
-          <div class="col-6">
-            <div class="risk-factor-card low">
-              <i class="fas fa-check-circle me-2"></i>
-              <div>
-                <div class="risk-factor-name">Market Volatility</div>
-                <div class="risk-factor-status">LOW</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="risk-factor-card medium">
-              <i class="fas fa-exclamation-triangle me-2"></i>
-              <div>
-                <div class="risk-factor-name">Position Size</div>
-                <div class="risk-factor-status">MEDIUM</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="risk-factor-card low">
-              <i class="fas fa-check-circle me-2"></i>
-              <div>
-                <div class="risk-factor-name">Correlation</div>
-                <div class="risk-factor-status">LOW</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="risk-factor-card high">
-              <i class="fas fa-times-circle me-2"></i>
-              <div>
-                <div class="risk-factor-name">Daily Limits</div>
-                <div class="risk-factor-status">HIGH</div>
-              </div>
-            </div>
-          </div>
+        <div class="tech-indicator">
+          <span class="small-muted">Win Probability</span>
+          <span class="indicator-value">64%</span>
+        </div>
+        <div class="tech-indicator">
+          <span class="small-muted">Max Drawdown</span>
+          <span class="indicator-value change-negative">-2.1%</span>
+        </div>
+        <div class="tech-indicator">
+          <span class="small-muted">Position Score</span>
+          <span class="indicator-value">7.2/10</span>
         </div>
       </div>
     </div>
 
-    <!-- Support & Resistance -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-layer-group"></i>
-        <span>Support & Resistance</span>
-      </div>
-      
-      <div class="levels-container">
-        <div class="level-card support-card">
-          <div class="level-title support-title">SUPPORT</div>
-          <div class="level-value" id="supportLevel">146.5870</div>
-          <div class="level-distance" id="supportDistance">0.55% below</div>
-        </div>
-        <div class="level-card resistance-card">
-          <div class="level-title resistance-title">RESISTANCE</div>
-          <div class="level-value" id="resistanceLevel">148.1000</div>
-          <div class="level-distance" id="resistanceDistance">0.48% above</div>
-        </div>
-      </div>
-
-      <div class="pivot-levels">
-        <div class="small-muted mb-2">PIVOT POINTS</div>
-        <div class="pivot-row">
-          <span class="pivot-label">R3</span>
-          <span class="pivot-value" id="pivotR3">149.2540</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">R2</span>
-          <span class="pivot-value" id="pivotR2">148.6720</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">R1</span>
-          <span class="pivot-value" id="pivotR1">148.3860</span>
-        </div>
-        <div class="pivot-row" style="border-bottom: 2px solid #3b82f6;">
-          <span class="pivot-label">PIVOT</span>
-          <span class="pivot-value" id="pivotPoint">147.8040</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">S1</span>
-          <span class="pivot-value" id="pivotS1">147.5180</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">S2</span>
-          <span class="pivot-value" id="pivotS2">146.9360</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">S3</span>
-          <span class="pivot-value" id="pivotS3">146.6500</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Market News -->
+    <!-- Market News & Events -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-newspaper"></i>
-        <span>Market News</span>
+        <span>Market News & Events</span>
       </div>
       <div class="news-container" id="fundamentalNews">
-        <div class="fw-bold">BoJ Maintains Ultra-Loose Policy</div>
-        <div class="small-muted">Bank of Japan keeps interest rates unchanged, yen weakens further against major currencies.</div>
-        <hr>
-        <div class="fw-bold">US Inflation Data Ahead</div>
-        <div class="small-muted">Traders await key CPI data release this week for Fed policy clues.</div>
+        <div class="fw-bold text-primary">BoJ Maintains Ultra-Loose Policy</div>
+        <div class="small-muted mb-2">Bank of Japan keeps interest rates unchanged, yen weakens further against major currencies.</div>
+        
+        <div class="fw-bold text-primary">US CPI Data Ahead</div>
+        <div class="small-muted mb-2">Traders await key inflation data release this week for Fed policy clues.</div>
+        
+        <div class="fw-bold text-primary">Geopolitical Tensions</div>
+        <div class="small-muted">Safe-haven flows supporting JPY amid global uncertainty.</div>
       </div>
     </div>
 
-    <!-- Technical Analysis -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-chart-bar"></i>
-        <span>Technical Analysis</span>
-      </div>
-      
-      <div class="tech-indicator">
-        <span class="small-muted">RSI</span>
-        <span class="indicator-value" id="rsiVal">42.35</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">MACD</span>
-        <span class="indicator-value" id="macdVal">-0.0023</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">MACD Histogram</span>
-        <span class="indicator-value" id="macdHistVal">-0.0008</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">ADX</span>
-        <span class="indicator-value" id="adxVal">28.45</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">ATR</span>
-        <span class="indicator-value" id="atrVal">0.6540</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Volatility</span>
-        <span class="indicator-value" id="volVal">0.44%</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Trend</span>
-        <span class="indicator-value" id="trendVal">Bearish</span>
-      </div>
-    </div>
-    
     <!-- Backtest Results -->
     <div class="card-soft">
       <div class="section-title">
@@ -1101,54 +944,31 @@
         <div class="row">
           <div class="col-6">
             <div class="metric-card">
-              <div class="small-muted">Total Profit</div>
-              <div class="metric-value change-positive">$8,240</div>
+              <div class="small-muted">Profit Factor</div>
+              <div class="metric-value">1.85</div>
             </div>
           </div>
           <div class="col-6">
             <div class="metric-card">
-              <div class="small-muted">Final Balance</div>
-              <div class="metric-value">$18,240</div>
+              <div class="small-muted">Sharpe Ratio</div>
+              <div class="metric-value">1.42</div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Backtest Configuration Modal -->
-<div class="modal fade" id="backtestModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fas fa-play-circle me-2"></i>Run Backtest
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">Initial Balance ($)</label>
-          <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
+        <div class="row">
+          <div class="col-6">
+            <div class="metric-card">
+              <div class="small-muted">Max Drawdown</div>
+              <div class="metric-value change-negative">-8.2%</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="metric-card">
+              <div class="small-muted">Recovery Factor</div>
+              <div class="metric-value">2.1</div>
+            </div>
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Backtest Period (Days)</label>
-          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Backtest Type</label>
-          <select class="form-select" id="backtestType">
-            <option value="advanced">Advanced Backtest</option>
-            <option value="basic">Basic Backtest</option>
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-deepseek" id="startBacktestBtn">
-          <i class="fas fa-play me-2"></i>Start Backtest
-        </button>
       </div>
     </div>
   </div>
@@ -1156,155 +976,261 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Initialize with data
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize order book
-  initializeOrderBook();
-  
-  // Set up theme toggle
-  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
-  
-  // Set up chart type buttons
-  setupChartTypeButtons();
-  
-  // Initialize with sample data
-  initializeWithData();
-});
+// Enhanced Chart Data Generation with Historical Data
+function generateHistoricalData(timeframe, period) {
+  const data = [];
+  const now = new Date();
+  let basePrice = 147.40;
+  let candlesCount = 0;
 
-// Initialize order book with sample data
-function initializeOrderBook() {
-  const orderBookBody = document.getElementById('orderBookBody');
-  orderBookBody.innerHTML = '';
-  
-  // Sample bid data
-  for (let i = 0; i < 5; i++) {
-    const price = (147.40 - i * 0.01).toFixed(4);
-    const size = (Math.random() * 2 + 0.5).toFixed(2);
-    const total = (parseFloat(size) * 2).toFixed(2);
+  // Determine number of candles based on timeframe and period
+  switch(period) {
+    case '1M': candlesCount = 30 * 24; break; // 1 month of 1H data
+    case '3M': candlesCount = 90 * 6; break;  // 3 months of 4H data
+    case '6M': candlesCount = 180 * 6; break; // 6 months of 4H data
+    case '1Y': candlesCount = 365; break;     // 1 year of 1D data
+    case '2Y': candlesCount = 730; break;     // 2 years of 1D data
+  }
+
+  for (let i = candlesCount; i >= 0; i--) {
+    const date = new Date(now);
     
-    const row = document.createElement('tr');
-    row.className = 'bid-row';
-    row.innerHTML = `
-      <td class="change-positive">${price}</td>
-      <td>${size}</td>
-      <td>${total}</td>
-    `;
-    orderBookBody.appendChild(row);
-  }
-  
-  // Sample ask data
-  for (let i = 0; i < 5; i++) {
-    const price = (147.41 + i * 0.01).toFixed(4);
-    const size = (Math.random() * 2 + 0.5).toFixed(2);
-    const total = (parseFloat(size) * 2).toFixed(2);
-    
-    const row = document.createElement('tr');
-    row.className = 'ask-row';
-    row.innerHTML = `
-      <td class="change-negative">${price}</td>
-      <td>${size}</td>
-      <td>${total}</td>
-    `;
-    orderBookBody.appendChild(row);
-  }
-}
+    // Adjust date based on timeframe
+    switch(timeframe) {
+      case '1D':
+        date.setDate(date.getDate() - i);
+        break;
+      case '4H':
+        date.setHours(date.getHours() - i * 4);
+        break;
+      case '1H':
+        date.setHours(date.getHours() - i);
+        break;
+      case '30M':
+        date.setMinutes(date.getMinutes() - i * 30);
+        break;
+      case '15M':
+        date.setMinutes(date.getMinutes() - i * 15);
+        break;
+      case '5M':
+        date.setMinutes(date.getMinutes() - i * 5);
+        break;
+    }
 
-// Theme toggle functionality
-function toggleTheme() {
-  const body = document.body;
-  const currentTheme = body.getAttribute('data-theme');
-  const themeToggle = document.getElementById('themeToggle');
-  
-  if (currentTheme === 'dark') {
-    body.removeAttribute('data-theme');
-    themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
-  } else {
-    body.setAttribute('data-theme', 'dark');
-    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-  }
-}
+    // More realistic price movement simulation
+    const volatility = 0.002; // 0.2% volatility
+    const change = (Math.random() - 0.5) * 2 * volatility * basePrice;
+    const open = basePrice;
+    const close = basePrice + change;
+    const high = Math.max(open, close) + Math.random() * volatility * basePrice;
+    const low = Math.min(open, close) - Math.random() * volatility * basePrice;
 
-// Chart type buttons functionality
-function setupChartTypeButtons() {
-  const chartTypeButtons = document.querySelectorAll('.chart-type-btn');
-  
-  chartTypeButtons.forEach(button => {
-    button.addEventListener('click', function() {
-      // Remove active class from all buttons
-      chartTypeButtons.forEach(btn => btn.classList.remove('active'));
-      
-      // Add active class to clicked button
-      this.classList.add('active');
-      
-      // In a real implementation, you would change the chart type here
-      console.log('Switching to chart type:', this.getAttribute('data-type'));
+    // Update base price for next candle (trend simulation)
+    basePrice = close;
+
+    data.push({
+      time: date.toISOString().split('T')[0] + (timeframe !== '1D' ? ' ' + date.toTimeString().split(' ')[0] : ''),
+      open: open,
+      high: high,
+      low: low,
+      close: close,
+      volume: Math.random() * 1000 + 500
     });
-  });
-}
-
-// Initialize with sample data
-function initializeWithData() {
-  // Set initial values based on the original content
-  document.getElementById('livePrice').textContent = '147.3990';
-  document.getElementById('currentPrice').textContent = '147.3990';
-  document.getElementById('pairChange').textContent = '(+0.25%)';
-  document.getElementById('pairChange').className = 'price-change change-positive';
-  
-  // Update status indicator
-  updateStatusIndicator(true);
-}
-
-// Update status indicator
-function updateStatusIndicator(isLive) {
-  const statusIndicator = document.getElementById('statusIndicator');
-  if (isLive) {
-    statusIndicator.className = 'status-indicator status-live';
-    statusIndicator.title = 'Live data connection active';
-  } else {
-    statusIndicator.className = 'status-indicator status-offline';
-    statusIndicator.title = 'No live data connection';
   }
+
+  return data;
 }
 
-// The rest of your existing JavaScript code for charts, analysis, etc. would go here
-// This is a simplified version - you would integrate your existing chart code
-
-// Sample chart initialization (simplified)
+// Initialize Charts with Historical Data
 const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
   layout: { 
-    backgroundColor: 'transparent', 
-    textColor: 'var(--text-primary)',
+    backgroundColor: '#ffffff', 
+    textColor: '#111' 
   },
   grid: {
-    vertLines: { color: 'rgba(0, 0, 0, 0.1)' },
-    horzLines: { color: 'rgba(0, 0, 0, 0.1)' }
+    vertLines: { color: '#f3f4f6' },
+    horzLines: { color: '#f3f4f6' }
+  },
+  timeScale: {
+    borderColor: '#eee',
+    timeVisible: true,
+    secondsVisible: false
   },
   width: document.getElementById('chartRoot').clientWidth,
   height: 520
 });
 
 const candleSeries = chart.addCandlestickSeries({
-  upColor: '#26a69a',
-  downColor: '#ef5350',
+  upColor: '#16a34a',
+  downColor: '#dc2626',
   borderVisible: false,
-  wickUpColor: '#26a69a',
-  wickDownColor: '#ef5350',
+  wickUpColor: '#16a34a',
+  wickDownColor: '#dc2626',
 });
 
-// Sample data
-const sampleData = [
-  { time: '2023-01-01', open: 146.5, high: 147.2, low: 146.2, close: 147.0 },
-  { time: '2023-01-02', open: 147.0, high: 147.8, low: 146.8, close: 147.5 },
-  { time: '2023-01-03', open: 147.5, high: 148.0, low: 147.2, close: 147.8 },
-  { time: '2023-01-04', open: 147.8, high: 148.2, low: 147.5, close: 147.9 },
-  { time: '2023-01-05', open: 147.9, high: 148.1, low: 147.3, close: 147.4 },
-];
+// Add EMA indicators
+const ema26Series = chart.addLineSeries({
+  color: '#3b82f6',
+  lineWidth: 1,
+  priceScaleId: 'right'
+});
 
-candleSeries.setData(sampleData);
+const ema50Series = chart.addLineSeries({
+  color: '#8b5cf6',
+  lineWidth: 1,
+  priceScaleId: 'right'
+});
+
+const ema100Series = chart.addLineSeries({
+  color: '#f59e0b',
+  lineWidth: 1,
+  priceScaleId: 'right'
+});
+
+// MACD Chart
+const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
+  layout: { 
+    backgroundColor: '#ffffff', 
+    textColor: '#111' 
+  },
+  grid: {
+    vertLines: { color: '#f3f4f6' },
+    horzLines: { color: '#f3f4f6' }
+  },
+  timeScale: {
+    borderColor: '#eee',
+    timeVisible: true,
+    secondsVisible: false
+  },
+  width: document.getElementById('macdRoot').clientWidth,
+  height: 160
+});
+
+const macdLineSeries = macdChart.addLineSeries({
+  color: '#0ea5e9',
+  lineWidth: 1
+});
+
+const macdSignalSeries = macdChart.addLineSeries({
+  color: '#f59e0b',
+  lineWidth: 1
+});
+
+const macdHistogramSeries = macdChart.addHistogramSeries({
+  color: '#a78bfa',
+  priceFormat: {
+    type: 'volume',
+  }
+});
+
+// Calculate EMA
+function calculateEMA(data, period) {
+  const k = 2 / (period + 1);
+  const ema = [data[0].close];
+  
+  for (let i = 1; i < data.length; i++) {
+    ema.push(data[i].close * k + ema[i - 1] * (1 - k));
+  }
+  
+  return ema.map((value, index) => ({
+    time: data[index].time,
+    value: value
+  }));
+}
+
+// Calculate MACD
+function calculateMACD(data) {
+  const ema12 = calculateEMA(data, 12);
+  const ema26 = calculateEMA(data, 26);
+  
+  const macdLine = ema12.map((ema, index) => ({
+    time: ema.time,
+    value: ema.value - ema26[index].value
+  }));
+  
+  const signalLine = calculateEMA(macdLine.map(d => ({close: d.value, time: d.time})), 9);
+  const histogram = macdLine.map((macd, index) => ({
+    time: macd.time,
+    value: macd.value - signalLine[index].value
+  }));
+  
+  return { macdLine, signalLine, histogram };
+}
+
+// Load initial chart data
+function loadChartData(timeframe = '4H', period = '6M') {
+  const historicalData = generateHistoricalData(timeframe, period);
+  
+  // Set candle data
+  candleSeries.setData(historicalData);
+  
+  // Calculate and set EMA indicators
+  const ema26Data = calculateEMA(historicalData, 26);
+  const ema50Data = calculateEMA(historicalData, 50);
+  const ema100Data = calculateEMA(historicalData, 100);
+  
+  ema26Series.setData(ema26Data);
+  ema50Series.setData(ema50Data);
+  ema100Series.setData(ema100Data);
+  
+  // Calculate and set MACD
+  const macdData = calculateMACD(historicalData);
+  macdLineSeries.setData(macdData.macdLine);
+  macdSignalSeries.setData(macdData.signalLine);
+  macdHistogramSeries.setData(macdData.histogram);
+  
+  // Update chart subtitle
+  document.getElementById('chartSubtitle').textContent = 
+    `${timeframe} Timeframe · ${period} Period · EMA(26,50,100) · MACD`;
+}
+
+// Timeframe button event listeners
+document.querySelectorAll('.timeframe-btn').forEach(button => {
+  button.addEventListener('click', function() {
+    // Remove active class from all buttons
+    document.querySelectorAll('.timeframe-btn').forEach(btn => btn.classList.remove('active'));
+    
+    // Add active class to clicked button
+    this.classList.add('active');
+    
+    // Get selected timeframe and period
+    const timeframe = this.getAttribute('data-tf');
+    const period = document.getElementById('periodSelect').value;
+    
+    // Reload chart data
+    loadChartData(timeframe, period);
+  });
+});
+
+// Period selector event listener
+document.getElementById('periodSelect').addEventListener('change', function() {
+  const timeframe = document.querySelector('.timeframe-btn.active').getAttribute('data-tf');
+  const period = this.value;
+  loadChartData(timeframe, period);
+});
+
+// Analysis tabs functionality
+document.querySelectorAll('.analysis-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    // Remove active class from all tabs
+    document.querySelectorAll('.analysis-tab').forEach(t => t.classList.remove('active'));
+    
+    // Add active class to clicked tab
+    this.classList.add('active');
+    
+    // Here you would show/hide different analysis content
+    // For now, we'll just log the selected tab
+    console.log('Selected analysis tab:', this.getAttribute('data-tab'));
+  });
+});
+
+// Initialize with default data
+loadChartData('4H', '6M');
 
 // Handle window resize
 window.addEventListener('resize', () => {
   chart.resize(document.getElementById('chartRoot').clientWidth, 520);
+  macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
 });
 </script>
 </body>
