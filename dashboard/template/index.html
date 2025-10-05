@@ -9,7 +9,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- FIX: Load Lightweight Charts properly -->
+  <!-- Chart Library -->
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
 
   <style>
@@ -90,7 +90,7 @@
     }
     
     #chartRoot { 
-      height: 400px; 
+      height: 450px; 
     }
     
     #macdRoot { 
@@ -173,6 +173,123 @@
       font-weight: 700;
       font-size: 1.1rem;
     }
+
+    .btn-deepseek {
+      background: var(--deepseek-primary);
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+    }
+
+    .btn-deepseek:hover {
+      background: var(--deepseek-accent);
+      color: white;
+    }
+
+    .btn-action {
+      background: var(--deepseek-secondary);
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+    }
+
+    .btn-action:hover {
+      background: var(--deepseek-primary);
+      color: white;
+    }
+
+    /* Support & Resistance Styles */
+    .levels-container {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .level-card {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .support-card {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .resistance-card {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .level-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .support-title {
+      color: #10b981;
+    }
+
+    .resistance-title {
+      color: #ef4444;
+    }
+
+    .level-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .level-distance {
+      font-size: 0.7rem;
+      color: #6b7280;
+      margin-top: 3px;
+    }
+
+    .pivot-levels {
+      margin-top: 15px;
+    }
+
+    .pivot-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .pivot-label {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .pivot-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .backtest-panel {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .performance-grade {
+      font-size: 1.6rem;
+      font-weight: bold;
+      text-align: center;
+      padding: 12px;
+      border-radius: 10px;
+      margin: 12px 0;
+    }
+
+    .grade-a { background: #d1fae5; color: #065f46; }
+    .grade-b { background: #fef3c7; color: #92400e; }
+    .grade-c { background: #fde68a; color: #78350f; }
+    .grade-d { background: #fecaca; color: #991b1b; }
   </style>
 </head>
 <body>
@@ -201,6 +318,8 @@
         <option>EURJPY</option>
         <option>GBPJPY</option>
         <option>GBPUSD</option>
+        <option>EURUSD</option>
+        <option>AUDUSD</option>
       </select>
     </div>
     
@@ -210,11 +329,16 @@
         <option value="1D">1D</option>
         <option value="4H">4H</option>
         <option value="1H">1H</option>
+        <option value="30m">30m</option>
       </select>
     </div>
     
-    <button id="analyzeBtn" class="btn btn-primary">
+    <button id="analyzeBtn" class="btn btn-deepseek">
       <i class="fas fa-chart-line me-2"></i>Analyze
+    </button>
+
+    <button id="runBacktestBtn" class="btn btn-action">
+      <i class="fas fa-play-circle me-2"></i>Backtest
     </button>
     
     <div class="d-flex align-items-center ms-3">
@@ -229,9 +353,18 @@
 <div class="row g-3">
   <div class="col-lg-8">
     <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-chart-candlestick"></i>
-        <span>Live Price Chart</span>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <div class="section-title">
+            <i class="fas fa-chart-candlestick"></i>
+            <span>Live Price Chart</span>
+          </div>
+          <div class="muted" id="chartSubtitle">Real-time Candlestick · EMA26 · MACD</div>
+        </div>
+        <div class="text-end">
+          <div class="small-muted">Current Price</div>
+          <div class="price-ticker" id="currentPrice">-</div>
+        </div>
       </div>
       <div id="chartRoot">
         <div class="loading">
@@ -248,6 +381,7 @@
   </div>
 
   <div class="col-lg-4">
+    <!-- AI Trading Signal Card -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-robot"></i>
@@ -293,6 +427,60 @@
       </div>
     </div>
 
+    <!-- Support & Resistance Card -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-layer-group"></i>
+        <span>Support & Resistance</span>
+      </div>
+      
+      <div class="levels-container">
+        <div class="level-card support-card">
+          <div class="level-title support-title">SUPPORT</div>
+          <div class="level-value" id="supportLevel">-</div>
+          <div class="level-distance" id="supportDistance">-</div>
+        </div>
+        <div class="level-card resistance-card">
+          <div class="level-title resistance-title">RESISTANCE</div>
+          <div class="level-value" id="resistanceLevel">-</div>
+          <div class="level-distance" id="resistanceDistance">-</div>
+        </div>
+      </div>
+
+      <div class="pivot-levels">
+        <div class="small-muted mb-2">PIVOT POINTS</div>
+        <div class="pivot-row">
+          <span class="pivot-label">R3</span>
+          <span class="pivot-value" id="pivotR3">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">R2</span>
+          <span class="pivot-value" id="pivotR2">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">R1</span>
+          <span class="pivot-value" id="pivotR1">-</span>
+        </div>
+        <div class="pivot-row" style="border-bottom: 2px solid #3b82f6;">
+          <span class="pivot-label">PIVOT</span>
+          <span class="pivot-value" id="pivotPoint">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S1</span>
+          <span class="pivot-value" id="pivotS1">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S2</span>
+          <span class="pivot-value" id="pivotS2">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S3</span>
+          <span class="pivot-value" id="pivotS3">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk Management Card -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-shield-alt"></i>
@@ -312,6 +500,7 @@
       <div id="riskStatus" class="muted">Assessing risk parameters...</div>
     </div>
 
+    <!-- Technical Analysis Card -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-chart-bar"></i>
@@ -328,13 +517,74 @@
           <span class="indicator-value" id="macdVal">-</span>
         </div>
         <div class="tech-indicator">
+          <span class="muted">MACD Histogram</span>
+          <span class="indicator-value" id="macdHistVal">-</span>
+        </div>
+        <div class="tech-indicator">
           <span class="muted">ADX</span>
           <span class="indicator-value" id="adxVal">-</span>
+        </div>
+        <div class="tech-indicator">
+          <span class="muted">ATR</span>
+          <span class="indicator-value" id="atrVal">-</span>
+        </div>
+        <div class="tech-indicator">
+          <span class="muted">Volatility</span>
+          <span class="indicator-value" id="volVal">-</span>
         </div>
         <div class="tech-indicator">
           <span class="muted">Trend</span>
           <span class="indicator-value" id="trendVal">-</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Backtest Results Card -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-chart-line"></i>
+        <span>Backtest Results</span>
+        <span id="backtestStatus" class="badge bg-secondary ms-2">Not Run</span>
+      </div>
+      <div id="backtestResults" class="backtest-panel">
+        <div class="text-center muted">Run backtest to see performance results</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backtest Configuration Modal -->
+<div class="modal fade" id="backtestModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-play-circle me-2"></i>Run Backtest
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Initial Balance ($)</label>
+          <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Period (Days)</label>
+          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Type</label>
+          <select class="form-select" id="backtestType">
+            <option value="advanced">Advanced Backtest</option>
+            <option value="basic">Basic Backtest</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-deepseek" id="startBacktestBtn">
+          <i class="fas fa-play me-2"></i>Start Backtest
+        </button>
       </div>
     </div>
   </div>
@@ -346,6 +596,10 @@
 <script>
 // Enhanced initialization with proper library checking
 console.log('Starting ANDRO-FX Frontend...');
+
+// Global state untuk menyimpan data
+let currentChartData = [];
+let currentPrice = 0;
 
 // Update loading status
 function updateLoadStatus(message) {
@@ -437,6 +691,9 @@ async function initializeBasicUI() {
   
   // Set up event listeners
   document.getElementById('analyzeBtn').addEventListener('click', analyze);
+  document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+  document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+  
   document.getElementById('pairSelect').addEventListener('change', function() {
     document.getElementById('currentPair').textContent = this.value + ' –';
     analyze();
@@ -461,7 +718,7 @@ async function initializeCharts() {
     // Create main chart
     const chart = LightweightCharts.createChart(chartRoot, {
       width: chartRoot.clientWidth,
-      height: 400,
+      height: 450,
       layout: {
         background: { color: '#ffffff' },
         textColor: '#374151',
@@ -485,6 +742,12 @@ async function initializeCharts() {
       wickDownColor: '#ef4444',
     });
     
+    // Create EMA series
+    const emaSeries = chart.addLineSeries({
+      color: '#3b82f6',
+      lineWidth: 2,
+    });
+    
     // Create MACD chart
     const macdChart = LightweightCharts.createChart(macdRoot, {
       width: macdRoot.clientWidth,
@@ -504,12 +767,24 @@ async function initializeCharts() {
       lineWidth: 1,
     });
     
+    const macdSignalSeries = macdChart.addLineSeries({
+      color: '#f59e0b',
+      lineWidth: 1,
+    });
+    
+    const macdHistogramSeries = macdChart.addHistogramSeries({
+      color: '#8b5cf6',
+    });
+    
     // Store chart instances globally
     window.tradingCharts = {
       mainChart: chart,
       candleSeries: candleSeries,
+      emaSeries: emaSeries,
       macdChart: macdChart,
-      macdLineSeries: macdLineSeries
+      macdLineSeries: macdLineSeries,
+      macdSignalSeries: macdSignalSeries,
+      macdHistogramSeries: macdHistogramSeries
     };
     
     console.log('Charts initialized successfully');
@@ -539,6 +814,310 @@ function showChartFallback() {
   `;
 }
 
+function showBacktestModal() {
+  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
+  modal.show();
+}
+
+async function runBacktest() {
+  const pair = document.getElementById('pairSelect').value;
+  const timeframe = document.getElementById('timeframeSelect').value;
+  const initialBalance = document.getElementById('initialBalance').value;
+  const days = document.getElementById('backtestDays').value;
+  const backtestType = document.getElementById('backtestType').value;
+  
+  // Close modal
+  const modal = bootstrap.Modal.getInstance(document.getElementById('backtestModal'));
+  modal.hide();
+  
+  // Update UI
+  document.getElementById('backtestStatus').textContent = 'Running...';
+  document.getElementById('backtestStatus').className = 'badge bg-warning ms-2';
+  document.getElementById('backtestResults').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
+  
+  try {
+    // Simulate backtest (replace with actual API call)
+    const backtestResult = await simulateBacktest(pair, timeframe, initialBalance, days);
+    displayBacktestResults(backtestResult);
+    
+    document.getElementById('backtestStatus').textContent = 'Completed';
+    document.getElementById('backtestStatus').className = 'badge bg-success ms-2';
+    
+  } catch (error) {
+    console.error('Backtest failed:', error);
+    document.getElementById('backtestResults').innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
+    document.getElementById('backtestStatus').textContent = 'Failed';
+    document.getElementById('backtestStatus').className = 'badge bg-danger ms-2';
+  }
+}
+
+async function simulateBacktest(pair, timeframe, initialBalance, days) {
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  const profit = (Math.random() - 0.4) * initialBalance * 0.1;
+  const winRate = 40 + Math.random() * 30;
+  const totalTrades = Math.floor(10 + Math.random() * 50);
+  const maxDrawdown = 2 + Math.random() * 8;
+  
+  const grades = ['A', 'B', 'C', 'D'];
+  const grade = grades[Math.floor(Math.random() * grades.length)];
+  
+  return {
+    summary: {
+      total_trades: totalTrades,
+      win_rate: winRate,
+      total_profit: profit,
+      final_balance: parseFloat(initialBalance) + profit,
+      return_percentage: (profit / initialBalance * 100),
+      max_drawdown: maxDrawdown
+    },
+    performance_grade: grade + (grade === 'A' ? '+' : ''),
+    trade_analysis: {
+      long_trades: Math.floor(totalTrades * 0.6),
+      short_trades: Math.floor(totalTrades * 0.4),
+      long_win_rate: winRate + (Math.random() * 10 - 5),
+      short_win_rate: winRate + (Math.random() * 10 - 5)
+    }
+  };
+}
+
+function displayBacktestResults(result) {
+  const summary = result.summary || {};
+  const tradeAnalysis = result.trade_analysis || {};
+  
+  let html = '';
+  
+  // Performance Grade
+  const grade = result.performance_grade || 'N/A';
+  const gradeClass = grade.startsWith('A') ? 'grade-a' : 
+                    grade.startsWith('B') ? 'grade-b' :
+                    grade.startsWith('C') ? 'grade-c' : 'grade-d';
+  
+  html += `<div class="performance-grade ${gradeClass}">Performance: ${grade}</div>`;
+  
+  // Summary Metrics
+  html += `
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Trades</div>
+          <div class="metric-value">${summary.total_trades || 0}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Win Rate</div>
+          <div class="metric-value ${(summary.win_rate || 0) >= 50 ? 'change-positive' : 'change-negative'}">
+            ${(summary.win_rate || 0).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Profit</div>
+          <div class="metric-value ${(summary.total_profit || 0) >= 0 ? 'change-positive' : 'change-negative'}">
+            $${(summary.total_profit || 0).toFixed(2)}
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Final Balance</div>
+          <div class="metric-value">$${(summary.final_balance || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Return %</div>
+          <div class="metric-value ${(summary.return_percentage || 0) >= 0 ? 'change-positive' : 'change-negative'}">
+            ${(summary.return_percentage || 0).toFixed(2)}%
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Max Drawdown</div>
+          <div class="metric-value change-negative">${(summary.max_drawdown || 0).toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Trade Analysis
+  if (tradeAnalysis.long_trades || tradeAnalysis.short_trades) {
+    html += `
+      <div class="mt-3">
+        <div class="small-muted mb-1">Trade Analysis</div>
+        <div class="small-muted">Long Trades: ${tradeAnalysis.long_trades || 0} (Win Rate: ${(tradeAnalysis.long_win_rate || 0).toFixed(1)}%)</div>
+        <div class="small-muted">Short Trades: ${tradeAnalysis.short_trades || 0} (Win Rate: ${(tradeAnalysis.short_win_rate || 0).toFixed(1)}%)</div>
+      </div>
+    `;
+  }
+  
+  document.getElementById('backtestResults').innerHTML = html;
+}
+
+/* ===== PERBAIKAN: Fungsi untuk menghasilkan data chart yang lebih banyak ===== */
+function generateChartData(timeframe) {
+  const data = [];
+  const basePrice = 148.75;
+  const now = new Date();
+  
+  let numPoints, volatility, timeIncrement;
+  
+  // Tentukan jumlah data berdasarkan timeframe
+  switch(timeframe) {
+    case '1D':
+      numPoints = 365; // 1 tahun data harian
+      volatility = 1.5;
+      timeIncrement = 24 * 60 * 60 * 1000;
+      break;
+    case '4H':
+      numPoints = 180; // 30 hari data 4-jam
+      volatility = 0.8;
+      timeIncrement = 4 * 60 * 60 * 1000;
+      break;
+    case '1H':
+      numPoints = 168; // 7 hari data 1-jam
+      volatility = 0.4;
+      timeIncrement = 60 * 60 * 1000;
+      break;
+    case '30m':
+      numPoints = 336; // 7 hari data 30-menit
+      volatility = 0.2;
+      timeIncrement = 30 * 60 * 1000;
+      break;
+    default:
+      numPoints = 100;
+      volatility = 1.0;
+      timeIncrement = 24 * 60 * 60 * 1000;
+  }
+  
+  // Generate trending data (naik atau turun)
+  let trend = Math.random() > 0.5 ? 1 : -1;
+  let currentBase = basePrice;
+  
+  for (let i = numPoints; i >= 0; i--) {
+    const date = new Date(now.getTime() - (i * timeIncrement));
+    
+    // Add slight trend
+    currentBase += trend * volatility * 0.1;
+    
+    const open = currentBase + (Math.random() - 0.5) * volatility;
+    const close = open + (Math.random() - 0.5) * volatility * 0.8;
+    const high = Math.max(open, close) + Math.random() * volatility * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * 0.5;
+    
+    data.push({
+      time: date.toISOString().split('T')[0],
+      open: parseFloat(open.toFixed(4)),
+      high: parseFloat(high.toFixed(4)),
+      low: parseFloat(low.toFixed(4)),
+      close: parseFloat(close.toFixed(4))
+    });
+  }
+  
+  console.log(`Generated ${data.length} data points for timeframe: ${timeframe}`);
+  return data;
+}
+
+/* ===== PERBAIKAN: Fungsi untuk menghitung EMA ===== */
+function calculateEMA(data, period) {
+  const k = 2 / (period + 1);
+  let ema = [data[0].close];
+  
+  for (let i = 1; i < data.length; i++) {
+    ema.push(data[i].close * k + ema[i-1] * (1 - k));
+  }
+  
+  return ema.map((value, index) => ({
+    time: data[index].time,
+    value: value
+  }));
+}
+
+/* ===== PERBAIKAN: Fungsi untuk menghitung MACD ===== */
+function calculateMACD(data) {
+  const ema12 = calculateEMA(data, 12);
+  const ema26 = calculateEMA(data, 26);
+  
+  const macdLine = ema12.map((ema, index) => ({
+    time: ema.time,
+    value: ema.value - ema26[index].value
+  }));
+  
+  // Calculate signal line (EMA of MACD line)
+  const k = 2 / (9 + 1);
+  let signal = [macdLine[0].value];
+  
+  for (let i = 1; i < macdLine.length; i++) {
+    signal.push(macdLine[i].value * k + signal[i-1] * (1 - k));
+  }
+  
+  const signalLine = macdLine.map((macd, index) => ({
+    time: macd.time,
+    value: signal[index]
+  }));
+  
+  const histogram = macdLine.map((macd, index) => ({
+    time: macd.time,
+    value: macd.value - signal[index],
+    color: (macd.value - signal[index]) >= 0 ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'
+  }));
+  
+  return {
+    macdLine,
+    signalLine,
+    histogram
+  };
+}
+
+/* ===== PERBAIKAN: Fungsi untuk menghitung Support & Resistance ===== */
+function calculateSupportResistance(data) {
+  if (data.length < 20) return { support: 0, resistance: 0 };
+  
+  const prices = data.map(d => d.close);
+  const currentPrice = prices[prices.length - 1];
+  
+  // Simple calculation - in real app, use proper algorithm
+  const resistance = currentPrice * (1 + 0.02 + Math.random() * 0.01);
+  const support = currentPrice * (1 - 0.02 - Math.random() * 0.01);
+  
+  return {
+    support: support.toFixed(4),
+    resistance: resistance.toFixed(4),
+    pivot: ((currentPrice + support + resistance) / 3).toFixed(4)
+  };
+}
+
+/* ===== PERBAIKAN: Fungsi untuk menghitung Pivot Points ===== */
+function calculatePivotPoints(high, low, close) {
+  const pivot = (high + low + close) / 3;
+  const r1 = (2 * pivot) - low;
+  const s1 = (2 * pivot) - high;
+  const r2 = pivot + (high - low);
+  const s2 = pivot - (high - low);
+  const r3 = high + 2 * (pivot - low);
+  const s3 = low - 2 * (high - pivot);
+  
+  return {
+    pivot: pivot.toFixed(4),
+    r1: r1.toFixed(4),
+    r2: r2.toFixed(4),
+    r3: r3.toFixed(4),
+    s1: s1.toFixed(4),
+    s2: s2.toFixed(4),
+    s3: s3.toFixed(4)
+  };
+}
+
 async function analyze() {
   console.log('Starting analysis...');
   
@@ -562,9 +1141,12 @@ async function analyze() {
     updateTechnicalIndicators(analysisData);
     updatePriceData(analysisData);
     
+    // PERBAIKAN: Update Support & Resistance
+    updateSupportResistance(analysisData);
+    
     // Update charts if available
     if (window.tradingCharts) {
-      await updateCharts(analysisData);
+      await updateCharts(analysisData, timeframe);
     }
     
     console.log('Analysis completed successfully');
@@ -620,16 +1202,25 @@ function generateSampleData(pair, timeframe) {
     technical_analysis: {
       momentum: {
         rsi: (30 + Math.random() * 40).toFixed(2),
-        macd: (Math.random() - 0.5).toFixed(4)
+        macd: (Math.random() - 0.5).toFixed(4),
+        macd_histogram: (Math.random() - 0.3).toFixed(4)
       },
       trend: {
         adx: (20 + Math.random() * 30).toFixed(2),
         trend_direction: Math.random() > 0.5 ? 'Bullish' : 'Bearish'
+      },
+      volatility: {
+        atr: (0.5 + Math.random() * 0.5).toFixed(4),
+        volatility_pct: (0.5 + Math.random() * 1.0).toFixed(2)
       }
     },
     risk_assessment: {
       risk_score: Math.floor(Math.random() * 10),
       approved: Math.random() > 0.3
+    },
+    support_resistance: {
+      support: (samplePrice * 0.99).toFixed(4),
+      resistance: (samplePrice * 1.01).toFixed(4)
     }
   };
 }
@@ -695,19 +1286,59 @@ function updateTechnicalIndicators(analysisData) {
   const tech = analysisData.technical_analysis || {};
   const momentum = tech.momentum || {};
   const trend = tech.trend || {};
+  const volatility = tech.volatility || {};
   
   document.getElementById('rsiVal').textContent = momentum.rsi || '-';
   document.getElementById('macdVal').textContent = momentum.macd || '-';
+  document.getElementById('macdHistVal').textContent = momentum.macd_histogram || '-';
   document.getElementById('adxVal').textContent = trend.adx || '-';
+  document.getElementById('atrVal').textContent = volatility.atr || '-';
+  document.getElementById('volVal').textContent = volatility.volatility_pct ? volatility.volatility_pct + '%' : '-';
   document.getElementById('trendVal').textContent = trend.trend_direction || '-';
 }
 
-function updatePriceData(analysisData) {
+/* ===== PERBAIKAN: Fungsi untuk update Support & Resistance ===== */
+function updateSupportResistance(analysisData) {
+  const sr = analysisData.support_resistance || {};
   const priceData = analysisData.price_data || {};
   const currentPrice = priceData.current || 0;
+  
+  // Update Support & Resistance levels
+  document.getElementById('supportLevel').textContent = sr.support || '-';
+  document.getElementById('resistanceLevel').textContent = sr.resistance || '-';
+  
+  // Calculate and display distances
+  if (currentPrice > 0 && sr.support && sr.resistance) {
+    const supportDistance = ((currentPrice - sr.support) / currentPrice * 100).toFixed(2);
+    const resistanceDistance = ((sr.resistance - currentPrice) / currentPrice * 100).toFixed(2);
+    
+    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
+    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
+  }
+  
+  // Calculate and update Pivot Points
+  const high = currentPrice * 1.01;
+  const low = currentPrice * 0.99;
+  const pivots = calculatePivotPoints(high, low, currentPrice);
+  
+  document.getElementById('pivotPoint').textContent = pivots.pivot;
+  document.getElementById('pivotR1').textContent = pivots.r1;
+  document.getElementById('pivotR2').textContent = pivots.r2;
+  document.getElementById('pivotR3').textContent = pivots.r3;
+  document.getElementById('pivotS1').textContent = pivots.s1;
+  document.getElementById('pivotS2').textContent = pivots.s2;
+  document.getElementById('pivotS3').textContent = pivots.s3;
+}
+
+/* ===== PERBAIKAN: Update price data dengan konsistensi ===== */
+function updatePriceData(analysisData) {
+  const priceData = analysisData.price_data || {};
+  currentPrice = priceData.current || 0;
   const change = priceData.change_pct || 0;
   
+  // PERBAIKAN: Update semua komponen harga dengan nilai yang sama
   document.getElementById('livePrice').textContent = currentPrice.toFixed(4);
+  document.getElementById('currentPrice').textContent = currentPrice.toFixed(4);
   
   // Update change indicator
   const changeElement = document.getElementById('pairChange');
@@ -717,9 +1348,14 @@ function updatePriceData(analysisData) {
   // Update status indicator
   document.getElementById('statusIndicator').textContent = 'Live';
   document.getElementById('statusIndicator').className = 'badge bg-success ms-2';
+  
+  // Update chart subtitle dengan timeframe
+  document.getElementById('chartSubtitle').textContent = 
+    `${document.getElementById('timeframeSelect').value} Timeframe · Real-time Candlestick · EMA26 · MACD`;
 }
 
-async function updateCharts(analysisData) {
+/* ===== PERBAIKAN: Update charts dengan data yang lebih banyak ===== */
+async function updateCharts(analysisData, timeframe) {
   console.log('Updating charts...');
   
   try {
@@ -729,55 +1365,28 @@ async function updateCharts(analysisData) {
       return;
     }
     
-    // Generate sample chart data
-    const chartData = generateChartData();
+    // PERBAIKAN: Generate chart data berdasarkan timeframe dengan lebih banyak data
+    const chartData = generateChartData(timeframe);
+    currentChartData = chartData;
     
-    // Update main chart
+    // Update main chart dengan candlestick data
     charts.candleSeries.setData(chartData);
     
-    // Generate MACD data
-    const macdData = generateMACDData(chartData);
+    // Calculate and update EMA
+    const emaData = calculateEMA(chartData, 26);
+    charts.emaSeries.setData(emaData);
     
-    // Update MACD chart
-    charts.macdLineSeries.setData(macdData);
+    // Calculate and update MACD
+    const macdData = calculateMACD(chartData);
+    charts.macdLineSeries.setData(macdData.macdLine);
+    charts.macdSignalSeries.setData(macdData.signalLine);
+    charts.macdHistogramSeries.setData(macdData.histogram);
     
-    console.log('Charts updated successfully');
+    console.log('Charts updated successfully with', chartData.length, 'data points');
     
   } catch (error) {
     console.error('Failed to update charts:', error);
   }
-}
-
-function generateChartData() {
-  const data = [];
-  const basePrice = 148.75;
-  const now = new Date();
-  
-  for (let i = 100; i >= 0; i--) {
-    const date = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000));
-    
-    const open = basePrice + (Math.random() - 0.5) * 2;
-    const close = open + (Math.random() - 0.5) * 1.5;
-    const high = Math.max(open, close) + Math.random() * 1;
-    const low = Math.min(open, close) - Math.random() * 1;
-    
-    data.push({
-      time: date.toISOString().split('T')[0],
-      open: parseFloat(open.toFixed(4)),
-      high: parseFloat(high.toFixed(4)),
-      low: parseFloat(low.toFixed(4)),
-      close: parseFloat(close.toFixed(4))
-    });
-  }
-  
-  return data;
-}
-
-function generateMACDData(chartData) {
-  return chartData.map((item, index) => ({
-    time: item.time,
-    value: (Math.sin(index * 0.1) * 0.5 + (Math.random() - 0.5) * 0.2)
-  }));
 }
 
 function showError(message) {
@@ -802,7 +1411,7 @@ window.addEventListener('resize', function() {
       const chartRoot = document.getElementById('chartRoot');
       const macdRoot = document.getElementById('macdRoot');
       
-      window.tradingCharts.mainChart.resize(chartRoot.clientWidth, 400);
+      window.tradingCharts.mainChart.resize(chartRoot.clientWidth, 450);
       window.tradingCharts.macdChart.resize(macdRoot.clientWidth, 150);
     } catch (error) {
       console.log('Resize error:', error);
