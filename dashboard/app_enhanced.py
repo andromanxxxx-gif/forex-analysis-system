@@ -16,7 +16,6 @@ import random
 
 # ==================== KONFIGURASI LOGGING ====================
 def setup_logging():
-    """Setup logging yang compatible dengan Windows"""
     logger = logging.getLogger()
     
     for handler in logger.handlers[:]:
@@ -47,12 +46,10 @@ app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
 # ==================== KONFIGURASI SISTEM ====================
 @dataclass
 class SystemConfig:
-    # API Configuration
     DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
     NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
     
-    # Trading Parameters
     INITIAL_BALANCE: float = 10000.0
     RISK_PER_TRADE: float = 0.02
     MAX_DAILY_LOSS: float = 0.03
@@ -61,47 +58,37 @@ class SystemConfig:
     STOP_LOSS_PCT: float = 0.01
     TAKE_PROFIT_PCT: float = 0.02
     
-    # Risk Management Parameters
     CORRELATION_THRESHOLD: float = 0.7
     VOLATILITY_THRESHOLD: float = 0.02
     DAILY_TRADE_LIMIT: int = 50
     MAX_POSITION_SIZE_PCT: float = 0.05
     
-    # Backtesting-specific parameters
     BACKTEST_DAILY_TRADE_LIMIT: int = 100
     BACKTEST_MIN_CONFIDENCE: int = 40
     BACKTEST_RISK_SCORE_THRESHOLD: int = 8
     
-    # Supported Instruments
     FOREX_PAIRS: List[str] = field(default_factory=lambda: [
         "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", 
         "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
     ])
     
-    # PERBAIKAN: Timeframe mapping yang konsisten dengan frontend
-    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
-    TIMEFRAME_MAPPING: Dict[str, str] = field(default_factory=lambda: {
-        'M30': '30m', '1H': '1H', '4H': '4H', '1D': '1D', '1W': '1W'
-    })
+    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D"])
     
-    # Backtesting
     DEFAULT_BACKTEST_DAYS: int = 90
     MIN_DATA_POINTS: int = 100
     
-    # Trading Hours (UTC)
     HIGH_IMPACT_HOURS: List[Tuple[int, int]] = field(default_factory=lambda: [(8, 10), (13, 15)])
 
 config = SystemConfig()
 
-# ==================== PERBAIKAN DATA MANAGER ====================
-class EnhancedDataManager:
+# ==================== DATA MANAGER ====================
+class DataManager:
     def __init__(self):
         self.historical_data = {}
-        self.timeframe_data = {}  # Struktur baru: {pair: {timeframe: DataFrame}}
+        self.timeframe_data = {}
         self.load_historical_data()
 
     def load_historical_data(self):
-        """Load data historis dengan struktur timeframe yang benar"""
         try:
             data_dir = "historical_data"
             if not os.path.exists(data_dir):
@@ -115,15 +102,12 @@ class EnhancedDataManager:
                 if filename.endswith('.csv'):
                     file_path = os.path.join(data_dir, filename)
                     try:
-                        # Extract pair dan timeframe dari filename
                         name_parts = filename.replace('.csv', '').split('_')
                         if len(name_parts) >= 2:
                             pair = name_parts[0].upper()
                             timeframe = name_parts[1].upper()
                             
-                            # PERBAIKAN: Validasi timeframe
                             if timeframe not in config.TIMEFRAMES:
-                                logger.warning(f"Unsupported timeframe in filename: {timeframe}")
                                 continue
                                 
                             if pair not in config.FOREX_PAIRS:
@@ -136,7 +120,6 @@ class EnhancedDataManager:
                                 df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
                                 df = df.dropna(subset=['date'])
                             
-                            # PERBAIKAN: Struktur data yang terorganisir per timeframe
                             if pair not in self.timeframe_data:
                                 self.timeframe_data[pair] = {}
                             
@@ -159,7 +142,6 @@ class EnhancedDataManager:
             self._create_sample_data()
 
     def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Standardisasi nama kolom"""
         column_mapping = {
             'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
             'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close',
@@ -170,24 +152,19 @@ class EnhancedDataManager:
         return df
 
     def _create_sample_data(self):
-        """Buat sample data untuk semua pair dan timeframe"""
         logger.info("Creating sample historical data for all timeframes...")
         
         for pair in config.FOREX_PAIRS:
             for timeframe in config.TIMEFRAMES:
-                if timeframe != '1W':  # Skip 1W untuk efisiensi
-                    self._generate_sample_data(pair, timeframe)
+                self._generate_sample_data(pair, timeframe)
 
     def _generate_sample_data(self, pair: str, timeframe: str):
-        """Generate sample data yang realistis dengan karakteristik timeframe"""
         try:
-            # Tentukan parameters berdasarkan timeframe
             timeframe_params = {
-                'M30': {'periods': 2000, 'volatility': 0.0008, 'base_points': 48},
-                '1H': {'periods': 1500, 'volatility': 0.0012, 'base_points': 24},
-                '4H': {'periods': 1000, 'volatility': 0.0020, 'base_points': 6},
-                '1D': {'periods': 500, 'volatility': 0.0035, 'base_points': 1},
-                '1W': {'periods': 200, 'volatility': 0.0050, 'base_points': 1}
+                'M30': {'periods': 2000, 'volatility': 0.0008},
+                '1H': {'periods': 1500, 'volatility': 0.0012},
+                '4H': {'periods': 1000, 'volatility': 0.0020},
+                '1D': {'periods': 500, 'volatility': 0.0035}
             }
             
             params = timeframe_params.get(timeframe, timeframe_params['1H'])
@@ -207,11 +184,9 @@ class EnhancedDataManager:
             start_date = datetime(2023, 1, 1)
             
             for i in range(periods):
-                # Random walk dengan karakteristik timeframe
                 change = np.random.normal(0, volatility)
                 current_price = current_price * (1 + change)
                 
-                # Generate OHLC dengan volatilitas yang sesuai timeframe
                 open_price = current_price
                 close_price = current_price * (1 + np.random.normal(0, volatility * 0.3))
                 high = max(open_price, close_price) + abs(change) * base_price * 0.5
@@ -220,17 +195,14 @@ class EnhancedDataManager:
                 if high <= low:
                     high = low + 0.0001
                 
-                # Generate date berdasarkan timeframe
                 if timeframe == 'M30':
                     current_date = start_date + timedelta(minutes=30*i)
                 elif timeframe == '1H':
                     current_date = start_date + timedelta(hours=i)
                 elif timeframe == '4H':
                     current_date = start_date + timedelta(hours=4*i)
-                elif timeframe == '1D':
+                else:  # 1D
                     current_date = start_date + timedelta(days=i)
-                else:  # 1W
-                    current_date = start_date + timedelta(weeks=i)
                 
                 prices.append({
                     'date': current_date,
@@ -243,12 +215,10 @@ class EnhancedDataManager:
             
             df = pd.DataFrame(prices)
             
-            # Save to file
             data_dir = "historical_data"
             filename = f"{data_dir}/{pair}_{timeframe}.csv"
             df.to_csv(filename, index=False)
             
-            # Store in memory dengan struktur yang benar
             if pair not in self.timeframe_data:
                 self.timeframe_data[pair] = {}
             self.timeframe_data[pair][timeframe] = df
@@ -259,28 +229,23 @@ class EnhancedDataManager:
             logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
 
     def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """PERBAIKAN: Dapatkan data harga dengan timeframe yang benar"""
         try:
             logger.info(f"Getting price data for {pair}-{timeframe} for {days} days")
             
-            # PERBAIKAN: Gunakan struktur timeframe_data yang baru
             if (pair in self.timeframe_data and 
                 timeframe in self.timeframe_data[pair]):
                 
                 df = self.timeframe_data[pair][timeframe]
                 
                 if df.empty:
-                    logger.warning(f"Empty dataframe for {pair}-{timeframe}, generating data")
                     return self._generate_simple_data(pair, timeframe, days)
                 
-                # Return data untuk periode tertentu
                 required_points = self._calculate_required_points(timeframe, days)
                 result_df = df.tail(min(required_points, len(df))).copy()
                 
                 logger.info(f"Returning {len(result_df)} data points for {pair}-{timeframe}")
                 return result_df
             
-            # Fallback: generate simple synthetic data
             logger.warning(f"No data found for {pair}-{timeframe}, generating synthetic data")
             return self._generate_simple_data(pair, timeframe, days)
             
@@ -289,19 +254,16 @@ class EnhancedDataManager:
             return self._generate_simple_data(pair, timeframe, days)
 
     def _calculate_required_points(self, timeframe: str, days: int) -> int:
-        """Hitung jumlah data points yang diperlukan berdasarkan timeframe"""
         points_per_day = {
-            'M30': 48,   # 2 per jam * 24 jam
-            '1H': 24,    # 1 per jam * 24 jam  
-            '4H': 6,     # 1 per 4 jam * 6
-            '1D': 1,     # 1 per hari
-            '1W': 1      # 1 per minggu
+            'M30': 48,
+            '1H': 24, 
+            '4H': 6,
+            '1D': 1
         }
         
         return days * points_per_day.get(timeframe, 1)
 
     def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate simple synthetic data dengan timeframe yang benar"""
         points = self._calculate_required_points(timeframe, days)
         
         base_prices = {
@@ -317,8 +279,7 @@ class EnhancedDataManager:
         start_date = datetime.now() - timedelta(days=days)
         
         for i in range(points):
-            # Volatilitas berdasarkan timeframe
-            volatility_factors = {'M30': 0.0005, '1H': 0.0008, '4H': 0.0015, '1D': 0.0025, '1W': 0.0040}
+            volatility_factors = {'M30': 0.0005, '1H': 0.0008, '4H': 0.0015, '1D': 0.0025}
             volatility = volatility_factors.get(timeframe, 0.001)
             
             change = np.random.normal(0, volatility)
@@ -332,17 +293,14 @@ class EnhancedDataManager:
             if high <= low:
                 high = low + 0.0001
             
-            # Generate date berdasarkan timeframe
             if timeframe == 'M30':
                 current_date = start_date + timedelta(minutes=30*i)
             elif timeframe == '1H':
                 current_date = start_date + timedelta(hours=i)
             elif timeframe == '4H':
                 current_date = start_date + timedelta(hours=4*i)
-            elif timeframe == '1D':
+            else:  # 1D
                 current_date = start_date + timedelta(days=i)
-            else:  # 1W
-                current_date = start_date + timedelta(weeks=i)
             
             prices.append({
                 'date': current_date,
@@ -363,7 +321,6 @@ class TechnicalAnalysisEngine:
         logger.info("Technical Analysis Engine initialized")
     
     def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
-        """Menghitung semua indikator teknikal dari DataFrame OHLC"""
         try:
             if df.empty or len(df) < 20:
                 return self._fallback_indicators(df)
@@ -379,30 +336,25 @@ class TechnicalAnalysisEngine:
             lows = df['low'].values
             opens = df['open'].values
             
-            # Handle NaN values
             closes = np.nan_to_num(closes, nan=closes[-1] if len(closes) > 0 else 150.0)
             highs = np.nan_to_num(highs, nan=closes[-1] if len(closes) > 0 else 150.0)
             lows = np.nan_to_num(lows, nan=closes[-1] if len(closes) > 0 else 150.0)
             opens = np.nan_to_num(opens, nan=closes[-1] if len(closes) > 0 else 150.0)
             
-            # Trend Indicators
             sma_20 = talib.SMA(closes, timeperiod=20)
             sma_50 = talib.SMA(closes, timeperiod=50)
             ema_12 = talib.EMA(closes, timeperiod=12)
             ema_26 = talib.EMA(closes, timeperiod=26)
             adx = talib.ADX(highs, lows, closes, timeperiod=14)
             
-            # Momentum Indicators
             rsi = talib.RSI(closes, timeperiod=14)
             macd, macd_signal, macd_hist = talib.MACD(closes)
             stoch_k, stoch_d = talib.STOCH(highs, lows, closes)
             williams_r = talib.WILLR(highs, lows, closes, timeperiod=14)
             
-            # Volatility Indicators
             bollinger_upper, bollinger_middle, bollinger_lower = talib.BBANDS(closes)
             atr = talib.ATR(highs, lows, closes, timeperiod=14)
             
-            # Support & Resistance
             lookback_period = min(50, len(highs))
             recent_high = np.max(highs[-lookback_period:]) if len(highs) >= lookback_period else np.max(highs)
             recent_low = np.min(lows[-lookback_period:]) if len(lows) >= lookback_period else np.min(lows)
@@ -458,7 +410,6 @@ class TechnicalAnalysisEngine:
             return self._fallback_indicators(df)
 
     def _fallback_indicators(self, df: pd.DataFrame) -> Dict:
-        """Fallback indicators jika TA-Lib gagal"""
         try:
             if len(df) > 0 and 'close' in df.columns:
                 closes = df['close'].values
@@ -519,7 +470,6 @@ class TwelveDataClient:
             logger.info("TwelveData running in LIVE mode with real API data")
     
     def get_real_time_price(self, pair: str) -> float:
-        """Ambil current price real-time dari TwelveData atau simulasi"""
         cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H%M')}"
         
         if pair in self.price_cache:
@@ -556,7 +506,6 @@ class TwelveDataClient:
             return self._get_simulated_real_time_price(pair)
     
     def _get_simulated_real_time_price(self, pair: str) -> float:
-        """Harga real-time simulasi untuk demo mode"""
         try:
             base_prices = {
                 'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
@@ -589,7 +538,6 @@ class DeepSeekAnalyzer:
             logger.info("DeepSeek AI running in LIVE mode")
     
     def analyze_market(self, pair: str, technical_data: Dict, fundamental_news: str) -> Dict:
-        """Menganalisis market menggunakan DeepSeek AI"""
         if self.demo_mode:
             return self._enhanced_analysis(technical_data, fundamental_news, pair)
         
@@ -633,7 +581,6 @@ class DeepSeekAnalyzer:
             return self._enhanced_analysis(technical_data, fundamental_news, pair)
     
     def _build_analysis_prompt(self, pair: str, technical_data: Dict, news: str) -> str:
-        """Membangun prompt untuk analisis AI"""
         trend = technical_data['trend']
         momentum = technical_data['momentum']
         volatility = technical_data['volatility']
@@ -670,7 +617,6 @@ HASILKAN ANALISIS DALAM FORMAT JSON:
 """
     
     def _parse_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
-        """Parse response dari DeepSeek AI"""
         try:
             cleaned_response = ai_response.strip()
             
@@ -724,7 +670,6 @@ HASILKAN ANALISIS DALAM FORMAT JSON:
             return self._enhanced_analysis(technical_data, "", "")
     
     def _enhanced_analysis(self, technical_data: Dict, news: str, pair: str) -> Dict:
-        """Analisis enhanced ketika AI tidak tersedia"""
         trend = technical_data['trend']
         momentum = technical_data['momentum']
         levels = technical_data['levels']
@@ -735,7 +680,6 @@ HASILKAN ANALISIS DALAM FORMAT JSON:
         
         signal_score = 0
         
-        # RSI scoring
         if rsi < 30:
             signal_score += 3
         elif rsi < 40:
@@ -745,23 +689,19 @@ HASILKAN ANALISIS DALAM FORMAT JSON:
         elif rsi > 60:
             signal_score -= 2
         
-        # MACD scoring
         if macd_hist > 0:
             signal_score += 2
         else:
             signal_score -= 2
         
-        # Trend scoring
         if trend['trend_direction'] == 'BULLISH':
             signal_score += 1
         else:
             signal_score -= 1
         
-        # Volatility consideration
         if technical_data['volatility']['volatility_pct'] < 0.015:
             signal_score += 1
         
-        # Determine signal
         if signal_score >= 5:
             signal = "BUY"
             confidence = 80
@@ -826,7 +766,6 @@ class FundamentalAnalysisEngine:
         logger.info("Fundamental Analysis Engine initialized")
     
     def get_forex_news(self, pair: str) -> str:
-        """Mendapatkan berita fundamental untuk pair forex"""
         cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H')}"
         if cache_key in self.news_cache:
             cached_time, news = self.news_cache[cache_key]
@@ -867,7 +806,6 @@ class FundamentalAnalysisEngine:
                         self.news_cache[cache_key] = (datetime.now(), news_text)
                         return news_text
             
-            # Fallback news
             news_text = self._get_fallback_news(pair)
             self.news_cache[cache_key] = (datetime.now(), news_text)
             return news_text
@@ -877,7 +815,6 @@ class FundamentalAnalysisEngine:
             return self._get_fallback_news(pair)
     
     def _get_fallback_news(self, pair: str) -> str:
-        """Berita fallback ketika API tidak tersedia"""
         news_templates = {
             'USDJPY': [
                 "Bank of Japan maintains ultra-loose monetary policy. Fed signals potential rate cuts in 2024.",
@@ -951,7 +888,6 @@ class AdvancedRiskManager:
         logger.info(f"Advanced Risk Manager initialized - Backtest Mode: {backtest_mode}")
     
     def reset_daily_limits(self):
-        """Reset daily limits jika hari baru"""
         today = datetime.now().date()
         if today != self.last_reset_date:
             self.today_trades = 0
@@ -962,7 +898,6 @@ class AdvancedRiskManager:
     def validate_trade(self, pair: str, signal: str, confidence: int, 
                       proposed_lot_size: float, account_balance: float, 
                       current_price: float, open_positions: List[Dict]) -> Dict:
-        """Validasi trade dengan multiple risk factors"""
         self.reset_daily_limits()
         
         validation_result = {
@@ -977,26 +912,22 @@ class AdvancedRiskManager:
         
         risk_factors = {}
         
-        # Check daily trade limit
         if self.today_trades >= self.daily_trade_limit:
             validation_result['approved'] = False
             validation_result['rejection_reasons'].append(f"Daily trade limit reached ({self.daily_trade_limit})")
             risk_factors['daily_limit'] = 'HIGH'
         
-        # Check daily loss limit
         daily_loss_limit = account_balance * self.max_daily_loss_pct
         if self.daily_pnl <= -daily_loss_limit:
             validation_result['approved'] = False
             validation_result['rejection_reasons'].append(f"Daily loss limit reached (${-self.daily_pnl:.2f})")
             risk_factors['daily_loss'] = 'HIGH'
         
-        # Check drawdown limit
         if self.current_drawdown >= self.max_drawdown_pct:
             validation_result['approved'] = False
             validation_result['rejection_reasons'].append(f"Max drawdown reached ({self.current_drawdown:.1%})")
             risk_factors['drawdown'] = 'HIGH'
         
-        # Position size validation
         max_position_value = account_balance * self.max_position_size_pct
         proposed_position_value = proposed_lot_size * 100000 * current_price
         
@@ -1007,35 +938,30 @@ class AdvancedRiskManager:
             validation_result['risk_score'] += 2
             risk_factors['position_size'] = 'MEDIUM'
         
-        # Correlation risk assessment
         correlation_risk = self._check_correlation_risk(pair, signal, open_positions)
         if correlation_risk['high_risk']:
             validation_result['risk_score'] += 3
             validation_result['warnings'].append(f"High correlation with {correlation_risk['correlated_pairs']}")
             risk_factors['correlation'] = 'HIGH'
         
-        # Market volatility check
         volatility_risk = self._check_volatility_risk(pair, current_price)
         if volatility_risk['high_volatility']:
             validation_result['risk_score'] += 2
             validation_result['warnings'].append(f"High volatility detected: {volatility_risk['volatility_pct']:.1%}")
             risk_factors['volatility'] = 'HIGH'
         
-        # Confidence-based risk adjustment
         min_confidence = config.BACKTEST_MIN_CONFIDENCE if self.backtest_mode else 60
         if confidence < min_confidence:
             validation_result['risk_score'] += 1
             validation_result['warnings'].append("Low confidence signal")
             risk_factors['confidence'] = 'MEDIUM'
         
-        # Time-based risk
         time_risk = self._check_time_risk()
         if time_risk['high_risk_period']:
             validation_result['risk_score'] += 2
             validation_result['warnings'].append(f"Trading during {time_risk['period_name']}")
             risk_factors['timing'] = 'MEDIUM'
         
-        # Final approval decision
         validation_result['risk_factors'] = risk_factors
         
         risk_threshold = config.BACKTEST_RISK_SCORE_THRESHOLD if self.backtest_mode else 6
@@ -1048,7 +974,6 @@ class AdvancedRiskManager:
         return validation_result
     
     def _check_correlation_risk(self, pair: str, signal: str, open_positions: List[Dict]) -> Dict:
-        """Check correlation risk dengan open positions"""
         high_risk = False
         correlated_pairs = []
         
@@ -1066,7 +991,6 @@ class AdvancedRiskManager:
         return {'high_risk': high_risk, 'correlated_pairs': correlated_pairs}
     
     def _check_volatility_risk(self, pair: str, current_price: float) -> Dict:
-        """Check volatility risk berdasarkan historical data"""
         try:
             price_data = data_manager.get_price_data(pair, '1H', days=5)
             if len(price_data) > 10:
@@ -1084,7 +1008,6 @@ class AdvancedRiskManager:
         return {'high_volatility': False, 'volatility_pct': 0.01}
     
     def _check_time_risk(self) -> Dict:
-        """Check jika sedang dalam periode high impact news"""
         now = datetime.utcnow()
         current_hour = now.hour
         
@@ -1098,7 +1021,6 @@ class AdvancedRiskManager:
         return {'high_risk_period': False, 'period_name': 'Normal Hours'}
     
     def update_trade_result(self, pnl: float, trade_success: bool):
-        """Update risk manager dengan hasil trade"""
         self.daily_pnl += pnl
         self.today_trades += 1
         
@@ -1111,29 +1033,26 @@ class AdvancedRiskManager:
         logger.info(f"Trade result: PnL ${pnl:.2f}, Daily PnL: ${self.daily_pnl:.2f}, Trades today: {self.today_trades}")
 
 # ==================== INITIALIZE SYSTEM ====================
-logger.info("Initializing Enhanced Forex Analysis System...")
+logger.info("Initializing Forex Analysis System...")
 
-# Inisialisasi komponen sistem dengan DataManager yang diperbaiki
 tech_engine = TechnicalAnalysisEngine()
 fundamental_engine = FundamentalAnalysisEngine()
 deepseek_analyzer = DeepSeekAnalyzer()
-data_manager = EnhancedDataManager()  # PERBAIKAN: Gunakan EnhancedDataManager
+data_manager = DataManager()
 twelve_data_client = TwelveDataClient()
 risk_manager = AdvancedRiskManager()
 
 logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
-logger.info(f"Timeframes: {config.TIMEFRAMES}")
 logger.info(f"Historical data structure: {len(data_manager.timeframe_data)} pairs with multiple timeframes")
 
-# Tampilkan status timeframe yang tersedia
-for pair in config.FOREX_PAIRS[:3]:  # Show first 3 pairs as sample
+for pair in config.FOREX_PAIRS[:3]:
     if pair in data_manager.timeframe_data:
         timeframes = list(data_manager.timeframe_data[pair].keys())
         logger.info(f"Available timeframes for {pair}: {timeframes}")
 
 logger.info("All system components initialized successfully")
 
-# ==================== FLASK ROUTES DIPERBAIKI ====================
+# ==================== FLASK ROUTES ====================
 @app.route('/')
 def index():
     return render_template('index.html', 
@@ -1143,25 +1062,22 @@ def index():
 
 @app.route('/api/analyze')
 def api_analyze():
-    """PERBAIKAN: Endpoint untuk analisis market dengan timeframe yang benar"""
+    """Endpoint utama untuk analisis market"""
     try:
         pair = request.args.get('pair', 'USDJPY').upper()
         timeframe = request.args.get('timeframe', '4H').upper()
-        
-        # PERBAIKAN: Validasi timeframe
-        if timeframe not in config.TIMEFRAMES:
-            logger.warning(f"Unsupported timeframe: {timeframe}, using 4H")
-            timeframe = '4H'
         
         logger.info(f"Analyze request for {pair}-{timeframe}")
         
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # 1) Ambil harga realtime
+        if timeframe not in config.TIMEFRAMES:
+            logger.warning(f"Unsupported timeframe: {timeframe}, using 4H")
+            timeframe = '4H'
+        
         real_time_price = twelve_data_client.get_real_time_price(pair)
         
-        # 2) PERBAIKAN: Ambil data harga dengan timeframe yang benar untuk analisis teknikal
         price_data = data_manager.get_price_data(pair, timeframe, days=60)
         if price_data.empty:
             logger.warning(f"No price data for {pair}-{timeframe}, using 1D as fallback")
@@ -1170,21 +1086,16 @@ def api_analyze():
         if price_data.empty:
             return jsonify({'error': 'No price data available'}), 400
         
-        # 3) Analisis teknikal
         technical_analysis = tech_engine.calculate_all_indicators(price_data)
         
-        # Override current price dengan realtime
         if 'levels' not in technical_analysis:
             technical_analysis['levels'] = {}
         technical_analysis['levels']['current_price'] = real_time_price
         
-        # 4) Analisis fundamental
         fundamental_news = fundamental_engine.get_forex_news(pair)
         
-        # 5) Analisis AI
         ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
         
-        # 6) Risk assessment
         risk_assessment = risk_manager.validate_trade(
             pair=pair,
             signal=ai_analysis.get('signal', 'HOLD'),
@@ -1195,16 +1106,13 @@ def api_analyze():
             open_positions=[]
         )
         
-        # 7) PERBAIKAN: Siapkan price_series dengan timeframe yang benar untuk chart
         price_series = []
         try:
-            # Tentukan jumlah data points berdasarkan timeframe
             chart_points = {
-                'M30': 500,   # ~10 days
-                '1H': 400,    # ~16 days  
-                '4H': 300,    # ~50 days
-                '1D': 200,    # 200 days
-                '1W': 100     # 100 weeks
+                'M30': 500,
+                '1H': 400, 
+                '4H': 300,
+                '1D': 200
             }
             
             points = chart_points.get(timeframe, 200)
@@ -1222,7 +1130,7 @@ def api_analyze():
                             date_str = str(row['date'])
                             
                         price_series.append({
-                            'time': date_str,  # PERBAIKAN: Gunakan 'time' untuk konsistensi dengan frontend
+                            'time': date_str,
                             'open': float(row['open']),
                             'high': float(row['high']),
                             'low': float(row['low']),
@@ -1236,7 +1144,6 @@ def api_analyze():
             logger.error(f"Error preparing price series for {pair}-{timeframe}: {e}")
             price_series = []
         
-        # 8) Susun response
         response = {
             'pair': pair,
             'timeframe': timeframe,
@@ -1251,7 +1158,7 @@ def api_analyze():
                 'resistance': technical_analysis.get('levels', {}).get('resistance'),
                 'change_pct': technical_analysis.get('momentum', {}).get('price_change_pct', 0)
             },
-            'price_series': price_series,   # Data untuk chart dengan timeframe yang benar
+            'price_series': price_series,
             'analysis_summary': f"{pair} currently trading at {real_time_price:.4f} on {timeframe} timeframe",
             'ai_provider': ai_analysis.get('ai_provider', 'DeepSeek AI'),
             'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
@@ -1263,6 +1170,65 @@ def api_analyze():
     except Exception as e:
         logger.error(f"Analysis error: {e}", exc_info=True)
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+
+# ==================== ENDPOINT HISTORICAL DATA UNTUK FRONTEND ====================
+@app.route('/api/historical-data')
+def api_historical_data():
+    """Endpoint khusus untuk data historis chart frontend"""
+    try:
+        pair = request.args.get('pair', 'USDJPY').upper()
+        timeframe = request.args.get('timeframe', '1D').upper()
+        
+        logger.info(f"Historical data request for {pair}-{timeframe}")
+        
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        if timeframe not in config.TIMEFRAMES:
+            return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
+        
+        chart_points = {
+            'M30': 500,
+            '1H': 400, 
+            '4H': 300,
+            '1D': 200
+        }
+        
+        points = chart_points.get(timeframe, 200)
+        hist_df = data_manager.get_price_data(pair, timeframe, days=points)
+        
+        if hist_df.empty:
+            return jsonify({'error': 'No historical data available'}), 400
+        
+        historical_data = []
+        hist_df = hist_df.sort_values('date')
+        
+        for _, row in hist_df.iterrows():
+            try:
+                if hasattr(row['date'], 'isoformat'):
+                    date_str = row['date'].isoformat()
+                else:
+                    date_str = str(row['date'])
+                    
+                historical_data.append({
+                    'time': date_str,
+                    'open': float(row['open']),
+                    'high': float(row['high']),
+                    'low': float(row['low']),
+                    'close': float(row['close']),
+                    'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else 0
+                })
+            except Exception as e:
+                logger.warning(f"Error processing row in historical data: {e}")
+                continue
+        
+        logger.info(f"Returning {len(historical_data)} historical data points for {pair}-{timeframe}")
+        
+        return jsonify(historical_data)
+    
+    except Exception as e:
+        logger.error(f"Historical data error: {e}")
+        return jsonify({'error': f'Historical data failed: {str(e)}'}), 500
 
 @app.route('/api/backtest', methods=['POST'])
 def api_backtest():
@@ -1279,13 +1245,6 @@ def api_backtest():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # Dapatkan data harga dengan timeframe yang benar
-        price_data = data_manager.get_price_data(pair, timeframe, days)
-        
-        if price_data.empty:
-            return jsonify({'error': 'No price data available for backtesting'}), 400
-        
-        # Untuk simplicity, kita kembalikan response basic
         return jsonify({
             'status': 'success',
             'summary': {
@@ -1387,7 +1346,6 @@ def api_market_overview():
 @app.route('/api/system_status')
 def api_system_status():
     """Status sistem dan ketersediaan timeframe"""
-    # Hitung ketersediaan data per timeframe
     timeframe_availability = {}
     for timeframe in config.TIMEFRAMES:
         available_pairs = []
@@ -1410,7 +1368,7 @@ def api_system_status():
         'deepseek_ai': 'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE',
         'twelve_data': 'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE',
         'server_time': datetime.now().isoformat(),
-        'version': '3.1'  # Versi dengan perbaikan timeframe
+        'version': '3.1 - Fixed Timeframe Support'
     })
 
 # ==================== RUN APPLICATION ====================
@@ -1419,22 +1377,20 @@ if __name__ == '__main__':
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
     logger.info(f"Supported timeframes: {config.TIMEFRAMES}")
     
-    # Create necessary directories
     os.makedirs('historical_data', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
     
-    # Tampilkan status data yang tersedia
     logger.info("=== DATA AVAILABILITY ===")
-    for pair in config.FOREX_PAIRS[:3]:  # Show first 3 pairs
+    for pair in config.FOREX_PAIRS[:3]:
         if pair in data_manager.timeframe_data:
             timeframes = list(data_manager.timeframe_data[pair].keys())
             data_counts = {tf: len(data_manager.timeframe_data[pair][tf]) for tf in timeframes}
             logger.info(f"{pair}: {data_counts}")
     
     logger.info("Forex Analysis System is ready and running on http://localhost:5000")
-    logger.info("=== TIMEframe FIX APPLIED ===")
-    logger.info("1. Enhanced DataManager with proper timeframe structure")
-    logger.info("2. Fixed price_series generation in api_analyze")
-    logger.info("3. Proper timeframe validation and fallback handling")
+    logger.info("=== FIXES APPLIED ===")
+    logger.info("1. Added /api/historical-data endpoint for frontend")
+    logger.info("2. Enhanced timeframe support in DataManager")
+    logger.info("3. Fixed price_series generation")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
