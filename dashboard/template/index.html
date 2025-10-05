@@ -52,6 +52,22 @@
       font-size: 1.2rem;
       font-weight: 700;
     }
+    .backtest-panel {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .performance-grade {
+      font-size: 1.5rem;
+      font-weight: bold;
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    .grade-a { background: #d1fae5; color: #065f46; }
+    .grade-b { background: #fef3c7; color: #92400e; }
+    .grade-c { background: #fde68a; color: #78350f; }
+    .grade-d { background: #fecaca; color: #991b1b; }
   </style>
 </head>
 <body>
@@ -60,14 +76,27 @@
   <h4 class="m-0">Forex AI Dashboard</h4>
   <label class="small-muted mb-0 ms-3">Pair</label>
   <select id="pairSelect" class="form-select form-select-sm" style="width:120px;">
-    <option>USDJPY</option><option>EURUSD</option><option>GBPJPY</option><option>CHFJPY</option>
+    <option>USDJPY</option>
+    <option>EURUSD</option>
+    <option>GBPJPY</option>
+    <option>CHFJPY</option>
+    <option>EURJPY</option>
+    <option>GBPUSD</option>
+    <option>USDCHF</option>
+    <option>AUDUSD</option>
+    <option>USDCAD</option>
+    <option>NZDUSD</option>
   </select>
   <label class="small-muted mb-0">Timeframe</label>
   <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
-    <option>1D</option><option>4H</option><option>1H</option>
+    <option>1D</option>
+    <option>4H</option>
+    <option>1H</option>
+    <option>M30</option>
   </select>
   <button id="analyzeBtn" class="btn btn-primary btn-sm ms-2">Analyze</button>
   <button id="toggleAutoRefresh" class="btn btn-outline-secondary btn-sm">Auto Refresh: OFF</button>
+  <button id="runBacktestBtn" class="btn btn-warning btn-sm">Run Backtest</button>
   <div id="pairTicker" class="ms-3 small-muted" style="font-weight:600; font-size:1.05rem;">
     USDJPY – 0.0000 (<span id="pairChange" style="color:gray;">0.00%</span>)
     <span id="statusIndicator" class="status-indicator status-offline"></span>
@@ -126,32 +155,50 @@
       <div class="small-muted">Volatility: <strong id="volVal">-</strong></div>
     </div>
     
-    <!-- Backtest Panel - Added Section -->
+    <!-- Backtest Results Panel -->
     <div class="card-soft">
-      <h6>Backtest Results</h6>
-      <div class="metric-card">
-        <div class="small-muted">Total Return</div>
-        <div id="backtestReturn" class="metric-value backtest-positive">-</div>
-      </div>
-      <div class="metric-card">
-        <div class="small-muted">Win Rate</div>
-        <div id="backtestWinRate" class="metric-value">-</div>
-      </div>
-      <div class="metric-card">
-        <div class="small-muted">Max Drawdown</div>
-        <div id="backtestDrawdown" class="metric-value backtest-negative">-</div>
-      </div>
-      <div class="metric-card">
-        <div class="small-muted">Sharpe Ratio</div>
-        <div id="backtestSharpe" class="metric-value">-</div>
-      </div>
-      <div class="mt-2">
-        <small class="small-muted">Backtest Period: 90 days</small>
+      <h6>Backtest Results <span id="backtestStatus" class="badge bg-secondary">Not Run</span></h6>
+      <div id="backtestResults" class="backtest-panel">
+        <div class="text-center muted">Run backtest to see results</div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Backtest Configuration Modal -->
+<div class="modal fade" id="backtestModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Backtest Configuration</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Initial Balance ($)</label>
+          <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Period (Days)</label>
+          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Type</label>
+          <select class="form-select" id="backtestType">
+            <option value="advanced">Advanced Backtest</option>
+            <option value="basic">Basic Backtest</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="startBacktestBtn">Start Backtest</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 /* ===== Utilities ===== */
 function calcEMA(values, period){
@@ -210,12 +257,8 @@ const volEl=document.getElementById('volVal');
 const changeEl=document.getElementById('pairChange');
 const statusIndicator=document.getElementById('statusIndicator');
 const lastUpdateEl=document.getElementById('lastUpdate');
-
-// Backtest elements
-const backtestReturn = document.getElementById('backtestReturn');
-const backtestWinRate = document.getElementById('backtestWinRate');
-const backtestDrawdown = document.getElementById('backtestDrawdown');
-const backtestSharpe = document.getElementById('backtestSharpe');
+const backtestResultsEl = document.getElementById('backtestResults');
+const backtestStatusEl = document.getElementById('backtestStatus');
 
 /* ===== Data state ===== */
 let lastCandle=null, auto=false, autoRefreshInterval=null, livePriceInterval=null;
@@ -244,217 +287,308 @@ function updateLastUpdateTime() {
   lastUpdateEl.textContent = 'Last: ' + now.toLocaleTimeString();
 }
 
-// Generate mock backtest data
-function generateBacktestData(signal) {
-  // In a real application, this would come from your backend API
-  const baseReturn = signal === 'BUY' ? 5.2 : signal === 'SELL' ? 4.8 : 0.5;
-  const baseWinRate = signal === 'BUY' ? 62 : signal === 'SELL' ? 58 : 50;
-  
-  return {
-    return: (baseReturn + (Math.random() * 2 - 1)).toFixed(2) + '%',
-    winRate: (baseWinRate + (Math.random() * 4 - 2)).toFixed(1) + '%',
-    drawdown: (2.5 + (Math.random() * 1.5)).toFixed(2) + '%',
-    sharpe: (1.2 + (Math.random() * 0.6 - 0.3)).toFixed(2)
-  };
-}
-
-// Update backtest panel
-function updateBacktest(signal) {
-  const backtestData = generateBacktestData(signal);
-  
-  backtestReturn.textContent = backtestData.return;
-  backtestWinRate.textContent = backtestData.winRate;
-  backtestDrawdown.textContent = backtestData.drawdown;
-  backtestSharpe.textContent = backtestData.sharpe;
-  
-  // Color coding for return
-  const returnValue = parseFloat(backtestData.return);
-  if (returnValue > 0) {
-    backtestReturn.className = 'metric-value backtest-positive';
-  } else if (returnValue < 0) {
-    backtestReturn.className = 'metric-value backtest-negative';
-  } else {
-    backtestReturn.className = 'metric-value backtest-neutral';
-  }
-}
-
 /* ===== Fetch + Render ===== */
 async function analyze(){
   const pair=pairSelect.value, tf=timeframeSelect.value;
   try {
+    const r=await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
+    const j=await r.json();
+    
+    // Update price series chart
+    if (j.price_series && j.price_series.length > 0) {
+      const c = j.price_series.map(p => ({
+        time: fmt(p.date),
+        open: +p.open,
+        high: +p.high,
+        low: +p.low,
+        close: +p.close
+      }));
+      
+      candle.setData(c);
+      const closes = c.map(d => d.close);
+      const ema = calcEMA(closes, 26).map((v, i) => ({time: c[i].time, value: v}));
+      ema26.setData(ema);
+      
+      const {macd, sig, hist} = calcMACDSeries(closes);
+      macdLine.setData(macd.map((v, i) => ({time: c[i].time, value: v})));
+      macdSignal.setData(sig.map((v, i) => ({time: c[i].time, value: v})));
+      macdHist.setData(hist.map((v, i) => ({time: c[i].time, value: v})));
+      
+      lastCandle = c.at(-1);
+    }
+    
+    // Update technical values
+    const t = j.technical_analysis || {};
+    macdValEl.textContent = t.momentum?.macd?.toFixed(4) || '-';
+    rsiEl.textContent = t.momentum?.rsi?.toFixed(2) || '-';
+    adxEl.textContent = t.trend?.adx?.toFixed(2) || '-';
+    atrEl.textContent = t.volatility?.atr?.toFixed(4) || '-';
+    volEl.textContent = t.volatility?.volatility_pct ? (t.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+    
+    // Update price data
+    const priceData = j.price_data || {};
+    livePriceEl.textContent = priceData.current?.toFixed(4) || '-';
+    
     // Update pair ticker
-    document.getElementById('pairTicker').innerHTML = `
-      ${pair} – 0.0000 (<span id="pairChange" style="color:gray;">0.00%</span>)
-      <span id="statusIndicator" class="status-indicator status-offline"></span>
-      <span id="lastUpdate" class="small-muted"></span>
-    `;
+    const change = priceData.change_pct || 0;
+    changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+    changeEl.style.color = change >= 0 ? '#16a34a' : '#dc2626';
     
-    // In a real app, this would be an API call
-    // const r=await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
-    // const j=await r.json();
+    // Update AI analysis
+    const ai = j.ai_analysis || {};
+    aiSummaryEl.textContent = ai.analysis_summary || '-';
+    setSignal(ai.signal || 'HOLD');
+    aiConfidence.textContent = (ai.confidence || '-') + '%';
+    aiRisk.textContent = ai.risk_level || '-';
+    aiEntry.textContent = ai.entry_price || '-';
+    aiSL.textContent = ai.stop_loss || '-';
+    aiTP1.textContent = ai.take_profit_1 || '-';
+    aiTP2.textContent = ai.take_profit_2 || '-';
     
-    // For demo purposes, we'll use mock data
-    const j = {
-      price_series: generateMockPriceData(),
-      price_data: { current: 148.75 },
-      ai_analysis: {
-        analysis_summary: "USDJPY berada dalam kondisi netral dengan potensi bullish jangka panjang. RSI @ level 45.53 tidak menunjukkan kondisi overbought/oversold, sementara MACD menunjukkan momentum intra-hari yang mengindikasikan pemantapan. Harga saat ini berada di antara range support-resistance utama. Berita fundamental menunjukkan stabilitas kesenjangan global dan kebijakan bank sentral mempengaruhi pergerakan. Disarankan menunggu konfirmasi breakout atau pullback ke level support yang lebih kuat sebelum entry.",
-        signal: "HOLD",
-        confidence: "55",
-        risk_level: "MEDIUM",
-        entry_price: "148.8000 - 147.4000",
-        stop_loss: "148.3000",
-        take_profit_1: "148.5000",
-        take_profit_2: "149.5000"
-      },
-      fundamental_analysis: "Global financial stability risks have not receded. RBA warns of inflation pressures. Sensex rebounds from 8-day slump after RBI holds repo rate.",
-      technical_analysis: {
-        momentum: { rsi: 45.53 },
-        trend: { adx: 14.31 },
-        volatility: { atr: 0.97, volatility_pct: 0.0065 }
-      }
-    };
+    // Update fundamental news
+    fundNews.textContent = j.fundamental_analysis || '-';
     
-    const ps=j.price_series||[]; 
-    const c=ps.map(p=>({time:fmt(p.date),open:+p.open,high:+p.high,low:+p.low,close:+p.close}));
-    
-    candle.setData(c);
-    const closes=c.map(d=>d.close);
-    const ema=calcEMA(closes,26).map((v,i)=>({time:c[i].time,value:v}));
-    ema26.setData(ema);
-    
-    const {macd,sig,hist}=calcMACDSeries(closes);
-    macdLine.setData(macd.map((v,i)=>({time:c[i].time,value:v})));
-    macdSignal.setData(sig.map((v,i)=>({time:c[i].time,value:v})));
-    macdHist.setData(hist.map((v,i)=>({time:c[i].time,value:v})));
-    
-    macdValEl.textContent=macd.at(-1)?.toFixed(3)||'-';
-    lastCandle=c.at(-1);
-    livePriceEl.textContent=j.price_data?.current?.toFixed(4)||lastCandle.close.toFixed(4);
-    
-    aiSummaryEl.textContent=j.ai_analysis?.analysis_summary||'-';
-    setSignal(j.ai_analysis?.signal||'HOLD');
-    aiConfidence.textContent=j.ai_analysis?.confidence+'%'||'-';
-    aiRisk.textContent=j.ai_analysis?.risk_level||'-';
-    aiEntry.textContent=j.ai_analysis?.entry_price||'-';
-    aiSL.textContent=j.ai_analysis?.stop_loss||'-';
-    aiTP1.textContent=j.ai_analysis?.take_profit_1||'-';
-    aiTP2.textContent=j.ai_analysis?.take_profit_2||'-';
-    fundNews.textContent=j.fundamental_analysis||'-';
-    
-    const t=j.technical_analysis||{};
-    rsiEl.textContent=t.momentum?.rsi?.toFixed(2)||'-';
-    adxEl.textContent=t.trend?.adx?.toFixed(2)||'-';
-    atrEl.textContent=t.volatility?.atr?.toFixed(2)||'-';
-    volEl.textContent=t.volatility?.volatility_pct?(t.volatility.volatility_pct*100).toFixed(2)+'%':'-';
-    
-    // Update backtest panel
-    updateBacktest(j.ai_analysis?.signal);
+    // Update provider info
+    document.getElementById('aiProviderTxt').textContent = ai.ai_provider || 'DeepSeek AI';
     
     updateStatusIndicator(true);
     updateLastUpdateTime();
+    
   } catch (error) {
     console.error('Analysis error:', error);
     updateStatusIndicator(false);
   }
 }
 
-// Generate mock price data for demonstration
-function generateMockPriceData() {
-  const data = [];
-  const basePrice = 148.5;
-  const now = new Date();
-  
-  for (let i = 30; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
+/* ===== Live Price Update ===== */
+let prevPrice = null;
+async function updateLivePrice() {
+  const pair = pairSelect.value;
+  try {
+    // Use the analyze endpoint to get updated price data
+    const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframeSelect.value}`);
+    const j = await r.json();
     
-    const open = basePrice + (Math.random() - 0.5) * 2;
-    const close = open + (Math.random() - 0.5) * 1.5;
-    const high = Math.max(open, close) + Math.random() * 0.8;
-    const low = Math.min(open, close) - Math.random() * 0.8;
+    const priceData = j.price_data || {};
+    const currentPrice = priceData.current;
     
-    data.push({
-      date: date.toISOString().split('T')[0],
-      open: open.toFixed(4),
-      high: high.toFixed(4),
-      low: low.toFixed(4),
-      close: close.toFixed(4)
-    });
-  }
-  
-  return data;
-}
-
-/* ===== Live Price Ticker ===== */
-let prevPrice=null;
-async function updateLivePrice(){
-  const pair=pairSelect.value;
-  try{
-    // In a real app, this would be an API call
-    // const r=await fetch(`/api/realtime?pair=${pair}`);
-    // const j=await r.json();
-    
-    // For demo, generate a random price movement
-    const currentPrice = parseFloat(livePriceEl.textContent) || 148.75;
-    const change = (Math.random() - 0.5) * 0.1;
-    const newPrice = currentPrice + change;
-    
-    livePriceEl.textContent = newPrice.toFixed(4);
-    
-    // Update pair ticker with change percentage
-    const ch = prevPrice ? ((newPrice - prevPrice) / prevPrice) * 100 : 0;
-    changeEl.textContent = ch.toFixed(2) + '%';
-    changeEl.style.color = ch >= 0 ? '#16a34a' : '#dc2626';
-    prevPrice = newPrice;
-    
-    // Update current candle with live price
-    if(lastCandle){
-      const u={
-        time:lastCandle.time,
-        open:lastCandle.open,
-        high:Math.max(lastCandle.high, newPrice),
-        low:Math.min(lastCandle.low, newPrice),
-        close:newPrice
-      };
-      candle.update(u);
+    if (currentPrice) {
+      livePriceEl.textContent = currentPrice.toFixed(4);
       
-      // Update EMA with new close price
-      const closes = [...candle.data().map(d => d.close)];
-      closes[closes.length - 1] = newPrice;
-      const ema = calcEMA(closes, 26);
-      const lastEma = ema[ema.length - 1];
-      ema26.update({time: lastCandle.time, value: lastEma});
+      // Update price change
+      const change = priceData.change_pct || 0;
+      changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+      changeEl.style.color = change >= 0 ? '#16a34a' : '#dc2626';
       
-      // Update MACD with new close price
-      const {macd, sig, hist} = calcMACDSeries(closes);
-      const lastMacd = macd[macd.length - 1];
-      const lastSig = sig[sig.length - 1];
-      const lastHist = hist[hist.length - 1];
+      // Update current candle with live price
+      if (lastCandle) {
+        const updatedCandle = {
+          time: lastCandle.time,
+          open: lastCandle.open,
+          high: Math.max(lastCandle.high, currentPrice),
+          low: Math.min(lastCandle.low, currentPrice),
+          close: currentPrice
+        };
+        candle.update(updatedCandle);
+        
+        // Update EMA with new close price
+        const closes = [...candle.data().map(d => d.close)];
+        closes[closes.length - 1] = currentPrice;
+        const ema = calcEMA(closes, 26);
+        const lastEma = ema[ema.length - 1];
+        ema26.update({time: lastCandle.time, value: lastEma});
+        
+        // Update MACD with new close price
+        const {macd, sig, hist} = calcMACDSeries(closes);
+        const lastMacd = macd[macd.length - 1];
+        const lastSig = sig[sig.length - 1];
+        const lastHist = hist[hist.length - 1];
+        
+        macdLine.update({time: lastCandle.time, value: lastMacd});
+        macdSignal.update({time: lastCandle.time, value: lastSig});
+        macdHist.update({time: lastCandle.time, value: lastHist});
+        
+        macdValEl.textContent = lastMacd.toFixed(4);
+      }
       
-      macdLine.update({time: lastCandle.time, value: lastMacd});
-      macdSignal.update({time: lastCandle.time, value: lastSig});
-      macdHist.update({time: lastCandle.time, value: lastHist});
-      
-      macdValEl.textContent = lastMacd.toFixed(3);
+      updateStatusIndicator(true);
+      updateLastUpdateTime();
     }
-    
-    updateStatusIndicator(true);
-    updateLastUpdateTime();
-  } catch(error) {
+  } catch (error) {
     console.error('Live price error:', error);
     updateStatusIndicator(false);
   }
 }
 
-/* ===== Events ===== */
-document.getElementById('analyzeBtn').onclick=analyze;
-document.getElementById('toggleAutoRefresh').onclick=()=>{
-  auto=!auto;
-  const toggleBtn = document.getElementById('toggleAutoRefresh');
-  toggleBtn.textContent='Auto Refresh: '+(auto?'ON':'OFF');
+/* ===== Backtest Functions ===== */
+function showBacktestModal() {
+  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
+  modal.show();
+}
+
+async function runBacktest() {
+  const pair = pairSelect.value;
+  const timeframe = timeframeSelect.value;
+  const initialBalance = document.getElementById('initialBalance').value;
+  const days = document.getElementById('backtestDays').value;
+  const backtestType = document.getElementById('backtestType').value;
   
-  if(auto){
+  backtestStatusEl.textContent = 'Running...';
+  backtestStatusEl.className = 'badge bg-warning';
+  backtestResultsEl.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
+  
+  try {
+    const endpoint = backtestType === 'advanced' ? '/api/advanced_backtest' : '/api/backtest';
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pair: pair,
+        timeframe: timeframe,
+        days: parseInt(days),
+        initial_balance: parseFloat(initialBalance)
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.status === 'success' || result.status === 'no_trades') {
+      displayBacktestResults(result);
+      backtestStatusEl.textContent = 'Completed';
+      backtestStatusEl.className = 'badge bg-success';
+    } else {
+      throw new Error(result.error || 'Backtest failed');
+    }
+    
+  } catch (error) {
+    console.error('Backtest error:', error);
+    backtestResultsEl.innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
+    backtestStatusEl.textContent = 'Failed';
+    backtestStatusEl.className = 'badge bg-danger';
+  }
+}
+
+function displayBacktestResults(result) {
+  const summary = result.summary || {};
+  const tradeAnalysis = result.trade_analysis || {};
+  
+  let html = '';
+  
+  // Performance Grade
+  const grade = result.performance_grade || 'N/A';
+  const gradeClass = grade.startsWith('A') ? 'grade-a' : 
+                    grade.startsWith('B') ? 'grade-b' :
+                    grade.startsWith('C') ? 'grade-c' : 'grade-d';
+  
+  html += `<div class="performance-grade ${gradeClass}">Performance: ${grade}</div>`;
+  
+  // Summary Metrics
+  html += `
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Trades</div>
+          <div class="metric-value">${summary.total_trades || 0}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Win Rate</div>
+          <div class="metric-value ${(summary.win_rate || 0) >= 50 ? 'backtest-positive' : 'backtest-negative'}">
+            ${(summary.win_rate || 0).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Profit</div>
+          <div class="metric-value ${(summary.total_profit || 0) >= 0 ? 'backtest-positive' : 'backtest-negative'}">
+            $${(summary.total_profit || 0).toFixed(2)}
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Final Balance</div>
+          <div class="metric-value">$${(summary.final_balance || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Return %</div>
+          <div class="metric-value ${(summary.return_percentage || 0) >= 0 ? 'backtest-positive' : 'backtest-negative'}">
+            ${(summary.return_percentage || 0).toFixed(2)}%
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Max Drawdown</div>
+          <div class="metric-value backtest-negative">${(summary.max_drawdown || 0).toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Profit Factor</div>
+          <div class="metric-value">${(summary.profit_factor || 0).toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Sharpe Ratio</div>
+          <div class="metric-value">${(summary.sharpe_ratio || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Trade Analysis
+  if (tradeAnalysis.long_trades || tradeAnalysis.short_trades) {
+    html += `
+      <div class="mt-3">
+        <h6>Trade Analysis</h6>
+        <div class="small-muted">Long Trades: ${tradeAnalysis.long_trades || 0} (Win Rate: ${(tradeAnalysis.long_win_rate || 0).toFixed(1)}%)</div>
+        <div class="small-muted">Short Trades: ${tradeAnalysis.short_trades || 0} (Win Rate: ${(tradeAnalysis.short_win_rate || 0).toFixed(1)}%)</div>
+      </div>
+    `;
+  }
+  
+  // Risk Metrics
+  html += `
+    <div class="mt-3">
+      <h6>Risk Metrics</h6>
+      <div class="small-muted">Avg Win: $${(summary.avg_win || 0).toFixed(2)}</div>
+      <div class="small-muted">Avg Loss: $${(summary.avg_loss || 0).toFixed(2)}</div>
+      <div class="small-muted">Max Consecutive Losses: ${summary.max_consecutive_losses || 0}</div>
+    </div>
+  `;
+  
+  backtestResultsEl.innerHTML = html;
+}
+
+/* ===== Event Listeners ===== */
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+
+document.getElementById('toggleAutoRefresh').addEventListener('click', function() {
+  auto = !auto;
+  const toggleBtn = document.getElementById('toggleAutoRefresh');
+  toggleBtn.textContent = 'Auto Refresh: ' + (auto ? 'ON' : 'OFF');
+  
+  if (auto) {
     // Start live price updates every 30 seconds
     livePriceInterval = setInterval(updateLivePrice, 30000);
     // Start analysis updates every 2 minutes
@@ -467,17 +601,16 @@ document.getElementById('toggleAutoRefresh').onclick=()=>{
     toggleBtn.classList.remove('btn-success');
     toggleBtn.classList.add('btn-outline-secondary');
   }
-};
+});
 
-// Add event listeners for pair and timeframe changes
 pairSelect.addEventListener('change', analyze);
 timeframeSelect.addEventListener('change', analyze);
 
 // Initialize dashboard
 analyze();
 
-// Start live price updates every 30 seconds
-livePriceInterval = setInterval(updateLivePrice, 30000);
+// Start live price updates every 5 seconds for responsive UI
+setInterval(updateLivePrice, 5000);
 </script>
 </body>
 </html>
