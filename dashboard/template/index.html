@@ -347,6 +347,76 @@
     .risk-tip:last-child {
       margin-bottom: 0;
     }
+
+    /* Support Resistance Styles */
+    .levels-container {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .level-card {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .support-card {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .resistance-card {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .level-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .support-title {
+      color: #10b981;
+    }
+
+    .resistance-title {
+      color: #ef4444;
+    }
+
+    .level-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .level-distance {
+      font-size: 0.7rem;
+      color: #6b7280;
+      margin-top: 3px;
+    }
+
+    .pivot-levels {
+      margin-top: 15px;
+    }
+
+    .pivot-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .pivot-label {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .pivot-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -467,7 +537,7 @@
       </div>
     </div>
 
-    <!-- Risk Management Card (Updated) -->
+    <!-- Risk Management Card -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-shield-alt"></i>
@@ -586,6 +656,59 @@
             <i class="fas fa-lightbulb text-warning me-2"></i>
             <span class="small">Monitor correlation between pairs</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Support & Resistance Card -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-layer-group"></i>
+        <span>Support & Resistance</span>
+      </div>
+      
+      <div class="levels-container">
+        <div class="level-card support-card">
+          <div class="level-title support-title">SUPPORT</div>
+          <div class="level-value" id="supportLevel">-</div>
+          <div class="level-distance" id="supportDistance">-</div>
+        </div>
+        <div class="level-card resistance-card">
+          <div class="level-title resistance-title">RESISTANCE</div>
+          <div class="level-value" id="resistanceLevel">-</div>
+          <div class="level-distance" id="resistanceDistance">-</div>
+        </div>
+      </div>
+
+      <div class="pivot-levels">
+        <div class="small-muted mb-2">PIVOT POINTS</div>
+        <div class="pivot-row">
+          <span class="pivot-label">R3</span>
+          <span class="pivot-value" id="pivotR3">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">R2</span>
+          <span class="pivot-value" id="pivotR2">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">R1</span>
+          <span class="pivot-value" id="pivotR1">-</span>
+        </div>
+        <div class="pivot-row" style="border-bottom: 2px solid #3b82f6;">
+          <span class="pivot-label">PIVOT</span>
+          <span class="pivot-value" id="pivotPoint">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S1</span>
+          <span class="pivot-value" id="pivotS1">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S2</span>
+          <span class="pivot-value" id="pivotS2">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S3</span>
+          <span class="pivot-value" id="pivotS3">-</span>
         </div>
       </div>
     </div>
@@ -712,6 +835,27 @@ function calcMACDSeries(c,short=12,long=26,signal=9){
   const sig=calcEMA(macd,signal);
   const hist=macd.map((v,i)=>v-(sig[i]||0));
   return {macd,sig,hist};
+}
+
+// Calculate Pivot Points
+function calculatePivotPoints(high, low, close) {
+  const pivot = (high + low + close) / 3;
+  const r1 = (2 * pivot) - low;
+  const s1 = (2 * pivot) - high;
+  const r2 = pivot + (high - low);
+  const s2 = pivot - (high - low);
+  const r3 = high + 2 * (pivot - low);
+  const s3 = low - 2 * (high - pivot);
+  
+  return {
+    pivot: pivot,
+    r1: r1,
+    r2: r2,
+    r3: r3,
+    s1: s1,
+    s2: s2,
+    s3: s3
+  };
 }
 
 // Improved date formatting function
@@ -846,6 +990,47 @@ function updateRiskAssessment(riskData) {
     riskWarnings.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i><span>High risk score detected - proceed with caution</span>`;
   } else {
     riskDetails.style.display = 'none';
+  }
+}
+
+/* ===== Support & Resistance Functions ===== */
+function updateSupportResistance(data) {
+  const srData = data.support_resistance || {};
+  const currentPrice = data.price_data?.current || 0;
+  
+  // Update Support & Resistance levels
+  const supportLevel = srData.support || (currentPrice * 0.995).toFixed(4);
+  const resistanceLevel = srData.resistance || (currentPrice * 1.005).toFixed(4);
+  
+  document.getElementById('supportLevel').textContent = supportLevel;
+  document.getElementById('resistanceLevel').textContent = resistanceLevel;
+  
+  // Calculate and display distances
+  if (currentPrice > 0) {
+    const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
+    const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
+    
+    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
+    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
+  }
+  
+  // Calculate and update Pivot Points
+  const priceSeries = data.price_series || [];
+  if (priceSeries.length > 0) {
+    const lastDay = priceSeries[priceSeries.length - 1];
+    const pivots = calculatePivotPoints(
+      parseFloat(lastDay.high) || currentPrice * 1.01,
+      parseFloat(lastDay.low) || currentPrice * 0.99,
+      parseFloat(lastDay.close) || currentPrice
+    );
+    
+    document.getElementById('pivotPoint').textContent = pivots.pivot.toFixed(4);
+    document.getElementById('pivotR1').textContent = pivots.r1.toFixed(4);
+    document.getElementById('pivotR2').textContent = pivots.r2.toFixed(4);
+    document.getElementById('pivotR3').textContent = pivots.r3.toFixed(4);
+    document.getElementById('pivotS1').textContent = pivots.s1.toFixed(4);
+    document.getElementById('pivotS2').textContent = pivots.s2.toFixed(4);
+    document.getElementById('pivotS3').textContent = pivots.s3.toFixed(4);
   }
 }
 
@@ -1030,6 +1215,17 @@ function generateSampleRiskAssessment() {
   };
 }
 
+// Generate sample support resistance data
+function generateSampleSupportResistance(currentPrice) {
+  const support = (currentPrice * (1 - (Math.random() * 0.02 + 0.005))).toFixed(4);
+  const resistance = (currentPrice * (1 + (Math.random() * 0.02 + 0.005))).toFixed(4);
+  
+  return {
+    support: support,
+    resistance: resistance
+  };
+}
+
 /* ===== Fetch + Render ===== */
 async function analyze(){
   const pair = pairSelect.value, tf = timeframeSelect.value;
@@ -1180,6 +1376,14 @@ async function analyze(){
     // Update risk assessment with new function
     const risk = j.risk_assessment || generateSampleRiskAssessment();
     updateRiskAssessment(risk);
+    
+    // Update Support & Resistance
+    const srData = {
+      support_resistance: j.support_resistance || generateSampleSupportResistance(currentPrice),
+      price_data: j.price_data || { current: currentPrice },
+      price_series: j.price_series || []
+    };
+    updateSupportResistance(srData);
     
     updateStatusIndicator(true);
     
