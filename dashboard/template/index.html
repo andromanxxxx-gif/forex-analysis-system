@@ -1,1425 +1,488 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ANDRO-FX Precision Forex Trading</title>
-
-  <!-- CSS Libraries -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <!-- Chart Library -->
-  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
-
-  <style>
-    :root {
-      --deepseek-primary: #0066cc;
-      --deepseek-secondary: #00aaff;
-      --deepseek-accent: #004499;
-      --signal-buy: #10b981;
-      --signal-sell: #ef4444;
-      --signal-hold: #f59e0b;
-      --text-primary: #1f2937;
-      --text-secondary: #6b7280;
-      --bg-primary: #f8fafc;
-      --bg-card: #ffffff;
-      --border-radius: 12px;
-    }
-
-    body {
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      font-family: "Inter", "Segoe UI", sans-serif;
-      padding: 18px;
-      margin: 0;
-    }
-
-    .topbar {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-      padding: 15px 20px;
-      background: var(--bg-card);
-      border-radius: var(--border-radius);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    }
-
-    .brand-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 1.5rem;
-      color: var(--deepseek-primary);
-    }
-
-    .brand-logo i {
-      color: var(--deepseek-secondary);
-    }
-
-    .card-soft {
-      background: var(--bg-card);
-      border-radius: var(--border-radius);
-      padding: 20px;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
-      margin-bottom: 20px;
-      border: 1px solid rgba(0, 0, 0, 0.05);
-    }
-
-    .section-title {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--deepseek-primary);
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-title i {
-      color: var(--deepseek-secondary);
-    }
-
-    #chartRoot, #macdRoot {
-      width: 100%;
-      background: var(--bg-card);
-      border-radius: 8px;
-    }
-    
-    #chartRoot { 
-      height: 450px; 
-    }
-    
-    #macdRoot { 
-      height: 150px; 
-      margin-top: 10px;
-    }
-
-    .muted { 
-      color: var(--text-secondary); 
-      font-size: 0.95rem; 
-    }
-
-    .ai-signal-buy, .ai-signal-sell, .ai-signal-hold {
-      color: white; 
-      padding: 12px 16px; 
-      border-radius: 8px; 
-      font-weight: 700;
-      font-size: 1.2rem;
-      text-align: center;
-      margin: 10px 0;
-    }
-
-    .ai-signal-buy { 
-      background: var(--signal-buy);
-      box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
-    }
-
-    .ai-signal-sell { 
-      background: var(--signal-sell);
-      box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
-    }
-
-    .ai-signal-hold { 
-      background: var(--signal-hold);
-      box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
-    }
-
-    .price-ticker {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--deepseek-primary);
-    }
-
-    .price-change {
-      font-size: 1rem;
-      font-weight: 600;
-    }
-
-    .change-positive { color: var(--signal-buy); }
-    .change-negative { color: var(--signal-sell); }
-
-    .metric-card {
-      background: var(--bg-primary);
-      border-radius: 10px;
-      padding: 15px;
-      margin-bottom: 12px;
-      border-left: 4px solid var(--deepseek-secondary);
-    }
-
-    .metric-value {
-      font-size: 1.4rem;
-      font-weight: 700;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--text-secondary);
-    }
-
-    .tech-indicator {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    }
-
-    .indicator-value {
-      font-weight: 700;
-      font-size: 1.1rem;
-    }
-
-    .btn-deepseek {
-      background: var(--deepseek-primary);
-      color: white;
-      font-weight: 600;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 16px;
-    }
-
-    .btn-deepseek:hover {
-      background: var(--deepseek-accent);
-      color: white;
-    }
-
-    .btn-action {
-      background: var(--deepseek-secondary);
-      color: white;
-      font-weight: 600;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 16px;
-    }
-
-    .btn-action:hover {
-      background: var(--deepseek-primary);
-      color: white;
-    }
-
-    /* Support & Resistance Styles */
-    .levels-container {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .level-card {
-      flex: 1;
-      padding: 12px;
-      border-radius: 8px;
-      text-align: center;
-    }
-
-    .support-card {
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-
-    .resistance-card {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-
-    .level-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      margin-bottom: 5px;
-    }
-
-    .support-title {
-      color: #10b981;
-    }
-
-    .resistance-title {
-      color: #ef4444;
-    }
-
-    .level-value {
-      font-size: 1.1rem;
-      font-weight: 700;
-    }
-
-    .level-distance {
-      font-size: 0.7rem;
-      color: #6b7280;
-      margin-top: 3px;
-    }
-
-    .pivot-levels {
-      margin-top: 15px;
-    }
-
-    .pivot-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      border-bottom: 1px solid #f3f4f6;
-    }
-
-    .pivot-label {
-      font-size: 0.8rem;
-      color: #6b7280;
-    }
-
-    .pivot-value {
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-
-    .backtest-panel {
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .performance-grade {
-      font-size: 1.6rem;
-      font-weight: bold;
-      text-align: center;
-      padding: 12px;
-      border-radius: 10px;
-      margin: 12px 0;
-    }
-
-    .grade-a { background: #d1fae5; color: #065f46; }
-    .grade-b { background: #fef3c7; color: #92400e; }
-    .grade-c { background: #fde68a; color: #78350f; }
-    .grade-d { background: #fecaca; color: #991b1b; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANDRO-FX Precision Forex Trading</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0c1a2d 0%, #152642 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(16, 33, 58, 0.8);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #4fc3f7;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+        }
+        
+        h2 {
+            color: #81d4fa;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        
+        .chart-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            flex: 1;
+            min-width: 300px;
+            background: rgba(16, 33, 58, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .chart-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a4365;
+        }
+        
+        .price-display {
+            flex: 1;
+            min-width: 250px;
+            background: rgba(16, 33, 58, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .current-price {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(30, 58, 98, 0.6);
+            border-radius: 8px;
+        }
+        
+        .price-value {
+            font-size: 2.8rem;
+            font-weight: bold;
+            color: #4fc3f7;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+        }
+        
+        .price-levels {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .price-level {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .price-level:hover {
+            background: rgba(41, 82, 139, 0.3);
+        }
+        
+        .level-value {
+            font-weight: 500;
+        }
+        
+        .level-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .signal-section {
+            background: rgba(16, 33, 58, 0.8);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .signal-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .signal-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+            color: #ff5252;
+        }
+        
+        .signal-content {
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        
+        .signal-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .signal-table th, .signal-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #2a4365;
+        }
+        
+        .signal-table th {
+            background: rgba(30, 58, 98, 0.6);
+            color: #81d4fa;
+        }
+        
+        .signal-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .signal-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .badge-sell {
+            background: rgba(244, 67, 54, 0.2);
+            color: #ff5252;
+            border: 1px solid #ff5252;
+        }
+        
+        .badge-medium {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid #ffc107;
+        }
+        
+        .badge-confidence {
+            background: rgba(79, 195, 247, 0.2);
+            color: #4fc3f7;
+            border: 1px solid #4fc3f7;
+        }
+        
+        .chart-placeholder {
+            height: 300px;
+            background: rgba(30, 58, 98, 0.4);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #81d4fa;
+            margin-top: 10px;
+        }
+        
+        .indicator-values {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .indicator-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        
+        .indicator-1 { background-color: #4fc3f7; }
+        .indicator-2 { background-color: #81c784; }
+        .indicator-3 { background-color: #ffb74d; }
+        
+        /* Level styling untuk berbagai jenis level */
+        .level-stop-loss {
+            background: rgba(244, 67, 54, 0.15);
+            border-left: 4px solid #ff5252;
+        }
+        
+        .level-entry {
+            background: rgba(255, 193, 7, 0.15);
+            border-left: 4px solid #ffc107;
+        }
+        
+        .level-current {
+            background: rgba(79, 195, 247, 0.2);
+            border-left: 4px solid #4fc3f7;
+            font-weight: bold;
+        }
+        
+        .level-take-profit {
+            background: rgba(76, 175, 80, 0.15);
+            border-left: 4px solid #4caf50;
+        }
+        
+        .level-support {
+            background: rgba(171, 71, 188, 0.15);
+            border-left: 4px solid #ab47bc;
+        }
+        
+        .level-normal {
+            border-left: 4px solid #2a4365;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+            color: #81d4fa;
+            font-size: 0.9rem;
+            border-top: 1px solid #2a4365;
+        }
+        
+        @media (max-width: 768px) {
+            .chart-section {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .price-value {
+                font-size: 2.2rem;
+            }
+        }
+    </style>
 </head>
 <body>
-
-<!-- Simple Loading Screen -->
-<div id="loadingScreen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-primary); display: flex; justify-content: center; align-items: center; z-index: 9999; flex-direction: column;">
-  <div class="text-center">
-    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-    <h4 class="text-primary">ANDRO-FX Trading System</h4>
-    <p class="text-muted">Initializing trading dashboard...</p>
-    <div id="loadStatus" class="small text-muted mt-2">Loading libraries...</div>
-  </div>
-</div>
-
-<div class="topbar">
-  <div class="brand-logo">
-    <i class="fas fa-brain"></i>
-    <span>ANDRO-FX Precision Forex Trading</span>
-  </div>
-  
-  <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
-    <div class="d-flex align-items-center">
-      <label class="small-muted mb-0 me-2">Pair</label>
-      <select id="pairSelect" class="form-select form-select-sm" style="width:130px;">
-        <option>USDJPY</option>
-        <option>EURJPY</option>
-        <option>GBPJPY</option>
-        <option>GBPUSD</option>
-        <option>EURUSD</option>
-        <option>AUDUSD</option>
-      </select>
-    </div>
-    
-    <div class="d-flex align-items-center">
-      <label class="small-muted mb-0 me-2">Timeframe</label>
-      <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
-        <option value="1D">1D</option>
-        <option value="4H">4H</option>
-        <option value="1H">1H</option>
-        <option value="30m">30m</option>
-      </select>
-    </div>
-    
-    <button id="analyzeBtn" class="btn btn-deepseek">
-      <i class="fas fa-chart-line me-2"></i>Analyze
-    </button>
-
-    <button id="runBacktestBtn" class="btn btn-action">
-      <i class="fas fa-play-circle me-2"></i>Backtest
-    </button>
-    
-    <div class="d-flex align-items-center ms-3">
-      <span class="price-ticker me-2" id="currentPair">USDJPY –</span>
-      <span id="livePrice" class="price-ticker">0.0000</span>
-      <span id="pairChange" class="price-change ms-2">(0.00%)</span>
-      <span id="statusIndicator" class="badge bg-secondary ms-2">Offline</span>
-    </div>
-  </div>
-</div>
-
-<div class="row g-3">
-  <div class="col-lg-8">
-    <div class="card-soft">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <div class="section-title">
-            <i class="fas fa-chart-candlestick"></i>
-            <span>Live Price Chart</span>
-          </div>
-          <div class="muted" id="chartSubtitle">Real-time Candlestick · EMA26 · MACD</div>
-        </div>
-        <div class="text-end">
-          <div class="small-muted">Current Price</div>
-          <div class="price-ticker" id="currentPrice">-</div>
-        </div>
-      </div>
-      <div id="chartRoot">
-        <div class="loading">
-          <i class="fas fa-chart-line fa-2x mb-3"></i>
-          <div>Loading chart data...</div>
-        </div>
-      </div>
-      <div id="macdRoot">
-        <div class="loading">
-          <div>Loading MACD indicator...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-4">
-    <!-- AI Trading Signal Card -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-robot"></i>
-        <span>AI Trading Signal</span>
-      </div>
-      
-      <div id="aiSummary" class="muted mb-3">Initializing analysis system...</div>
-      
-      <div class="mb-3">
-        <div class="small-muted mb-2">TRADING SIGNAL</div>
-        <div id="aiSignalBadge" class="ai-signal-hold">LOADING</div>
-      </div>
-      
-      <div class="row mb-3">
-        <div class="col-6">
-          <div class="metric-card">
-            <div class="small-muted">Confidence</div>
-            <div class="metric-value" id="aiConfidence">-</div>
-          </div>
-        </div>
-        <div class="col-6">
-          <div class="metric-card">
-            <div class="small-muted">Risk Level</div>
-            <div class="metric-value" id="aiRisk">-</div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="mb-3">
-        <div class="small-muted mb-2">TRADING LEVELS</div>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="muted">Entry:</span>
-          <span id="aiEntry" class="fw-bold">-</span>
-        </div>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="muted">Stop Loss:</span>
-          <span id="aiSL" class="fw-bold text-danger">-</span>
-        </div>
-        <div class="d-flex justify-content-between">
-          <span class="muted">Take Profit:</span>
-          <span id="aiTP1" class="fw-bold text-success">-</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Support & Resistance Card -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-layer-group"></i>
-        <span>Support & Resistance</span>
-      </div>
-      
-      <div class="levels-container">
-        <div class="level-card support-card">
-          <div class="level-title support-title">SUPPORT</div>
-          <div class="level-value" id="supportLevel">-</div>
-          <div class="level-distance" id="supportDistance">-</div>
-        </div>
-        <div class="level-card resistance-card">
-          <div class="level-title resistance-title">RESISTANCE</div>
-          <div class="level-value" id="resistanceLevel">-</div>
-          <div class="level-distance" id="resistanceDistance">-</div>
-        </div>
-      </div>
-
-      <div class="pivot-levels">
-        <div class="small-muted mb-2">PIVOT POINTS</div>
-        <div class="pivot-row">
-          <span class="pivot-label">R3</span>
-          <span class="pivot-value" id="pivotR3">-</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">R2</span>
-          <span class="pivot-value" id="pivotR2">-</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">R1</span>
-          <span class="pivot-value" id="pivotR1">-</span>
-        </div>
-        <div class="pivot-row" style="border-bottom: 2px solid #3b82f6;">
-          <span class="pivot-label">PIVOT</span>
-          <span class="pivot-value" id="pivotPoint">-</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">S1</span>
-          <span class="pivot-value" id="pivotS1">-</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">S2</span>
-          <span class="pivot-value" id="pivotS2">-</span>
-        </div>
-        <div class="pivot-row">
-          <span class="pivot-label">S3</span>
-          <span class="pivot-value" id="pivotS3">-</span>
-        </div>
-      </div>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-chart-line"></i> ANDRO-FX Precision Forex Trading</h1>
+            <p>Real-time Trading Signals dengan Analisis AI</p>
+        </header>
+        
+        <section class="chart-section">
+            <div class="chart-container">
+                <div class="chart-info">
+                    <h2>Live Price Chart</h2>
+                    <div>4H Timeframe - Real-time Candlestick - EM426 - MACD</div>
+                </div>
+                
+                <div class="chart-placeholder">
+                    <div>
+                        <i class="fas fa-chart-bar" style="font-size: 3rem; margin-bottom: 10px;"></i>
+                        <p>Grafik Harga Real-time USD/JPY</p>
+                    </div>
+                </div>
+                
+                <div class="indicator-values">
+                    <div class="indicator">
+                        <div class="indicator-dot indicator-1"></div>
+                        <span>0x1</span>
+                    </div>
+                    <div class="indicator">
+                        <div class="indicator-dot indicator-2"></div>
+                        <span>0.53</span>
+                    </div>
+                    <div class="indicator">
+                        <div class="indicator-dot indicator-3"></div>
+                        <span>0.35</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="price-display">
+                <div class="current-price">
+                    <div>Current Price</div>
+                    <div class="price-value">147.3990</div>
+                </div>
+                
+                <div class="price-levels">
+                    <div class="price-level level-normal">
+                        <div class="level-value">190.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">185.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">180.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">175.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">170.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">165.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">160.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">155.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">150.00</div>
+                        <div>Resistance</div>
+                    </div>
+                    <div class="price-level level-stop-loss">
+                        <div class="level-value">148.100</div>
+                        <div>Stop Loss <i class="fas fa-arrow-up" style="color: #ff5252;"></i></div>
+                    </div>
+                    <div class="price-level level-entry">
+                        <div class="level-value">147.500</div>
+                        <div>Entry Zone</div>
+                    </div>
+                    <div class="price-level level-entry">
+                        <div class="level-value">147.300</div>
+                        <div>Entry Zone</div>
+                    </div>
+                    <div class="price-level level-current">
+                        <div class="level-value">147.3990</div>
+                        <div>Current Price <i class="fas fa-bolt" style="color: #4fc3f7;"></i></div>
+                    </div>
+                    <div class="price-level level-take-profit">
+                        <div class="level-value">146.800</div>
+                        <div>Take Profit <i class="fas fa-arrow-down" style="color: #4caf50;"></i></div>
+                    </div>
+                    <div class="price-level level-support">
+                        <div class="level-value">146.5870</div>
+                        <div>Support Target</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">145.00</div>
+                        <div>Support</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">140.00</div>
+                        <div>Support</div>
+                    </div>
+                    <div class="price-level level-normal">
+                        <div class="level-value">135.00</div>
+                        <div>Support</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="signal-section">
+            <div class="signal-header">
+                <i class="fas fa-robot signal-icon"></i>
+                <h2>AI Trading Signal</h2>
+            </div>
+            
+            <div class="signal-content">
+                <p>USDJPY menunjukkan momentum bearish dengan MACD masih di bawah garis signal dan RSI netral cenderung lemah. Meskipun volatilitas rendah, kondisi teknikal mendukung penurunan lebih lanjut menuju support 146.5870. Fundamental dengan risiko stabilitas keuangan global dan ketegangan geopolitik dapat mendukung safe-haven JPY.</p>
+            </div>
+            
+            <h3>TRADING SIGNAL</h3>
+            
+            <table class="signal-table">
+                <tr>
+                    <th>Sinyal</th>
+                    <th>Confidence</th>
+                    <th>Risk Level</th>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="signal-badge badge-sell">
+                            <i class="fas fa-arrow-down"></i> SELL
+                        </span>
+                    </td>
+                    <td>
+                        <span class="signal-badge badge-confidence">
+                            65%
+                        </span>
+                    </td>
+                    <td>
+                        <span class="signal-badge badge-medium">
+                            MEDIUM
+                        </span>
+                    </td>
+                </tr>
+            </table>
+            
+            <h3 style="margin-top: 25px;">TRADING LEVELS</h3>
+            
+            <table class="signal-table">
+                <tr>
+                    <th>Entry</th>
+                    <td>147.300 - 147.500</td>
+                </tr>
+                <tr>
+                    <th>Stop Loss</th>
+                    <td>148.100</td>
+                </tr>
+                <tr>
+                    <th>Take Profit</th>
+                    <td>146.800</td>
+                </tr>
+            </table>
+        </section>
+        
+        <footer>
+            <p>ANDRO-FX Precision Trading &copy; 2023 - Data dan sinyal disediakan untuk tujuan edukasi</p>
+        </footer>
     </div>
 
-    <!-- Risk Management Card -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-shield-alt"></i>
-        <span>Risk Management</span>
-      </div>
-      
-      <div class="mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="small-muted">RISK SCORE</span>
-          <span id="riskScore" class="badge bg-secondary">-/10</span>
-        </div>
-        <div class="progress mb-3" style="height: 8px;">
-          <div id="riskProgress" class="progress-bar" style="width: 0%"></div>
-        </div>
-      </div>
-      
-      <div id="riskStatus" class="muted">Assessing risk parameters...</div>
-    </div>
-
-    <!-- Technical Analysis Card -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-chart-bar"></i>
-        <span>Technical Analysis</span>
-      </div>
-      
-      <div id="techIndicators">
-        <div class="tech-indicator">
-          <span class="muted">RSI</span>
-          <span class="indicator-value" id="rsiVal">-</span>
-        </div>
-        <div class="tech-indicator">
-          <span class="muted">MACD</span>
-          <span class="indicator-value" id="macdVal">-</span>
-        </div>
-        <div class="tech-indicator">
-          <span class="muted">MACD Histogram</span>
-          <span class="indicator-value" id="macdHistVal">-</span>
-        </div>
-        <div class="tech-indicator">
-          <span class="muted">ADX</span>
-          <span class="indicator-value" id="adxVal">-</span>
-        </div>
-        <div class="tech-indicator">
-          <span class="muted">ATR</span>
-          <span class="indicator-value" id="atrVal">-</span>
-        </div>
-        <div class="tech-indicator">
-          <span class="muted">Volatility</span>
-          <span class="indicator-value" id="volVal">-</span>
-        </div>
-        <div class="tech-indicator">
-          <span class="muted">Trend</span>
-          <span class="indicator-value" id="trendVal">-</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Backtest Results Card -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-chart-line"></i>
-        <span>Backtest Results</span>
-        <span id="backtestStatus" class="badge bg-secondary ms-2">Not Run</span>
-      </div>
-      <div id="backtestResults" class="backtest-panel">
-        <div class="text-center muted">Run backtest to see performance results</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Backtest Configuration Modal -->
-<div class="modal fade" id="backtestModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fas fa-play-circle me-2"></i>Run Backtest
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">Initial Balance ($)</label>
-          <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Backtest Period (Days)</label>
-          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Backtest Type</label>
-          <select class="form-select" id="backtestType">
-            <option value="advanced">Advanced Backtest</option>
-            <option value="basic">Basic Backtest</option>
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-deepseek" id="startBacktestBtn">
-          <i class="fas fa-play me-2"></i>Start Backtest
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- JavaScript Libraries -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-// Enhanced initialization with proper library checking
-console.log('Starting ANDRO-FX Frontend...');
-
-// Global state untuk menyimpan data
-let currentChartData = [];
-let currentPrice = 0;
-
-// Update loading status
-function updateLoadStatus(message) {
-  const statusElement = document.getElementById('loadStatus');
-  if (statusElement) {
-    statusElement.textContent = message;
-  }
-  console.log('Load Status:', message);
-}
-
-// Check if Lightweight Charts is available
-function checkLightweightCharts() {
-  if (typeof LightweightCharts === 'undefined') {
-    console.error('Lightweight Charts is not available');
-    updateLoadStatus('Chart library failed to load - using fallback');
-    return false;
-  }
-  console.log('Lightweight Charts is available');
-  return true;
-}
-
-// Hide loading screen when everything is ready
-function hideLoadingScreen() {
-  const loadingScreen = document.getElementById('loadingScreen');
-  if (loadingScreen) {
-    loadingScreen.style.display = 'none';
-    console.log('Loading screen hidden');
-  }
-}
-
-// Global error handler
-window.addEventListener('error', function(e) {
-  console.error('Global error:', e.error);
-  updateLoadStatus('Error: ' + e.error.message);
-});
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM fully loaded');
-  updateLoadStatus('DOM ready - initializing application...');
-  
-  // Check for required libraries
-  const librariesReady = checkLightweightCharts();
-  
-  if (librariesReady) {
-    initializeApp();
-  } else {
-    // Try to initialize anyway with fallback
-    setTimeout(initializeApp, 1000);
-  }
-});
-
-async function initializeApp() {
-  console.log('Initializing application...');
-  updateLoadStatus('Initializing trading dashboard...');
-  
-  try {
-    // Initialize basic UI first
-    await initializeBasicUI();
-    
-    // Initialize charts if library is available
-    if (typeof LightweightCharts !== 'undefined') {
-      await initializeCharts();
-    } else {
-      console.warn('Lightweight Charts not available, using simple display');
-      showChartFallback();
-    }
-    
-    // Perform initial analysis
-    await analyze();
-    
-    console.log('Application initialized successfully');
-    updateLoadStatus('Dashboard ready!');
-    
-    // Hide loading screen after everything is set up
-    setTimeout(hideLoadingScreen, 500);
-    
-  } catch (error) {
-    console.error('Failed to initialize app:', error);
-    updateLoadStatus('Initialization failed: ' + error.message);
-    showError('Initialization failed: ' + error.message);
-    // Still hide loading screen to show error state
-    setTimeout(hideLoadingScreen, 1000);
-  }
-}
-
-async function initializeBasicUI() {
-  console.log('Initializing basic UI...');
-  
-  // Set up event listeners
-  document.getElementById('analyzeBtn').addEventListener('click', analyze);
-  document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
-  document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
-  
-  document.getElementById('pairSelect').addEventListener('change', function() {
-    document.getElementById('currentPair').textContent = this.value + ' –';
-    analyze();
-  });
-  document.getElementById('timeframeSelect').addEventListener('change', analyze);
-  
-  console.log('Basic UI initialized');
-}
-
-async function initializeCharts() {
-  console.log('Initializing charts...');
-  updateLoadStatus('Initializing charts...');
-  
-  try {
-    const chartRoot = document.getElementById('chartRoot');
-    const macdRoot = document.getElementById('macdRoot');
-    
-    // Clear loading messages
-    chartRoot.innerHTML = '';
-    macdRoot.innerHTML = '';
-    
-    // Create main chart
-    const chart = LightweightCharts.createChart(chartRoot, {
-      width: chartRoot.clientWidth,
-      height: 450,
-      layout: {
-        background: { color: '#ffffff' },
-        textColor: '#374151',
-      },
-      grid: {
-        vertLines: { color: '#f3f4f6' },
-        horzLines: { color: '#f3f4f6' },
-      },
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-      }
-    });
-    
-    // Create candlestick series
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: '#10b981',
-      downColor: '#ef4444',
-      borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
-    });
-    
-    // Create EMA series
-    const emaSeries = chart.addLineSeries({
-      color: '#3b82f6',
-      lineWidth: 2,
-    });
-    
-    // Create MACD chart
-    const macdChart = LightweightCharts.createChart(macdRoot, {
-      width: macdRoot.clientWidth,
-      height: 150,
-      layout: {
-        background: { color: '#ffffff' },
-        textColor: '#374151',
-      },
-      grid: {
-        vertLines: { color: '#f3f4f6' },
-        horzLines: { color: '#f3f4f6' },
-      },
-    });
-    
-    const macdLineSeries = macdChart.addLineSeries({
-      color: '#3b82f6',
-      lineWidth: 1,
-    });
-    
-    const macdSignalSeries = macdChart.addLineSeries({
-      color: '#f59e0b',
-      lineWidth: 1,
-    });
-    
-    const macdHistogramSeries = macdChart.addHistogramSeries({
-      color: '#8b5cf6',
-    });
-    
-    // Store chart instances globally
-    window.tradingCharts = {
-      mainChart: chart,
-      candleSeries: candleSeries,
-      emaSeries: emaSeries,
-      macdChart: macdChart,
-      macdLineSeries: macdLineSeries,
-      macdSignalSeries: macdSignalSeries,
-      macdHistogramSeries: macdHistogramSeries
-    };
-    
-    console.log('Charts initialized successfully');
-    
-  } catch (error) {
-    console.error('Chart initialization failed:', error);
-    showChartFallback();
-    throw new Error('Could not initialize charts: ' + error.message);
-  }
-}
-
-function showChartFallback() {
-  const chartRoot = document.getElementById('chartRoot');
-  const macdRoot = document.getElementById('macdRoot');
-  
-  chartRoot.innerHTML = `
-    <div class="alert alert-info">
-      <i class="fas fa-info-circle me-2"></i>
-      Chart display unavailable. Analysis data is still functional.
-    </div>
-  `;
-  
-  macdRoot.innerHTML = `
-    <div class="alert alert-secondary">
-      MACD indicator unavailable
-    </div>
-  `;
-}
-
-function showBacktestModal() {
-  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
-  modal.show();
-}
-
-async function runBacktest() {
-  const pair = document.getElementById('pairSelect').value;
-  const timeframe = document.getElementById('timeframeSelect').value;
-  const initialBalance = document.getElementById('initialBalance').value;
-  const days = document.getElementById('backtestDays').value;
-  const backtestType = document.getElementById('backtestType').value;
-  
-  // Close modal
-  const modal = bootstrap.Modal.getInstance(document.getElementById('backtestModal'));
-  modal.hide();
-  
-  // Update UI
-  document.getElementById('backtestStatus').textContent = 'Running...';
-  document.getElementById('backtestStatus').className = 'badge bg-warning ms-2';
-  document.getElementById('backtestResults').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
-  
-  try {
-    // Simulate backtest (replace with actual API call)
-    const backtestResult = await simulateBacktest(pair, timeframe, initialBalance, days);
-    displayBacktestResults(backtestResult);
-    
-    document.getElementById('backtestStatus').textContent = 'Completed';
-    document.getElementById('backtestStatus').className = 'badge bg-success ms-2';
-    
-  } catch (error) {
-    console.error('Backtest failed:', error);
-    document.getElementById('backtestResults').innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
-    document.getElementById('backtestStatus').textContent = 'Failed';
-    document.getElementById('backtestStatus').className = 'badge bg-danger ms-2';
-  }
-}
-
-async function simulateBacktest(pair, timeframe, initialBalance, days) {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  const profit = (Math.random() - 0.4) * initialBalance * 0.1;
-  const winRate = 40 + Math.random() * 30;
-  const totalTrades = Math.floor(10 + Math.random() * 50);
-  const maxDrawdown = 2 + Math.random() * 8;
-  
-  const grades = ['A', 'B', 'C', 'D'];
-  const grade = grades[Math.floor(Math.random() * grades.length)];
-  
-  return {
-    summary: {
-      total_trades: totalTrades,
-      win_rate: winRate,
-      total_profit: profit,
-      final_balance: parseFloat(initialBalance) + profit,
-      return_percentage: (profit / initialBalance * 100),
-      max_drawdown: maxDrawdown
-    },
-    performance_grade: grade + (grade === 'A' ? '+' : ''),
-    trade_analysis: {
-      long_trades: Math.floor(totalTrades * 0.6),
-      short_trades: Math.floor(totalTrades * 0.4),
-      long_win_rate: winRate + (Math.random() * 10 - 5),
-      short_win_rate: winRate + (Math.random() * 10 - 5)
-    }
-  };
-}
-
-function displayBacktestResults(result) {
-  const summary = result.summary || {};
-  const tradeAnalysis = result.trade_analysis || {};
-  
-  let html = '';
-  
-  // Performance Grade
-  const grade = result.performance_grade || 'N/A';
-  const gradeClass = grade.startsWith('A') ? 'grade-a' : 
-                    grade.startsWith('B') ? 'grade-b' :
-                    grade.startsWith('C') ? 'grade-c' : 'grade-d';
-  
-  html += `<div class="performance-grade ${gradeClass}">Performance: ${grade}</div>`;
-  
-  // Summary Metrics
-  html += `
-    <div class="row">
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Total Trades</div>
-          <div class="metric-value">${summary.total_trades || 0}</div>
-        </div>
-      </div>
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Win Rate</div>
-          <div class="metric-value ${(summary.win_rate || 0) >= 50 ? 'change-positive' : 'change-negative'}">
-            ${(summary.win_rate || 0).toFixed(1)}%
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Total Profit</div>
-          <div class="metric-value ${(summary.total_profit || 0) >= 0 ? 'change-positive' : 'change-negative'}">
-            $${(summary.total_profit || 0).toFixed(2)}
-          </div>
-        </div>
-      </div>
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Final Balance</div>
-          <div class="metric-value">$${(summary.final_balance || 0).toFixed(2)}</div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Return %</div>
-          <div class="metric-value ${(summary.return_percentage || 0) >= 0 ? 'change-positive' : 'change-negative'}">
-            ${(summary.return_percentage || 0).toFixed(2)}%
-          </div>
-        </div>
-      </div>
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Max Drawdown</div>
-          <div class="metric-value change-negative">${(summary.max_drawdown || 0).toFixed(2)}%</div>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  // Trade Analysis
-  if (tradeAnalysis.long_trades || tradeAnalysis.short_trades) {
-    html += `
-      <div class="mt-3">
-        <div class="small-muted mb-1">Trade Analysis</div>
-        <div class="small-muted">Long Trades: ${tradeAnalysis.long_trades || 0} (Win Rate: ${(tradeAnalysis.long_win_rate || 0).toFixed(1)}%)</div>
-        <div class="small-muted">Short Trades: ${tradeAnalysis.short_trades || 0} (Win Rate: ${(tradeAnalysis.short_win_rate || 0).toFixed(1)}%)</div>
-      </div>
-    `;
-  }
-  
-  document.getElementById('backtestResults').innerHTML = html;
-}
-
-/* ===== PERBAIKAN: Fungsi untuk menghasilkan data chart yang lebih banyak ===== */
-function generateChartData(timeframe) {
-  const data = [];
-  const basePrice = 148.75;
-  const now = new Date();
-  
-  let numPoints, volatility, timeIncrement;
-  
-  // Tentukan jumlah data berdasarkan timeframe
-  switch(timeframe) {
-    case '1D':
-      numPoints = 365; // 1 tahun data harian
-      volatility = 1.5;
-      timeIncrement = 24 * 60 * 60 * 1000;
-      break;
-    case '4H':
-      numPoints = 180; // 30 hari data 4-jam
-      volatility = 0.8;
-      timeIncrement = 4 * 60 * 60 * 1000;
-      break;
-    case '1H':
-      numPoints = 168; // 7 hari data 1-jam
-      volatility = 0.4;
-      timeIncrement = 60 * 60 * 1000;
-      break;
-    case '30m':
-      numPoints = 336; // 7 hari data 30-menit
-      volatility = 0.2;
-      timeIncrement = 30 * 60 * 1000;
-      break;
-    default:
-      numPoints = 100;
-      volatility = 1.0;
-      timeIncrement = 24 * 60 * 60 * 1000;
-  }
-  
-  // Generate trending data (naik atau turun)
-  let trend = Math.random() > 0.5 ? 1 : -1;
-  let currentBase = basePrice;
-  
-  for (let i = numPoints; i >= 0; i--) {
-    const date = new Date(now.getTime() - (i * timeIncrement));
-    
-    // Add slight trend
-    currentBase += trend * volatility * 0.1;
-    
-    const open = currentBase + (Math.random() - 0.5) * volatility;
-    const close = open + (Math.random() - 0.5) * volatility * 0.8;
-    const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-    const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-    
-    data.push({
-      time: date.toISOString().split('T')[0],
-      open: parseFloat(open.toFixed(4)),
-      high: parseFloat(high.toFixed(4)),
-      low: parseFloat(low.toFixed(4)),
-      close: parseFloat(close.toFixed(4))
-    });
-  }
-  
-  console.log(`Generated ${data.length} data points for timeframe: ${timeframe}`);
-  return data;
-}
-
-/* ===== PERBAIKAN: Fungsi untuk menghitung EMA ===== */
-function calculateEMA(data, period) {
-  const k = 2 / (period + 1);
-  let ema = [data[0].close];
-  
-  for (let i = 1; i < data.length; i++) {
-    ema.push(data[i].close * k + ema[i-1] * (1 - k));
-  }
-  
-  return ema.map((value, index) => ({
-    time: data[index].time,
-    value: value
-  }));
-}
-
-/* ===== PERBAIKAN: Fungsi untuk menghitung MACD ===== */
-function calculateMACD(data) {
-  const ema12 = calculateEMA(data, 12);
-  const ema26 = calculateEMA(data, 26);
-  
-  const macdLine = ema12.map((ema, index) => ({
-    time: ema.time,
-    value: ema.value - ema26[index].value
-  }));
-  
-  // Calculate signal line (EMA of MACD line)
-  const k = 2 / (9 + 1);
-  let signal = [macdLine[0].value];
-  
-  for (let i = 1; i < macdLine.length; i++) {
-    signal.push(macdLine[i].value * k + signal[i-1] * (1 - k));
-  }
-  
-  const signalLine = macdLine.map((macd, index) => ({
-    time: macd.time,
-    value: signal[index]
-  }));
-  
-  const histogram = macdLine.map((macd, index) => ({
-    time: macd.time,
-    value: macd.value - signal[index],
-    color: (macd.value - signal[index]) >= 0 ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'
-  }));
-  
-  return {
-    macdLine,
-    signalLine,
-    histogram
-  };
-}
-
-/* ===== PERBAIKAN: Fungsi untuk menghitung Support & Resistance ===== */
-function calculateSupportResistance(data) {
-  if (data.length < 20) return { support: 0, resistance: 0 };
-  
-  const prices = data.map(d => d.close);
-  const currentPrice = prices[prices.length - 1];
-  
-  // Simple calculation - in real app, use proper algorithm
-  const resistance = currentPrice * (1 + 0.02 + Math.random() * 0.01);
-  const support = currentPrice * (1 - 0.02 - Math.random() * 0.01);
-  
-  return {
-    support: support.toFixed(4),
-    resistance: resistance.toFixed(4),
-    pivot: ((currentPrice + support + resistance) / 3).toFixed(4)
-  };
-}
-
-/* ===== PERBAIKAN: Fungsi untuk menghitung Pivot Points ===== */
-function calculatePivotPoints(high, low, close) {
-  const pivot = (high + low + close) / 3;
-  const r1 = (2 * pivot) - low;
-  const s1 = (2 * pivot) - high;
-  const r2 = pivot + (high - low);
-  const s2 = pivot - (high - low);
-  const r3 = high + 2 * (pivot - low);
-  const s3 = low - 2 * (high - pivot);
-  
-  return {
-    pivot: pivot.toFixed(4),
-    r1: r1.toFixed(4),
-    r2: r2.toFixed(4),
-    r3: r3.toFixed(4),
-    s1: s1.toFixed(4),
-    s2: s2.toFixed(4),
-    s3: s3.toFixed(4)
-  };
-}
-
-async function analyze() {
-  console.log('Starting analysis...');
-  
-  const pair = document.getElementById('pairSelect').value;
-  const timeframe = document.getElementById('timeframeSelect').value;
-  
-  try {
-    // Show loading state
-    document.getElementById('aiSignalBadge').className = 'ai-signal-hold';
-    document.getElementById('aiSignalBadge').textContent = 'ANALYZING...';
-    document.getElementById('aiSummary').textContent = 'Fetching market data...';
-    document.getElementById('statusIndicator').className = 'badge bg-warning ms-2';
-    document.getElementById('statusIndicator').textContent = 'Analyzing';
-    
-    // Fetch analysis data
-    const analysisData = await fetchAnalysisData(pair, timeframe);
-    
-    // Update UI with analysis results
-    updateTradingSignal(analysisData);
-    updateRiskAssessment(analysisData);
-    updateTechnicalIndicators(analysisData);
-    updatePriceData(analysisData);
-    
-    // PERBAIKAN: Update Support & Resistance
-    updateSupportResistance(analysisData);
-    
-    // Update charts if available
-    if (window.tradingCharts) {
-      await updateCharts(analysisData, timeframe);
-    }
-    
-    console.log('Analysis completed successfully');
-    
-  } catch (error) {
-    console.error('Analysis failed:', error);
-    showError('Analysis failed: ' + error.message);
-  }
-}
-
-async function fetchAnalysisData(pair, timeframe) {
-  console.log(`Fetching analysis for ${pair} ${timeframe}...`);
-  
-  try {
-    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-    
-    if (!response.ok) {
-      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Analysis data received:', data);
-    return data;
-    
-  } catch (error) {
-    console.error('Failed to fetch analysis data:', error);
-    
-    // Return sample data as fallback
-    return generateSampleData(pair, timeframe);
-  }
-}
-
-function generateSampleData(pair, timeframe) {
-  console.log('Generating sample data...');
-  
-  const samplePrice = 148.75 + (Math.random() - 0.5) * 2;
-  const signal = Math.random() > 0.6 ? 'BUY' : Math.random() > 0.3 ? 'SELL' : 'HOLD';
-  
-  return {
-    ai_analysis: {
-      signal: signal,
-      confidence: Math.floor(60 + Math.random() * 35),
-      analysis_summary: `AI analysis for ${pair} on ${timeframe} timeframe. Market shows ${signal.toLowerCase()} signals with strong momentum.`,
-      entry_price: (samplePrice * 0.998).toFixed(4),
-      stop_loss: (samplePrice * 0.99).toFixed(4),
-      take_profit_1: (samplePrice * 1.01).toFixed(4),
-      risk_level: Math.random() > 0.7 ? 'High' : Math.random() > 0.4 ? 'Medium' : 'Low'
-    },
-    price_data: {
-      current: samplePrice,
-      change_pct: (Math.random() - 0.5) * 2
-    },
-    technical_analysis: {
-      momentum: {
-        rsi: (30 + Math.random() * 40).toFixed(2),
-        macd: (Math.random() - 0.5).toFixed(4),
-        macd_histogram: (Math.random() - 0.3).toFixed(4)
-      },
-      trend: {
-        adx: (20 + Math.random() * 30).toFixed(2),
-        trend_direction: Math.random() > 0.5 ? 'Bullish' : 'Bearish'
-      },
-      volatility: {
-        atr: (0.5 + Math.random() * 0.5).toFixed(4),
-        volatility_pct: (0.5 + Math.random() * 1.0).toFixed(2)
-      }
-    },
-    risk_assessment: {
-      risk_score: Math.floor(Math.random() * 10),
-      approved: Math.random() > 0.3
-    },
-    support_resistance: {
-      support: (samplePrice * 0.99).toFixed(4),
-      resistance: (samplePrice * 1.01).toFixed(4)
-    }
-  };
-}
-
-function updateTradingSignal(analysisData) {
-  const aiAnalysis = analysisData.ai_analysis || {};
-  const signal = aiAnalysis.signal || 'HOLD';
-  const confidence = aiAnalysis.confidence || 0;
-  
-  const signalElement = document.getElementById('aiSignalBadge');
-  signalElement.textContent = signal;
-  
-  // Update signal color
-  if (signal === 'BUY') {
-    signalElement.className = 'ai-signal-buy';
-  } else if (signal === 'SELL') {
-    signalElement.className = 'ai-signal-sell';
-  } else {
-    signalElement.className = 'ai-signal-hold';
-  }
-  
-  // Update confidence and risk
-  document.getElementById('aiConfidence').textContent = confidence + '%';
-  document.getElementById('aiRisk').textContent = aiAnalysis.risk_level || 'Medium';
-  
-  // Update trading levels
-  document.getElementById('aiEntry').textContent = aiAnalysis.entry_price || '-';
-  document.getElementById('aiSL').textContent = aiAnalysis.stop_loss || '-';
-  document.getElementById('aiTP1').textContent = aiAnalysis.take_profit_1 || '-';
-  
-  // Update summary
-  document.getElementById('aiSummary').textContent = 
-    aiAnalysis.analysis_summary || `${signal} signal with ${confidence}% confidence`;
-}
-
-function updateRiskAssessment(analysisData) {
-  const risk = analysisData.risk_assessment || {};
-  const score = risk.risk_score || 0;
-  const approved = risk.approved;
-  
-  document.getElementById('riskScore').textContent = score + '/10';
-  
-  // Update progress bar color
-  const progressBar = document.getElementById('riskProgress');
-  progressBar.style.width = (score * 10) + '%';
-  
-  if (score <= 3) {
-    progressBar.className = 'progress-bar bg-success';
-    document.getElementById('riskStatus').textContent = 'Low Risk - Trade Approved';
-    document.getElementById('riskStatus').className = 'text-success fw-bold';
-  } else if (score <= 6) {
-    progressBar.className = 'progress-bar bg-warning';
-    document.getElementById('riskStatus').textContent = 'Medium Risk - Proceed with Caution';
-    document.getElementById('riskStatus').className = 'text-warning fw-bold';
-  } else {
-    progressBar.className = 'progress-bar bg-danger';
-    document.getElementById('riskStatus').textContent = 'High Risk - Not Recommended';
-    document.getElementById('riskStatus').className = 'text-danger fw-bold';
-  }
-}
-
-function updateTechnicalIndicators(analysisData) {
-  const tech = analysisData.technical_analysis || {};
-  const momentum = tech.momentum || {};
-  const trend = tech.trend || {};
-  const volatility = tech.volatility || {};
-  
-  document.getElementById('rsiVal').textContent = momentum.rsi || '-';
-  document.getElementById('macdVal').textContent = momentum.macd || '-';
-  document.getElementById('macdHistVal').textContent = momentum.macd_histogram || '-';
-  document.getElementById('adxVal').textContent = trend.adx || '-';
-  document.getElementById('atrVal').textContent = volatility.atr || '-';
-  document.getElementById('volVal').textContent = volatility.volatility_pct ? volatility.volatility_pct + '%' : '-';
-  document.getElementById('trendVal').textContent = trend.trend_direction || '-';
-}
-
-/* ===== PERBAIKAN: Fungsi untuk update Support & Resistance ===== */
-function updateSupportResistance(analysisData) {
-  const sr = analysisData.support_resistance || {};
-  const priceData = analysisData.price_data || {};
-  const currentPrice = priceData.current || 0;
-  
-  // Update Support & Resistance levels
-  document.getElementById('supportLevel').textContent = sr.support || '-';
-  document.getElementById('resistanceLevel').textContent = sr.resistance || '-';
-  
-  // Calculate and display distances
-  if (currentPrice > 0 && sr.support && sr.resistance) {
-    const supportDistance = ((currentPrice - sr.support) / currentPrice * 100).toFixed(2);
-    const resistanceDistance = ((sr.resistance - currentPrice) / currentPrice * 100).toFixed(2);
-    
-    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
-    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
-  }
-  
-  // Calculate and update Pivot Points
-  const high = currentPrice * 1.01;
-  const low = currentPrice * 0.99;
-  const pivots = calculatePivotPoints(high, low, currentPrice);
-  
-  document.getElementById('pivotPoint').textContent = pivots.pivot;
-  document.getElementById('pivotR1').textContent = pivots.r1;
-  document.getElementById('pivotR2').textContent = pivots.r2;
-  document.getElementById('pivotR3').textContent = pivots.r3;
-  document.getElementById('pivotS1').textContent = pivots.s1;
-  document.getElementById('pivotS2').textContent = pivots.s2;
-  document.getElementById('pivotS3').textContent = pivots.s3;
-}
-
-/* ===== PERBAIKAN: Update price data dengan konsistensi ===== */
-function updatePriceData(analysisData) {
-  const priceData = analysisData.price_data || {};
-  currentPrice = priceData.current || 0;
-  const change = priceData.change_pct || 0;
-  
-  // PERBAIKAN: Update semua komponen harga dengan nilai yang sama
-  document.getElementById('livePrice').textContent = currentPrice.toFixed(4);
-  document.getElementById('currentPrice').textContent = currentPrice.toFixed(4);
-  
-  // Update change indicator
-  const changeElement = document.getElementById('pairChange');
-  changeElement.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
-  changeElement.className = change >= 0 ? 'price-change change-positive ms-2' : 'price-change change-negative ms-2';
-  
-  // Update status indicator
-  document.getElementById('statusIndicator').textContent = 'Live';
-  document.getElementById('statusIndicator').className = 'badge bg-success ms-2';
-  
-  // Update chart subtitle dengan timeframe
-  document.getElementById('chartSubtitle').textContent = 
-    `${document.getElementById('timeframeSelect').value} Timeframe · Real-time Candlestick · EMA26 · MACD`;
-}
-
-/* ===== PERBAIKAN: Update charts dengan data yang lebih banyak ===== */
-async function updateCharts(analysisData, timeframe) {
-  console.log('Updating charts...');
-  
-  try {
-    const charts = window.tradingCharts;
-    if (!charts || !charts.candleSeries) {
-      console.warn('Charts not available for update');
-      return;
-    }
-    
-    // PERBAIKAN: Generate chart data berdasarkan timeframe dengan lebih banyak data
-    const chartData = generateChartData(timeframe);
-    currentChartData = chartData;
-    
-    // Update main chart dengan candlestick data
-    charts.candleSeries.setData(chartData);
-    
-    // Calculate and update EMA
-    const emaData = calculateEMA(chartData, 26);
-    charts.emaSeries.setData(emaData);
-    
-    // Calculate and update MACD
-    const macdData = calculateMACD(chartData);
-    charts.macdLineSeries.setData(macdData.macdLine);
-    charts.macdSignalSeries.setData(macdData.signalLine);
-    charts.macdHistogramSeries.setData(macdData.histogram);
-    
-    console.log('Charts updated successfully with', chartData.length, 'data points');
-    
-  } catch (error) {
-    console.error('Failed to update charts:', error);
-  }
-}
-
-function showError(message) {
-  console.error('Displaying error:', message);
-  
-  // Update UI to show error
-  document.getElementById('aiSignalBadge').className = 'ai-signal-hold';
-  document.getElementById('aiSignalBadge').textContent = 'ERROR';
-  document.getElementById('aiSummary').textContent = message;
-  document.getElementById('aiSummary').style.color = '#ef4444';
-  
-  document.getElementById('riskStatus').textContent = 'Risk assessment unavailable';
-  
-  document.getElementById('statusIndicator').textContent = 'Error';
-  document.getElementById('statusIndicator').className = 'badge bg-danger ms-2';
-}
-
-// Handle window resize
-window.addEventListener('resize', function() {
-  if (window.tradingCharts && window.tradingCharts.mainChart) {
-    try {
-      const chartRoot = document.getElementById('chartRoot');
-      const macdRoot = document.getElementById('macdRoot');
-      
-      window.tradingCharts.mainChart.resize(chartRoot.clientWidth, 450);
-      window.tradingCharts.macdChart.resize(macdRoot.clientWidth, 150);
-    } catch (error) {
-      console.log('Resize error:', error);
-    }
-  }
-});
-
-console.log('ANDRO-FX Frontend script loaded');
-</script>
+    <script>
+        // Simulasi perubahan harga (hanya untuk demonstrasi)
+        function updatePrice() {
+            const priceElement = document.querySelector('.price-value');
+            let currentPrice = parseFloat(priceElement.textContent);
+            
+            // Simulasi fluktuasi kecil
+            const change = (Math.random() - 0.5) * 0.01;
+            currentPrice += change;
+            
+            // Format angka dengan 4 digit desimal
+            priceElement.textContent = currentPrice.toFixed(4);
+            
+            // Update setiap 3 detik
+            setTimeout(updatePrice, 3000);
+        }
+        
+        // Mulai simulasi setelah halaman dimuat
+        window.addEventListener('load', updatePrice);
+    </script>
 </body>
 </html>
