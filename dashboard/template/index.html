@@ -68,6 +68,8 @@
     .grade-b { background: #fef3c7; color: #92400e; }
     .grade-c { background: #fde68a; color: #78350f; }
     .grade-d { background: #fecaca; color: #991b1b; }
+    .risk-approved { color: #10b981; }
+    .risk-rejected { color: #ef4444; }
   </style>
 </head>
 <body>
@@ -139,6 +141,10 @@
         <div class="col"><small class="small-muted">TP1</small><div id="aiTP1">-</div></div>
         <div class="col"><small class="small-muted">TP2</small><div id="aiTP2">-</div></div>
       </div>
+      <div class="mt-2">
+        <small class="small-muted">Risk Assessment:</small>
+        <div id="riskAssessment">-</div>
+      </div>
     </div>
 
     <div class="card-soft">
@@ -150,9 +156,11 @@
       <h6>Technical Overview</h6>
       <div class="small-muted">RSI: <strong id="rsiVal">-</strong></div>
       <div class="small-muted">MACD: <strong id="macdVal">-</strong></div>
+      <div class="small-muted">MACD Hist: <strong id="macdHistVal">-</strong></div>
       <div class="small-muted">ADX: <strong id="adxVal">-</strong></div>
       <div class="small-muted">ATR: <strong id="atrVal">-</strong></div>
       <div class="small-muted">Volatility: <strong id="volVal">-</strong></div>
+      <div class="small-muted">Trend: <strong id="trendVal">-</strong></div>
     </div>
     
     <!-- Backtest Results Panel -->
@@ -213,19 +221,42 @@ function calcMACDSeries(c,short=12,long=26,signal=9){
   const hist=macd.map((v,i)=>v-(sig[i]||0));
   return {macd,sig,hist};
 }
-function fmt(d){const t=new Date(d);return t.toISOString().split('T')[0];}
+
+// Improved date formatting function
+function fmt(d){
+  try {
+    if (typeof d === 'string') {
+      // Handle string dates
+      if (d.includes('T')) {
+        return d.split('T')[0];
+      } else {
+        return d;
+      }
+    } else if (d instanceof Date) {
+      return d.toISOString().split('T')[0];
+    }
+    return d;
+  } catch (e) {
+    console.error('Date formatting error:', e, d);
+    return '2023-01-01'; // fallback
+  }
+}
 
 /* ===== Chart Setup ===== */
 const chart=LightweightCharts.createChart(document.getElementById('chartRoot'),{
   layout:{backgroundColor:'#fff',textColor:'#111'},grid:{vertLines:{color:'#f3f4f6'},horzLines:{color:'#f3f4f6'}},
-  timeScale:{borderColor:'#eee'},rightPriceScale:{borderColor:'#eee'}
+  timeScale:{borderColor:'#eee'},rightPriceScale:{borderColor:'#eee'},
+  width: document.getElementById('chartRoot').clientWidth,
+  height: 520
 });
 const candle=chart.addCandlestickSeries({upColor:'#16a34a',downColor:'#dc2626',borderVisible:true});
 const ema26=chart.addLineSeries({color:'#2563eb',lineWidth:1.5});
 
 const macdChart=LightweightCharts.createChart(document.getElementById('macdRoot'),{
   layout:{backgroundColor:'#fff',textColor:'#111'},
-  grid:{vertLines:{color:'#f3f4f6'},horzLines:{color:'#f3f4f6'}},timeScale:{visible:true,borderColor:'#eee'}
+  grid:{vertLines:{color:'#f3f4f6'},horzLines:{color:'#f3f4f6'}},timeScale:{visible:true,borderColor:'#eee'},
+  width: document.getElementById('macdRoot').clientWidth,
+  height: 140
 });
 const macdLine=macdChart.addLineSeries({color:'#0ea5e9'});
 const macdSignal=macdChart.addLineSeries({color:'#f59e0b'});
@@ -251,14 +282,17 @@ const aiTP2=document.getElementById('aiTP2');
 const fundNews=document.getElementById('fundamentalNews');
 const rsiEl=document.getElementById('rsiVal');
 const macdValEl=document.getElementById('macdVal');
+const macdHistVal=document.getElementById('macdHistVal');
 const adxEl=document.getElementById('adxVal');
 const atrEl=document.getElementById('atrVal');
 const volEl=document.getElementById('volVal');
+const trendEl=document.getElementById('trendVal');
 const changeEl=document.getElementById('pairChange');
 const statusIndicator=document.getElementById('statusIndicator');
 const lastUpdateEl=document.getElementById('lastUpdate');
 const backtestResultsEl = document.getElementById('backtestResults');
 const backtestStatusEl = document.getElementById('backtestStatus');
+const riskAssessmentEl = document.getElementById('riskAssessment');
 
 /* ===== Data state ===== */
 let lastCandle=null, auto=false, autoRefreshInterval=null, livePriceInterval=null;
@@ -287,58 +321,151 @@ function updateLastUpdateTime() {
   lastUpdateEl.textContent = 'Last: ' + now.toLocaleTimeString();
 }
 
+// Generate sample price data for testing
+function generateSamplePriceData() {
+  const data = [];
+  const basePrice = 148.75;
+  const now = new Date();
+  
+  for (let i = 100; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    const open = basePrice + (Math.random() - 0.5) * 2;
+    const close = open + (Math.random() - 0.5) * 1.5;
+    const high = Math.max(open, close) + Math.random() * 0.8;
+    const low = Math.min(open, close) - Math.random() * 0.8;
+    
+    data.push({
+      time: fmt(date),
+      open: open,
+      high: high,
+      low: low,
+      close: close
+    });
+  }
+  
+  return data;
+}
+
 /* ===== Fetch + Render ===== */
 async function analyze(){
   const pair=pairSelect.value, tf=timeframeSelect.value;
   try {
+    console.log(`Fetching analysis for ${pair}-${tf}...`);
     const r=await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
-    const j=await r.json();
     
-    // Update price series chart
-    if (j.price_series && j.price_series.length > 0) {
-      const c = j.price_series.map(p => ({
-        time: fmt(p.date),
-        open: +p.open,
-        high: +p.high,
-        low: +p.low,
-        close: +p.close
-      }));
-      
-      candle.setData(c);
-      const closes = c.map(d => d.close);
-      const ema = calcEMA(closes, 26).map((v, i) => ({time: c[i].time, value: v}));
-      ema26.setData(ema);
-      
-      const {macd, sig, hist} = calcMACDSeries(closes);
-      macdLine.setData(macd.map((v, i) => ({time: c[i].time, value: v})));
-      macdSignal.setData(sig.map((v, i) => ({time: c[i].time, value: v})));
-      macdHist.setData(hist.map((v, i) => ({time: c[i].time, value: v})));
-      
-      lastCandle = c.at(-1);
+    if (!r.ok) {
+      throw new Error(`HTTP error! status: ${r.status}`);
     }
     
-    // Update technical values
+    const j=await r.json();
+    console.log('Analysis response:', j);
+    
+    // Update price series chart - FIXED: Handle both price_series and fallback
+    let chartData = [];
+    
+    if (j.price_series && j.price_series.length > 0) {
+      console.log(`Processing ${j.price_series.length} price series data points`);
+      chartData = j.price_series.map(p => ({
+        time: fmt(p.date),
+        open: parseFloat(p.open) || 0,
+        high: parseFloat(p.high) || 0,
+        low: parseFloat(p.low) || 0,
+        close: parseFloat(p.close) || 0
+      }));
+    } else {
+      console.warn('No price_series data, using sample data');
+      chartData = generateSamplePriceData();
+    }
+    
+    // Update charts
+    if (chartData.length > 0) {
+      candle.setData(chartData);
+      const closes = chartData.map(d => d.close);
+      
+      // Calculate and update EMA
+      const ema = calcEMA(closes, 26).map((v, i) => ({
+        time: chartData[i].time, 
+        value: v
+      }));
+      ema26.setData(ema);
+      
+      // Calculate and update MACD
+      const {macd, sig, hist} = calcMACDSeries(closes);
+      macdLine.setData(macd.map((v, i) => ({
+        time: chartData[i].time, 
+        value: v || 0
+      })));
+      macdSignal.setData(sig.map((v, i) => ({
+        time: chartData[i].time, 
+        value: v || 0
+      })));
+      macdHist.setData(hist.map((v, i) => ({
+        time: chartData[i].time, 
+        value: v || 0
+      })));
+      
+      lastCandle = chartData.at(-1);
+      
+      // Resize charts to ensure proper rendering
+      setTimeout(() => {
+        chart.resize();
+        macdChart.resize();
+      }, 100);
+    }
+    
+    // Update technical values - FIXED: Handle nested technical_analysis structure
     const t = j.technical_analysis || {};
-    macdValEl.textContent = t.momentum?.macd?.toFixed(4) || '-';
-    rsiEl.textContent = t.momentum?.rsi?.toFixed(2) || '-';
-    adxEl.textContent = t.trend?.adx?.toFixed(2) || '-';
-    atrEl.textContent = t.volatility?.atr?.toFixed(4) || '-';
-    volEl.textContent = t.volatility?.volatility_pct ? (t.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+    console.log('Technical analysis:', t);
+    
+    // Handle momentum indicators
+    if (t.momentum) {
+      rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
+      macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
+      macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
+    } else {
+      rsiEl.textContent = '-';
+      macdValEl.textContent = '-';
+      macdHistVal.textContent = '-';
+    }
+    
+    // Handle trend indicators
+    if (t.trend) {
+      adxEl.textContent = (t.trend.adx || 0).toFixed(2);
+      trendEl.textContent = t.trend.trend_direction || '-';
+    } else {
+      adxEl.textContent = '-';
+      trendEl.textContent = '-';
+    }
+    
+    // Handle volatility indicators
+    if (t.volatility) {
+      atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
+      volEl.textContent = t.volatility.volatility_pct ? 
+        (t.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+    } else {
+      atrEl.textContent = '-';
+      volEl.textContent = '-';
+    }
     
     // Update price data
     const priceData = j.price_data || {};
-    livePriceEl.textContent = priceData.current?.toFixed(4) || '-';
+    const currentPrice = priceData.current || (t.levels && t.levels.current_price);
+    livePriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
     
-    // Update pair ticker
+    // Update pair ticker with change
     const change = priceData.change_pct || 0;
     changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
     changeEl.style.color = change >= 0 ? '#16a34a' : '#dc2626';
     
     // Update AI analysis
     const ai = j.ai_analysis || {};
-    aiSummaryEl.textContent = ai.analysis_summary || '-';
+    console.log('AI analysis:', ai);
+    
+    aiSummaryEl.textContent = ai.analysis_summary || 'No analysis available';
     setSignal(ai.signal || 'HOLD');
-    aiConfidence.textContent = (ai.confidence || '-') + '%';
+    aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '-';
     aiRisk.textContent = ai.risk_level || '-';
     aiEntry.textContent = ai.entry_price || '-';
     aiSL.textContent = ai.stop_loss || '-';
@@ -346,7 +473,20 @@ async function analyze(){
     aiTP2.textContent = ai.take_profit_2 || '-';
     
     // Update fundamental news
-    fundNews.textContent = j.fundamental_analysis || '-';
+    fundNews.textContent = j.fundamental_analysis || 'No news available';
+    
+    // Update risk assessment
+    const risk = j.risk_assessment || {};
+    if (risk.approved !== undefined) {
+      riskAssessmentEl.textContent = risk.approved ? 
+        '<span class="risk-approved">✓ APPROVED</span>' : 
+        '<span class="risk-rejected">✗ REJECTED</span>';
+      if (risk.rejection_reasons && risk.rejection_reasons.length > 0) {
+        riskAssessmentEl.innerHTML += `<div class="small-muted">Reasons: ${risk.rejection_reasons.join(', ')}</div>`;
+      }
+    } else {
+      riskAssessmentEl.textContent = '-';
+    }
     
     // Update provider info
     document.getElementById('aiProviderTxt').textContent = ai.ai_provider || 'DeepSeek AI';
@@ -357,6 +497,10 @@ async function analyze(){
   } catch (error) {
     console.error('Analysis error:', error);
     updateStatusIndicator(false);
+    
+    // Show error to user
+    aiSummaryEl.textContent = `Error: ${error.message}`;
+    aiSummaryEl.style.color = '#ef4444';
   }
 }
 
@@ -367,10 +511,14 @@ async function updateLivePrice() {
   try {
     // Use the analyze endpoint to get updated price data
     const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframeSelect.value}`);
+    
+    if (!r.ok) return;
+    
     const j = await r.json();
     
     const priceData = j.price_data || {};
-    const currentPrice = priceData.current;
+    const t = j.technical_analysis || {};
+    const currentPrice = priceData.current || (t.levels && t.levels.current_price);
     
     if (currentPrice) {
       livePriceEl.textContent = currentPrice.toFixed(4);
@@ -392,11 +540,13 @@ async function updateLivePrice() {
         candle.update(updatedCandle);
         
         // Update EMA with new close price
-        const closes = [...candle.data().map(d => d.close)];
-        closes[closes.length - 1] = currentPrice;
+        const currentData = candle.data();
+        const closes = currentData.map(d => d.close);
         const ema = calcEMA(closes, 26);
         const lastEma = ema[ema.length - 1];
-        ema26.update({time: lastCandle.time, value: lastEma});
+        if (lastEma) {
+          ema26.update({time: lastCandle.time, value: lastEma});
+        }
         
         // Update MACD with new close price
         const {macd, sig, hist} = calcMACDSeries(closes);
@@ -404,11 +554,14 @@ async function updateLivePrice() {
         const lastSig = sig[sig.length - 1];
         const lastHist = hist[hist.length - 1];
         
-        macdLine.update({time: lastCandle.time, value: lastMacd});
-        macdSignal.update({time: lastCandle.time, value: lastSig});
-        macdHist.update({time: lastCandle.time, value: lastHist});
-        
-        macdValEl.textContent = lastMacd.toFixed(4);
+        if (lastMacd !== undefined) {
+          macdLine.update({time: lastCandle.time, value: lastMacd});
+          macdSignal.update({time: lastCandle.time, value: lastSig});
+          macdHist.update({time: lastCandle.time, value: lastHist});
+          
+          macdValEl.textContent = lastMacd.toFixed(4);
+          macdHistVal.textContent = lastHist.toFixed(4);
+        }
       }
       
       updateStatusIndicator(true);
@@ -440,6 +593,8 @@ async function runBacktest() {
   try {
     const endpoint = backtestType === 'advanced' ? '/api/advanced_backtest' : '/api/backtest';
     
+    console.log('Starting backtest with:', { pair, timeframe, days, initialBalance, backtestType });
+    
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -453,7 +608,12 @@ async function runBacktest() {
       })
     });
     
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const result = await response.json();
+    console.log('Backtest result:', result);
     
     if (result.status === 'success' || result.status === 'no_trades') {
       displayBacktestResults(result);
@@ -476,6 +636,12 @@ function displayBacktestResults(result) {
   const tradeAnalysis = result.trade_analysis || {};
   
   let html = '';
+  
+  if (result.status === 'no_trades') {
+    html = `<div class="alert alert-warning">No trades were executed during the backtest period.</div>`;
+    backtestResultsEl.innerHTML = html;
+    return;
+  }
   
   // Performance Grade
   const grade = result.performance_grade || 'N/A';
@@ -611,6 +777,12 @@ analyze();
 
 // Start live price updates every 5 seconds for responsive UI
 setInterval(updateLivePrice, 5000);
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  chart.resize();
+  macdChart.resize();
+});
 </script>
 </body>
 </html>
