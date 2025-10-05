@@ -3,89 +3,349 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Forex AI Dashboard</title>
+  <title>DeepSeek AI Forex Intelligence</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
+    :root {
+      --deepseek-primary: #0066cc;
+      --deepseek-secondary: #00aaff;
+      --deepseek-accent: #004499;
+      --signal-buy: #10b981;
+      --signal-sell: #ef4444;
+      --signal-hold: #f59e0b;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-primary: #f8fafc;
+      --bg-card: #ffffff;
+      --border-radius: 12px;
+    }
+
     body {
-      background: #f8fafc;
-      color: #111827;
+      background: var(--bg-primary);
+      color: var(--text-primary);
       font-family: "Inter", "Segoe UI", sans-serif;
       padding: 18px;
     }
+
     .topbar {
       display: flex;
-      gap: 12px;
+      gap: 15px;
       align-items: center;
-      margin-bottom: 14px;
+      margin-bottom: 20px;
       flex-wrap: wrap;
+      padding: 15px 20px;
+      background: var(--bg-card);
+      border-radius: var(--border-radius);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.5rem;
+      color: var(--deepseek-primary);
+    }
+
+    .brand-logo i {
+      color: var(--deepseek-secondary);
+    }
+
     .card-soft {
-      background: #fff;
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.05);
-      margin-bottom: 14px;
+      background: var(--bg-card);
+      border-radius: var(--border-radius);
+      padding: 20px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
     }
-    #chartRoot, #macdRoot {
-      border-radius: 8px;
-      background: #fff;
+
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--deepseek-primary);
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    #chartRoot { height: 400px; }
-    #macdRoot { height: 120px; margin-top: 10px; }
-    .muted { color: #6b7280; font-size: .95rem; }
-    .ai-signal-buy { color: #0f5132; background: #d1fae5; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
-    .ai-signal-sell { color: #6b0f1a; background: #ffe5e5; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
-    .ai-signal-hold { color: #6a5b00; background: #fff7cc; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
-    .small-muted { color: #6b7280; font-size: .9rem; }
+
+    .section-title i {
+      color: var(--deepseek-secondary);
+    }
+
+    #chartRoot { 
+      height: 520px; 
+      border-radius: var(--border-radius); 
+      background: var(--bg-card);
+    }
+    
+    #macdRoot { 
+      height: 160px; 
+      margin-top: 15px; 
+      border-radius: var(--border-radius); 
+      background: var(--bg-card);
+    }
+
+    .muted { 
+      color: var(--text-secondary); 
+      font-size: 0.95rem; 
+    }
+
+    .ai-signal-buy { 
+      color: white; 
+      background: var(--signal-buy); 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      font-weight: 700;
+      font-size: 1.2rem;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+    }
+
+    .ai-signal-sell { 
+      color: white; 
+      background: var(--signal-sell); 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      font-weight: 700;
+      font-size: 1.2rem;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+    }
+
+    .ai-signal-hold { 
+      color: white; 
+      background: var(--signal-hold); 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      font-weight: 700;
+      font-size: 1.2rem;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+    }
+
+    .small-muted { 
+      color: var(--text-secondary); 
+      font-size: 0.9rem; 
+    }
+
     .status-indicator {
       display: inline-block;
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      margin-right: 5px;
+      margin-right: 8px;
     }
-    .status-live { background-color: #10b981; }
-    .status-offline { background-color: #ef4444; }
+
+    .status-live { background-color: var(--signal-buy); }
+    .status-offline { background-color: var(--signal-sell); }
+
+    .metric-card {
+      background: var(--bg-primary);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--deepseek-secondary);
+    }
+
+    .metric-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    .backtest-panel {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .performance-grade {
+      font-size: 1.6rem;
+      font-weight: bold;
+      text-align: center;
+      padding: 12px;
+      border-radius: 10px;
+      margin: 12px 0;
+    }
+
+    .grade-a { background: #d1fae5; color: #065f46; }
+    .grade-b { background: #fef3c7; color: #92400e; }
+    .grade-c { background: #fde68a; color: #78350f; }
+    .grade-d { background: #fecaca; color: #991b1b; }
+
+    .trading-level {
+      font-size: 1.1rem;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin: 5px 0;
+    }
+
+    .level-entry { 
+      background: rgba(16, 185, 129, 0.1); 
+      color: var(--signal-buy);
+      border-left: 4px solid var(--signal-buy);
+    }
+
+    .level-sl { 
+      background: rgba(239, 68, 68, 0.1); 
+      color: var(--signal-sell);
+      border-left: 4px solid var(--signal-sell);
+    }
+
+    .level-tp { 
+      background: rgba(34, 197, 94, 0.1); 
+      color: #16a34a;
+      border-left: 4px solid #16a34a;
+    }
+
+    .btn-deepseek {
+      background: var(--deepseek-primary);
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+    }
+
+    .btn-deepseek:hover {
+      background: var(--deepseek-accent);
+      color: white;
+    }
+
+    .btn-action {
+      background: var(--deepseek-secondary);
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+    }
+
+    .btn-action:hover {
+      background: var(--deepseek-primary);
+      color: white;
+    }
+
+    .price-ticker {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--deepseek-primary);
+    }
+
+    .price-change {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .change-positive { color: var(--signal-buy); }
+    .change-negative { color: var(--signal-sell); }
+
+    .risk-approved { 
+      color: var(--signal-buy); 
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .risk-rejected { 
+      color: var(--signal-sell); 
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .tech-indicator {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .indicator-value {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .news-container {
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 10px;
+      background: var(--bg-primary);
+      border-radius: 8px;
+      border-left: 4px solid var(--deepseek-secondary);
+    }
   </style>
 </head>
 <body>
 
 <div class="topbar">
-  <h4 class="m-0">Forex AI Dashboard</h4>
-  <label class="small-muted mb-0 ms-3">Pair</label>
-  <select id="pairSelect" class="form-select form-select-sm" style="width:120px;">
-    <option>USDJPY</option>
-    <option>EURUSD</option>
-    <option>GBPJPY</option>
-    <option>CHFJPY</option>
-  </select>
-  <label class="small-muted mb-0">Timeframe</label>
-  <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
-    <option>1D</option>
-    <option>4H</option>
-    <option>1H</option>
-  </select>
-  <button id="analyzeBtn" class="btn btn-primary btn-sm ms-2">Analyze</button>
-  <button id="runBacktestBtn" class="btn btn-warning btn-sm">Backtest</button>
-  <div id="pairTicker" class="ms-3" style="font-weight:600; font-size:1.05rem;">
-    USDJPY – <span id="livePrice">0.0000</span> (<span id="pairChange">0.00%</span>)
+  <div class="brand-logo">
+    <i class="fas fa-brain"></i>
+    <span>DeepSeek AI Forex Intelligence</span>
+  </div>
+  
+  <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
+    <div class="d-flex align-items-center">
+      <label class="small-muted mb-0 me-2">Pair</label>
+      <select id="pairSelect" class="form-select form-select-sm" style="width:130px;">
+        <option>USDJPY</option>
+        <option>EURJPY</option>
+        <option>GBPJPY</option>
+        <option>CHFJPY</option>
+        <option>GBPUSD</option>
+        <option>USDCHF</option>
+        <option>AUDUSD</option>
+        <option>USDCAD</option>
+        <option>NZDUSD</option>
+      </select>
+    </div>
+    
+    <div class="d-flex align-items-center">
+      <label class="small-muted mb-0 me-2">Timeframe</label>
+      <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
+        <option>1D</option>
+        <option>4H</option>
+        <option>1H</option>
+        <option>M30</option>
+      </select>
+    </div>
+    
+    <button id="analyzeBtn" class="btn btn-deepseek">
+      <i class="fas fa-chart-line me-2"></i>Analyze
+    </button>
+    
+    <button id="runBacktestBtn" class="btn btn-action">
+      <i class="fas fa-play-circle me-2"></i>Backtest
+    </button>
+    
+    <div id="pairTicker" class="d-flex align-items-center ms-3">
+      <span class="price-ticker me-2">USDJPY –</span>
+      <span id="livePrice" class="price-ticker">0.0000</span>
+      <span id="pairChange" class="price-change ms-2">(0.00%)</span>
+      <span id="statusIndicator" class="status-indicator status-offline ms-2"></span>
+    </div>
   </div>
 </div>
 
-<div class="row gx-3">
+<div class="row g-4">
   <div class="col-lg-8">
     <div class="card-soft">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <strong>Price Chart - <span id="currentPair">USDJPY</span></strong>
-          <div class="muted" id="chartSubtitle">Candlestick · EMA26 · MACD</div>
+          <div class="section-title">
+            <i class="fas fa-chart-candlestick"></i>
+            <span>Live Price Chart</span>
+          </div>
+          <div class="muted" id="chartSubtitle">Real-time Candlestick · EMA26 · MACD</div>
         </div>
-        <div style="text-align:right">
-          <div class="small-muted">Live Price</div>
-          <div style="font-weight:700; font-size:1.2rem" id="currentPrice">-</div>
+        <div class="text-end">
+          <div class="small-muted">Current Price</div>
+          <div class="price-ticker" id="currentPrice">-</div>
         </div>
       </div>
       <div id="chartRoot"></div>
@@ -95,82 +355,146 @@
 
   <div class="col-lg-4">
     <div class="card-soft">
-      <h5>AI Analysis</h5>
-      <div id="aiSummary" class="muted small">No analysis yet. Click Analyze to start.</div>
-      <div class="mt-2"><strong>Signal:</strong> <span id="aiSignalBadge">-</span></div>
-      <div class="row mt-2">
-        <div class="col-6"><small class="small-muted">Confidence</small><div id="aiConfidence">-</div></div>
-        <div class="col-6"><small class="small-muted">Risk</small><div id="aiRisk">-</div></div>
+      <div class="section-title">
+        <i class="fas fa-robot"></i>
+        <span>AI Trading Signal</span>
       </div>
-      <div class="row mt-2">
-        <div class="col-6"><small class="small-muted">Entry</small><div id="aiEntry">-</div></div>
-        <div class="col-6"><small class="small-muted">SL</small><div id="aiSL">-</div></div>
+      
+      <div id="aiSummary" class="muted mb-3">No analysis yet. Click Analyze to start.</div>
+      
+      <div class="mb-3">
+        <div class="small-muted mb-2">TRADING SIGNAL</div>
+        <div id="aiSignalBadge" class="ai-signal-hold">HOLD</div>
       </div>
-      <div class="row mt-1">
-        <div class="col-6"><small class="small-muted">TP1</small><div id="aiTP1">-</div></div>
-        <div class="col-6"><small class="small-muted">TP2</small><div id="aiTP2">-</div></div>
+      
+      <div class="row mb-3">
+        <div class="col-6">
+          <div class="metric-card">
+            <div class="small-muted">Confidence</div>
+            <div class="metric-value" id="aiConfidence">-</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="metric-card">
+            <div class="small-muted">Risk Level</div>
+            <div class="metric-value" id="aiRisk">-</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mb-3">
+        <div class="small-muted mb-2">TRADING LEVELS</div>
+        <div class="trading-level level-entry">
+          <i class="fas fa-sign-in-alt me-2"></i>Entry: <span id="aiEntry">-</span>
+        </div>
+        <div class="trading-level level-sl">
+          <i class="fas fa-stop-circle me-2"></i>Stop Loss: <span id="aiSL">-</span>
+        </div>
+        <div class="trading-level level-tp">
+          <i class="fas fa-target me-2"></i>Take Profit 1: <span id="aiTP1">-</span>
+        </div>
+        <div class="trading-level level-tp">
+          <i class="fas fa-bullseye me-2"></i>Take Profit 2: <span id="aiTP2">-</span>
+        </div>
+      </div>
+      
+      <div class="mt-3">
+        <div class="small-muted mb-2">RISK ASSESSMENT</div>
+        <div id="riskAssessment" class="risk-approved">-</div>
       </div>
     </div>
 
     <div class="card-soft">
-      <h6>Technical Overview</h6>
-      <div class="row">
-        <div class="col-6">
-          <div class="small-muted">RSI</div>
-          <div id="rsiVal">-</div>
-        </div>
-        <div class="col-6">
-          <div class="small-muted">MACD</div>
-          <div id="macdVal">-</div>
-        </div>
+      <div class="section-title">
+        <i class="fas fa-newspaper"></i>
+        <span>Market News</span>
       </div>
-      <div class="row mt-2">
-        <div class="col-6">
-          <div class="small-muted">ADX</div>
-          <div id="adxVal">-</div>
-        </div>
-        <div class="col-6">
-          <div class="small-muted">ATR</div>
-          <div id="atrVal">-</div>
-        </div>
+      <div class="news-container" id="fundamentalNews">
+        No news available. Analyzing market conditions...
       </div>
     </div>
 
     <div class="card-soft">
-      <h6>News & Risk</h6>
-      <div id="fundamentalNews" class="small muted">No news available</div>
-      <div class="mt-2">
-        <div class="small-muted">Risk Assessment</div>
-        <div id="riskAssessment">-</div>
+      <div class="section-title">
+        <i class="fas fa-chart-bar"></i>
+        <span>Technical Analysis</span>
+      </div>
+      
+      <div class="tech-indicator">
+        <span class="small-muted">RSI</span>
+        <span class="indicator-value" id="rsiVal">-</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">MACD</span>
+        <span class="indicator-value" id="macdVal">-</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">MACD Histogram</span>
+        <span class="indicator-value" id="macdHistVal">-</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">ADX</span>
+        <span class="indicator-value" id="adxVal">-</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">ATR</span>
+        <span class="indicator-value" id="atrVal">-</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Volatility</span>
+        <span class="indicator-value" id="volVal">-</span>
+      </div>
+      <div class="tech-indicator">
+        <span class="small-muted">Trend</span>
+        <span class="indicator-value" id="trendVal">-</span>
       </div>
     </div>
-
+    
     <div class="card-soft">
-      <h6>Backtest Results</h6>
-      <div id="backtestResults">
-        <div class="text-center muted small">Run backtest to see results</div>
+      <div class="section-title">
+        <i class="fas fa-chart-line"></i>
+        <span>Backtest Results</span>
+        <span id="backtestStatus" class="badge bg-secondary ms-2">Not Run</span>
+      </div>
+      <div id="backtestResults" class="backtest-panel">
+        <div class="text-center muted">Run backtest to see performance results</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Simple Backtest Modal -->
+<!-- Backtest Configuration Modal -->
 <div class="modal fade" id="backtestModal" tabindex="-1">
-  <div class="modal-dialog modal-sm">
+  <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Run Backtest</h5>
+        <h5 class="modal-title">
+          <i class="fas fa-play-circle me-2"></i>Run Backtest
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label">Days to test</label>
-          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="90">
+          <label class="form-label">Initial Balance ($)</label>
+          <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Period (Days)</label>
+          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Type</label>
+          <select class="form-select" id="backtestType">
+            <option value="advanced">Advanced Backtest</option>
+            <option value="basic">Basic Backtest</option>
+          </select>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="startBacktestBtn">Run</button>
+        <button type="button" class="btn btn-deepseek" id="startBacktestBtn">
+          <i class="fas fa-play me-2"></i>Start Backtest
+        </button>
       </div>
     </div>
   </div>
@@ -178,335 +502,652 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Simple initialization function
-function initApp() {
-  console.log('Initializing Forex Dashboard...');
-  
-  // Initialize charts with error handling
-  try {
-    const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
-      layout: { 
-        backgroundColor: '#fff', 
-        textColor: '#111' 
-      },
-      grid: {
-        vertLines: { color: '#f3f4f6' },
-        horzLines: { color: '#f3f4f6' }
-      },
-      width: document.getElementById('chartRoot').clientWidth,
-      height: 400
-    });
+// Global state untuk menyimpan data chart
+let currentChartData = [];
+let currentEmaData = [];
+let currentMacdData = { macd: [], signal: [], hist: [] };
+let lastCandleTime = null;
 
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: '#16a34a',
-      downColor: '#dc2626',
-      borderVisible: false,
-      wickUpColor: '#16a34a',
-      wickDownColor: '#dc2626'
-    });
-
-    const emaSeries = chart.addLineSeries({
-      color: '#2563eb',
-      lineWidth: 1
-    });
-
-    const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
-      layout: { backgroundColor: '#fff', textColor: '#111' },
-      grid: {
-        vertLines: { color: '#f3f4f6' },
-        horzLines: { color: '#f3f4f6' }
-      },
-      width: document.getElementById('macdRoot').clientWidth,
-      height: 120
-    });
-
-    const macdLine = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1 });
-    const macdSignal = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
-    const macdHistogram = macdChart.addHistogramSeries({ color: '#a78bfa' });
-
-    // Store chart objects globally
-    window.charts = {
-      main: chart,
-      candle: candleSeries,
-      ema: emaSeries,
-      macdChart: macdChart,
-      macdLine: macdLine,
-      macdSignal: macdSignal,
-      macdHistogram: macdHistogram
-    };
-
-    // Set initial empty data
-    candleSeries.setData([]);
-    emaSeries.setData([]);
-    macdLine.setData([]);
-    macdSignal.setData([]);
-    macdHistogram.setData([]);
-
-  } catch (error) {
-    console.error('Chart initialization error:', error);
-    document.getElementById('chartRoot').innerHTML = '<div class="alert alert-warning">Charts not available</div>';
-    document.getElementById('macdRoot').innerHTML = '<div class="alert alert-warning">MACD not available</div>';
-  }
-
-  // Set up event listeners
-  document.getElementById('analyzeBtn').addEventListener('click', analyze);
-  document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
-  document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
-
-  // Initial analysis
-  analyze();
-}
-
-// Main analysis function
-async function analyze() {
-  const pair = document.getElementById('pairSelect').value;
-  const timeframe = document.getElementById('timeframeSelect').value;
-  
-  try {
-    console.log('Fetching analysis for', pair, timeframe);
-    
-    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    
-    const data = await response.json();
-    console.log('Analysis data received:', data);
-    
-    updateUI(data);
-    
-  } catch (error) {
-    console.error('Analysis error:', error);
-    document.getElementById('aiSummary').textContent = 'Error loading analysis';
-    document.getElementById('aiSummary').style.color = '#ef4444';
-  }
-}
-
-// Update UI with data
-function updateUI(data) {
-  try {
-    // Update basic info
-    document.getElementById('currentPair').textContent = data.pair || 'USDJPY';
-    document.getElementById('currentPrice').textContent = formatPrice(data.price_data?.current);
-    
-    // Update price ticker
-    const change = data.price_data?.change_pct || 0;
-    document.getElementById('pairChange').textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
-    document.getElementById('pairChange').style.color = change >= 0 ? '#16a34a' : '#ef4444';
-    
-    // Update AI analysis
-    const ai = data.ai_analysis || {};
-    document.getElementById('aiSummary').textContent = ai.analysis_summary || 'No analysis available';
-    updateSignal(ai.signal);
-    document.getElementById('aiConfidence').textContent = ai.confidence ? ai.confidence + '%' : '-';
-    document.getElementById('aiRisk').textContent = ai.risk_level || '-';
-    document.getElementById('aiEntry').textContent = ai.entry_price || '-';
-    document.getElementById('aiSL').textContent = ai.stop_loss || '-';
-    document.getElementById('aiTP1').textContent = ai.take_profit_1 || '-';
-    document.getElementById('aiTP2').textContent = ai.take_profit_2 || '-';
-    
-    // Update technical data
-    const tech = data.technical_analysis || {};
-    document.getElementById('rsiVal').textContent = tech.momentum?.rsi?.toFixed(2) || '-';
-    document.getElementById('macdVal').textContent = tech.momentum?.macd?.toFixed(4) || '-';
-    document.getElementById('adxVal').textContent = tech.trend?.adx?.toFixed(2) || '-';
-    document.getElementById('atrVal').textContent = tech.volatility?.atr?.toFixed(4) || '-';
-    
-    // Update news
-    document.getElementById('fundamentalNews').textContent = data.fundamental_analysis || 'No news available';
-    
-    // Update risk assessment
-    const risk = data.risk_assessment || {};
-    updateRiskAssessment(risk);
-    
-    // Update charts if data available
-    if (data.price_series && data.price_series.length > 0) {
-      updateCharts(data.price_series);
-    }
-    
-  } catch (error) {
-    console.error('UI update error:', error);
-  }
-}
-
-// Update signal display
-function updateSignal(signal) {
-  const badge = document.getElementById('aiSignalBadge');
-  if (!signal) {
-    badge.textContent = '-';
-    badge.className = '';
-    return;
-  }
-  
-  badge.textContent = signal;
-  badge.className = signal === 'BUY' ? 'ai-signal-buy' : 
-                   signal === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
-}
-
-// Update risk assessment
-function updateRiskAssessment(risk) {
-  const element = document.getElementById('riskAssessment');
-  if (!risk.approved) {
-    element.innerHTML = '<span style="color: #ef4444;">✗ Not Approved</span>';
-    return;
-  }
-  
-  let html = '<span style="color: #10b981;">✓ Approved</span>';
-  if (risk.risk_score !== undefined) {
-    html += `<div class="small muted">Risk Score: ${risk.risk_score}/10</div>`;
-  }
-  element.innerHTML = html;
-}
-
-// Update charts with price data
-function updateCharts(priceSeries) {
-  try {
-    if (!window.charts) return;
-    
-    const chartData = priceSeries.map(item => ({
-      time: item.date.split('T')[0],
-      open: parseFloat(item.open),
-      high: parseFloat(item.high),
-      low: parseFloat(item.low),
-      close: parseFloat(item.close)
-    }));
-    
-    // Update main chart
-    window.charts.candle.setData(chartData);
-    
-    // Calculate and update EMA
-    const closes = chartData.map(d => d.close);
-    const emaData = calculateEMA(closes, 26).map((value, index) => ({
-      time: chartData[index].time,
-      value: value
-    }));
-    window.charts.ema.setData(emaData);
-    
-    // Calculate and update MACD
-    const macdData = calculateMACD(closes);
-    const macdLineData = macdData.macd.map((value, index) => ({
-      time: chartData[index].time,
-      value: value
-    }));
-    const signalLineData = macdData.signal.map((value, index) => ({
-      time: chartData[index].time,
-      value: value
-    }));
-    const histogramData = macdData.histogram.map((value, index) => ({
-      time: chartData[index].time,
-      value: value
-    }));
-    
-    window.charts.macdLine.setData(macdLineData);
-    window.charts.macdSignal.setData(signalLineData);
-    window.charts.macdHistogram.setData(histogramData);
-    
-  } catch (error) {
-    console.error('Chart update error:', error);
-  }
-}
-
-// Technical indicator calculations
-function calculateEMA(data, period) {
-  const k = 2 / (period + 1);
-  const ema = [data[0]];
-  for (let i = 1; i < data.length; i++) {
-    ema.push(data[i] * k + ema[i - 1] * (1 - k));
+/* ===== Utilities ===== */
+function calcEMA(values, period){
+  if (!values || values.length === 0) return [];
+  const k=2/(period+1);
+  let ema=[values[0]];
+  for(let i=1;i<values.length;i++) {
+    ema.push(values[i]*k+ema[i-1]*(1-k));
   }
   return ema;
 }
 
-function calculateMACD(data, fast = 12, slow = 26, signal = 9) {
-  const fastEMA = calculateEMA(data, fast);
-  const slowEMA = calculateEMA(data, slow);
-  const macd = fastEMA.map((fast, i) => fast - slowEMA[i]);
-  const signalLine = calculateEMA(macd, signal);
-  const histogram = macd.map((macdVal, i) => macdVal - signalLine[i]);
+function calcMACDSeries(c,short=12,long=26,signal=9){
+  if (!c || c.length === 0) return {macd: [], sig: [], hist: []};
+  const emaS=calcEMA(c,short),emaL=calcEMA(c,long);
+  const macd=c.map((_,i)=>emaS[i]-emaL[i]);
+  const sig=calcEMA(macd,signal);
+  const hist=macd.map((v,i)=>v-(sig[i]||0));
+  return {macd,sig,hist};
+}
+
+// Improved date formatting function
+function fmt(d){
+  try {
+    if (typeof d === 'string') {
+      if (d.includes('T')) {
+        return d.split('T')[0];
+      } else {
+        return d;
+      }
+    } else if (d instanceof Date) {
+      return d.toISOString().split('T')[0];
+    }
+    return String(d);
+  } catch (e) {
+    console.error('Date formatting error:', e, d);
+    return '2023-01-01';
+  }
+}
+
+// Clean data - remove null/undefined values
+function cleanChartData(data) {
+  return data.filter(item => 
+    item && 
+    item.time && 
+    item.open !== null && item.open !== undefined &&
+    item.high !== null && item.high !== undefined &&
+    item.low !== null && item.low !== undefined &&
+    item.close !== null && item.close !== undefined
+  ).map(item => ({
+    time: item.time,
+    open: parseFloat(item.open) || 0,
+    high: parseFloat(item.high) || 0,
+    low: parseFloat(item.low) || 0,
+    close: parseFloat(item.close) || 0
+  }));
+}
+
+/* ===== Chart Setup ===== */
+const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
+  layout: { 
+    backgroundColor: '#fff', 
+    textColor: '#111' 
+  },
+  grid: {
+    vertLines: { color: '#f3f4f6' },
+    horzLines: { color: '#f3f4f6' }
+  },
+  timeScale: {
+    borderColor: '#eee',
+    timeVisible: true,
+    secondsVisible: false
+  },
+  rightPriceScale: {
+    borderColor: '#eee'
+  },
+  width: document.getElementById('chartRoot').clientWidth,
+  height: 520
+});
+
+const candle = chart.addCandlestickSeries({
+  upColor: '#16a34a',
+  downColor: '#dc2626', 
+  borderVisible: true,
+  wickUpColor: '#16a34a',
+  wickDownColor: '#dc2626'
+});
+
+const ema26 = chart.addLineSeries({
+  color: '#2563eb',
+  lineWidth: 1.5,
+  priceScaleId: 'right'
+});
+
+const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
+  layout: { 
+    backgroundColor: '#fff', 
+    textColor: '#111' 
+  },
+  grid: {
+    vertLines: { color: '#f3f4f6' },
+    horzLines: { color: '#f3f4f6' }
+  },
+  timeScale: {
+    borderColor: '#eee',
+    timeVisible: true,
+    secondsVisible: false
+  },
+  width: document.getElementById('macdRoot').clientWidth,
+  height: 160
+});
+
+const macdLine = macdChart.addLineSeries({
+  color: '#0ea5e9',
+  lineWidth: 1
+});
+
+const macdSignal = macdChart.addLineSeries({
+  color: '#f59e0b', 
+  lineWidth: 1
+});
+
+const macdHist = macdChart.addHistogramSeries({
+  color: '#a78bfa',
+  priceFormat: {
+    type: 'volume',
+  }
+});
+
+// Sync time scales between charts
+chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+  try {
+    macdChart.timeScale().setVisibleRange(timeRange);
+  } catch (e) {
+    console.log('Time scale sync error:', e);
+  }
+});
+
+/* ===== DOM refs ===== */
+const livePriceEl = document.getElementById('livePrice');
+const pairSelect = document.getElementById('pairSelect');
+const timeframeSelect = document.getElementById('timeframeSelect');
+const aiSummaryEl = document.getElementById('aiSummary');
+const aiSignal = document.getElementById('aiSignalBadge');
+const aiConfidence = document.getElementById('aiConfidence');
+const aiRisk = document.getElementById('aiRisk');
+const aiEntry = document.getElementById('aiEntry');
+const aiSL = document.getElementById('aiSL');
+const aiTP1 = document.getElementById('aiTP1');
+const aiTP2 = document.getElementById('aiTP2');
+const fundNews = document.getElementById('fundamentalNews');
+const rsiEl = document.getElementById('rsiVal');
+const macdValEl = document.getElementById('macdVal');
+const macdHistVal = document.getElementById('macdHistVal');
+const adxEl = document.getElementById('adxVal');
+const atrEl = document.getElementById('atrVal');
+const volEl = document.getElementById('volVal');
+const trendEl = document.getElementById('trendVal');
+const changeEl = document.getElementById('pairChange');
+const statusIndicator = document.getElementById('statusIndicator');
+const backtestResultsEl = document.getElementById('backtestResults');
+const backtestStatusEl = document.getElementById('backtestStatus');
+const riskAssessmentEl = document.getElementById('riskAssessment');
+const currentPriceEl = document.getElementById('currentPrice');
+
+/* ===== Data state ===== */
+let auto = false, autoRefreshInterval = null, livePriceInterval = null;
+let currentSignal = 'HOLD';
+
+function setSignal(sig){
+  aiSignal.textContent = sig;
+  currentSignal = sig;
+  aiSignal.className = sig === 'BUY' ? 'ai-signal-buy' : 
+                     sig === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
+}
+
+// Update status indicator
+function updateStatusIndicator(isLive) {
+  if (isLive) {
+    statusIndicator.className = 'status-indicator status-live';
+    statusIndicator.title = 'Live data connection active';
+  } else {
+    statusIndicator.className = 'status-indicator status-offline';
+    statusIndicator.title = 'No live data connection';
+  }
+}
+
+// Generate sample price data for testing
+function generateSamplePriceData() {
+  const data = [];
+  const basePrice = 148.75;
+  const now = new Date();
   
-  return { macd, signal: signalLine, histogram };
+  for (let i = 100; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    const open = basePrice + (Math.random() - 0.5) * 2;
+    const close = open + (Math.random() - 0.5) * 1.5;
+    const high = Math.max(open, close) + Math.random() * 0.8;
+    const low = Math.min(open, close) - Math.random() * 0.8;
+    
+    data.push({
+      time: fmt(date),
+      open: open,
+      high: high,
+      low: low,
+      close: close
+    });
+  }
+  
+  return data;
 }
 
-// Utility functions
-function formatPrice(price) {
-  if (!price) return '-';
-  return parseFloat(price).toFixed(4);
+/* ===== Fetch + Render ===== */
+async function analyze(){
+  const pair = pairSelect.value, tf = timeframeSelect.value;
+  try {
+    console.log(`Fetching analysis for ${pair}-${tf}...`);
+    const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
+    
+    if (!r.ok) {
+      throw new Error(`HTTP error! status: ${r.status}`);
+    }
+    
+    const j = await r.json();
+    console.log('Analysis response:', j);
+    
+    // Update price series chart
+    let chartData = [];
+    
+    if (j.price_series && j.price_series.length > 0) {
+      console.log(`Processing ${j.price_series.length} price series data points`);
+      chartData = j.price_series.map(p => ({
+        time: fmt(p.date),
+        open: parseFloat(p.open) || 0,
+        high: parseFloat(p.high) || 0,
+        low: parseFloat(p.low) || 0,
+        close: parseFloat(p.close) || 0
+      }));
+    } else {
+      console.warn('No price_series data, using sample data');
+      chartData = generateSamplePriceData();
+    }
+    
+    // Clean and set chart data
+    const cleanData = cleanChartData(chartData);
+    currentChartData = cleanData;
+    
+    if (cleanData.length > 0) {
+      candle.setData(cleanData);
+      
+      const closes = cleanData.map(d => d.close);
+      
+      // Calculate and update EMA
+      const ema = calcEMA(closes, 26);
+      currentEmaData = ema.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      ema26.setData(currentEmaData);
+      
+      // Calculate and update MACD
+      const {macd, sig, hist} = calcMACDSeries(closes);
+      currentMacdData = { 
+        macd: macd.map(v => isNaN(v) ? 0 : v),
+        signal: sig.map(v => isNaN(v) ? 0 : v),
+        hist: hist.map(v => isNaN(v) ? 0 : v)
+      };
+      
+      const macdSeriesData = macd.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      const signalSeriesData = sig.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      const histSeriesData = hist.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      
+      macdLine.setData(macdSeriesData);
+      macdSignal.setData(signalSeriesData);
+      macdHist.setData(histSeriesData);
+      
+      lastCandleTime = cleanData[cleanData.length - 1]?.time;
+      
+      // Resize charts
+      setTimeout(() => {
+        try {
+          chart.resize(document.getElementById('chartRoot').clientWidth, 520);
+          macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
+        } catch (e) {
+          console.log('Chart resize error:', e);
+        }
+      }, 100);
+    }
+    
+    // Update technical values
+    const t = j.technical_analysis || {};
+    console.log('Technical analysis:', t);
+    
+    // Handle momentum indicators
+    if (t.momentum) {
+      rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
+      macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
+      macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
+    } else {
+      rsiEl.textContent = '-';
+      macdValEl.textContent = '-';
+      macdHistVal.textContent = '-';
+    }
+    
+    // Handle trend indicators
+    if (t.trend) {
+      adxEl.textContent = (t.trend.adx || 0).toFixed(2);
+      trendEl.textContent = t.trend.trend_direction || '-';
+    } else {
+      adxEl.textContent = '-';
+      trendEl.textContent = '-';
+    }
+    
+    // Handle volatility indicators
+    if (t.volatility) {
+      atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
+      volEl.textContent = t.volatility.volatility_pct ? 
+        (t.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+    } else {
+      atrEl.textContent = '-';
+      volEl.textContent = '-';
+    }
+    
+    // Update price data
+    const priceData = j.price_data || {};
+    const currentPrice = priceData.current || (t.levels && t.levels.current_price);
+    livePriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
+    currentPriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
+    
+    // Update pair ticker with change
+    const change = priceData.change_pct || 0;
+    changeEl.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
+    changeEl.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
+    
+    // Update AI analysis
+    const ai = j.ai_analysis || {};
+    console.log('AI analysis:', ai);
+    
+    aiSummaryEl.textContent = ai.analysis_summary || 'No analysis available';
+    setSignal(ai.signal || 'HOLD');
+    aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '-';
+    aiRisk.textContent = ai.risk_level || '-';
+    aiEntry.textContent = ai.entry_price || '-';
+    aiSL.textContent = ai.stop_loss || '-';
+    aiTP1.textContent = ai.take_profit_1 || '-';
+    aiTP2.textContent = ai.take_profit_2 || '-';
+    
+    // Update fundamental news
+    fundNews.textContent = j.fundamental_analysis || 'No news available';
+    
+    // Update risk assessment
+    const risk = j.risk_assessment || {};
+    if (risk.approved !== undefined) {
+      riskAssessmentEl.textContent = risk.approved ? 
+        '<span class="risk-approved">✓ TRADE APPROVED</span>' : 
+        '<span class="risk-rejected">✗ TRADE REJECTED</span>';
+      if (risk.rejection_reasons && risk.rejection_reasons.length > 0) {
+        riskAssessmentEl.innerHTML += `<div class="small-muted mt-1">Reasons: ${risk.rejection_reasons.join(', ')}</div>`;
+      }
+    } else {
+      riskAssessmentEl.textContent = '-';
+    }
+    
+    updateStatusIndicator(true);
+    
+  } catch (error) {
+    console.error('Analysis error:', error);
+    updateStatusIndicator(false);
+    
+    // Show error to user
+    aiSummaryEl.textContent = `Error: ${error.message}`;
+    aiSummaryEl.style.color = '#ef4444';
+  }
 }
 
-// Backtest functions
+/* ===== Live Price Update ===== */
+let prevPrice = null;
+async function updateLivePrice() {
+  const pair = pairSelect.value;
+  try {
+    // Use the analyze endpoint to get updated price data
+    const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframeSelect.value}`);
+    
+    if (!r.ok) return;
+    
+    const j = await r.json();
+    
+    const priceData = j.price_data || {};
+    const t = j.technical_analysis || {};
+    const currentPrice = priceData.current || (t.levels && t.levels.current_price);
+    
+    if (currentPrice && currentChartData.length > 0) {
+      livePriceEl.textContent = currentPrice.toFixed(4);
+      currentPriceEl.textContent = currentPrice.toFixed(4);
+      
+      // Update price change
+      const change = priceData.change_pct || 0;
+      changeEl.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
+      changeEl.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
+      
+      // Update current candle with live price - FIXED: Use our stored data instead of candle.data()
+      const lastIndex = currentChartData.length - 1;
+      const lastCandle = currentChartData[lastIndex];
+      
+      if (lastCandle) {
+        const updatedCandle = {
+          time: lastCandle.time,
+          open: lastCandle.open,
+          high: Math.max(lastCandle.high, currentPrice),
+          low: Math.min(lastCandle.low, currentPrice),
+          close: currentPrice
+        };
+        
+        // Update our stored data
+        currentChartData[lastIndex] = updatedCandle;
+        
+        // Update the chart
+        candle.update(updatedCandle);
+        
+        // Update EMA with new close price
+        const closes = currentChartData.map(d => d.close);
+        const ema = calcEMA(closes, 26);
+        const lastEma = ema[ema.length - 1];
+        
+        if (lastEma && !isNaN(lastEma)) {
+          const updatedEma = {
+            time: lastCandle.time,
+            value: lastEma
+          };
+          currentEmaData[lastIndex] = updatedEma;
+          ema26.update(updatedEma);
+        }
+        
+        // Update MACD with new close price
+        const {macd, sig, hist} = calcMACDSeries(closes);
+        const lastMacd = macd[macd.length - 1];
+        const lastSig = sig[sig.length - 1];
+        const lastHist = hist[hist.length - 1];
+        
+        if (lastMacd !== undefined && !isNaN(lastMacd)) {
+          currentMacdData.macd[lastIndex] = lastMacd;
+          currentMacdData.signal[lastIndex] = lastSig;
+          currentMacdData.hist[lastIndex] = lastHist;
+          
+          macdLine.update({time: lastCandle.time, value: lastMacd});
+          macdSignal.update({time: lastCandle.time, value: lastSig});
+          macdHist.update({time: lastCandle.time, value: lastHist});
+          
+          macdValEl.textContent = lastMacd.toFixed(4);
+          macdHistVal.textContent = lastHist.toFixed(4);
+        }
+      }
+      
+      updateStatusIndicator(true);
+    }
+  } catch (error) {
+    console.error('Live price error:', error);
+    updateStatusIndicator(false);
+  }
+}
+
+/* ===== Backtest Functions ===== */
 function showBacktestModal() {
   const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
   modal.show();
 }
 
 async function runBacktest() {
-  const pair = document.getElementById('pairSelect').value;
+  const pair = pairSelect.value;
+  const timeframe = timeframeSelect.value;
+  const initialBalance = document.getElementById('initialBalance').value;
   const days = document.getElementById('backtestDays').value;
+  const backtestType = document.getElementById('backtestType').value;
   
-  const modal = bootstrap.Modal.getInstance(document.getElementById('backtestModal'));
-  modal.hide();
-  
-  document.getElementById('backtestResults').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Running backtest...</div>';
+  backtestStatusEl.textContent = 'Running...';
+  backtestStatusEl.className = 'badge bg-warning';
+  backtestResultsEl.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
   
   try {
-    const response = await fetch('/api/backtest', {
+    const endpoint = backtestType === 'advanced' ? '/api/advanced_backtest' : '/api/backtest';
+    
+    console.log('Starting backtest with:', { pair, timeframe, days, initialBalance, backtestType });
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         pair: pair,
+        timeframe: timeframe,
         days: parseInt(days),
-        initial_balance: 10000
+        initial_balance: parseFloat(initialBalance)
       })
     });
     
-    if (!response.ok) throw new Error('Backtest failed');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
     const result = await response.json();
-    displayBacktestResults(result);
+    console.log('Backtest result:', result);
+    
+    if (result.status === 'success' || result.status === 'no_trades') {
+      displayBacktestResults(result);
+      backtestStatusEl.textContent = 'Completed';
+      backtestStatusEl.className = 'badge bg-success';
+    } else {
+      throw new Error(result.error || 'Backtest failed');
+    }
     
   } catch (error) {
     console.error('Backtest error:', error);
-    document.getElementById('backtestResults').innerHTML = '<div class="alert alert-danger">Backtest failed</div>';
+    backtestResultsEl.innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
+    backtestStatusEl.textContent = 'Failed';
+    backtestStatusEl.className = 'badge bg-danger';
   }
 }
 
 function displayBacktestResults(result) {
   const summary = result.summary || {};
+  const tradeAnalysis = result.trade_analysis || {};
+  
   let html = '';
   
   if (result.status === 'no_trades') {
-    html = '<div class="alert alert-warning">No trades executed</div>';
-  } else {
-    html = `
-      <div class="row">
-        <div class="col-6">
+    html = `<div class="alert alert-warning">No trades were executed during the backtest period.</div>`;
+    backtestResultsEl.innerHTML = html;
+    return;
+  }
+  
+  // Performance Grade
+  const grade = result.performance_grade || 'N/A';
+  const gradeClass = grade.startsWith('A') ? 'grade-a' : 
+                    grade.startsWith('B') ? 'grade-b' :
+                    grade.startsWith('C') ? 'grade-c' : 'grade-d';
+  
+  html += `<div class="performance-grade ${gradeClass}">Performance: ${grade}</div>`;
+  
+  // Summary Metrics
+  html += `
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
           <div class="small-muted">Total Trades</div>
-          <div>${summary.total_trades || 0}</div>
-        </div>
-        <div class="col-6">
-          <div class="small-muted">Win Rate</div>
-          <div>${(summary.win_rate || 0).toFixed(1)}%</div>
+          <div class="metric-value">${summary.total_trades || 0}</div>
         </div>
       </div>
-      <div class="row mt-2">
-        <div class="col-6">
-          <div class="small-muted">Profit</div>
-          <div style="color: ${(summary.total_profit || 0) >= 0 ? '#10b981' : '#ef4444'}">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Win Rate</div>
+          <div class="metric-value ${(summary.win_rate || 0) >= 50 ? 'change-positive' : 'change-negative'}">
+            ${(summary.win_rate || 0).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Profit</div>
+          <div class="metric-value ${(summary.total_profit || 0) >= 0 ? 'change-positive' : 'change-negative'}">
             $${(summary.total_profit || 0).toFixed(2)}
           </div>
         </div>
-        <div class="col-6">
-          <div class="small-muted">Return</div>
-          <div style="color: ${(summary.return_percentage || 0) >= 0 ? '#10b981' : '#ef4444'}">
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Final Balance</div>
+          <div class="metric-value">$${(summary.final_balance || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Return %</div>
+          <div class="metric-value ${(summary.return_percentage || 0) >= 0 ? 'change-positive' : 'change-negative'}">
             ${(summary.return_percentage || 0).toFixed(2)}%
           </div>
         </div>
       </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Max Drawdown</div>
+          <div class="metric-value change-negative">${(summary.max_drawdown || 0).toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Trade Analysis
+  if (tradeAnalysis.long_trades || tradeAnalysis.short_trades) {
+    html += `
+      <div class="mt-3">
+        <div class="small-muted mb-1">Trade Analysis</div>
+        <div class="small-muted">Long Trades: ${tradeAnalysis.long_trades || 0} (Win Rate: ${(tradeAnalysis.long_win_rate || 0).toFixed(1)}%)</div>
+        <div class="small-muted">Short Trades: ${tradeAnalysis.short_trades || 0} (Win Rate: ${(tradeAnalysis.short_win_rate || 0).toFixed(1)}%)</div>
+      </div>
     `;
   }
   
-  document.getElementById('backtestResults').innerHTML = html;
+  backtestResultsEl.innerHTML = html;
 }
 
-// Initialize app when page loads
-document.addEventListener('DOMContentLoaded', initApp);
+/* ===== Event Listeners ===== */
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+
+pairSelect.addEventListener('change', analyze);
+timeframeSelect.addEventListener('change', analyze);
+
+// Initialize dashboard
+analyze();
+
+// Start live price updates every 5 seconds for responsive UI
+setInterval(updateLivePrice, 5000);
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  try {
+    chart.resize(document.getElementById('chartRoot').clientWidth, 520);
+    macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
+  } catch (e) {
+    console.log('Resize error:', e);
+  }
+});
 </script>
 </body>
 </html>
