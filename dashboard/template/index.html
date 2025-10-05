@@ -439,6 +439,40 @@
       background: rgba(245, 158, 11, 0.1);
       border: 1px solid rgba(245, 158, 11, 0.3);
     }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      border-radius: var(--border-radius);
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: var(--bg-primary);
+      font-size: 0.9rem;
+    }
+
+    .status-online {
+      color: var(--signal-buy);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .status-offline {
+      color: var(--signal-sell);
+      background: rgba(239, 68, 68, 0.1);
+    }
   </style>
 </head>
 <body>
@@ -450,29 +484,34 @@
   </div>
   
   <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
+    <div class="system-status status-online">
+      <i class="fas fa-circle"></i>
+      <span>System Online</span>
+    </div>
+    
     <div class="d-flex align-items-center">
       <label class="small-muted mb-0 me-2">Pair</label>
       <select id="pairSelect" class="form-select form-select-sm" style="width:130px;">
-        <option>USDJPY</option>
-        <option>EURJPY</option>
-        <option>GBPJPY</option>
-        <option>CHFJPY</option>
-        <option>GBPUSD</option>
-        <option>USDCHF</option>
-        <option>AUDUSD</option>
-        <option>USDCAD</option>
-        <option>NZDUSD</option>
+        <option value="USDJPY">USDJPY</option>
+        <option value="EURJPY">EURJPY</option>
+        <option value="GBPJPY">GBPJPY</option>
+        <option value="CHFJPY">CHFJPY</option>
+        <option value="EURUSD">EURUSD</option>
+        <option value="GBPUSD">GBPUSD</option>
+        <option value="USDCHF">USDCHF</option>
+        <option value="AUDUSD">AUDUSD</option>
+        <option value="USDCAD">USDCAD</option>
+        <option value="NZDUSD">NZDUSD</option>
       </select>
     </div>
     
     <div class="d-flex align-items-center">
-      <label class="small-muted mb-0 me-2">Data Period</label>
-      <select id="periodSelect" class="form-select form-select-sm" style="width:140px;">
-        <option value="1M">1 Month (1H)</option>
-        <option value="3M">3 Months (1H/4H)</option>
-        <option value="6M" selected>6 Months (4H)</option>
-        <option value="1Y">1 Year (1D)</option>
-        <option value="2Y">2 Years (1D)</option>
+      <label class="small-muted mb-0 me-2">Timeframe</label>
+      <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
+        <option value="1D">1D</option>
+        <option value="4H" selected>4H</option>
+        <option value="1H">1H</option>
+        <option value="M30">M30</option>
       </select>
     </div>
     
@@ -485,248 +524,107 @@
     </button>
     
     <div id="pairTicker" class="d-flex align-items-center ms-3">
-      <span class="price-ticker me-2">USDJPY –</span>
-      <span id="livePrice" class="price-ticker">147.3990</span>
-      <span id="pairChange" class="price-change change-negative ms-2">(-0.25%)</span>
-      <span id="statusIndicator" class="status-indicator status-live ms-2"></span>
+      <span class="price-ticker me-2" id="currentPair">USDJPY –</span>
+      <span id="livePrice" class="price-ticker">-</span>
+      <span id="pairChange" class="price-change ms-2">(0.00%)</span>
+      <span id="statusIndicator" class="status-indicator status-offline ms-2"></span>
     </div>
   </div>
 </div>
 
 <div class="row g-4">
   <div class="col-lg-8">
-    <div class="card-soft">
+    <div class="card-soft position-relative">
+      <div id="chartLoading" class="loading-overlay" style="display: none;">
+        <div class="text-center">
+          <div class="spinner-border text-primary mb-2"></div>
+          <div>Loading chart data...</div>
+        </div>
+      </div>
+      
       <div class="chart-controls">
         <div>
           <div class="section-title">
             <i class="fas fa-chart-candlestick"></i>
             <span>Live Price Chart</span>
           </div>
-          <div class="muted" id="chartSubtitle">Real-time Candlestick · EMA26 · MACD</div>
+          <div class="muted" id="chartSubtitle">4H Timeframe · EMA26 · MACD</div>
         </div>
         <div class="text-end">
           <div class="small-muted">Current Price</div>
-          <div class="price-ticker" id="currentPrice">147.3990</div>
+          <div class="price-ticker" id="currentPrice">-</div>
         </div>
       </div>
       
       <!-- Timeframe Controls -->
       <div class="timeframe-controls">
-        <button class="timeframe-btn active" data-tf="1D">1D</button>
-        <button class="timeframe-btn" data-tf="4H">4H</button>
+        <button class="timeframe-btn" data-tf="1D">1D</button>
+        <button class="timeframe-btn active" data-tf="4H">4H</button>
         <button class="timeframe-btn" data-tf="1H">1H</button>
-        <button class="timeframe-btn" data-tf="30M">30M</button>
-        <button class="timeframe-btn" data-tf="15M">15M</button>
-        <button class="timeframe-btn" data-tf="5M">5M</button>
-      </div>
-      
-      <!-- Chart Indicators Toggle -->
-      <div class="d-flex gap-4 mb-3">
-        <div class="indicator-toggle">
-          <input type="checkbox" id="toggleEMA" checked>
-          <label for="toggleEMA" class="small-muted">EMA (26,50,100)</label>
-        </div>
-        <div class="indicator-toggle">
-          <input type="checkbox" id="toggleBollinger" checked>
-          <label for="toggleBollinger" class="small-muted">Bollinger Bands</label>
-        </div>
-        <div class="indicator-toggle">
-          <input type="checkbox" id="toggleVolume" checked>
-          <label for="toggleVolume" class="small-muted">Volume</label>
-        </div>
+        <button class="timeframe-btn" data-tf="M30">30M</button>
       </div>
       
       <div id="chartRoot"></div>
       <div id="macdRoot"></div>
-      
-      <!-- Price Levels Panel -->
-      <div class="price-levels-panel">
-        <div class="section-title">
-          <i class="fas fa-layer-group"></i>
-          <span>Key Price Levels</span>
-        </div>
-        
-        <div class="price-level-item price-level-resistance">
-          <div>
-            <strong>Resistance 3</strong>
-            <div class="small-muted">Strong Resistance</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">149.2540</div>
-            <span class="level-strength strength-strong">Strong</span>
-          </div>
-        </div>
-        
-        <div class="price-level-item price-level-resistance">
-          <div>
-            <strong>Resistance 2</strong>
-            <div class="small-muted">Stop Loss Level</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">148.1000</div>
-            <span class="level-strength strength-medium">Medium</span>
-          </div>
-        </div>
-        
-        <div class="price-level-item price-level-resistance">
-          <div>
-            <strong>Resistance 1</strong>
-            <div class="small-muted">Minor Resistance</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">147.8000</div>
-            <span class="level-strength strength-weak">Weak</span>
-          </div>
-        </div>
-        
-        <div class="price-level-item price-level-pivot">
-          <div>
-            <strong>Current Price</strong>
-            <div class="small-muted">Market Price</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">147.3990</div>
-            <span class="level-strength strength-weak">Live</span>
-          </div>
-        </div>
-        
-        <div class="price-level-item price-level-support">
-          <div>
-            <strong>Support 1</strong>
-            <div class="small-muted">Take Profit 1</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">146.8000</div>
-            <span class="level-strength strength-weak">Weak</span>
-          </div>
-        </div>
-        
-        <div class="price-level-item price-level-support">
-          <div>
-            <strong>Support 2</strong>
-            <div class="small-muted">Take Profit 2</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">146.5870</div>
-            <span class="level-strength strength-medium">Medium</span>
-          </div>
-        </div>
-        
-        <div class="price-level-item price-level-support">
-          <div>
-            <strong>Support 3</strong>
-            <div class="small-muted">Strong Support</div>
-          </div>
-          <div class="text-end">
-            <div class="fw-bold">145.9200</div>
-            <span class="level-strength strength-strong">Strong</span>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- Advanced Analysis Tabs -->
+    <!-- Analysis Results -->
     <div class="card-soft">
-      <div class="analysis-tabs">
-        <button class="analysis-tab active" data-tab="technical">Technical Analysis</button>
-        <button class="analysis-tab" data-tab="fundamental">Fundamental Analysis</button>
-        <button class="analysis-tab" data-tab="sentiment">Market Sentiment</button>
-        <button class="analysis-tab" data-tab="historical">Historical Performance</button>
+      <div class="section-title">
+        <i class="fas fa-chart-bar"></i>
+        <span>Technical Analysis</span>
       </div>
       
-      <div id="technicalAnalysis" class="analysis-content">
-        <div class="row">
-          <div class="col-md-6">
-            <div class="section-title">
-              <i class="fas fa-chart-line"></i>
-              <span>Trend Analysis</span>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="trend-analysis">
+            <div class="trend-card trend-down">
+              <div class="small-muted">Primary Trend</div>
+              <div class="fw-bold" id="primaryTrend">-</div>
+              <div class="small-muted" id="primaryTrendTimeframe">-</div>
             </div>
-            
-            <div class="trend-analysis">
-              <div class="trend-card trend-down">
-                <div class="small-muted">Primary Trend</div>
-                <div class="fw-bold">Bearish</div>
-                <div class="small-muted">4H & 1D Timeframe</div>
-              </div>
-              <div class="trend-card trend-neutral">
-                <div class="small-muted">Secondary Trend</div>
-                <div class="fw-bold">Neutral</div>
-                <div class="small-muted">1H Timeframe</div>
-              </div>
-              <div class="trend-card trend-down">
-                <div class="small-muted">Momentum</div>
-                <div class="fw-bold">Bearish</div>
-                <div class="small-muted">RSI & MACD</div>
-              </div>
-              <div class="trend-card trend-up">
-                <div class="small-muted">Volatility</div>
-                <div class="fw-bold">Increasing</div>
-                <div class="small-muted">ATR Rising</div>
-              </div>
+            <div class="trend-card trend-neutral">
+              <div class="small-muted">Momentum</div>
+              <div class="fw-bold" id="momentum">-</div>
+              <div class="small-muted" id="momentumIndicator">-</div>
             </div>
-          </div>
-          
-          <div class="col-md-6">
-            <div class="section-title">
-              <i class="fas fa-ruler-combined"></i>
-              <span>Pattern Recognition</span>
+            <div class="trend-card trend-up">
+              <div class="small-muted">Volatility</div>
+              <div class="fw-bold" id="volatility">-</div>
+              <div class="small-muted" id="volatilityLevel">-</div>
             </div>
-            
-            <div class="tech-indicator">
-              <span class="small-muted">Chart Pattern</span>
-              <span class="indicator-value">Descending Triangle</span>
-            </div>
-            <div class="tech-indicator">
-              <span class="small-muted">Fibonacci Level</span>
-              <span class="indicator-value">61.8% Retracement</span>
-            </div>
-            <div class="tech-indicator">
-              <span class="small-muted">Support Break</span>
-              <span class="indicator-value change-negative">Confirmed</span>
-            </div>
-            <div class="tech-indicator">
-              <span class="small-muted">Volume Trend</span>
-              <span class="indicator-value">Below Average</span>
+            <div class="trend-card trend-neutral">
+              <div class="small-muted">Support/Resistance</div>
+              <div class="fw-bold" id="srBias">-</div>
+              <div class="small-muted" id="srLevels">-</div>
             </div>
           </div>
         </div>
         
-        <div class="historical-performance">
-          <div class="section-title">
-            <i class="fas fa-chart-bar"></i>
-            <span>Historical Performance</span>
+        <div class="col-md-6">
+          <div class="tech-indicator">
+            <span class="small-muted">RSI (14)</span>
+            <span class="indicator-value" id="rsiVal">-</span>
           </div>
-          
-          <div class="performance-metric">
-            <span class="small-muted">1 Week Performance</span>
-            <span class="change-negative">-1.2%</span>
+          <div class="tech-indicator">
+            <span class="small-muted">MACD Line</span>
+            <span class="indicator-value" id="macdVal">-</span>
           </div>
-          <div class="performance-bar">
-            <div class="performance-fill" style="width: 40%; background: #ef4444;"></div>
+          <div class="tech-indicator">
+            <span class="small-muted">MACD Signal</span>
+            <span class="indicator-value" id="macdSignalVal">-</span>
           </div>
-          
-          <div class="performance-metric">
-            <span class="small-muted">1 Month Performance</span>
-            <span class="change-negative">-2.8%</span>
+          <div class="tech-indicator">
+            <span class="small-muted">MACD Histogram</span>
+            <span class="indicator-value" id="macdHistVal">-</span>
           </div>
-          <div class="performance-bar">
-            <div class="performance-fill" style="width: 60%; background: #ef4444;"></div>
+          <div class="tech-indicator">
+            <span class="small-muted">ADX</span>
+            <span class="indicator-value" id="adxVal">-</span>
           </div>
-          
-          <div class="performance-metric">
-            <span class="small-muted">3 Month Performance</span>
-            <span class="change-positive">+3.5%</span>
-          </div>
-          <div class="performance-bar">
-            <div class="performance-fill" style="width: 30%; background: #10b981;"></div>
-          </div>
-          
-          <div class="performance-metric">
-            <span class="small-muted">1 Year Performance</span>
-            <span class="change-positive">+12.3%</span>
-          </div>
-          <div class="performance-bar">
-            <div class="performance-fill" style="width: 70%; background: #10b981;"></div>
+          <div class="tech-indicator">
+            <span class="small-muted">ATR (14)</span>
+            <span class="indicator-value" id="atrVal">-</span>
           </div>
         </div>
       </div>
@@ -741,28 +639,24 @@
         <span>AI Trading Signal</span>
       </div>
       
-      <div id="aiSummary" class="muted mb-3">
-        USDJPY menunjukkan momentum bearish dengan MACD masih di bawah garis signal dan RSI netral cenderung lemah. 
-        Meskipun volatilitas rendah, kondisi teknikal mendukung penurunan lebih lanjut menuju support 146.5870. 
-        Fundamental dengan risiko stabilitas keuangan global dan ketegangan geopolitik dapat mendukung safe-haven JPY.
-      </div>
+      <div id="aiSummary" class="muted mb-3">No analysis yet. Click Analyze to start.</div>
       
       <div class="mb-3">
         <div class="small-muted mb-2">TRADING SIGNAL</div>
-        <div id="aiSignalBadge" class="ai-signal-sell">SELL</div>
+        <div id="aiSignalBadge" class="ai-signal-hold">HOLD</div>
       </div>
       
       <div class="row mb-3">
         <div class="col-6">
           <div class="metric-card">
             <div class="small-muted">Confidence</div>
-            <div class="metric-value" id="aiConfidence">65%</div>
+            <div class="metric-value" id="aiConfidence">-</div>
           </div>
         </div>
         <div class="col-6">
           <div class="metric-card">
             <div class="small-muted">Risk Level</div>
-            <div class="metric-value" id="aiRisk">MEDIUM</div>
+            <div class="metric-value" id="aiRisk">-</div>
           </div>
         </div>
       </div>
@@ -770,151 +664,115 @@
       <div class="mb-3">
         <div class="small-muted mb-2">TRADING LEVELS</div>
         <div class="trading-level level-entry">
-          <i class="fas fa-sign-in-alt me-2"></i>Entry: <span id="aiEntry">147.300 - 147.500</span>
+          <i class="fas fa-sign-in-alt me-2"></i>Entry: <span id="aiEntry">-</span>
         </div>
         <div class="trading-level level-sl">
-          <i class="fas fa-stop-circle me-2"></i>Stop Loss: <span id="aiSL">148.100</span>
+          <i class="fas fa-stop-circle me-2"></i>Stop Loss: <span id="aiSL">-</span>
         </div>
         <div class="trading-level level-tp">
-          <i class="fas fa-target me-2"></i>Take Profit 1: <span id="aiTP1">146.800</span>
+          <i class="fas fa-target me-2"></i>Take Profit 1: <span id="aiTP1">-</span>
         </div>
         <div class="trading-level level-tp">
-          <i class="fas fa-bullseye me-2"></i>Take Profit 2: <span id="aiTP2">146.5870</span>
-        </div>
-      </div>
-      
-      <div class="mt-3">
-        <div class="small-muted mb-2">POSITION SIZING CALCULATOR</div>
-        <div class="mb-2">
-          <label class="small-muted">Account Balance ($)</label>
-          <input type="number" class="form-control" value="10000">
-        </div>
-        <div class="mb-2">
-          <label class="small-muted">Risk Percentage (%)</label>
-          <input type="number" class="form-control" value="2" step="0.1">
-        </div>
-        <div class="metric-card">
-          <div class="small-muted">Recommended Position Size</div>
-          <div class="metric-value">0.85 Lots</div>
+          <i class="fas fa-bullseye me-2"></i>Take Profit 2: <span id="aiTP2">-</span>
         </div>
       </div>
     </div>
 
-    <!-- Technical Indicators -->
+    <!-- Support & Resistance -->
     <div class="card-soft">
       <div class="section-title">
-        <i class="fas fa-chart-bar"></i>
-        <span>Technical Indicators</span>
+        <i class="fas fa-layer-group"></i>
+        <span>Support & Resistance</span>
       </div>
       
-      <div class="tech-indicator">
-        <span class="small-muted">RSI (14)</span>
-        <span class="indicator-value" id="rsiVal">42.35</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">MACD Line</span>
-        <span class="indicator-value" id="macdVal">-0.0023</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">MACD Signal</span>
-        <span class="indicator-value" id="macdSignalVal">-0.0015</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">MACD Histogram</span>
-        <span class="indicator-value" id="macdHistVal">-0.0008</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Stochastic %K</span>
-        <span class="indicator-value" id="stochK">35.2</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Stochastic %D</span>
-        <span class="indicator-value" id="stochD">42.1</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Williams %R</span>
-        <span class="indicator-value" id="williamsR">-68.5</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">CCI</span>
-        <span class="indicator-value" id="cciVal">-45.3</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">ADX</span>
-        <span class="indicator-value" id="adxVal">28.45</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">ATR (14)</span>
-        <span class="indicator-value" id="atrVal">0.6540</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Bollinger Position</span>
-        <span class="indicator-value" id="bollingerPos">Lower Band</span>
-      </div>
-      <div class="tech-indicator">
-        <span class="small-muted">Ichimoku Cloud</span>
-        <span class="indicator-value change-negative" id="ichimoku">Below Cloud</span>
-      </div>
-    </div>
-
-    <!-- Risk Management -->
-    <div class="card-soft">
-      <div class="section-title">
-        <i class="fas fa-shield-alt"></i>
-        <span>Risk Management</span>
-      </div>
-      
-      <div class="mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div class="small-muted">TRADE APPROVAL STATUS</div>
-          <div id="riskScoreBadge" class="badge bg-warning">Score: 6/10</div>
+      <div class="price-levels-panel">
+        <div class="price-level-item price-level-resistance">
+          <div>
+            <strong>Resistance 3</strong>
+            <div class="small-muted">Strong Resistance</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" id="resistance3">-</div>
+            <span class="level-strength strength-strong">Strong</span>
+          </div>
         </div>
         
-        <div id="riskStatus" class="text-center p-4 rounded-3 mb-3" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 2px solid #bae6fd;">
-          <div class="risk-icon mb-2">
-            <i class="fas fa-check-circle fa-2x text-success"></i>
+        <div class="price-level-item price-level-resistance">
+          <div>
+            <strong>Resistance 2</strong>
+            <div class="small-muted">Medium Resistance</div>
           </div>
-          <div id="riskMainStatus" class="fw-bold fs-5">APPROVED</div>
-          <div id="riskSubStatus" class="small text-muted mt-1">Trade meets risk criteria</div>
+          <div class="text-end">
+            <div class="fw-bold" id="resistance2">-</div>
+            <span class="level-strength strength-medium">Medium</span>
+          </div>
         </div>
-      </div>
-
-      <div class="mb-4">
-        <div class="small-muted mb-2">RISK METRICS</div>
-        <div class="tech-indicator">
-          <span class="small-muted">Risk/Reward Ratio</span>
-          <span class="indicator-value">1:1.8</span>
+        
+        <div class="price-level-item price-level-resistance">
+          <div>
+            <strong>Resistance 1</strong>
+            <div class="small-muted">Weak Resistance</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" id="resistance1">-</div>
+            <span class="level-strength strength-weak">Weak</span>
+          </div>
         </div>
-        <div class="tech-indicator">
-          <span class="small-muted">Win Probability</span>
-          <span class="indicator-value">64%</span>
+        
+        <div class="price-level-item price-level-pivot">
+          <div>
+            <strong>Current Price</strong>
+            <div class="small-muted">Market Price</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" id="currentPriceLevel">-</div>
+            <span class="level-strength strength-weak">Live</span>
+          </div>
         </div>
-        <div class="tech-indicator">
-          <span class="small-muted">Max Drawdown</span>
-          <span class="indicator-value change-negative">-2.1%</span>
+        
+        <div class="price-level-item price-level-support">
+          <div>
+            <strong>Support 1</strong>
+            <div class="small-muted">Weak Support</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" id="support1">-</div>
+            <span class="level-strength strength-weak">Weak</span>
+          </div>
         </div>
-        <div class="tech-indicator">
-          <span class="small-muted">Position Score</span>
-          <span class="indicator-value">7.2/10</span>
+        
+        <div class="price-level-item price-level-support">
+          <div>
+            <strong>Support 2</strong>
+            <div class="small-muted">Medium Support</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" id="support2">-</div>
+            <span class="level-strength strength-medium">Medium</span>
+          </div>
+        </div>
+        
+        <div class="price-level-item price-level-support">
+          <div>
+            <strong>Support 3</strong>
+            <div class="small-muted">Strong Support</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" id="support3">-</div>
+            <span class="level-strength strength-strong">Strong</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Market News & Events -->
+    <!-- Market News -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-newspaper"></i>
-        <span>Market News & Events</span>
+        <span>Market News</span>
       </div>
       <div class="news-container" id="fundamentalNews">
-        <div class="fw-bold text-primary">BoJ Maintains Ultra-Loose Policy</div>
-        <div class="small-muted mb-2">Bank of Japan keeps interest rates unchanged, yen weakens further against major currencies.</div>
-        
-        <div class="fw-bold text-primary">US CPI Data Ahead</div>
-        <div class="small-muted mb-2">Traders await key inflation data release this week for Fed policy clues.</div>
-        
-        <div class="fw-bold text-primary">Geopolitical Tensions</div>
-        <div class="small-muted">Safe-haven flows supporting JPY amid global uncertainty.</div>
+        Loading market news...
       </div>
     </div>
 
@@ -923,52 +781,64 @@
       <div class="section-title">
         <i class="fas fa-chart-line"></i>
         <span>Backtest Results</span>
-        <span id="backtestStatus" class="badge bg-success ms-2">Completed</span>
+        <span id="backtestStatus" class="badge bg-secondary ms-2">Not Run</span>
       </div>
       <div id="backtestResults" class="backtest-panel">
-        <div class="performance-grade grade-b">Performance: B+</div>
-        <div class="row">
-          <div class="col-6">
-            <div class="metric-card">
-              <div class="small-muted">Total Trades</div>
-              <div class="metric-value">142</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="metric-card">
-              <div class="small-muted">Win Rate</div>
-              <div class="metric-value change-positive">72.5%</div>
-            </div>
-          </div>
+        <div class="text-center muted">Run backtest to see performance results</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backtest Configuration Modal -->
+<div class="modal fade" id="backtestModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-play-circle me-2"></i>Run Backtest
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Currency Pair</label>
+          <select class="form-select" id="backtestPair">
+            <option value="USDJPY">USDJPY</option>
+            <option value="EURJPY">EURJPY</option>
+            <option value="GBPJPY">GBPJPY</option>
+            <option value="CHFJPY">CHFJPY</option>
+            <option value="EURUSD">EURUSD</option>
+            <option value="GBPUSD">GBPUSD</option>
+            <option value="USDCHF">USDCHF</option>
+            <option value="AUDUSD">AUDUSD</option>
+            <option value="USDCAD">USDCAD</option>
+            <option value="NZDUSD">NZDUSD</option>
+          </select>
         </div>
-        <div class="row">
-          <div class="col-6">
-            <div class="metric-card">
-              <div class="small-muted">Profit Factor</div>
-              <div class="metric-value">1.85</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="metric-card">
-              <div class="small-muted">Sharpe Ratio</div>
-              <div class="metric-value">1.42</div>
-            </div>
-          </div>
+        <div class="mb-3">
+          <label class="form-label">Timeframe</label>
+          <select class="form-select" id="backtestTimeframe">
+            <option value="1D">1D</option>
+            <option value="4H" selected>4H</option>
+            <option value="1H">1H</option>
+            <option value="M30">M30</option>
+          </select>
         </div>
-        <div class="row">
-          <div class="col-6">
-            <div class="metric-card">
-              <div class="small-muted">Max Drawdown</div>
-              <div class="metric-value change-negative">-8.2%</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="metric-card">
-              <div class="small-muted">Recovery Factor</div>
-              <div class="metric-value">2.1</div>
-            </div>
-          </div>
+        <div class="mb-3">
+          <label class="form-label">Initial Balance ($)</label>
+          <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
         </div>
+        <div class="mb-3">
+          <label class="form-label">Backtest Period (Days)</label>
+          <input type="number" class="form-control" id="backtestDays" value="30" min="7" max="365">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-deepseek" id="startBacktestBtn">
+          <i class="fas fa-play me-2"></i>Start Backtest
+        </button>
       </div>
     </div>
   </div>
@@ -976,155 +846,122 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Enhanced Chart Data Generation with Historical Data
-function generateHistoricalData(timeframe, period) {
-  const data = [];
-  const now = new Date();
-  let basePrice = 147.40;
-  let candlesCount = 0;
+// Global variables
+let currentChartData = [];
+let currentPair = 'USDJPY';
+let currentTimeframe = '4H';
+let chart, candleSeries, ema26Series, macdChart, macdLineSeries, macdSignalSeries, macdHistogramSeries;
 
-  // Determine number of candles based on timeframe and period
-  switch(period) {
-    case '1M': candlesCount = 30 * 24; break; // 1 month of 1H data
-    case '3M': candlesCount = 90 * 6; break;  // 3 months of 4H data
-    case '6M': candlesCount = 180 * 6; break; // 6 months of 4H data
-    case '1Y': candlesCount = 365; break;     // 1 year of 1D data
-    case '2Y': candlesCount = 730; break;     // 2 years of 1D data
-  }
+// Initialize charts
+function initializeCharts() {
+  // Main chart
+  chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
+    layout: { 
+      backgroundColor: '#ffffff', 
+      textColor: '#111' 
+    },
+    grid: {
+      vertLines: { color: '#f3f4f6' },
+      horzLines: { color: '#f3f4f6' }
+    },
+    timeScale: {
+      borderColor: '#eee',
+      timeVisible: true,
+      secondsVisible: false
+    },
+    width: document.getElementById('chartRoot').clientWidth,
+    height: 520
+  });
 
-  for (let i = candlesCount; i >= 0; i--) {
-    const date = new Date(now);
-    
-    // Adjust date based on timeframe
-    switch(timeframe) {
-      case '1D':
-        date.setDate(date.getDate() - i);
-        break;
-      case '4H':
-        date.setHours(date.getHours() - i * 4);
-        break;
-      case '1H':
-        date.setHours(date.getHours() - i);
-        break;
-      case '30M':
-        date.setMinutes(date.getMinutes() - i * 30);
-        break;
-      case '15M':
-        date.setMinutes(date.getMinutes() - i * 15);
-        break;
-      case '5M':
-        date.setMinutes(date.getMinutes() - i * 5);
-        break;
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#16a34a',
+    downColor: '#dc2626',
+    borderVisible: false,
+    wickUpColor: '#16a34a',
+    wickDownColor: '#dc2626',
+  });
+
+  ema26Series = chart.addLineSeries({
+    color: '#3b82f6',
+    lineWidth: 1,
+    priceScaleId: 'right'
+  });
+
+  // MACD chart
+  macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
+    layout: { 
+      backgroundColor: '#ffffff', 
+      textColor: '#111' 
+    },
+    grid: {
+      vertLines: { color: '#f3f4f6' },
+      horzLines: { color: '#f3f4f6' }
+    },
+    timeScale: {
+      borderColor: '#eee',
+      timeVisible: true,
+      secondsVisible: false
+    },
+    width: document.getElementById('macdRoot').clientWidth,
+    height: 160
+  });
+
+  macdLineSeries = macdChart.addLineSeries({
+    color: '#0ea5e9',
+    lineWidth: 1
+  });
+
+  macdSignalSeries = macdChart.addLineSeries({
+    color: '#f59e0b',
+    lineWidth: 1
+  });
+
+  macdHistogramSeries = macdChart.addHistogramSeries({
+    color: '#a78bfa',
+    priceFormat: {
+      type: 'volume',
     }
+  });
 
-    // More realistic price movement simulation
-    const volatility = 0.002; // 0.2% volatility
-    const change = (Math.random() - 0.5) * 2 * volatility * basePrice;
-    const open = basePrice;
-    const close = basePrice + change;
-    const high = Math.max(open, close) + Math.random() * volatility * basePrice;
-    const low = Math.min(open, close) - Math.random() * volatility * basePrice;
-
-    // Update base price for next candle (trend simulation)
-    basePrice = close;
-
-    data.push({
-      time: date.toISOString().split('T')[0] + (timeframe !== '1D' ? ' ' + date.toTimeString().split(' ')[0] : ''),
-      open: open,
-      high: high,
-      low: low,
-      close: close,
-      volume: Math.random() * 1000 + 500
-    });
-  }
-
-  return data;
+  // Sync time scales
+  chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+    try {
+      macdChart.timeScale().setVisibleRange(timeRange);
+    } catch (e) {
+      console.log('Time scale sync error:', e);
+    }
+  });
 }
 
-// Initialize Charts with Historical Data
-const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
-  layout: { 
-    backgroundColor: '#ffffff', 
-    textColor: '#111' 
-  },
-  grid: {
-    vertLines: { color: '#f3f4f6' },
-    horzLines: { color: '#f3f4f6' }
-  },
-  timeScale: {
-    borderColor: '#eee',
-    timeVisible: true,
-    secondsVisible: false
-  },
-  width: document.getElementById('chartRoot').clientWidth,
-  height: 520
-});
+// Show loading indicator
+function showLoading(show) {
+  document.getElementById('chartLoading').style.display = show ? 'flex' : 'none';
+}
 
-const candleSeries = chart.addCandlestickSeries({
-  upColor: '#16a34a',
-  downColor: '#dc2626',
-  borderVisible: false,
-  wickUpColor: '#16a34a',
-  wickDownColor: '#dc2626',
-});
-
-// Add EMA indicators
-const ema26Series = chart.addLineSeries({
-  color: '#3b82f6',
-  lineWidth: 1,
-  priceScaleId: 'right'
-});
-
-const ema50Series = chart.addLineSeries({
-  color: '#8b5cf6',
-  lineWidth: 1,
-  priceScaleId: 'right'
-});
-
-const ema100Series = chart.addLineSeries({
-  color: '#f59e0b',
-  lineWidth: 1,
-  priceScaleId: 'right'
-});
-
-// MACD Chart
-const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
-  layout: { 
-    backgroundColor: '#ffffff', 
-    textColor: '#111' 
-  },
-  grid: {
-    vertLines: { color: '#f3f4f6' },
-    horzLines: { color: '#f3f4f6' }
-  },
-  timeScale: {
-    borderColor: '#eee',
-    timeVisible: true,
-    secondsVisible: false
-  },
-  width: document.getElementById('macdRoot').clientWidth,
-  height: 160
-});
-
-const macdLineSeries = macdChart.addLineSeries({
-  color: '#0ea5e9',
-  lineWidth: 1
-});
-
-const macdSignalSeries = macdChart.addLineSeries({
-  color: '#f59e0b',
-  lineWidth: 1
-});
-
-const macdHistogramSeries = macdChart.addHistogramSeries({
-  color: '#a78bfa',
-  priceFormat: {
-    type: 'volume',
+// Update status indicator
+function updateStatusIndicator(isLive) {
+  const statusIndicator = document.getElementById('statusIndicator');
+  if (isLive) {
+    statusIndicator.className = 'status-indicator status-live';
+    statusIndicator.title = 'Live data connection active';
+  } else {
+    statusIndicator.className = 'status-indicator status-offline';
+    statusIndicator.title = 'No live data connection';
   }
-});
+}
+
+// Set trading signal
+function setSignal(sig) {
+  const aiSignal = document.getElementById('aiSignalBadge');
+  aiSignal.textContent = sig;
+  aiSignal.className = sig === 'BUY' ? 'ai-signal-buy' : 
+                     sig === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
+}
 
 // Calculate EMA
 function calculateEMA(data, period) {
+  if (!data || data.length === 0) return [];
+  
   const k = 2 / (period + 1);
   const ema = [data[0].close];
   
@@ -1140,6 +977,10 @@ function calculateEMA(data, period) {
 
 // Calculate MACD
 function calculateMACD(data) {
+  if (!data || data.length < 26) {
+    return { macdLine: [], signalLine: [], histogram: [] };
+  }
+
   const ema12 = calculateEMA(data, 12);
   const ema26 = calculateEMA(data, 26);
   
@@ -1148,7 +989,9 @@ function calculateMACD(data) {
     value: ema.value - ema26[index].value
   }));
   
+  // Calculate signal line (EMA of MACD)
   const signalLine = calculateEMA(macdLine.map(d => ({close: d.value, time: d.time})), 9);
+  
   const histogram = macdLine.map((macd, index) => ({
     time: macd.time,
     value: macd.value - signalLine[index].value
@@ -1157,80 +1000,296 @@ function calculateMACD(data) {
   return { macdLine, signalLine, histogram };
 }
 
-// Load initial chart data
-function loadChartData(timeframe = '4H', period = '6M') {
-  const historicalData = generateHistoricalData(timeframe, period);
-  
-  // Set candle data
-  candleSeries.setData(historicalData);
-  
-  // Calculate and set EMA indicators
-  const ema26Data = calculateEMA(historicalData, 26);
-  const ema50Data = calculateEMA(historicalData, 50);
-  const ema100Data = calculateEMA(historicalData, 100);
-  
-  ema26Series.setData(ema26Data);
-  ema50Series.setData(ema50Data);
-  ema100Series.setData(ema100Data);
-  
-  // Calculate and set MACD
-  const macdData = calculateMACD(historicalData);
-  macdLineSeries.setData(macdData.macdLine);
-  macdSignalSeries.setData(macdData.signalLine);
-  macdHistogramSeries.setData(macdData.histogram);
-  
-  // Update chart subtitle
-  document.getElementById('chartSubtitle').textContent = 
-    `${timeframe} Timeframe · ${period} Period · EMA(26,50,100) · MACD`;
+// Format date for chart
+function formatDate(dateString) {
+  try {
+    if (dateString.includes('T')) {
+      return dateString.split('T')[0];
+    }
+    return dateString;
+  } catch (e) {
+    return dateString;
+  }
 }
 
-// Timeframe button event listeners
-document.querySelectorAll('.timeframe-btn').forEach(button => {
-  button.addEventListener('click', function() {
-    // Remove active class from all buttons
-    document.querySelectorAll('.timeframe-btn').forEach(btn => btn.classList.remove('active'));
+// Main analysis function
+async function analyze() {
+  const pair = document.getElementById('pairSelect').value;
+  const timeframe = document.getElementById('timeframeSelect').value;
+  
+  currentPair = pair;
+  currentTimeframe = timeframe;
+  
+  showLoading(true);
+  updateStatusIndicator(false);
+  
+  try {
+    console.log(`Fetching analysis for ${pair}-${timeframe}...`);
     
-    // Add active class to clicked button
-    this.classList.add('active');
+    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
     
-    // Get selected timeframe and period
-    const timeframe = this.getAttribute('data-tf');
-    const period = document.getElementById('periodSelect').value;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
-    // Reload chart data
-    loadChartData(timeframe, period);
+    const data = await response.json();
+    console.log('Analysis response:', data);
+    
+    // Update pair display
+    document.getElementById('currentPair').textContent = `${pair} –`;
+    
+    // Update price data
+    const priceData = data.price_data || {};
+    const currentPrice = priceData.current || 0;
+    
+    document.getElementById('livePrice').textContent = currentPrice.toFixed(4);
+    document.getElementById('currentPrice').textContent = currentPrice.toFixed(4);
+    document.getElementById('currentPriceLevel').textContent = currentPrice.toFixed(4);
+    
+    // Update price change
+    const change = priceData.change_pct || 0;
+    const changeElement = document.getElementById('pairChange');
+    changeElement.textContent = `(${change >= 0 ? '+' : ''}${change.toFixed(2)}%)`;
+    changeElement.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
+    
+    // Update chart data
+    if (data.price_series && data.price_series.length > 0) {
+      const chartData = data.price_series.map(item => ({
+        time: formatDate(item.date || item.time),
+        open: parseFloat(item.open),
+        high: parseFloat(item.high),
+        low: parseFloat(item.low),
+        close: parseFloat(item.close)
+      }));
+      
+      currentChartData = chartData;
+      candleSeries.setData(chartData);
+      
+      // Calculate and update EMA
+      const ema26Data = calculateEMA(chartData, 26);
+      ema26Series.setData(ema26Data);
+      
+      // Calculate and update MACD
+      const macdData = calculateMACD(chartData);
+      macdLineSeries.setData(macdData.macdLine);
+      macdSignalSeries.setData(macdData.signalLine);
+      macdHistogramSeries.setData(macdData.histogram);
+      
+      // Update chart subtitle
+      document.getElementById('chartSubtitle').textContent = 
+        `${timeframe} Timeframe · Real-time Candlestick · EMA26 · MACD`;
+    }
+    
+    // Update technical indicators
+    const technical = data.technical_analysis || {};
+    if (technical.momentum) {
+      document.getElementById('rsiVal').textContent = (technical.momentum.rsi || 0).toFixed(2);
+      document.getElementById('macdVal').textContent = (technical.momentum.macd || 0).toFixed(4);
+      document.getElementById('macdSignalVal').textContent = (technical.momentum.macd_signal || 0).toFixed(4);
+      document.getElementById('macdHistVal').textContent = (technical.momentum.macd_histogram || 0).toFixed(4);
+    }
+    
+    if (technical.trend) {
+      document.getElementById('adxVal').textContent = (technical.trend.adx || 0).toFixed(2);
+    }
+    
+    if (technical.volatility) {
+      document.getElementById('atrVal').textContent = (technical.volatility.atr || 0).toFixed(4);
+    }
+    
+    // Update AI analysis
+    const aiAnalysis = data.ai_analysis || {};
+    document.getElementById('aiSummary').textContent = aiAnalysis.analysis_summary || 'No analysis available';
+    setSignal(aiAnalysis.signal || 'HOLD');
+    document.getElementById('aiConfidence').textContent = aiAnalysis.confidence ? `${aiAnalysis.confidence}%` : '-';
+    document.getElementById('aiRisk').textContent = aiAnalysis.risk_level || '-';
+    document.getElementById('aiEntry').textContent = aiAnalysis.entry_price || '-';
+    document.getElementById('aiSL').textContent = aiAnalysis.stop_loss || '-';
+    document.getElementById('aiTP1').textContent = aiAnalysis.take_profit_1 || '-';
+    document.getElementById('aiTP2').textContent = aiAnalysis.take_profit_2 || '-';
+    
+    // Update trend analysis
+    document.getElementById('primaryTrend').textContent = technical.trend?.trend_direction || '-';
+    document.getElementById('primaryTrendTimeframe').textContent = `${timeframe} Trend`;
+    document.getElementById('momentum').textContent = technical.momentum?.rsi > 50 ? 'Bullish' : 'Bearish';
+    document.getElementById('momentumIndicator').textContent = `RSI: ${technical.momentum?.rsi?.toFixed(2) || '-'}`;
+    document.getElementById('volatility').textContent = technical.volatility?.volatility_pct ? 
+      (technical.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+    document.getElementById('volatilityLevel').textContent = 'ATR Based';
+    
+    // Update support and resistance
+    const sr = data.support_resistance || {};
+    document.getElementById('resistance3').textContent = sr.r3 ? sr.r3.toFixed(4) : '-';
+    document.getElementById('resistance2').textContent = sr.r2 ? sr.r2.toFixed(4) : '-';
+    document.getElementById('resistance1').textContent = sr.r1 ? sr.r1.toFixed(4) : '-';
+    document.getElementById('support1').textContent = sr.s1 ? sr.s1.toFixed(4) : '-';
+    document.getElementById('support2').textContent = sr.s2 ? sr.s2.toFixed(4) : '-';
+    document.getElementById('support3').textContent = sr.s3 ? sr.s3.toFixed(4) : '-';
+    
+    // Update market news
+    document.getElementById('fundamentalNews').textContent = 
+      data.fundamental_analysis || 'No market news available';
+    
+    updateStatusIndicator(true);
+    
+  } catch (error) {
+    console.error('Analysis error:', error);
+    document.getElementById('aiSummary').textContent = `Error: ${error.message}`;
+    updateStatusIndicator(false);
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Backtest functions
+function showBacktestModal() {
+  // Set current pair and timeframe in backtest modal
+  document.getElementById('backtestPair').value = currentPair;
+  document.getElementById('backtestTimeframe').value = currentTimeframe;
+  
+  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
+  modal.show();
+}
+
+async function runBacktest() {
+  const pair = document.getElementById('backtestPair').value;
+  const timeframe = document.getElementById('backtestTimeframe').value;
+  const initialBalance = document.getElementById('initialBalance').value;
+  const days = document.getElementById('backtestDays').value;
+  
+  document.getElementById('backtestStatus').textContent = 'Running...';
+  document.getElementById('backtestStatus').className = 'badge bg-warning';
+  document.getElementById('backtestResults').innerHTML = 
+    '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
+  
+  try {
+    const response = await fetch('/api/backtest', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pair: pair,
+        timeframe: timeframe,
+        days: parseInt(days),
+        initial_balance: parseFloat(initialBalance)
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Backtest result:', result);
+    
+    displayBacktestResults(result);
+    document.getElementById('backtestStatus').textContent = 'Completed';
+    document.getElementById('backtestStatus').className = 'badge bg-success';
+    
+  } catch (error) {
+    console.error('Backtest error:', error);
+    document.getElementById('backtestResults').innerHTML = 
+      `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
+    document.getElementById('backtestStatus').textContent = 'Failed';
+    document.getElementById('backtestStatus').className = 'badge bg-danger';
+  }
+}
+
+function displayBacktestResults(result) {
+  const summary = result.summary || {};
+  let html = '';
+  
+  if (result.status === 'no_trades') {
+    html = `<div class="alert alert-warning">No trades were executed during the backtest period.</div>`;
+  } else {
+    const grade = result.performance_grade || 'N/A';
+    const gradeClass = grade.startsWith('A') ? 'grade-a' : 
+                      grade.startsWith('B') ? 'grade-b' :
+                      grade.startsWith('C') ? 'grade-c' : 'grade-d';
+    
+    html = `
+      <div class="performance-grade ${gradeClass}">Performance: ${grade}</div>
+      <div class="row">
+        <div class="col-6">
+          <div class="metric-card">
+            <div class="small-muted">Total Trades</div>
+            <div class="metric-value">${summary.total_trades || 0}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="metric-card">
+            <div class="small-muted">Win Rate</div>
+            <div class="metric-value ${(summary.win_rate || 0) >= 50 ? 'change-positive' : 'change-negative'}">
+              ${(summary.win_rate || 0).toFixed(1)}%
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-6">
+          <div class="metric-card">
+            <div class="small-muted">Total Profit</div>
+            <div class="metric-value ${(summary.total_profit || 0) >= 0 ? 'change-positive' : 'change-negative'}">
+              $${(summary.total_profit || 0).toFixed(2)}
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="metric-card">
+            <div class="small-muted">Final Balance</div>
+            <div class="metric-value">$${(summary.final_balance || 0).toFixed(2)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  document.getElementById('backtestResults').innerHTML = html;
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize charts
+  initializeCharts();
+  
+  // Set up event listeners
+  document.getElementById('analyzeBtn').addEventListener('click', analyze);
+  document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+  document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+  
+  document.getElementById('pairSelect').addEventListener('change', analyze);
+  document.getElementById('timeframeSelect').addEventListener('change', analyze);
+  
+  // Timeframe buttons
+  document.querySelectorAll('.timeframe-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      // Remove active class from all buttons
+      document.querySelectorAll('.timeframe-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Add active class to clicked button
+      this.classList.add('active');
+      
+      // Update timeframe select
+      const timeframe = this.getAttribute('data-tf');
+      document.getElementById('timeframeSelect').value = timeframe;
+      
+      // Trigger analysis
+      analyze();
+    });
   });
-});
-
-// Period selector event listener
-document.getElementById('periodSelect').addEventListener('change', function() {
-  const timeframe = document.querySelector('.timeframe-btn.active').getAttribute('data-tf');
-  const period = this.value;
-  loadChartData(timeframe, period);
-});
-
-// Analysis tabs functionality
-document.querySelectorAll('.analysis-tab').forEach(tab => {
-  tab.addEventListener('click', function() {
-    // Remove active class from all tabs
-    document.querySelectorAll('.analysis-tab').forEach(t => t.classList.remove('active'));
-    
-    // Add active class to clicked tab
-    this.classList.add('active');
-    
-    // Here you would show/hide different analysis content
-    // For now, we'll just log the selected tab
-    console.log('Selected analysis tab:', this.getAttribute('data-tab'));
+  
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    chart.resize(document.getElementById('chartRoot').clientWidth, 520);
+    macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
   });
-});
-
-// Initialize with default data
-loadChartData('4H', '6M');
-
-// Handle window resize
-window.addEventListener('resize', () => {
-  chart.resize(document.getElementById('chartRoot').clientWidth, 520);
-  macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
+  
+  // Initial analysis
+  analyze();
+  
+  // Auto-refresh every 30 seconds
+  setInterval(analyze, 30000);
 });
 </script>
 </body>
