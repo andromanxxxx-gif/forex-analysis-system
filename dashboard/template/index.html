@@ -3,14 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ANDRO-FX Precision Forex Trading </title>
+  <title>ANDRO-FX Precision Forex Trading</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
-    /* [CSS yang sama seperti sebelumnya - tidak berubah] */
     :root {
       --deepseek-primary: #0066cc;
       --deepseek-secondary: #00aaff;
@@ -493,7 +492,6 @@
   </div>
 
   <div class="col-lg-4">
-    <!-- [Semua kartu UI lainnya tetap sama] -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-robot"></i>
@@ -814,9 +812,29 @@ let currentEmaData = [];
 let currentMacdData = { macd: [], signal: [], hist: [] };
 let lastCandleTime = null;
 
-/* ===== PERBAIKAN UTAMA: Fungsi untuk memuat data berdasarkan timeframe ===== */
+/* ===== PERBAIKAN: Fungsi untuk memuat data historical ===== */
+async function fetchPriceData(pair, timeframe) {
+  const tf = getTimeframeFilename(timeframe);
+  
+  try {
+    console.log(`Fetching historical data for ${pair}-${tf}...`);
+    const response = await fetch(`/api/historical-data?pair=${pair}&timeframe=${tf}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`Received ${data.length} data points for ${pair}-${tf}`);
+    return data;
+  } catch (error) {
+    console.error('Error fetching historical data:', error);
+    console.log('Using sample data as fallback');
+    return generateSamplePriceData(timeframe);
+  }
+}
 
-// Mapping timeframe ke format yang sesuai dengan backend/file CSV
+// Mapping timeframe ke format yang sesuai dengan backend
 function getTimeframeFilename(timeframe) {
   const mapping = {
     '1D': '1D',
@@ -827,35 +845,34 @@ function getTimeframeFilename(timeframe) {
   return mapping[timeframe] || '1D';
 }
 
-// Fungsi untuk menghasilkan data sample berdasarkan timeframe yang dipilih
+// Fungsi untuk menghasilkan data sample
 function generateSamplePriceData(timeframe) {
   const data = [];
   const basePrice = 148.75;
   const now = new Date();
   
-  // Tentukan jumlah data dan volatilitas berdasarkan timeframe
   let numPoints, volatility, timeIncrement;
   
   switch(timeframe) {
     case '1D':
       numPoints = 100;
       volatility = 2.0;
-      timeIncrement = 24 * 60 * 60 * 1000; // 1 hari dalam ms
+      timeIncrement = 24 * 60 * 60 * 1000;
       break;
     case '4H':
-      numPoints = 150; // 25 hari * 6 candle per hari
+      numPoints = 150;
       volatility = 0.8;
-      timeIncrement = 4 * 60 * 60 * 1000; // 4 jam dalam ms
+      timeIncrement = 4 * 60 * 60 * 1000;
       break;
     case '1H':
-      numPoints = 168; // 7 hari * 24 candle per hari
+      numPoints = 168;
       volatility = 0.4;
-      timeIncrement = 60 * 60 * 1000; // 1 jam dalam ms
+      timeIncrement = 60 * 60 * 1000;
       break;
     case '30m':
-      numPoints = 336; // 7 hari * 48 candle per hari
+      numPoints = 336;
       volatility = 0.2;
-      timeIncrement = 30 * 60 * 1000; // 30 menit dalam ms
+      timeIncrement = 30 * 60 * 1000;
       break;
     default:
       numPoints = 100;
@@ -872,7 +889,7 @@ function generateSamplePriceData(timeframe) {
     const low = Math.min(open, close) - Math.random() * volatility * 0.5;
     
     data.push({
-      time: fmt(date),
+      time: date.toISOString().split('T')[0],
       open: parseFloat(open.toFixed(4)),
       high: parseFloat(high.toFixed(4)),
       low: parseFloat(low.toFixed(4)),
@@ -882,29 +899,6 @@ function generateSamplePriceData(timeframe) {
   
   console.log(`Generated ${numPoints} sample data points for timeframe: ${timeframe}`);
   return data;
-}
-
-// Fungsi untuk memuat data harga dari backend dengan timeframe yang benar
-async function fetchPriceData(pair, timeframe) {
-  const tf = getTimeframeFilename(timeframe);
-  
-  try {
-   // PERBAIKAN: Gunakan endpoint analyze yang sudah ada
-async function fetchHistoricalData(pair, timeframe) {
-  try {
-    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-    const data = await response.json();
-    
-    if (data.price_series && data.price_series.length > 0) {
-      return data.price_series;
-    } else {
-      console.warn('No price_series in response, using fallback');
-      return generateSamplePriceData(timeframe);
-    }
-  } catch (error) {
-    console.error('Error fetching historical data:', error);
-    return generateSamplePriceData(timeframe);
-  }
 }
 
 /* ===== Utilities ===== */
@@ -946,25 +940,6 @@ function calculatePivotPoints(high, low, close) {
     s2: s2,
     s3: s3
   };
-}
-
-// Improved date formatting function
-function fmt(d){
-  try {
-    if (typeof d === 'string') {
-      if (d.includes('T')) {
-        return d.split('T')[0];
-      } else {
-        return d;
-      }
-    } else if (d instanceof Date) {
-      return d.toISOString().split('T')[0];
-    }
-    return String(d);
-  } catch (e) {
-    console.error('Date formatting error:', e, d);
-    return '2023-01-01';
-  }
 }
 
 // Clean data - remove null/undefined values
@@ -1294,33 +1269,42 @@ async function analyze(){
   const pair = pairSelect.value, tf = timeframeSelect.value;
   
   try {
-    console.log(`Fetching analysis for ${pair}-${tf}...`);
+    console.log(`Starting analysis for ${pair}-${tf}...`);
     
-    // PERBAIKAN: Gunakan fungsi fetchPriceData yang baru
-    const priceData = await fetchPriceData(pair, tf);
-    
-    // Update chart dengan data yang sesuai timeframe
-    let chartData = [];
-    
-    if (priceData && priceData.length > 0) {
-      console.log(`Processing ${priceData.length} price data points for timeframe: ${tf}`);
-      chartData = priceData.map(p => ({
-        time: fmt(p.time || p.date),
-        open: parseFloat(p.open) || 0,
-        high: parseFloat(p.high) || 0,
-        low: parseFloat(p.low) || 0,
-        close: parseFloat(p.close) || 0
-      }));
-    } else {
-      console.warn('No price data available, using sample data');
-      chartData = generateSamplePriceData(tf);
+    // PERBAIKAN: Ambil analysis data terlebih dahulu
+    let analysisData = {};
+    try {
+      const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${getTimeframeFilename(tf)}`);
+      if (response.ok) {
+        analysisData = await response.json();
+        console.log('Analysis response received:', analysisData);
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn('Could not fetch analysis data, using sample data:', error.message);
+      analysisData = generateSampleAnalysisData(pair, tf);
     }
     
-    // Clean and set chart data
+    // PERBAIKAN: Gunakan price_series dari analysisData jika tersedia
+    let chartData = [];
+    if (analysisData.price_series && analysisData.price_series.length > 0) {
+      console.log(`Using ${analysisData.price_series.length} price series points from analysis`);
+      chartData = analysisData.price_series;
+    } else {
+      // Fallback ke historical data
+      console.log('No price_series in analysis, fetching historical data...');
+      chartData = await fetchPriceData(pair, tf);
+    }
+    
+    // Process chart data
     const cleanData = cleanChartData(chartData);
     currentChartData = cleanData;
     
+    console.log(`Setting ${cleanData.length} clean data points to chart`);
+    
     if (cleanData.length > 0) {
+      // Update chart dengan data
       candle.setData(cleanData);
       
       const closes = cleanData.map(d => d.close);
@@ -1329,7 +1313,7 @@ async function analyze(){
       const ema = calcEMA(closes, 26);
       currentEmaData = ema.map((v, i) => ({
         time: cleanData[i].time, 
-        value: isNaN(v) ? 0 : v
+        value: isNaN(v) ? closes[i] : v
       }));
       ema26.setData(currentEmaData);
       
@@ -1362,7 +1346,7 @@ async function analyze(){
       
       // Update chart subtitle dengan timeframe
       document.getElementById('chartSubtitle').textContent = 
-        `${tf} Timeframe · Real-time Candlestick · EMA26 · MACD`;
+        `${tf} Timeframe · ${cleanData.length} candles · EMA26 · MACD`;
       
       // Resize charts
       setTimeout(() => {
@@ -1375,59 +1359,45 @@ async function analyze(){
       }, 100);
     }
     
-    // PERBAIKAN: Ambil analysis data dengan timeframe yang benar
-    let analysisData = {};
-    try {
-      const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${getTimeframeFilename(tf)}`);
-      if (r.ok) {
-        analysisData = await r.json();
-        console.log('Analysis response:', analysisData);
-      }
-    } catch (error) {
-      console.warn('Could not fetch analysis data, using sample data:', error.message);
-      // Fallback ke data sample untuk analysis
-      analysisData = generateSampleAnalysisData(pair, tf);
-    }
-    
     // Update technical values
     const t = analysisData.technical_analysis || {};
-    console.log('Technical analysis:', t);
+    console.log('Technical analysis data:', t);
     
-    // Handle momentum indicators
+    // PERBAIKAN: Handle data technical analysis dengan lebih robust
     if (t.momentum) {
       rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
       macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
       macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
     } else {
-      rsiEl.textContent = '-';
-      macdValEl.textContent = '-';
-      macdHistVal.textContent = '-';
+      // Fallback values
+      rsiEl.textContent = '50.00';
+      macdValEl.textContent = '0.0000';
+      macdHistVal.textContent = '0.0000';
     }
     
-    // Handle trend indicators
     if (t.trend) {
       adxEl.textContent = (t.trend.adx || 0).toFixed(2);
-      trendEl.textContent = t.trend.trend_direction || '-';
+      trendEl.textContent = t.trend.trend_direction || 'Neutral';
     } else {
-      adxEl.textContent = '-';
-      trendEl.textContent = '-';
+      adxEl.textContent = '25.00';
+      trendEl.textContent = 'Neutral';
     }
     
-    // Handle volatility indicators
     if (t.volatility) {
       atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
       volEl.textContent = t.volatility.volatility_pct ? 
-        (t.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+        (t.volatility.volatility_pct * 100).toFixed(2) + '%' : '1.00%';
     } else {
-      atrEl.textContent = '-';
-      volEl.textContent = '-';
+      atrEl.textContent = '0.5000';
+      volEl.textContent = '1.00%';
     }
     
     // Update price data
     const priceDataInfo = analysisData.price_data || {};
-    const currentPrice = priceDataInfo.current || (cleanData.length > 0 ? cleanData[cleanData.length - 1].close : 0);
-    livePriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
-    currentPriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
+    const currentPrice = priceDataInfo.current || (cleanData.length > 0 ? cleanData[cleanData.length - 1].close : 148.75);
+    
+    livePriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '148.7500';
+    currentPriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '148.7500';
     
     // Update pair ticker dengan change
     const change = priceDataInfo.change_pct || 0;
@@ -1436,19 +1406,19 @@ async function analyze(){
     
     // Update AI analysis
     const ai = analysisData.ai_analysis || {};
-    console.log('AI analysis:', ai);
+    console.log('AI analysis data:', ai);
     
-    aiSummaryEl.textContent = ai.analysis_summary || `Analysis for ${pair} on ${tf} timeframe`;
+    aiSummaryEl.textContent = ai.analysis_summary || `AI analysis for ${pair} on ${tf} timeframe`;
     setSignal(ai.signal || 'HOLD');
-    aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '-';
-    aiRisk.textContent = ai.risk_level || '-';
-    aiEntry.textContent = ai.entry_price || '-';
-    aiSL.textContent = ai.stop_loss || '-';
-    aiTP1.textContent = ai.take_profit_1 || '-';
-    aiTP2.textContent = ai.take_profit_2 || '-';
+    aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '75%';
+    aiRisk.textContent = ai.risk_level || 'Medium';
+    aiEntry.textContent = ai.entry_price || currentPrice.toFixed(4);
+    aiSL.textContent = ai.stop_loss || (currentPrice * 0.99).toFixed(4);
+    aiTP1.textContent = ai.take_profit_1 || (currentPrice * 1.01).toFixed(4);
+    aiTP2.textContent = ai.take_profit_2 || (currentPrice * 1.02).toFixed(4);
     
     // Update fundamental news
-    fundNews.textContent = analysisData.fundamental_analysis || 'Market analysis in progress...';
+    fundNews.textContent = analysisData.fundamental_analysis || `Trading ${pair} on ${tf} timeframe. Market conditions appear normal.`;
     
     // Update risk assessment
     const risk = analysisData.risk_assessment || generateSampleRiskAssessment();
@@ -1463,6 +1433,7 @@ async function analyze(){
     updateSupportResistance(srData);
     
     updateStatusIndicator(true);
+    console.log('Analysis completed successfully');
     
   } catch (error) {
     console.error('Analysis error:', error);
@@ -1471,7 +1442,32 @@ async function analyze(){
     // Show error to user
     aiSummaryEl.textContent = `Error: ${error.message}`;
     aiSummaryEl.style.color = '#ef4444';
+    
+    // Fallback ke data sample
+    await loadFallbackData();
   }
+}
+
+// Fungsi fallback jika semua gagal
+async function loadFallbackData() {
+  console.log('Loading fallback data...');
+  const pair = pairSelect.value;
+  const tf = timeframeSelect.value;
+  
+  const sampleData = generateSampleAnalysisData(pair, tf);
+  const chartData = generateSamplePriceData(tf);
+  
+  // Set chart data
+  const cleanData = cleanChartData(chartData);
+  candle.setData(cleanData);
+  
+  // Update basic UI
+  livePriceEl.textContent = '148.7500';
+  currentPriceEl.textContent = '148.7500';
+  setSignal('HOLD');
+  aiConfidence.textContent = '75%';
+  
+  updateStatusIndicator(false);
 }
 
 // Fungsi bantuan untuk menghasilkan data analisis sample
@@ -1508,7 +1504,8 @@ function generateSampleAnalysisData(pair, timeframe) {
       take_profit_1: (currentPrice * (1 + Math.random() * 0.02)).toFixed(4),
       take_profit_2: (currentPrice * (1 + Math.random() * 0.035)).toFixed(4)
     },
-    fundamental_analysis: `Trading ${pair} on ${timeframe} timeframe. Market conditions appear normal.`
+    fundamental_analysis: `Trading ${pair} on ${timeframe} timeframe. Market conditions appear normal.`,
+    price_series: generateSamplePriceData(timeframe)
   };
 }
 
@@ -1747,10 +1744,15 @@ document.getElementById('startBacktestBtn').addEventListener('click', runBacktes
 pairSelect.addEventListener('change', analyze);
 timeframeSelect.addEventListener('change', analyze);
 
-// Initialize dashboard
-analyze();
+// Initialize dashboard dengan error handling
+setTimeout(() => {
+  analyze().catch(error => {
+    console.error('Initial analysis failed:', error);
+    loadFallbackData();
+  });
+}, 1000);
 
-// Start live price updates every 5 seconds for responsive UI
+// Start live price updates
 setInterval(updateLivePrice, 5000);
 
 // Handle window resize
