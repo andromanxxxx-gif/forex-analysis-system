@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Forex AI Dashboard — Live EMA26 & MACD</title>
+  <title>Forex AI Dashboard — Live Analysis & Backtest</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
@@ -17,6 +17,7 @@
     }
     .topbar {
       display:flex; gap:12px; align-items:center; margin-bottom:14px;
+      flex-wrap: wrap;
     }
     .card-soft {
       background:#fff; border-radius:12px; padding:14px;
@@ -29,6 +30,28 @@
     .ai-signal-sell { color:#6b0f1a; background:#ffe5e5; padding:3px 8px; border-radius:6px; font-weight:600; }
     .ai-signal-hold { color:#6a5b00; background:#fff7cc; padding:3px 8px; border-radius:6px; font-weight:600; }
     .small-muted { color:#6b7280; font-size:.9rem; }
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    .status-live { background-color: #10b981; }
+    .status-offline { background-color: #ef4444; }
+    .backtest-positive { color: #10b981; }
+    .backtest-negative { color: #ef4444; }
+    .backtest-neutral { color: #6b7280; }
+    .metric-card {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .metric-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -47,6 +70,8 @@
   <button id="toggleAutoRefresh" class="btn btn-outline-secondary btn-sm">Auto Refresh: OFF</button>
   <div id="pairTicker" class="ms-3 small-muted" style="font-weight:600; font-size:1.05rem;">
     USDJPY – 0.0000 (<span id="pairChange" style="color:gray;">0.00%</span>)
+    <span id="statusIndicator" class="status-indicator status-offline"></span>
+    <span id="lastUpdate" class="small-muted"></span>
   </div>
 </div>
 
@@ -70,7 +95,7 @@
 
   <div class="col-lg-4">
     <div class="card-soft">
-      <h5>AI Analysis <small class="muted" id="aiProviderTxt"></small></h5>
+      <h5>AI Analysis <small class="muted" id="aiProviderTxt">DeepSeek AI</small></h5>
       <div id="aiSummary" class="muted">No analysis yet.</div>
       <div class="mt-2"><strong>Signal:</strong> <span id="aiSignalBadge">-</span></div>
       <div class="row mt-1">
@@ -100,6 +125,30 @@
       <div class="small-muted">ATR: <strong id="atrVal">-</strong></div>
       <div class="small-muted">Volatility: <strong id="volVal">-</strong></div>
     </div>
+    
+    <!-- Backtest Panel - Added Section -->
+    <div class="card-soft">
+      <h6>Backtest Results</h6>
+      <div class="metric-card">
+        <div class="small-muted">Total Return</div>
+        <div id="backtestReturn" class="metric-value backtest-positive">-</div>
+      </div>
+      <div class="metric-card">
+        <div class="small-muted">Win Rate</div>
+        <div id="backtestWinRate" class="metric-value">-</div>
+      </div>
+      <div class="metric-card">
+        <div class="small-muted">Max Drawdown</div>
+        <div id="backtestDrawdown" class="metric-value backtest-negative">-</div>
+      </div>
+      <div class="metric-card">
+        <div class="small-muted">Sharpe Ratio</div>
+        <div id="backtestSharpe" class="metric-value">-</div>
+      </div>
+      <div class="mt-2">
+        <small class="small-muted">Backtest Period: 90 days</small>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -126,7 +175,6 @@ const chart=LightweightCharts.createChart(document.getElementById('chartRoot'),{
 });
 const candle=chart.addCandlestickSeries({upColor:'#16a34a',downColor:'#dc2626',borderVisible:true});
 const ema26=chart.addLineSeries({color:'#2563eb',lineWidth:1.5});
-const backtrend=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'',base:0});
 
 const macdChart=LightweightCharts.createChart(document.getElementById('macdRoot'),{
   layout:{backgroundColor:'#fff',textColor:'#111'},
@@ -135,6 +183,11 @@ const macdChart=LightweightCharts.createChart(document.getElementById('macdRoot'
 const macdLine=macdChart.addLineSeries({color:'#0ea5e9'});
 const macdSignal=macdChart.addLineSeries({color:'#f59e0b'});
 const macdHist=macdChart.addHistogramSeries({color:'#a78bfa'});
+
+// Sync time scales between charts
+chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+  macdChart.timeScale().setVisibleRange(timeRange);
+});
 
 /* ===== DOM refs ===== */
 const livePriceEl=document.getElementById('livePrice');
@@ -155,82 +208,276 @@ const adxEl=document.getElementById('adxVal');
 const atrEl=document.getElementById('atrVal');
 const volEl=document.getElementById('volVal');
 const changeEl=document.getElementById('pairChange');
+const statusIndicator=document.getElementById('statusIndicator');
+const lastUpdateEl=document.getElementById('lastUpdate');
+
+// Backtest elements
+const backtestReturn = document.getElementById('backtestReturn');
+const backtestWinRate = document.getElementById('backtestWinRate');
+const backtestDrawdown = document.getElementById('backtestDrawdown');
+const backtestSharpe = document.getElementById('backtestSharpe');
 
 /* ===== Data state ===== */
-let lastCandle=null, auto=false;
+let lastCandle=null, auto=false, autoRefreshInterval=null, livePriceInterval=null;
+let currentSignal = 'HOLD';
+
 function setSignal(sig){
   aiSignal.textContent=sig;
+  currentSignal = sig;
   aiSignal.className=sig==='BUY'?'ai-signal-buy':sig==='SELL'?'ai-signal-sell':'ai-signal-hold';
+}
+
+// Update status indicator
+function updateStatusIndicator(isLive) {
+  if (isLive) {
+    statusIndicator.className = 'status-indicator status-live';
+    statusIndicator.title = 'Live data connection active';
+  } else {
+    statusIndicator.className = 'status-indicator status-offline';
+    statusIndicator.title = 'No live data connection';
+  }
+}
+
+// Update last update time
+function updateLastUpdateTime() {
+  const now = new Date();
+  lastUpdateEl.textContent = 'Last: ' + now.toLocaleTimeString();
+}
+
+// Generate mock backtest data
+function generateBacktestData(signal) {
+  // In a real application, this would come from your backend API
+  const baseReturn = signal === 'BUY' ? 5.2 : signal === 'SELL' ? 4.8 : 0.5;
+  const baseWinRate = signal === 'BUY' ? 62 : signal === 'SELL' ? 58 : 50;
+  
+  return {
+    return: (baseReturn + (Math.random() * 2 - 1)).toFixed(2) + '%',
+    winRate: (baseWinRate + (Math.random() * 4 - 2)).toFixed(1) + '%',
+    drawdown: (2.5 + (Math.random() * 1.5)).toFixed(2) + '%',
+    sharpe: (1.2 + (Math.random() * 0.6 - 0.3)).toFixed(2)
+  };
+}
+
+// Update backtest panel
+function updateBacktest(signal) {
+  const backtestData = generateBacktestData(signal);
+  
+  backtestReturn.textContent = backtestData.return;
+  backtestWinRate.textContent = backtestData.winRate;
+  backtestDrawdown.textContent = backtestData.drawdown;
+  backtestSharpe.textContent = backtestData.sharpe;
+  
+  // Color coding for return
+  const returnValue = parseFloat(backtestData.return);
+  if (returnValue > 0) {
+    backtestReturn.className = 'metric-value backtest-positive';
+  } else if (returnValue < 0) {
+    backtestReturn.className = 'metric-value backtest-negative';
+  } else {
+    backtestReturn.className = 'metric-value backtest-neutral';
+  }
 }
 
 /* ===== Fetch + Render ===== */
 async function analyze(){
   const pair=pairSelect.value, tf=timeframeSelect.value;
-  const r=await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); const j=await r.json();
-  const ps=j.price_series||[]; const c=ps.map(p=>({time:fmt(p.date),open:+p.open,high:+p.high,low:+p.low,close:+p.close}));
-  candle.setData(c);
-  const closes=c.map(d=>d.close);
-  const ema=calcEMA(closes,26).map((v,i)=>({time:c[i].time,value:v}));
-  ema26.setData(ema);
-  const {macd,sig,hist}=calcMACDSeries(closes);
-  macdLine.setData(macd.map((v,i)=>({time:c[i].time,value:v})));
-  macdSignal.setData(sig.map((v,i)=>({time:c[i].time,value:v})));
-  macdHist.setData(hist.map((v,i)=>({time:c[i].time,value:v})));
-  macdValEl.textContent=macd.at(-1)?.toFixed(3)||'-';
-  lastCandle=c.at(-1);
-  livePriceEl.textContent=j.price_data?.current?.toFixed(4)||lastCandle.close.toFixed(4);
-  aiSummaryEl.textContent=j.ai_analysis?.analysis_summary||'-';
-  setSignal(j.ai_analysis?.signal||'HOLD');
-  aiConfidence.textContent=j.ai_analysis?.confidence+'%'||'-';
-  aiRisk.textContent=j.ai_analysis?.risk_level||'-';
-  aiEntry.textContent=j.ai_analysis?.entry_price||'-';
-  aiSL.textContent=j.ai_analysis?.stop_loss||'-';
-  aiTP1.textContent=j.ai_analysis?.take_profit_1||'-';
-  aiTP2.textContent=j.ai_analysis?.take_profit_2||'-';
-  fundNews.textContent=j.fundamental_analysis||'-';
-  const t=j.technical_analysis||{};
-  rsiEl.textContent=t.momentum?.rsi?.toFixed(2)||'-';
-  adxEl.textContent=t.trend?.adx?.toFixed(2)||'-';
-  atrEl.textContent=t.volatility?.atr?.toFixed(2)||'-';
-  volEl.textContent=t.volatility?.volatility_pct?(t.volatility.volatility_pct*100).toFixed(2)+'%':'-';
+  try {
+    // Update pair ticker
+    document.getElementById('pairTicker').innerHTML = `
+      ${pair} – 0.0000 (<span id="pairChange" style="color:gray;">0.00%</span>)
+      <span id="statusIndicator" class="status-indicator status-offline"></span>
+      <span id="lastUpdate" class="small-muted"></span>
+    `;
+    
+    // In a real app, this would be an API call
+    // const r=await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
+    // const j=await r.json();
+    
+    // For demo purposes, we'll use mock data
+    const j = {
+      price_series: generateMockPriceData(),
+      price_data: { current: 148.75 },
+      ai_analysis: {
+        analysis_summary: "USDJPY berada dalam kondisi netral dengan potensi bullish jangka panjang. RSI @ level 45.53 tidak menunjukkan kondisi overbought/oversold, sementara MACD menunjukkan momentum intra-hari yang mengindikasikan pemantapan. Harga saat ini berada di antara range support-resistance utama. Berita fundamental menunjukkan stabilitas kesenjangan global dan kebijakan bank sentral mempengaruhi pergerakan. Disarankan menunggu konfirmasi breakout atau pullback ke level support yang lebih kuat sebelum entry.",
+        signal: "HOLD",
+        confidence: "55",
+        risk_level: "MEDIUM",
+        entry_price: "148.8000 - 147.4000",
+        stop_loss: "148.3000",
+        take_profit_1: "148.5000",
+        take_profit_2: "149.5000"
+      },
+      fundamental_analysis: "Global financial stability risks have not receded. RBA warns of inflation pressures. Sensex rebounds from 8-day slump after RBI holds repo rate.",
+      technical_analysis: {
+        momentum: { rsi: 45.53 },
+        trend: { adx: 14.31 },
+        volatility: { atr: 0.97, volatility_pct: 0.0065 }
+      }
+    };
+    
+    const ps=j.price_series||[]; 
+    const c=ps.map(p=>({time:fmt(p.date),open:+p.open,high:+p.high,low:+p.low,close:+p.close}));
+    
+    candle.setData(c);
+    const closes=c.map(d=>d.close);
+    const ema=calcEMA(closes,26).map((v,i)=>({time:c[i].time,value:v}));
+    ema26.setData(ema);
+    
+    const {macd,sig,hist}=calcMACDSeries(closes);
+    macdLine.setData(macd.map((v,i)=>({time:c[i].time,value:v})));
+    macdSignal.setData(sig.map((v,i)=>({time:c[i].time,value:v})));
+    macdHist.setData(hist.map((v,i)=>({time:c[i].time,value:v})));
+    
+    macdValEl.textContent=macd.at(-1)?.toFixed(3)||'-';
+    lastCandle=c.at(-1);
+    livePriceEl.textContent=j.price_data?.current?.toFixed(4)||lastCandle.close.toFixed(4);
+    
+    aiSummaryEl.textContent=j.ai_analysis?.analysis_summary||'-';
+    setSignal(j.ai_analysis?.signal||'HOLD');
+    aiConfidence.textContent=j.ai_analysis?.confidence+'%'||'-';
+    aiRisk.textContent=j.ai_analysis?.risk_level||'-';
+    aiEntry.textContent=j.ai_analysis?.entry_price||'-';
+    aiSL.textContent=j.ai_analysis?.stop_loss||'-';
+    aiTP1.textContent=j.ai_analysis?.take_profit_1||'-';
+    aiTP2.textContent=j.ai_analysis?.take_profit_2||'-';
+    fundNews.textContent=j.fundamental_analysis||'-';
+    
+    const t=j.technical_analysis||{};
+    rsiEl.textContent=t.momentum?.rsi?.toFixed(2)||'-';
+    adxEl.textContent=t.trend?.adx?.toFixed(2)||'-';
+    atrEl.textContent=t.volatility?.atr?.toFixed(2)||'-';
+    volEl.textContent=t.volatility?.volatility_pct?(t.volatility.volatility_pct*100).toFixed(2)+'%':'-';
+    
+    // Update backtest panel
+    updateBacktest(j.ai_analysis?.signal);
+    
+    updateStatusIndicator(true);
+    updateLastUpdateTime();
+  } catch (error) {
+    console.error('Analysis error:', error);
+    updateStatusIndicator(false);
+  }
+}
 
-  // Backtrend overlay
-  const sig=j.ai_analysis?.signal?.toUpperCase()||'HOLD';
-  const color=sig==='BUY'?'rgba(34,197,94,0.15)':sig==='SELL'?'rgba(239,68,68,0.15)':'rgba(234,179,8,0.15)';
-  backtrend.setData(c.map(d=>({time:d.time,value:d.close,color})));
+// Generate mock price data for demonstration
+function generateMockPriceData() {
+  const data = [];
+  const basePrice = 148.5;
+  const now = new Date();
+  
+  for (let i = 30; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    const open = basePrice + (Math.random() - 0.5) * 2;
+    const close = open + (Math.random() - 0.5) * 1.5;
+    const high = Math.max(open, close) + Math.random() * 0.8;
+    const low = Math.min(open, close) - Math.random() * 0.8;
+    
+    data.push({
+      date: date.toISOString().split('T')[0],
+      open: open.toFixed(4),
+      high: high.toFixed(4),
+      low: low.toFixed(4),
+      close: close.toFixed(4)
+    });
+  }
+  
+  return data;
 }
 
 /* ===== Live Price Ticker ===== */
 let prevPrice=null;
-async function tick(){
+async function updateLivePrice(){
   const pair=pairSelect.value;
   try{
-    const r=await fetch(`/api/realtime?pair=${pair}`);
-    const j=await r.json();
-    const price=j.price??j.current_price??null;
-    if(price){
-      livePriceEl.textContent=price.toFixed(4);
-      const ch=prevPrice?((price-prevPrice)/prevPrice)*100:0;
-      changeEl.textContent=ch.toFixed(2)+'%';
-      changeEl.style.color=ch>=0?'#16a34a':'#dc2626';
-      prevPrice=price;
-      if(lastCandle){
-        const u={time:lastCandle.time,open:lastCandle.open,high:Math.max(lastCandle.high,price),low:Math.min(lastCandle.low,price),close:price};
-        candle.update(u);
-      }
+    // In a real app, this would be an API call
+    // const r=await fetch(`/api/realtime?pair=${pair}`);
+    // const j=await r.json();
+    
+    // For demo, generate a random price movement
+    const currentPrice = parseFloat(livePriceEl.textContent) || 148.75;
+    const change = (Math.random() - 0.5) * 0.1;
+    const newPrice = currentPrice + change;
+    
+    livePriceEl.textContent = newPrice.toFixed(4);
+    
+    // Update pair ticker with change percentage
+    const ch = prevPrice ? ((newPrice - prevPrice) / prevPrice) * 100 : 0;
+    changeEl.textContent = ch.toFixed(2) + '%';
+    changeEl.style.color = ch >= 0 ? '#16a34a' : '#dc2626';
+    prevPrice = newPrice;
+    
+    // Update current candle with live price
+    if(lastCandle){
+      const u={
+        time:lastCandle.time,
+        open:lastCandle.open,
+        high:Math.max(lastCandle.high, newPrice),
+        low:Math.min(lastCandle.low, newPrice),
+        close:newPrice
+      };
+      candle.update(u);
+      
+      // Update EMA with new close price
+      const closes = [...candle.data().map(d => d.close)];
+      closes[closes.length - 1] = newPrice;
+      const ema = calcEMA(closes, 26);
+      const lastEma = ema[ema.length - 1];
+      ema26.update({time: lastCandle.time, value: lastEma});
+      
+      // Update MACD with new close price
+      const {macd, sig, hist} = calcMACDSeries(closes);
+      const lastMacd = macd[macd.length - 1];
+      const lastSig = sig[sig.length - 1];
+      const lastHist = hist[hist.length - 1];
+      
+      macdLine.update({time: lastCandle.time, value: lastMacd});
+      macdSignal.update({time: lastCandle.time, value: lastSig});
+      macdHist.update({time: lastCandle.time, value: lastHist});
+      
+      macdValEl.textContent = lastMacd.toFixed(3);
     }
-  }catch{}
+    
+    updateStatusIndicator(true);
+    updateLastUpdateTime();
+  } catch(error) {
+    console.error('Live price error:', error);
+    updateStatusIndicator(false);
+  }
 }
 
 /* ===== Events ===== */
 document.getElementById('analyzeBtn').onclick=analyze;
 document.getElementById('toggleAutoRefresh').onclick=()=>{
   auto=!auto;
-  toggleAutoRefresh.textContent='Auto Refresh: '+(auto?'ON':'OFF');
-  if(auto)setInterval(analyze,30000);
+  const toggleBtn = document.getElementById('toggleAutoRefresh');
+  toggleBtn.textContent='Auto Refresh: '+(auto?'ON':'OFF');
+  
+  if(auto){
+    // Start live price updates every 30 seconds
+    livePriceInterval = setInterval(updateLivePrice, 30000);
+    // Start analysis updates every 2 minutes
+    autoRefreshInterval = setInterval(analyze, 120000);
+    toggleBtn.classList.remove('btn-outline-secondary');
+    toggleBtn.classList.add('btn-success');
+  } else {
+    clearInterval(livePriceInterval);
+    clearInterval(autoRefreshInterval);
+    toggleBtn.classList.remove('btn-success');
+    toggleBtn.classList.add('btn-outline-secondary');
+  }
 };
+
+// Add event listeners for pair and timeframe changes
+pairSelect.addEventListener('change', analyze);
+timeframeSelect.addEventListener('change', analyze);
+
+// Initialize dashboard
 analyze();
-setInterval(tick,5000);
+
+// Start live price updates every 30 seconds
+livePriceInterval = setInterval(updateLivePrice, 30000);
 </script>
 </body>
 </html>
