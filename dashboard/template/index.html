@@ -3,29 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AndroFX - Precision ForeX Trading</title>
+  <title>AndroFX - Precision Forex Trading</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --andro-primary: #1a365d;
-      --andro-secondary: #2d3748;
-      --andro-accent: #3182ce;
-      --andro-success: #38a169;
-      --andro-danger: #e53e3e;
-      --andro-warning: #d69e2e;
-      --andro-info: #00a3c4;
-      --text-primary: #2d3748;
-      --text-secondary: #718096;
-      --bg-primary: #f7fafc;
-      --bg-card: #ffffff;
+      --andro-primary: #0f172a;
+      --andro-secondary: #1e293b;
+      --andro-accent: #3b82f6;
+      --andro-gradient: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+      --andro-success: #10b981;
+      --andro-danger: #ef4444;
+      --andro-warning: #f59e0b;
+      --andro-info: #06b6d4;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
       --border-radius: 16px;
-      --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.08);
-      --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
+      --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
 
     * {
@@ -33,7 +34,7 @@
     }
 
     body {
-      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       color: var(--text-primary);
       padding: 20px;
       min-height: 100vh;
@@ -45,37 +46,46 @@
       align-items: center;
       margin-bottom: 25px;
       flex-wrap: wrap;
-      padding: 20px 25px;
-      background: var(--bg-card);
+      padding: 20px 30px;
+      background: rgba(30, 41, 59, 0.8);
       border-radius: var(--border-radius);
-      box-shadow: var(--shadow-soft);
-      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow-glow);
+      border: 1px solid rgba(59, 130, 246, 0.2);
       backdrop-filter: blur(10px);
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
     }
 
     .brand-logo {
       display: flex;
       align-items: center;
       gap: 12px;
+      font-family: 'Orbitron', sans-serif;
       font-weight: 700;
-      font-size: 1.8rem;
-      background: linear-gradient(135deg, var(--andro-primary) 0%, var(--andro-accent) 100%);
+      font-size: 2rem;
+      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
     }
 
     .brand-tagline {
       font-size: 0.9rem;
       font-weight: 500;
       color: var(--andro-info);
-      margin-left: 10px;
       font-style: italic;
+      letter-spacing: 1px;
     }
 
     .brand-logo i {
-      color: var(--andro-accent);
-      font-size: 2rem;
+      color: #3b82f6;
+      font-size: 2.2rem;
+      filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
     }
 
     .card-soft {
@@ -84,40 +94,59 @@
       padding: 25px;
       box-shadow: var(--shadow-card);
       margin-bottom: 25px;
-      border: 1px solid rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(59, 130, 246, 0.1);
       backdrop-filter: blur(10px);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-soft::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--andro-gradient);
     }
 
     .card-soft:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      transform: translateY(-5px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      border-color: rgba(59, 130, 246, 0.3);
     }
 
     .section-title {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--andro-primary);
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--text-primary);
       margin-bottom: 20px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       padding-bottom: 12px;
-      border-bottom: 2px solid rgba(49, 130, 206, 0.1);
+      border-bottom: 1px solid rgba(59, 130, 246, 0.2);
     }
 
     .section-title i {
       color: var(--andro-accent);
-      background: rgba(49, 130, 206, 0.1);
-      padding: 8px;
-      border-radius: 10px;
+      background: rgba(59, 130, 246, 0.1);
+      padding: 10px;
+      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     #chartRoot { 
       height: 520px; 
       border-radius: var(--border-radius); 
       background: var(--bg-card);
-      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.04);
+      box-shadow: inset 0 2px 20px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(59, 130, 246, 0.1);
     }
     
     #macdRoot { 
@@ -125,7 +154,8 @@
       margin-top: 15px; 
       border-radius: var(--border-radius); 
       background: var(--bg-card);
-      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.04);
+      box-shadow: inset 0 2px 20px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(59, 130, 246, 0.1);
     }
 
     .muted { 
@@ -136,38 +166,58 @@
 
     .ai-signal-buy { 
       color: white; 
-      background: linear-gradient(135deg, var(--andro-success) 0%, #48bb78 100%);
-      padding: 12px 20px; 
+      background: linear-gradient(135deg, var(--andro-success) 0%, #059669 100%);
+      padding: 15px 25px; 
       border-radius: 12px; 
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: 1.4rem;
       text-align: center;
-      box-shadow: 0 6px 12px rgba(56, 161, 105, 0.3);
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
       border: 1px solid rgba(255, 255, 255, 0.2);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ai-signal-buy::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: 0.5s;
+    }
+
+    .ai-signal-buy:hover::before {
+      left: 100%;
     }
 
     .ai-signal-sell { 
       color: white; 
-      background: linear-gradient(135deg, var(--andro-danger) 0%, #fc8181 100%);
-      padding: 12px 20px; 
+      background: linear-gradient(135deg, var(--andro-danger) 0%, #dc2626 100%);
+      padding: 15px 25px; 
       border-radius: 12px; 
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: 1.4rem;
       text-align: center;
-      box-shadow: 0 6px 12px rgba(229, 62, 62, 0.3);
+      box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
       border: 1px solid rgba(255, 255, 255, 0.2);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .ai-signal-hold { 
       color: white; 
-      background: linear-gradient(135deg, var(--andro-warning) 0%, #ecc94b 100%);
-      padding: 12px 20px; 
+      background: linear-gradient(135deg, var(--andro-warning) 0%, #d97706 100%);
+      padding: 15px 25px; 
       border-radius: 12px; 
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: 1.4rem;
       text-align: center;
-      box-shadow: 0 6px 12px rgba(214, 158, 46, 0.3);
+      box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
       border: 1px solid rgba(255, 255, 255, 0.2);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .small-muted { 
@@ -179,11 +229,11 @@
 
     .status-indicator {
       display: inline-block;
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       margin-right: 8px;
-      box-shadow: 0 0 10px currentColor;
+      box-shadow: 0 0 15px currentColor;
     }
 
     .status-live { 
@@ -196,28 +246,32 @@
     }
 
     @keyframes pulse {
-      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(56, 161, 105, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(56, 161, 105, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(56, 161, 105, 0); }
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
     .metric-card {
-      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
       border-radius: 12px;
-      padding: 18px;
+      padding: 20px;
       margin-bottom: 15px;
       border-left: 4px solid var(--andro-accent);
-      transition: transform 0.2s ease;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(59, 130, 246, 0.1);
     }
 
     .metric-card:hover {
       transform: translateX(5px);
+      border-color: rgba(59, 130, 246, 0.3);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
     }
 
     .metric-value {
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       font-weight: 700;
-      color: var(--andro-primary);
+      color: var(--text-primary);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .backtest-panel {
@@ -226,89 +280,111 @@
     }
 
     .performance-grade {
-      font-size: 1.7rem;
+      font-size: 1.8rem;
       font-weight: bold;
       text-align: center;
-      padding: 15px;
+      padding: 20px;
       border-radius: 12px;
       margin: 15px 0;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    .grade-a { background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%); color: #22543d; }
-    .grade-b { background: linear-gradient(135deg, #fef5e7 0%, #fbd38d 100%); color: #744210; }
-    .grade-c { background: linear-gradient(135deg, #fef5e7 0%, #f6ad55 100%); color: #7b341e; }
-    .grade-d { background: linear-gradient(135deg, #fed7d7 0%, #feb2b2 100%); color: #742a2a; }
+    .grade-a { background: linear-gradient(135deg, #065f46 0%, #047857 100%); color: #ffffff; }
+    .grade-b { background: linear-gradient(135deg, #92400e 0%, #b45309 100%); color: #ffffff; }
+    .grade-c { background: linear-gradient(135deg, #78350f 0%, #92400e 100%); color: #ffffff; }
+    .grade-d { background: linear-gradient(135deg, #991b1b 0%, #b91c1c 100%); color: #ffffff; }
 
     .trading-level {
       font-size: 1.1rem;
       font-weight: 600;
-      padding: 10px 15px;
+      padding: 12px 16px;
       border-radius: 10px;
       margin: 8px 0;
-      transition: transform 0.2s ease;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .trading-level:hover {
-      transform: translateX(5px);
+      transform: translateX(8px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     }
 
     .level-entry { 
-      background: rgba(56, 161, 105, 0.1); 
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
       color: var(--andro-success);
       border-left: 4px solid var(--andro-success);
     }
 
     .level-sl { 
-      background: rgba(229, 62, 62, 0.1); 
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%);
       color: var(--andro-danger);
       border-left: 4px solid var(--andro-danger);
     }
 
     .level-tp { 
-      background: rgba(72, 187, 120, 0.1); 
-      color: #38a169;
-      border-left: 4px solid #38a169;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.15) 100%);
+      color: #22c55e;
+      border-left: 4px solid #22c55e;
     }
 
     .btn-androfx {
-      background: linear-gradient(135deg, var(--andro-primary) 0%, var(--andro-accent) 100%);
+      background: var(--andro-gradient);
       color: white;
       font-weight: 600;
       border: none;
       border-radius: 10px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-androfx::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: 0.5s;
+    }
+
+    .btn-androfx:hover::before {
+      left: 100%;
     }
 
     .btn-androfx:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(49, 130, 206, 0.4);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(59, 130, 246, 0.5);
       color: white;
     }
 
     .btn-action {
-      background: linear-gradient(135deg, var(--andro-info) 0%, #63b3ed 100%);
+      background: linear-gradient(135deg, var(--andro-info) 0%, #0891b2 100%);
       color: white;
       font-weight: 600;
       border: none;
       border-radius: 10px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(0, 163, 196, 0.3);
+      box-shadow: 0 6px 16px rgba(6, 182, 212, 0.4);
     }
 
     .btn-action:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(0, 163, 196, 0.4);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(6, 182, 212, 0.5);
       color: white;
     }
 
     .price-ticker {
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       font-weight: 700;
-      color: var(--andro-primary);
+      color: var(--text-primary);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .price-change {
@@ -335,45 +411,48 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      transition: background-color 0.2s ease;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
     }
 
     .tech-indicator:hover {
-      background-color: rgba(247, 250, 252, 0.5);
+      background: rgba(59, 130, 246, 0.05);
       border-radius: 8px;
-      padding: 10px 8px;
+      padding: 12px 10px;
+      transform: translateX(5px);
     }
 
     .indicator-value {
       font-weight: 700;
       font-size: 1.1rem;
+      color: var(--text-primary);
     }
 
     .news-container {
       max-height: 120px;
       overflow-y: auto;
-      padding: 12px;
-      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      padding: 15px;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
       border-radius: 10px;
       border-left: 4px solid var(--andro-accent);
+      border: 1px solid rgba(59, 130, 246, 0.1);
     }
 
     /* Risk Management Styles */
     .risk-meter-bar {
-      background: #e2e8f0;
+      background: #374151;
       height: 10px;
       border-radius: 5px;
       overflow: hidden;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .risk-meter-fill {
       height: 100%;
       border-radius: 5px;
       transition: width 0.5s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
     .risk-meter-labels {
@@ -388,15 +467,16 @@
     .risk-factor-card {
       display: flex;
       align-items: center;
-      padding: 10px;
+      padding: 12px;
       border-radius: 10px;
-      background: #f7fafc;
-      border: 1px solid #e2e8f0;
-      transition: transform 0.2s ease;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
     }
 
     .risk-factor-card:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     }
 
     .risk-factor-card.low {
@@ -412,7 +492,7 @@
     }
 
     .risk-factor-card.pending {
-      border-left: 4px solid #a0aec0;
+      border-left: 4px solid #6b7280;
     }
 
     .risk-factor-name {
@@ -422,7 +502,7 @@
 
     .risk-factor-status {
       font-size: 0.75rem;
-      color: #718096;
+      color: var(--text-secondary);
       font-weight: 500;
     }
 
@@ -431,11 +511,13 @@
       align-items: center;
       margin-bottom: 8px;
       font-size: 0.85rem;
-      padding: 6px 0;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .risk-tip:last-child {
       margin-bottom: 0;
+      border-bottom: none;
     }
 
     /* Support Resistance Styles */
@@ -447,25 +529,27 @@
 
     .level-card {
       flex: 1;
-      padding: 15px;
+      padding: 18px;
       border-radius: 12px;
       text-align: center;
-      transition: transform 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .level-card:hover {
-      transform: translateY(-3px);
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     }
 
     .support-card {
-      background: linear-gradient(135deg, rgba(56, 161, 105, 0.1) 0%, rgba(72, 187, 120, 0.1) 100%);
-      border: 1px solid rgba(56, 161, 105, 0.2);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.2);
     }
 
     .resistance-card {
-      background: linear-gradient(135deg, rgba(229, 62, 62, 0.1) 0%, rgba(245, 101, 101, 0.1) 100%);
-      border: 1px solid rgba(229, 62, 62, 0.2);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%);
+      border: 1px solid rgba(239, 68, 68, 0.2);
     }
 
     .level-title {
@@ -484,9 +568,10 @@
     }
 
     .level-value {
-      font-size: 1.2rem;
+      font-size: 1.3rem;
       font-weight: 700;
-      color: var(--andro-primary);
+      color: var(--text-primary);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .level-distance {
@@ -503,15 +588,15 @@
     .pivot-row {
       display: flex;
       justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px solid #f1f5f9;
-      transition: background-color 0.2s ease;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
     }
 
     .pivot-row:hover {
-      background-color: rgba(247, 250, 252, 0.5);
+      background: rgba(59, 130, 246, 0.05);
       border-radius: 6px;
-      padding: 6px 8px;
+      padding: 8px 10px;
     }
 
     .pivot-label {
@@ -523,16 +608,16 @@
     .pivot-value {
       font-size: 0.9rem;
       font-weight: 600;
-      color: var(--andro-primary);
+      color: var(--text-primary);
     }
 
     /* Custom scrollbar */
     ::-webkit-scrollbar {
-      width: 6px;
+      width: 8px;
     }
 
     ::-webkit-scrollbar-track {
-      background: #f1f1f1;
+      background: #1e293b;
       border-radius: 10px;
     }
 
@@ -542,27 +627,31 @@
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: var(--andro-primary);
+      background: #2563eb;
     }
 
     /* Form controls styling */
     .form-select, .form-control {
       border-radius: 8px;
-      border: 1px solid #e2e8f0;
-      padding: 8px 12px;
+      border: 1px solid #374151;
+      padding: 10px 12px;
       font-size: 0.9rem;
       transition: all 0.3s ease;
+      background: #1e293b;
+      color: var(--text-primary);
     }
 
     .form-select:focus, .form-control:focus {
       border-color: var(--andro-accent);
-      box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      background: #1e293b;
+      color: var(--text-primary);
     }
 
     /* Badge styling */
     .badge {
       font-weight: 600;
-      padding: 6px 10px;
+      padding: 6px 12px;
       border-radius: 8px;
       font-size: 0.75rem;
     }
@@ -577,12 +666,14 @@
     /* Modal styling */
     .modal-content {
       border-radius: 16px;
-      border: none;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      background: var(--bg-card);
+      color: var(--text-primary);
     }
 
     .modal-header {
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       padding: 20px 25px;
     }
 
@@ -591,20 +682,46 @@
     }
 
     .modal-footer {
-      border-top: 1px solid #e2e8f0;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
       padding: 20px 25px;
+    }
+
+    .btn-close {
+      filter: invert(1);
+    }
+
+    /* Trading view specific */
+    .tradingview-widget-copyright {
+      display: none;
+    }
+
+    /* Glow effects */
+    .glow {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Loading animation */
+    @keyframes shimmer {
+      0% { background-position: -468px 0; }
+      100% { background-position: 468px 0; }
+    }
+
+    .shimmer {
+      animation: shimmer 2s infinite linear;
+      background: linear-gradient(to right, #1e293b 8%, #2d3748 18%, #1e293b 33%);
+      background-size: 800px 104px;
     }
   </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="d-flex align-items-center">
+  <div class="brand-container">
     <div class="brand-logo">
       <i class="fas fa-robot"></i>
       <span>AndroFX</span>
     </div>
-    <div class="brand-tagline">Precision ForeX Trading</div>
+    <div class="brand-tagline">PRECISION TRADING</div>
   </div>
   
   <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
@@ -731,7 +848,7 @@
           <div id="riskScoreBadge" class="badge bg-secondary">Score: -/10</div>
         </div>
         
-        <div id="riskStatus" class="text-center p-4 rounded-3 mb-3" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 2px solid #bae6fd;">
+        <div id="riskStatus" class="text-center p-4 rounded-3 mb-3" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%); border: 2px solid rgba(59, 130, 246, 0.3);">
           <div class="risk-icon mb-2">
             <i class="fas fa-question-circle fa-2x text-muted"></i>
           </div>
@@ -874,7 +991,7 @@
           <span class="pivot-label">R1</span>
           <span class="pivot-value" id="pivotR1">-</span>
         </div>
-        <div class="pivot-row" style="border-bottom: 2px solid #3182ce;">
+        <div class="pivot-row" style="border-bottom: 2px solid #3b82f6;">
           <span class="pivot-label">PIVOT</span>
           <span class="pivot-value" id="pivotPoint">-</span>
         </div>
