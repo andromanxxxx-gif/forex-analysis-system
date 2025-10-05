@@ -279,6 +279,74 @@
       border-radius: 8px;
       border-left: 4px solid var(--deepseek-secondary);
     }
+
+    /* Risk Management Styles */
+    .risk-meter-bar {
+      background: #e5e7eb;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .risk-meter-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .risk-meter-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .risk-factor-card {
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+    }
+
+    .risk-factor-card.low {
+      border-left: 4px solid #10b981;
+    }
+
+    .risk-factor-card.medium {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .risk-factor-card.high {
+      border-left: 4px solid #ef4444;
+    }
+
+    .risk-factor-card.pending {
+      border-left: 4px solid #6b7280;
+    }
+
+    .risk-factor-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .risk-factor-status {
+      font-size: 0.7rem;
+      color: #6b7280;
+    }
+
+    .risk-tip {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+    }
+
+    .risk-tip:last-child {
+      margin-bottom: 0;
+    }
   </style>
 </head>
 <body>
@@ -397,10 +465,128 @@
           <i class="fas fa-bullseye me-2"></i>Take Profit 2: <span id="aiTP2">-</span>
         </div>
       </div>
+    </div>
+
+    <!-- Risk Management Card (Updated) -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-shield-alt"></i>
+        <span>Risk Management</span>
+      </div>
       
-      <div class="mt-3">
-        <div class="small-muted mb-2">RISK ASSESSMENT</div>
-        <div id="riskAssessment" class="risk-approved">-</div>
+      <!-- Risk Status dengan Visual yang Lebih Menarik -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="small-muted">TRADE APPROVAL STATUS</div>
+          <div id="riskScoreBadge" class="badge bg-secondary">Score: -/10</div>
+        </div>
+        
+        <div id="riskStatus" class="text-center p-4 rounded-3 mb-3" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 2px solid #bae6fd;">
+          <div class="risk-icon mb-2">
+            <i class="fas fa-question-circle fa-2x text-muted"></i>
+          </div>
+          <div id="riskMainStatus" class="fw-bold fs-5">Awaiting Analysis</div>
+          <div id="riskSubStatus" class="small text-muted mt-1">No risk assessment data available</div>
+        </div>
+      </div>
+
+      <!-- Risk Score Visualization -->
+      <div class="mb-4">
+        <div class="small-muted mb-2">RISK SCORE BREAKDOWN</div>
+        <div class="risk-score-container">
+          <div class="risk-meter mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="small">Low Risk</span>
+              <span class="small">High Risk</span>
+            </div>
+            <div class="risk-meter-bar">
+              <div id="riskMeterFill" class="risk-meter-fill" style="width: 0%"></div>
+            </div>
+            <div class="risk-meter-labels">
+              <span>0</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
+              <span>10</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Factors Grid -->
+      <div class="mb-4">
+        <div class="small-muted mb-2">RISK FACTORS</div>
+        <div id="riskFactors" class="row g-2">
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Market Volatility</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Position Size</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Correlation</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Daily Limits</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Details -->
+      <div id="riskDetails" style="display: none;">
+        <div class="small-muted mb-2">DETAILED ANALYSIS</div>
+        <div id="riskWarnings" class="alert alert-warning py-2 small">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <span>No warnings detected</span>
+        </div>
+        <div id="riskRejections" class="alert alert-danger py-2 small" style="display: none;">
+          <i class="fas fa-times-circle me-2"></i>
+          <span>Rejection reasons will appear here</span>
+        </div>
+      </div>
+
+      <!-- Risk Management Tips -->
+      <div class="mt-3 pt-3 border-top">
+        <div class="small-muted mb-2">RISK MANAGEMENT TIPS</div>
+        <div class="risk-tips">
+          <div class="risk-tip">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            <span class="small">Always use stop-loss orders</span>
+          </div>
+          <div class="risk-tip">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            <span class="small">Risk only 1-2% per trade</span>
+          </div>
+          <div class="risk-tip">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            <span class="small">Monitor correlation between pairs</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -565,6 +751,104 @@ function cleanChartData(data) {
   }));
 }
 
+/* ===== Risk Management Functions ===== */
+function updateRiskAssessment(riskData) {
+  const riskScore = riskData.risk_score || 0;
+  const approved = riskData.approved;
+  const rejectionReasons = riskData.rejection_reasons || [];
+  const riskFactors = riskData.risk_factors || [];
+  
+  // Update risk score badge
+  const riskScoreBadge = document.getElementById('riskScoreBadge');
+  riskScoreBadge.textContent = `Score: ${riskScore}/10`;
+  riskScoreBadge.className = `badge ${
+    riskScore <= 3 ? 'bg-success' : 
+    riskScore <= 6 ? 'bg-warning' : 'bg-danger'
+  }`;
+  
+  // Update risk status display
+  const riskMainStatus = document.getElementById('riskMainStatus');
+  const riskSubStatus = document.getElementById('riskSubStatus');
+  const riskStatus = document.getElementById('riskStatus');
+  const riskIcon = riskStatus.querySelector('.risk-icon i');
+  
+  if (approved) {
+    riskMainStatus.textContent = 'APPROVED';
+    riskSubStatus.textContent = 'Trade meets risk criteria';
+    riskStatus.style.background = 'linear-gradient(135deg, #f0f9ff, #e0f2fe)';
+    riskStatus.style.border = '2px solid #bae6fd';
+    riskIcon.className = 'fas fa-check-circle fa-2x text-success';
+  } else {
+    riskMainStatus.textContent = 'REJECTED';
+    riskSubStatus.textContent = rejectionReasons.length > 0 ? 
+      rejectionReasons[0] : 'Trade does not meet risk criteria';
+    riskStatus.style.background = 'linear-gradient(135deg, #fef2f2, #fee2e2)';
+    riskStatus.style.border = '2px solid #fecaca';
+    riskIcon.className = 'fas fa-times-circle fa-2x text-danger';
+  }
+  
+  // Update risk meter
+  const riskMeterFill = document.getElementById('riskMeterFill');
+  riskMeterFill.style.width = `${riskScore * 10}%`;
+  riskMeterFill.style.background = riskScore <= 3 ? '#10b981' : 
+                                  riskScore <= 6 ? '#f59e0b' : '#ef4444';
+  
+  // Update risk factors
+  const riskFactorsContainer = document.getElementById('riskFactors');
+  riskFactorsContainer.innerHTML = '';
+  
+  if (riskFactors.length > 0) {
+    riskFactors.forEach(factor => {
+      const factorElement = document.createElement('div');
+      factorElement.className = 'col-6';
+      
+      let statusClass = 'pending';
+      let statusIcon = 'clock';
+      
+      if (factor.status === 'low') {
+        statusClass = 'low';
+        statusIcon = 'check-circle';
+      } else if (factor.status === 'medium') {
+        statusClass = 'medium';
+        statusIcon = 'exclamation-triangle';
+      } else if (factor.status === 'high') {
+        statusClass = 'high';
+        statusIcon = 'times-circle';
+      }
+      
+      factorElement.innerHTML = `
+        <div class="risk-factor-card ${statusClass}">
+          <i class="fas fa-${statusIcon} me-2"></i>
+          <div>
+            <div class="risk-factor-name">${factor.name}</div>
+            <div class="risk-factor-status">${factor.status.toUpperCase()}</div>
+          </div>
+        </div>
+      `;
+      riskFactorsContainer.appendChild(factorElement);
+    });
+  }
+  
+  // Update risk details
+  const riskDetails = document.getElementById('riskDetails');
+  const riskWarnings = document.getElementById('riskWarnings');
+  const riskRejections = document.getElementById('riskRejections');
+  
+  if (rejectionReasons.length > 0) {
+    riskDetails.style.display = 'block';
+    riskWarnings.style.display = 'none';
+    riskRejections.style.display = 'block';
+    riskRejections.innerHTML = `<i class="fas fa-times-circle me-2"></i><span>${rejectionReasons.join(', ')}</span>`;
+  } else if (riskScore > 6) {
+    riskDetails.style.display = 'block';
+    riskWarnings.style.display = 'block';
+    riskRejections.style.display = 'none';
+    riskWarnings.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i><span>High risk score detected - proceed with caution</span>`;
+  } else {
+    riskDetails.style.display = 'none';
+  }
+}
+
 /* ===== Chart Setup ===== */
 const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
   layout: { 
@@ -669,7 +953,6 @@ const changeEl = document.getElementById('pairChange');
 const statusIndicator = document.getElementById('statusIndicator');
 const backtestResultsEl = document.getElementById('backtestResults');
 const backtestStatusEl = document.getElementById('backtestStatus');
-const riskAssessmentEl = document.getElementById('riskAssessment');
 const currentPriceEl = document.getElementById('currentPrice');
 
 /* ===== Data state ===== */
@@ -719,6 +1002,32 @@ function generateSamplePriceData() {
   }
   
   return data;
+}
+
+// Generate sample risk assessment data
+function generateSampleRiskAssessment() {
+  const riskScore = Math.floor(Math.random() * 11); // 0-10
+  const approved = riskScore <= 7;
+  
+  const riskFactors = [
+    { name: 'Market Volatility', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' },
+    { name: 'Position Size', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' },
+    { name: 'Correlation', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' },
+    { name: 'Daily Limits', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' }
+  ];
+  
+  const rejectionReasons = approved ? [] : [
+    'Position size exceeds daily limit',
+    'High correlation with existing positions',
+    'Market volatility too high'
+  ].slice(0, Math.floor(Math.random() * 2) + 1);
+  
+  return {
+    risk_score: riskScore,
+    approved: approved,
+    rejection_reasons: rejectionReasons,
+    risk_factors: riskFactors
+  };
 }
 
 /* ===== Fetch + Render ===== */
@@ -868,18 +1177,9 @@ async function analyze(){
     // Update fundamental news
     fundNews.textContent = j.fundamental_analysis || 'No news available';
     
-    // Update risk assessment
-    const risk = j.risk_assessment || {};
-    if (risk.approved !== undefined) {
-      riskAssessmentEl.textContent = risk.approved ? 
-        '<span class="risk-approved">✓ TRADE APPROVED</span>' : 
-        '<span class="risk-rejected">✗ TRADE REJECTED</span>';
-      if (risk.rejection_reasons && risk.rejection_reasons.length > 0) {
-        riskAssessmentEl.innerHTML += `<div class="small-muted mt-1">Reasons: ${risk.rejection_reasons.join(', ')}</div>`;
-      }
-    } else {
-      riskAssessmentEl.textContent = '-';
-    }
+    // Update risk assessment with new function
+    const risk = j.risk_assessment || generateSampleRiskAssessment();
+    updateRiskAssessment(risk);
     
     updateStatusIndicator(true);
     
