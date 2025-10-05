@@ -889,19 +889,20 @@ async function fetchPriceData(pair, timeframe) {
   const tf = getTimeframeFilename(timeframe);
   
   try {
-    // Coba ambil data dari endpoint dengan parameter timeframe yang benar
-    const response = await fetch(`/api/historical-data?pair=${pair}&timeframe=${tf}`);
+   // PERBAIKAN: Gunakan endpoint analyze yang sudah ada
+async function fetchHistoricalData(pair, timeframe) {
+  try {
+    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
+    const data = await response.json();
     
-    if (response.ok) {
-      const data = await response.json();
-      console.log(`Loaded ${data.length} data points for ${pair}-${tf} from backend`);
-      return data;
+    if (data.price_series && data.price_series.length > 0) {
+      return data.price_series;
     } else {
-      throw new Error(`Backend returned ${response.status}`);
+      console.warn('No price_series in response, using fallback');
+      return generateSamplePriceData(timeframe);
     }
   } catch (error) {
-    console.warn(`Could not fetch data from backend for ${pair}-${tf}, using sample data:`, error.message);
-    // Fallback ke data sample jika backend tidak tersedia
+    console.error('Error fetching historical data:', error);
     return generateSamplePriceData(timeframe);
   }
 }
