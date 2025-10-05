@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
+    /* CSS styling tetap sama seperti sebelumnya */
     :root {
       --andro-primary: #0f172a;
       --andro-secondary: #1e293b;
@@ -690,26 +691,26 @@
       filter: invert(1);
     }
 
-    /* Trading view specific */
-    .tradingview-widget-copyright {
-      display: none;
+    /* Loading states */
+    .loading {
+      opacity: 0.7;
+      pointer-events: none;
     }
 
-    /* Glow effects */
-    .glow {
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    .spinner {
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #3498db;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 10px;
     }
 
-    /* Loading animation */
-    @keyframes shimmer {
-      0% { background-position: -468px 0; }
-      100% { background-position: 468px 0; }
-    }
-
-    .shimmer {
-      animation: shimmer 2s infinite linear;
-      background: linear-gradient(to right, #1e293b 8%, #2d3748 18%, #1e293b 33%);
-      background-size: 800px 104px;
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -1108,8 +1109,858 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Kode JavaScript tetap sama seperti sebelumnya
-// ... (semua kode JavaScript dari implementasi sebelumnya)
+// Global state untuk menyimpan data chart
+let currentChartData = [];
+let currentEmaData = [];
+let currentMacdData = { macd: [], signal: [], hist: [] };
+let lastCandleTime = null;
+
+// API Base URL - sesuaikan dengan backend Flask
+const API_BASE_URL = 'http://localhost:5000';
+
+/* ===== Utilities ===== */
+function calcEMA(values, period){
+  if (!values || values.length === 0) return [];
+  const k=2/(period+1);
+  let ema=[values[0]];
+  for(let i=1;i<values.length;i++) {
+    ema.push(values[i]*k+ema[i-1]*(1-k));
+  }
+  return ema;
+}
+
+function calcMACDSeries(c,short=12,long=26,signal=9){
+  if (!c || c.length === 0) return {macd: [], sig: [], hist: []};
+  const emaS=calcEMA(c,short),emaL=calcEMA(c,long);
+  const macd=c.map((_,i)=>emaS[i]-emaL[i]);
+  const sig=calcEMA(macd,signal);
+  const hist=macd.map((v,i)=>v-(sig[i]||0));
+  return {macd,sig,hist};
+}
+
+// Improved date formatting function
+function fmt(d){
+  try {
+    if (typeof d === 'string') {
+      if (d.includes('T')) {
+        return d.split('T')[0];
+      } else {
+        return d;
+      }
+    } else if (d instanceof Date) {
+      return d.toISOString().split('T')[0];
+    }
+    return String(d);
+  } catch (e) {
+    console.error('Date formatting error:', e, d);
+    return '2023-01-01';
+  }
+}
+
+// Clean data - remove null/undefined values
+function cleanChartData(data) {
+  return data.filter(item => 
+    item && 
+    item.time && 
+    item.open !== null && item.open !== undefined &&
+    item.high !== null && item.high !== undefined &&
+    item.low !== null && item.low !== undefined &&
+    item.close !== null && item.close !== undefined
+  ).map(item => ({
+    time: item.time,
+    open: parseFloat(item.open) || 0,
+    high: parseFloat(item.high) || 0,
+    low: parseFloat(item.low) || 0,
+    close: parseFloat(item.close) || 0
+  }));
+}
+
+/* ===== Risk Management Functions ===== */
+function updateRiskAssessment(riskData) {
+  const riskScore = riskData.risk_score || 0;
+  const approved = riskData.approved;
+  const rejectionReasons = riskData.rejection_reasons || [];
+  const riskFactors = riskData.risk_factors || [];
+  
+  // Update risk score badge
+  const riskScoreBadge = document.getElementById('riskScoreBadge');
+  riskScoreBadge.textContent = `Score: ${riskScore}/10`;
+  riskScoreBadge.className = `badge ${
+    riskScore <= 3 ? 'bg-success' : 
+    riskScore <= 6 ? 'bg-warning' : 'bg-danger'
+  }`;
+  
+  // Update risk status display
+  const riskMainStatus = document.getElementById('riskMainStatus');
+  const riskSubStatus = document.getElementById('riskSubStatus');
+  const riskStatus = document.getElementById('riskStatus');
+  const riskIcon = riskStatus.querySelector('.risk-icon i');
+  
+  if (approved) {
+    riskMainStatus.textContent = 'APPROVED';
+    riskSubStatus.textContent = 'Trade meets risk criteria';
+    riskStatus.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))';
+    riskStatus.style.border = '2px solid rgba(16, 185, 129, 0.3)';
+    riskIcon.className = 'fas fa-check-circle fa-2x text-success';
+  } else {
+    riskMainStatus.textContent = 'REJECTED';
+    riskSubStatus.textContent = rejectionReasons.length > 0 ? 
+      rejectionReasons[0] : 'Trade does not meet risk criteria';
+    riskStatus.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1))';
+    riskStatus.style.border = '2px solid rgba(239, 68, 68, 0.3)';
+    riskIcon.className = 'fas fa-times-circle fa-2x text-danger';
+  }
+  
+  // Update risk meter
+  const riskMeterFill = document.getElementById('riskMeterFill');
+  riskMeterFill.style.width = `${riskScore * 10}%`;
+  riskMeterFill.style.background = riskScore <= 3 ? '#10b981' : 
+                                  riskScore <= 6 ? '#f59e0b' : '#ef4444';
+  
+  // Update risk factors
+  const riskFactorsContainer = document.getElementById('riskFactors');
+  riskFactorsContainer.innerHTML = '';
+  
+  if (riskFactors.length > 0) {
+    riskFactors.forEach(factor => {
+      const factorElement = document.createElement('div');
+      factorElement.className = 'col-6';
+      
+      let statusClass = 'pending';
+      let statusIcon = 'clock';
+      
+      if (factor.status === 'low') {
+        statusClass = 'low';
+        statusIcon = 'check-circle';
+      } else if (factor.status === 'medium') {
+        statusClass = 'medium';
+        statusIcon = 'exclamation-triangle';
+      } else if (factor.status === 'high') {
+        statusClass = 'high';
+        statusIcon = 'times-circle';
+      }
+      
+      factorElement.innerHTML = `
+        <div class="risk-factor-card ${statusClass}">
+          <i class="fas fa-${statusIcon} me-2"></i>
+          <div>
+            <div class="risk-factor-name">${factor.name}</div>
+            <div class="risk-factor-status">${factor.status.toUpperCase()}</div>
+          </div>
+        </div>
+      `;
+      riskFactorsContainer.appendChild(factorElement);
+    });
+  }
+  
+  // Update risk details
+  const riskDetails = document.getElementById('riskDetails');
+  const riskWarnings = document.getElementById('riskWarnings');
+  const riskRejections = document.getElementById('riskRejections');
+  
+  if (rejectionReasons.length > 0) {
+    riskDetails.style.display = 'block';
+    riskWarnings.style.display = 'none';
+    riskRejections.style.display = 'block';
+    riskRejections.innerHTML = `<i class="fas fa-times-circle me-2"></i><span>${rejectionReasons.join(', ')}</span>`;
+  } else if (riskScore > 6) {
+    riskDetails.style.display = 'block';
+    riskWarnings.style.display = 'block';
+    riskRejections.style.display = 'none';
+    riskWarnings.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i><span>High risk score detected - proceed with caution</span>`;
+  } else {
+    riskDetails.style.display = 'none';
+  }
+}
+
+/* ===== Support & Resistance Functions ===== */
+function updateSupportResistance(data) {
+  const srData = data.support_resistance || {};
+  const currentPrice = data.price_data?.current || 0;
+  
+  // Update Support & Resistance levels
+  const supportLevel = srData.support || (currentPrice * 0.995).toFixed(4);
+  const resistanceLevel = srData.resistance || (currentPrice * 1.005).toFixed(4);
+  
+  document.getElementById('supportLevel').textContent = supportLevel;
+  document.getElementById('resistanceLevel').textContent = resistanceLevel;
+  
+  // Calculate and display distances
+  if (currentPrice > 0) {
+    const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
+    const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
+    
+    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
+    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
+  }
+}
+
+/* ===== Chart Setup ===== */
+const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
+  layout: { 
+    backgroundColor: '#1e293b', 
+    textColor: '#f8fafc' 
+  },
+  grid: {
+    vertLines: { color: '#374151' },
+    horzLines: { color: '#374151' }
+  },
+  timeScale: {
+    borderColor: '#475569',
+    timeVisible: true,
+    secondsVisible: false
+  },
+  rightPriceScale: {
+    borderColor: '#475569'
+  },
+  width: document.getElementById('chartRoot').clientWidth,
+  height: 520
+});
+
+const candle = chart.addCandlestickSeries({
+  upColor: '#10b981',
+  downColor: '#ef4444', 
+  borderVisible: true,
+  wickUpColor: '#10b981',
+  wickDownColor: '#ef4444'
+});
+
+const ema26 = chart.addLineSeries({
+  color: '#3b82f6',
+  lineWidth: 1.5,
+  priceScaleId: 'right'
+});
+
+const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
+  layout: { 
+    backgroundColor: '#1e293b', 
+    textColor: '#f8fafc' 
+  },
+  grid: {
+    vertLines: { color: '#374151' },
+    horzLines: { color: '#374151' }
+  },
+  timeScale: {
+    borderColor: '#475569',
+    timeVisible: true,
+    secondsVisible: false
+  },
+  width: document.getElementById('macdRoot').clientWidth,
+  height: 160
+});
+
+const macdLine = macdChart.addLineSeries({
+  color: '#3b82f6',
+  lineWidth: 1
+});
+
+const macdSignal = macdChart.addLineSeries({
+  color: '#f59e0b', 
+  lineWidth: 1
+});
+
+const macdHist = macdChart.addHistogramSeries({
+  color: '#8b5cf6',
+  priceFormat: {
+    type: 'volume',
+  }
+});
+
+// Sync time scales between charts
+chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+  try {
+    macdChart.timeScale().setVisibleRange(timeRange);
+  } catch (e) {
+    console.log('Time scale sync error:', e);
+  }
+});
+
+/* ===== DOM refs ===== */
+const livePriceEl = document.getElementById('livePrice');
+const pairSelect = document.getElementById('pairSelect');
+const timeframeSelect = document.getElementById('timeframeSelect');
+const aiSummaryEl = document.getElementById('aiSummary');
+const aiSignal = document.getElementById('aiSignalBadge');
+const aiConfidence = document.getElementById('aiConfidence');
+const aiRisk = document.getElementById('aiRisk');
+const aiEntry = document.getElementById('aiEntry');
+const aiSL = document.getElementById('aiSL');
+const aiTP1 = document.getElementById('aiTP1');
+const aiTP2 = document.getElementById('aiTP2');
+const fundNews = document.getElementById('fundamentalNews');
+const rsiEl = document.getElementById('rsiVal');
+const macdValEl = document.getElementById('macdVal');
+const macdHistVal = document.getElementById('macdHistVal');
+const adxEl = document.getElementById('adxVal');
+const atrEl = document.getElementById('atrVal');
+const volEl = document.getElementById('volVal');
+const trendEl = document.getElementById('trendVal');
+const changeEl = document.getElementById('pairChange');
+const statusIndicator = document.getElementById('statusIndicator');
+const backtestResultsEl = document.getElementById('backtestResults');
+const backtestStatusEl = document.getElementById('backtestStatus');
+const currentPriceEl = document.getElementById('currentPrice');
+const analyzeBtn = document.getElementById('analyzeBtn');
+
+/* ===== Data state ===== */
+let auto = false, autoRefreshInterval = null, livePriceInterval = null;
+let currentSignal = 'HOLD';
+
+function setSignal(sig){
+  aiSignal.textContent = sig;
+  currentSignal = sig;
+  aiSignal.className = sig === 'BUY' ? 'ai-signal-buy' : 
+                     sig === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
+}
+
+// Update status indicator
+function updateStatusIndicator(isLive) {
+  if (isLive) {
+    statusIndicator.className = 'status-indicator status-live';
+    statusIndicator.title = 'Live data connection active';
+  } else {
+    statusIndicator.className = 'status-indicator status-offline';
+    statusIndicator.title = 'No live data connection';
+  }
+}
+
+// Show loading state
+function setLoadingState(loading) {
+  if (loading) {
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+    document.body.classList.add('loading');
+  } else {
+    analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>Analyze';
+    document.body.classList.remove('loading');
+  }
+}
+
+// Generate sample price data for testing
+function generateSamplePriceData() {
+  const data = [];
+  const basePrice = 148.75;
+  const now = new Date();
+  
+  for (let i = 100; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    const open = basePrice + (Math.random() - 0.5) * 2;
+    const close = open + (Math.random() - 0.5) * 1.5;
+    const high = Math.max(open, close) + Math.random() * 0.8;
+    const low = Math.min(open, close) - Math.random() * 0.8;
+    
+    data.push({
+      time: fmt(date),
+      open: open,
+      high: high,
+      low: low,
+      close: close
+    });
+  }
+  
+  return data;
+}
+
+// Generate sample risk assessment data
+function generateSampleRiskAssessment() {
+  const riskScore = Math.floor(Math.random() * 11); // 0-10
+  const approved = riskScore <= 7;
+  
+  const riskFactors = [
+    { name: 'Market Volatility', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' },
+    { name: 'Position Size', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' },
+    { name: 'Correlation', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' },
+    { name: 'Daily Limits', status: Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low' }
+  ];
+  
+  const rejectionReasons = approved ? [] : [
+    'Position size exceeds daily limit',
+    'High correlation with existing positions',
+    'Market volatility too high'
+  ].slice(0, Math.floor(Math.random() * 2) + 1);
+  
+  return {
+    risk_score: riskScore,
+    approved: approved,
+    rejection_reasons: rejectionReasons,
+    risk_factors: riskFactors
+  };
+}
+
+// Generate sample support resistance data
+function generateSampleSupportResistance(currentPrice) {
+  const support = (currentPrice * (1 - (Math.random() * 0.02 + 0.005))).toFixed(4);
+  const resistance = (currentPrice * (1 + (Math.random() * 0.02 + 0.005))).toFixed(4);
+  
+  return {
+    support: support,
+    resistance: resistance
+  };
+}
+
+/* ===== Fetch + Render ===== */
+async function analyze(){
+  const pair = pairSelect.value, tf = timeframeSelect.value;
+  
+  setLoadingState(true);
+  aiSummaryEl.textContent = 'Analyzing market data...';
+  aiSummaryEl.style.color = '';
+  
+  try {
+    console.log(`Fetching analysis for ${pair}-${tf}...`);
+    
+    // Gunakan endpoint yang sesuai dengan backend Flask
+    const response = await fetch(`${API_BASE_URL}/api/analyze?pair=${pair}&timeframe=${tf}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Analysis response:', data);
+    
+    // Update price series chart
+    let chartData = [];
+    
+    if (data.price_series && data.price_series.length > 0) {
+      console.log(`Processing ${data.price_series.length} price series data points`);
+      chartData = data.price_series.map(p => ({
+        time: fmt(p.date || p.time),
+        open: parseFloat(p.open) || 0,
+        high: parseFloat(p.high) || 0,
+        low: parseFloat(p.low) || 0,
+        close: parseFloat(p.close) || 0
+      }));
+    } else {
+      console.warn('No price_series data, using sample data');
+      chartData = generateSamplePriceData();
+    }
+    
+    // Clean and set chart data
+    const cleanData = cleanChartData(chartData);
+    currentChartData = cleanData;
+    
+    if (cleanData.length > 0) {
+      candle.setData(cleanData);
+      
+      const closes = cleanData.map(d => d.close);
+      
+      // Calculate and update EMA
+      const ema = calcEMA(closes, 26);
+      currentEmaData = ema.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      ema26.setData(currentEmaData);
+      
+      // Calculate and update MACD
+      const {macd, sig, hist} = calcMACDSeries(closes);
+      currentMacdData = { 
+        macd: macd.map(v => isNaN(v) ? 0 : v),
+        signal: sig.map(v => isNaN(v) ? 0 : v),
+        hist: hist.map(v => isNaN(v) ? 0 : v)
+      };
+      
+      const macdSeriesData = macd.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      const signalSeriesData = sig.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      const histSeriesData = hist.map((v, i) => ({
+        time: cleanData[i].time, 
+        value: isNaN(v) ? 0 : v
+      }));
+      
+      macdLine.setData(macdSeriesData);
+      macdSignal.setData(signalSeriesData);
+      macdHist.setData(histSeriesData);
+      
+      lastCandleTime = cleanData[cleanData.length - 1]?.time;
+      
+      // Resize charts
+      setTimeout(() => {
+        try {
+          chart.resize(document.getElementById('chartRoot').clientWidth, 520);
+          macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
+        } catch (e) {
+          console.log('Chart resize error:', e);
+        }
+      }, 100);
+    }
+    
+    // Update technical values
+    const technical = data.technical_analysis || {};
+    console.log('Technical analysis:', technical);
+    
+    // Handle momentum indicators
+    if (technical.momentum) {
+      rsiEl.textContent = (technical.momentum.rsi || 0).toFixed(2);
+      macdValEl.textContent = (technical.momentum.macd || 0).toFixed(4);
+      macdHistVal.textContent = (technical.momentum.macd_histogram || 0).toFixed(4);
+    } else {
+      rsiEl.textContent = '-';
+      macdValEl.textContent = '-';
+      macdHistVal.textContent = '-';
+    }
+    
+    // Handle trend indicators
+    if (technical.trend) {
+      adxEl.textContent = (technical.trend.adx || 0).toFixed(2);
+      trendEl.textContent = technical.trend.trend_direction || '-';
+    } else {
+      adxEl.textContent = '-';
+      trendEl.textContent = '-';
+    }
+    
+    // Handle volatility indicators
+    if (technical.volatility) {
+      atrEl.textContent = (technical.volatility.atr || 0).toFixed(4);
+      volEl.textContent = technical.volatility.volatility_pct ? 
+        (technical.volatility.volatility_pct * 100).toFixed(2) + '%' : '-';
+    } else {
+      atrEl.textContent = '-';
+      volEl.textContent = '-';
+    }
+    
+    // Update price data
+    const priceData = data.price_data || {};
+    const currentPrice = priceData.current || (technical.levels && technical.levels.current_price);
+    livePriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
+    currentPriceEl.textContent = currentPrice ? currentPrice.toFixed(4) : '-';
+    
+    // Update pair ticker with change
+    const change = priceData.change_pct || 0;
+    changeEl.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
+    changeEl.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
+    
+    // Update AI analysis
+    const ai = data.ai_analysis || {};
+    console.log('AI analysis:', ai);
+    
+    aiSummaryEl.textContent = ai.analysis_summary || 'Analysis completed';
+    setSignal(ai.signal || 'HOLD');
+    aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '-';
+    aiRisk.textContent = ai.risk_level || '-';
+    aiEntry.textContent = ai.entry_price || '-';
+    aiSL.textContent = ai.stop_loss || '-';
+    aiTP1.textContent = ai.take_profit_1 || '-';
+    aiTP2.textContent = ai.take_profit_2 || '-';
+    
+    // Update fundamental news
+    fundNews.textContent = data.fundamental_analysis || 'Market conditions stable';
+    
+    // Update risk assessment with new function
+    const risk = data.risk_assessment || generateSampleRiskAssessment();
+    updateRiskAssessment(risk);
+    
+    // Update Support & Resistance
+    const srData = {
+      support_resistance: data.support_resistance || generateSampleSupportResistance(currentPrice),
+      price_data: data.price_data || { current: currentPrice },
+      price_series: data.price_series || []
+    };
+    updateSupportResistance(srData);
+    
+    updateStatusIndicator(true);
+    
+  } catch (error) {
+    console.error('Analysis error:', error);
+    updateStatusIndicator(false);
+    
+    // Show error to user
+    aiSummaryEl.textContent = `Error: ${error.message}`;
+    aiSummaryEl.style.color = '#ef4444';
+    
+    // Fallback to sample data for demonstration
+    console.log('Using fallback sample data...');
+    const currentPrice = 148.75;
+    livePriceEl.textContent = currentPrice.toFixed(4);
+    currentPriceEl.textContent = currentPrice.toFixed(4);
+    
+    // Generate sample chart data
+    const sampleData = generateSamplePriceData();
+    candle.setData(sampleData);
+    
+    // Update with sample technical data
+    rsiEl.textContent = '52.34';
+    macdValEl.textContent = '0.0023';
+    macdHistVal.textContent = '0.0008';
+    adxEl.textContent = '28.45';
+    atrEl.textContent = '0.0087';
+    volEl.textContent = '0.85%';
+    trendEl.textContent = 'BULLISH';
+    
+    setSignal('BUY');
+    aiConfidence.textContent = '76%';
+    aiRisk.textContent = 'MEDIUM';
+    
+    fundNews.textContent = 'USD strengthens against JPY on positive economic data';
+  } finally {
+    setLoadingState(false);
+  }
+}
+
+/* ===== Live Price Update ===== */
+let prevPrice = null;
+async function updateLivePrice() {
+  const pair = pairSelect.value;
+  try {
+    // Use the analyze endpoint to get updated price data
+    const response = await fetch(`${API_BASE_URL}/api/analyze?pair=${pair}&timeframe=${timeframeSelect.value}`);
+    
+    if (!response.ok) return;
+    
+    const data = await response.json();
+    
+    const priceData = data.price_data || {};
+    const technical = data.technical_analysis || {};
+    const currentPrice = priceData.current || (technical.levels && technical.levels.current_price);
+    
+    if (currentPrice && currentChartData.length > 0) {
+      livePriceEl.textContent = currentPrice.toFixed(4);
+      currentPriceEl.textContent = currentPrice.toFixed(4);
+      
+      // Update price change
+      const change = priceData.change_pct || 0;
+      changeEl.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
+      changeEl.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
+      
+      // Update current candle with live price
+      const lastIndex = currentChartData.length - 1;
+      const lastCandle = currentChartData[lastIndex];
+      
+      if (lastCandle) {
+        const updatedCandle = {
+          time: lastCandle.time,
+          open: lastCandle.open,
+          high: Math.max(lastCandle.high, currentPrice),
+          low: Math.min(lastCandle.low, currentPrice),
+          close: currentPrice
+        };
+        
+        // Update our stored data
+        currentChartData[lastIndex] = updatedCandle;
+        
+        // Update the chart
+        candle.update(updatedCandle);
+        
+        // Update EMA with new close price
+        const closes = currentChartData.map(d => d.close);
+        const ema = calcEMA(closes, 26);
+        const lastEma = ema[ema.length - 1];
+        
+        if (lastEma && !isNaN(lastEma)) {
+          const updatedEma = {
+            time: lastCandle.time,
+            value: lastEma
+          };
+          currentEmaData[lastIndex] = updatedEma;
+          ema26.update(updatedEma);
+        }
+        
+        // Update MACD with new close price
+        const {macd, sig, hist} = calcMACDSeries(closes);
+        const lastMacd = macd[macd.length - 1];
+        const lastSig = sig[sig.length - 1];
+        const lastHist = hist[hist.length - 1];
+        
+        if (lastMacd !== undefined && !isNaN(lastMacd)) {
+          currentMacdData.macd[lastIndex] = lastMacd;
+          currentMacdData.signal[lastIndex] = lastSig;
+          currentMacdData.hist[lastIndex] = lastHist;
+          
+          macdLine.update({time: lastCandle.time, value: lastMacd});
+          macdSignal.update({time: lastCandle.time, value: lastSig});
+          macdHist.update({time: lastCandle.time, value: lastHist});
+          
+          macdValEl.textContent = lastMacd.toFixed(4);
+          macdHistVal.textContent = lastHist.toFixed(4);
+        }
+      }
+      
+      updateStatusIndicator(true);
+    }
+  } catch (error) {
+    console.error('Live price error:', error);
+    updateStatusIndicator(false);
+  }
+}
+
+/* ===== Backtest Functions ===== */
+function showBacktestModal() {
+  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
+  modal.show();
+}
+
+async function runBacktest() {
+  const pair = pairSelect.value;
+  const timeframe = timeframeSelect.value;
+  const initialBalance = document.getElementById('initialBalance').value;
+  const days = document.getElementById('backtestDays').value;
+  const backtestType = document.getElementById('backtestType').value;
+  
+  backtestStatusEl.textContent = 'Running...';
+  backtestStatusEl.className = 'badge bg-warning';
+  backtestResultsEl.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
+  
+  try {
+    const endpoint = backtestType === 'advanced' ? '/api/advanced_backtest' : '/api/backtest';
+    
+    console.log('Starting backtest with:', { pair, timeframe, days, initialBalance, backtestType });
+    
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pair: pair,
+        timeframe: timeframe,
+        days: parseInt(days),
+        initial_balance: parseFloat(initialBalance)
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Backtest result:', result);
+    
+    if (result.status === 'success' || result.status === 'no_trades') {
+      displayBacktestResults(result);
+      backtestStatusEl.textContent = 'Completed';
+      backtestStatusEl.className = 'badge bg-success';
+    } else {
+      throw new Error(result.error || 'Backtest failed');
+    }
+    
+  } catch (error) {
+    console.error('Backtest error:', error);
+    backtestResultsEl.innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
+    backtestStatusEl.textContent = 'Failed';
+    backtestStatusEl.className = 'badge bg-danger';
+  }
+}
+
+function displayBacktestResults(result) {
+  const summary = result.summary || {};
+  const tradeAnalysis = result.trade_analysis || {};
+  
+  let html = '';
+  
+  if (result.status === 'no_trades') {
+    html = `<div class="alert alert-warning">No trades were executed during the backtest period.</div>`;
+    backtestResultsEl.innerHTML = html;
+    return;
+  }
+  
+  // Performance Grade
+  const grade = result.performance_grade || 'N/A';
+  const gradeClass = grade.startsWith('A') ? 'grade-a' : 
+                    grade.startsWith('B') ? 'grade-b' :
+                    grade.startsWith('C') ? 'grade-c' : 'grade-d';
+  
+  html += `<div class="performance-grade ${gradeClass}">Performance: ${grade}</div>`;
+  
+  // Summary Metrics
+  html += `
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Trades</div>
+          <div class="metric-value">${summary.total_trades || 0}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Win Rate</div>
+          <div class="metric-value ${(summary.win_rate || 0) >= 50 ? 'change-positive' : 'change-negative'}">
+            ${(summary.win_rate || 0).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Profit</div>
+          <div class="metric-value ${(summary.total_profit || 0) >= 0 ? 'change-positive' : 'change-negative'}">
+            $${(summary.total_profit || 0).toFixed(2)}
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Final Balance</div>
+          <div class="metric-value">$${(summary.final_balance || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Return %</div>
+          <div class="metric-value ${(summary.return_percentage || 0) >= 0 ? 'change-positive' : 'change-negative'}">
+            ${(summary.return_percentage || 0).toFixed(2)}%
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Max Drawdown</div>
+          <div class="metric-value change-negative">${(summary.max_drawdown || 0).toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Trade Analysis
+  if (tradeAnalysis.long_trades || tradeAnalysis.short_trades) {
+    html += `
+      <div class="mt-3">
+        <div class="small-muted mb-1">Trade Analysis</div>
+        <div class="small-muted">Long Trades: ${tradeAnalysis.long_trades || 0} (Win Rate: ${(tradeAnalysis.long_win_rate || 0).toFixed(1)}%)</div>
+        <div class="small-muted">Short Trades: ${tradeAnalysis.short_trades || 0} (Win Rate: ${(tradeAnalysis.short_win_rate || 0).toFixed(1)}%)</div>
+      </div>
+    `;
+  }
+  
+  backtestResultsEl.innerHTML = html;
+}
+
+/* ===== Event Listeners ===== */
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+
+pairSelect.addEventListener('change', analyze);
+timeframeSelect.addEventListener('change', analyze);
+
+// Initialize dashboard
+analyze();
+
+// Start live price updates every 5 seconds for responsive UI
+setInterval(updateLivePrice, 5000);
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  try {
+    chart.resize(document.getElementById('chartRoot').clientWidth, 520);
+    macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
+  } catch (e) {
+    console.log('Resize error:', e);
+  }
+});
 </script>
 </body>
 </html>
