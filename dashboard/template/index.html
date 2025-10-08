@@ -437,6 +437,19 @@
       border-radius: 8px;
       display: none;
     }
+
+    .realtime-indicator {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      z-index: 5;
+    }
   </style>
 </head>
 <body>
@@ -496,6 +509,9 @@
       <div class="chart-loading" id="chartLoading">
         <div class="spinner-border text-primary" role="status"></div>
         <span class="ms-2">Loading chart data...</span>
+      </div>
+      <div class="realtime-indicator" id="realtimeIndicator" style="display: none;">
+        <i class="fas fa-circle me-1"></i> LIVE
       </div>
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
@@ -840,6 +856,8 @@ let currentChartData = [];
 let currentEmaData = [];
 let currentMacdData = { macd: [], signal: [], hist: [] };
 let lastCandleTime = null;
+let realtimeCandle = null;
+let isRealtimeMode = false;
 
 /* ===== Utilities ===== */
 function calcEMA(values, period){
@@ -919,6 +937,51 @@ function cleanChartData(data) {
     low: parseFloat(item.low) || 0,
     close: parseFloat(item.close) || 0
   }));
+}
+
+// Generate next candle time based on timeframe
+function getNextCandleTime(lastCandleTime, timeframe) {
+  const lastTime = new Date(lastCandleTime * 1000);
+  let nextTime;
+  
+  switch(timeframe) {
+    case '1D':
+      nextTime = new Date(lastTime);
+      nextTime.setDate(nextTime.getDate() + 1);
+      break;
+    case '4H':
+      nextTime = new Date(lastTime);
+      nextTime.setHours(nextTime.getHours() + 4);
+      break;
+    case '1H':
+      nextTime = new Date(lastTime);
+      nextTime.setHours(nextTime.getHours() + 1);
+      break;
+    case 'M30':
+      nextTime = new Date(lastTime);
+      nextTime.setMinutes(nextTime.getMinutes() + 30);
+      break;
+    default:
+      nextTime = new Date(lastTime);
+      nextTime.setDate(nextTime.getDate() + 1);
+  }
+  
+  return Math.floor(nextTime.getTime() / 1000);
+}
+
+// Create realtime candle for current period
+function createRealtimeCandle(lastCandle, timeframe) {
+  const currentTime = getNextCandleTime(lastCandle.time, timeframe);
+  const openPrice = lastCandle.close;
+  
+  return {
+    time: currentTime,
+    open: openPrice,
+    high: openPrice,
+    low: openPrice,
+    close: openPrice,
+    isRealtime: true
+  };
 }
 
 /* ===== Pair Ticker Update Function ===== */
@@ -1079,8 +1142,8 @@ const chartOptions = {
     borderColor: '#eee',
     timeVisible: true,
     secondsVisible: false,
-    barSpacing: 8, // Menambah spacing antara bar
-    minBarSpacing: 2, // Minimum spacing
+    barSpacing: 8,
+    minBarSpacing: 2,
     fixLeftEdge: true,
     fixRightEdge: true
   },
@@ -1186,6 +1249,7 @@ const backtestResultsEl = document.getElementById('backtestResults');
 const backtestStatusEl = document.getElementById('backtestStatus');
 const currentPriceEl = document.getElementById('currentPrice');
 const chartLoading = document.getElementById('chartLoading');
+const realtimeIndicator = document.getElementById('realtimeIndicator');
 
 /* ===== Data state ===== */
 let auto = false, autoRefreshInterval = null, livePriceInterval = null;
@@ -1203,9 +1267,11 @@ function updateStatusIndicator(isLive) {
   if (isLive) {
     statusIndicator.className = 'status-indicator status-live';
     statusIndicator.title = 'Live data connection active';
+    realtimeIndicator.style.display = 'block';
   } else {
     statusIndicator.className = 'status-indicator status-offline';
     statusIndicator.title = 'No live data connection';
+    realtimeIndicator.style.display = 'none';
   }
 }
 
@@ -1213,7 +1279,7 @@ function updateStatusIndicator(isLive) {
 function generateSamplePriceData(timeframe = '1D') {
   const data = [];
   const basePrice = 148.75;
-  const volatility = 0.002; // 0.2% volatility
+  const volatility = 0.002;
   
   let periods;
   let timeIncrement;
@@ -1222,22 +1288,22 @@ function generateSamplePriceData(timeframe = '1D') {
   // Set parameters berdasarkan timeframe
   switch(timeframe) {
     case '4H':
-      periods = 90; // 90 periods (15 days of 4H data)
-      timeIncrement = 4 * 60 * 60 * 1000; // 4 hours
+      periods = 90;
+      timeIncrement = 4 * 60 * 60 * 1000;
       break;
     case '1H':
-      periods = 168; // 168 periods (7 days of 1H data)
-      timeIncrement = 60 * 60 * 1000; // 1 hour
+      periods = 168;
+      timeIncrement = 60 * 60 * 1000;
       break;
     case 'M30':
-      periods = 336; // 336 periods (7 days of 30M data)
-      timeIncrement = 30 * 60 * 1000; // 30 minutes
+      periods = 336;
+      timeIncrement = 30 * 60 * 1000;
       break;
     case '1D':
     default:
-      periods = 100; // 100 days
-      timeIncrement = 24 * 60 * 60 * 1000; // 1 day
-      baseDate = new Date('2023-06-01'); // Start from June for better visibility
+      periods = 100;
+      timeIncrement = 24 * 60 * 60 * 1000;
+      baseDate = new Date('2023-06-01');
   }
   
   let currentPrice = basePrice;
@@ -1245,9 +1311,7 @@ function generateSamplePriceData(timeframe = '1D') {
   for (let i = 0; i < periods; i++) {
     const date = new Date(baseDate.getTime() + (i * timeIncrement));
     
-    // Untuk intraday, set waktu trading yang realistis
     if (timeframe !== '1D') {
-      // Set waktu antara 00:00 - 23:00 untuk variasi
       const hour = Math.floor(Math.random() * 24);
       const minute = timeframe === 'M30' ? (Math.random() > 0.5 ? 30 : 0) : 0;
       date.setHours(hour, minute, 0, 0);
@@ -1259,7 +1323,6 @@ function generateSamplePriceData(timeframe = '1D') {
     const high = Math.max(open, close) + Math.random() * volatility * currentPrice;
     const low = Math.min(open, close) - Math.random() * volatility * currentPrice;
     
-    // Ensure realistic price movement
     currentPrice = close;
     
     data.push({
@@ -1276,7 +1339,7 @@ function generateSamplePriceData(timeframe = '1D') {
 
 // Generate sample risk assessment data
 function generateSampleRiskAssessment() {
-  const riskScore = Math.floor(Math.random() * 11); // 0-10
+  const riskScore = Math.floor(Math.random() * 11);
   const approved = riskScore <= 7;
   
   const riskFactors = [
@@ -1351,17 +1414,27 @@ async function analyze(){
     
     // Clean and set chart data
     const cleanData = cleanChartData(chartData);
-    currentChartData = cleanData;
     
+    // Add realtime candle for current period (8 October 2025)
     if (cleanData.length > 0) {
-      candle.setData(cleanData);
+      const lastCandle = cleanData[cleanData.length - 1];
+      realtimeCandle = createRealtimeCandle(lastCandle, tf);
+      currentChartData = [...cleanData, realtimeCandle];
+      isRealtimeMode = true;
+    } else {
+      currentChartData = cleanData;
+      isRealtimeMode = false;
+    }
+    
+    if (currentChartData.length > 0) {
+      candle.setData(currentChartData);
       
-      const closes = cleanData.map(d => d.close);
+      const closes = currentChartData.map(d => d.close);
       
       // Calculate and update EMA
       const ema = calcEMA(closes, 26);
       currentEmaData = ema.map((v, i) => ({
-        time: cleanData[i].time, 
+        time: currentChartData[i].time, 
         value: isNaN(v) ? 0 : v
       }));
       ema26.setData(currentEmaData);
@@ -1375,15 +1448,15 @@ async function analyze(){
       };
       
       const macdSeriesData = macd.map((v, i) => ({
-        time: cleanData[i].time, 
+        time: currentChartData[i].time, 
         value: isNaN(v) ? 0 : v
       }));
       const signalSeriesData = sig.map((v, i) => ({
-        time: cleanData[i].time, 
+        time: currentChartData[i].time, 
         value: isNaN(v) ? 0 : v
       }));
       const histSeriesData = hist.map((v, i) => ({
-        time: cleanData[i].time, 
+        time: currentChartData[i].time, 
         value: isNaN(v) ? 0 : v
       }));
       
@@ -1391,16 +1464,15 @@ async function analyze(){
       macdSignal.setData(signalSeriesData);
       macdHist.setData(histSeriesData);
       
-      lastCandleTime = cleanData[cleanData.length - 1]?.time;
+      lastCandleTime = currentChartData[currentChartData.length - 1]?.time;
       
-      // Update chart time scale settings based on timeframe
+      // Update chart time scale settings
       try {
         const timeScaleOptions = {
           timeVisible: true,
           secondsVisible: false
         };
         
-        // Adjust bar spacing based on timeframe
         if (tf === '1D') {
           timeScaleOptions.barSpacing = 6;
         } else if (tf === '4H') {
@@ -1419,7 +1491,7 @@ async function analyze(){
         console.log('Time scale update error:', e);
       }
       
-      // Resize charts dengan delay untuk memastikan container sudah render
+      // Resize charts
       setTimeout(() => {
         try {
           const chartWidth = document.getElementById('chartRoot').clientWidth;
@@ -1537,7 +1609,7 @@ async function updateLivePrice() {
     const t = j.technical_analysis || {};
     const currentPrice = priceData.current || (t.levels && t.levels.current_price);
     
-    if (currentPrice && currentChartData.length > 0) {
+    if (currentPrice && currentChartData.length > 0 && isRealtimeMode) {
       livePriceEl.textContent = currentPrice.toFixed(4);
       currentPriceEl.textContent = currentPrice.toFixed(4);
       
@@ -1546,53 +1618,55 @@ async function updateLivePrice() {
       changeEl.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
       changeEl.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
       
-      // Update current candle with live price
-      const lastIndex = currentChartData.length - 1;
-      const lastCandle = currentChartData[lastIndex];
-      
-      if (lastCandle) {
+      // Update realtime candle with live price
+      if (realtimeCandle) {
         const updatedCandle = {
-          time: lastCandle.time,
-          open: lastCandle.open,
-          high: Math.max(lastCandle.high, currentPrice),
-          low: Math.min(lastCandle.low, currentPrice),
+          time: realtimeCandle.time,
+          open: realtimeCandle.open,
+          high: Math.max(realtimeCandle.high, currentPrice),
+          low: Math.min(realtimeCandle.low, currentPrice),
           close: currentPrice
         };
         
         // Update our stored data
-        currentChartData[lastIndex] = updatedCandle;
+        realtimeCandle = updatedCandle;
+        currentChartData[currentChartData.length - 1] = updatedCandle;
         
         // Update the chart
         candle.update(updatedCandle);
         
-        // Update EMA with new close price
-        const closes = currentChartData.map(d => d.close);
-        const ema = calcEMA(closes, 26);
+        // Update EMA with new close price (exclude realtime candle from calculation)
+        const historicalCloses = currentChartData
+          .slice(0, -1)
+          .map(d => d.close)
+          .concat([currentPrice]);
+        
+        const ema = calcEMA(historicalCloses, 26);
         const lastEma = ema[ema.length - 1];
         
         if (lastEma && !isNaN(lastEma)) {
           const updatedEma = {
-            time: lastCandle.time,
+            time: updatedCandle.time,
             value: lastEma
           };
-          currentEmaData[lastIndex] = updatedEma;
+          currentEmaData[currentEmaData.length - 1] = updatedEma;
           ema26.update(updatedEma);
         }
         
-        // Update MACD with new close price
-        const {macd, sig, hist} = calcMACDSeries(closes);
+        // Update MACD with new close price (exclude realtime candle)
+        const {macd, sig, hist} = calcMACDSeries(historicalCloses);
         const lastMacd = macd[macd.length - 1];
         const lastSig = sig[sig.length - 1];
         const lastHist = hist[hist.length - 1];
         
         if (lastMacd !== undefined && !isNaN(lastMacd)) {
-          currentMacdData.macd[lastIndex] = lastMacd;
-          currentMacdData.signal[lastIndex] = lastSig;
-          currentMacdData.hist[lastIndex] = lastHist;
+          currentMacdData.macd[currentMacdData.macd.length - 1] = lastMacd;
+          currentMacdData.signal[currentMacdData.signal.length - 1] = lastSig;
+          currentMacdData.hist[currentMacdData.hist.length - 1] = lastHist;
           
-          macdLine.update({time: lastCandle.time, value: lastMacd});
-          macdSignal.update({time: lastCandle.time, value: lastSig});
-          macdHist.update({time: lastCandle.time, value: lastHist});
+          macdLine.update({time: updatedCandle.time, value: lastMacd});
+          macdSignal.update({time: updatedCandle.time, value: lastSig});
+          macdHist.update({time: updatedCandle.time, value: lastHist});
           
           macdValEl.textContent = lastMacd.toFixed(4);
           macdHistVal.textContent = lastHist.toFixed(4);
@@ -1768,8 +1842,8 @@ timeframeSelect.addEventListener('change', analyze);
 updatePairTicker(pairSelect.value);
 analyze();
 
-// Start live price updates every 5 seconds for responsive UI
-setInterval(updateLivePrice, 5000);
+// Start live price updates every 3 seconds for more responsive UI
+setInterval(updateLivePrice, 3000);
 
 // Improved window resize handler
 let resizeTimeout;
