@@ -516,6 +516,7 @@
   </div>
 
   <div class="col-lg-4">
+    <!-- AI Trading Signal Card -->
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-robot"></i>
@@ -568,7 +569,6 @@
         <span>Risk Management</span>
       </div>
       
-      <!-- Risk Status dengan Visual yang Lebih Menarik -->
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div class="small-muted">TRADE APPROVAL STATUS</div>
@@ -882,27 +882,24 @@ function calculatePivotPoints(high, low, close) {
   };
 }
 
-// Improved date formatting function for different timeframes
+// Improved date formatting function untuk semua timeframe
 function fmt(d, timeframe = '1D') {
   try {
     if (typeof d === 'string') {
-      // Jika sudah string, return as-is untuk intraday
-      if (timeframe !== '1D' && d.includes('T')) {
-        return d; // Keep full datetime for intraday
-      }
-      return d.split('T')[0]; // Hanya date untuk daily
-    } else if (d instanceof Date) {
-      if (timeframe === '1D') {
-        return d.toISOString().split('T')[0]; // YYYY-MM-DD untuk daily
-      } else {
-        // Untuk intraday, format dengan waktu
-        return d.toISOString().replace('Z', ''); // YYYY-MM-DDTHH:mm:ss.sss
-      }
+      // Jika sudah string, parse ke Date dulu
+      d = new Date(d);
     }
-    return String(d);
+    
+    if (d instanceof Date) {
+      // Untuk semua timeframe, gunakan timestamp (lebih konsisten)
+      return d.getTime() / 1000; // Convert to seconds (Lightweight Charts format)
+    }
+    
+    // Jika sudah number (timestamp), return as-is
+    return d;
   } catch (e) {
     console.error('Date formatting error:', e, d);
-    return '2023-01-01';
+    return Math.floor(Date.now() / 1000);
   }
 }
 
@@ -1069,7 +1066,7 @@ function updateSupportResistance(data) {
 }
 
 /* ===== Chart Setup ===== */
-const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), {
+const chartOptions = {
   layout: { 
     backgroundColor: '#fff', 
     textColor: '#111' 
@@ -1081,21 +1078,32 @@ const chart = LightweightCharts.createChart(document.getElementById('chartRoot')
   timeScale: {
     borderColor: '#eee',
     timeVisible: true,
-    secondsVisible: false
+    secondsVisible: false,
+    barSpacing: 8, // Menambah spacing antara bar
+    minBarSpacing: 2, // Minimum spacing
+    fixLeftEdge: true,
+    fixRightEdge: true
   },
   rightPriceScale: {
-    borderColor: '#eee'
+    borderColor: '#eee',
+    scaleMargins: {
+      top: 0.1,
+      bottom: 0.1
+    }
   },
   width: document.getElementById('chartRoot').clientWidth,
   height: 520
-});
+};
+
+const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
 
 const candle = chart.addCandlestickSeries({
   upColor: '#16a34a',
   downColor: '#dc2626', 
   borderVisible: true,
   wickUpColor: '#16a34a',
-  wickDownColor: '#dc2626'
+  wickDownColor: '#dc2626',
+  priceScaleId: 'right'
 });
 
 const ema26 = chart.addLineSeries({
@@ -1104,7 +1112,7 @@ const ema26 = chart.addLineSeries({
   priceScaleId: 'right'
 });
 
-const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
+const macdChartOptions = {
   layout: { 
     backgroundColor: '#fff', 
     textColor: '#111' 
@@ -1116,11 +1124,15 @@ const macdChart = LightweightCharts.createChart(document.getElementById('macdRoo
   timeScale: {
     borderColor: '#eee',
     timeVisible: true,
-    secondsVisible: false
+    secondsVisible: false,
+    barSpacing: 8,
+    minBarSpacing: 2
   },
   width: document.getElementById('macdRoot').clientWidth,
   height: 160
-});
+};
+
+const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), macdChartOptions);
 
 const macdLine = macdChart.addLineSeries({
   color: '#0ea5e9',
@@ -1197,57 +1209,65 @@ function updateStatusIndicator(isLive) {
   }
 }
 
-// Generate sample price data for testing - FIXED for timeframe 4H
+// Generate realistic sample price data untuk semua timeframe
 function generateSamplePriceData(timeframe = '1D') {
   const data = [];
   const basePrice = 148.75;
-  const now = new Date();
+  const volatility = 0.002; // 0.2% volatility
   
-  let periods = 100;
+  let periods;
   let timeIncrement;
+  let baseDate = new Date('2023-01-01');
   
-  // Set time increment berdasarkan timeframe
+  // Set parameters berdasarkan timeframe
   switch(timeframe) {
     case '4H':
-      periods = 200; // More data for 4H
-      timeIncrement = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+      periods = 90; // 90 periods (15 days of 4H data)
+      timeIncrement = 4 * 60 * 60 * 1000; // 4 hours
       break;
     case '1H':
-      periods = 400;
+      periods = 168; // 168 periods (7 days of 1H data)
       timeIncrement = 60 * 60 * 1000; // 1 hour
       break;
     case 'M30':
-      periods = 800;
+      periods = 336; // 336 periods (7 days of 30M data)
       timeIncrement = 30 * 60 * 1000; // 30 minutes
       break;
     case '1D':
     default:
-      periods = 100;
+      periods = 100; // 100 days
       timeIncrement = 24 * 60 * 60 * 1000; // 1 day
+      baseDate = new Date('2023-06-01'); // Start from June for better visibility
   }
   
-  for (let i = periods; i >= 0; i--) {
-    const date = new Date(now.getTime() - (i * timeIncrement));
+  let currentPrice = basePrice;
+  
+  for (let i = 0; i < periods; i++) {
+    const date = new Date(baseDate.getTime() + (i * timeIncrement));
     
-    // Untuk intraday, pastikan waktu tidak selalu 00:00
+    // Untuk intraday, set waktu trading yang realistis
     if (timeframe !== '1D') {
-      // Set random hour within trading hours untuk variasi
+      // Set waktu antara 00:00 - 23:00 untuk variasi
       const hour = Math.floor(Math.random() * 24);
       const minute = timeframe === 'M30' ? (Math.random() > 0.5 ? 30 : 0) : 0;
       date.setHours(hour, minute, 0, 0);
     }
     
-    const open = basePrice + (Math.random() - 0.5) * 2;
-    const close = open + (Math.random() - 0.5) * 1.5;
-    const high = Math.max(open, close) + Math.random() * 0.8;
-    const low = Math.min(open, close) - Math.random() * 0.8;
+    const change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
+    const open = currentPrice;
+    const close = open + change;
+    const high = Math.max(open, close) + Math.random() * volatility * currentPrice;
+    const low = Math.min(open, close) - Math.random() * volatility * currentPrice;
+    
+    // Ensure realistic price movement
+    currentPrice = close;
     
     data.push({
       time: fmt(date, timeframe),
-      open: open,
-      high: high,
-      low: low,
-      close: close
+      open: parseFloat(open.toFixed(4)),
+      high: parseFloat(high.toFixed(4)),
+      low: parseFloat(low.toFixed(4)),
+      close: parseFloat(close.toFixed(4))
     });
   }
   
@@ -1318,7 +1338,7 @@ async function analyze(){
     if (j.price_series && j.price_series.length > 0) {
       console.log(`Processing ${j.price_series.length} price series data points`);
       chartData = j.price_series.map(p => ({
-        time: fmt(p.date, tf), // Pass timeframe to formatter
+        time: fmt(p.date, tf),
         open: parseFloat(p.open) || 0,
         high: parseFloat(p.high) || 0,
         low: parseFloat(p.low) || 0,
@@ -1326,7 +1346,7 @@ async function analyze(){
       }));
     } else {
       console.warn('No price_series data, using sample data');
-      chartData = generateSamplePriceData(tf); // Pass timeframe to generator
+      chartData = generateSamplePriceData(tf);
     }
     
     // Clean and set chart data
@@ -1373,29 +1393,44 @@ async function analyze(){
       
       lastCandleTime = cleanData[cleanData.length - 1]?.time;
       
-      // Update time scale format berdasarkan timeframe
+      // Update chart time scale settings based on timeframe
       try {
-        chart.timeScale().applyOptions({
+        const timeScaleOptions = {
           timeVisible: true,
           secondsVisible: false
-        });
-        macdChart.timeScale().applyOptions({
-          timeVisible: true,
-          secondsVisible: false
-        });
+        };
+        
+        // Adjust bar spacing based on timeframe
+        if (tf === '1D') {
+          timeScaleOptions.barSpacing = 6;
+        } else if (tf === '4H') {
+          timeScaleOptions.barSpacing = 4;
+        } else {
+          timeScaleOptions.barSpacing = 2;
+        }
+        
+        chart.timeScale().applyOptions(timeScaleOptions);
+        macdChart.timeScale().applyOptions(timeScaleOptions);
+        
+        // Fit content untuk menampilkan semua data
+        chart.timeScale().fitContent();
+        macdChart.timeScale().fitContent();
       } catch (e) {
         console.log('Time scale update error:', e);
       }
       
-      // Resize charts
+      // Resize charts dengan delay untuk memastikan container sudah render
       setTimeout(() => {
         try {
-          chart.resize(document.getElementById('chartRoot').clientWidth, 520);
-          macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
+          const chartWidth = document.getElementById('chartRoot').clientWidth;
+          const macdWidth = document.getElementById('macdRoot').clientWidth;
+          
+          chart.resize(chartWidth, 520);
+          macdChart.resize(macdWidth, 160);
         } catch (e) {
           console.log('Chart resize error:', e);
         }
-      }, 100);
+      }, 300);
     }
     
     // Update technical values
@@ -1511,7 +1546,7 @@ async function updateLivePrice() {
       changeEl.textContent = '(' + (change >= 0 ? '+' : '') + change.toFixed(2) + '%)';
       changeEl.className = change >= 0 ? 'price-change change-positive' : 'price-change change-negative';
       
-      // Update current candle with live price - FIXED: Use our stored data instead of candle.data()
+      // Update current candle with live price
       const lastIndex = currentChartData.length - 1;
       const lastCandle = currentChartData[lastIndex];
       
@@ -1736,14 +1771,25 @@ analyze();
 // Start live price updates every 5 seconds for responsive UI
 setInterval(updateLivePrice, 5000);
 
-// Handle window resize
+// Improved window resize handler
+let resizeTimeout;
 window.addEventListener('resize', () => {
-  try {
-    chart.resize(document.getElementById('chartRoot').clientWidth, 520);
-    macdChart.resize(document.getElementById('macdRoot').clientWidth, 160);
-  } catch (e) {
-    console.log('Resize error:', e);
-  }
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    try {
+      const chartWidth = document.getElementById('chartRoot').clientWidth;
+      const macdWidth = document.getElementById('macdRoot').clientWidth;
+      
+      chart.resize(chartWidth, 520);
+      macdChart.resize(macdWidth, 160);
+      
+      // Re-apply time scale settings after resize
+      chart.timeScale().fitContent();
+      macdChart.timeScale().fitContent();
+    } catch (e) {
+      console.log('Resize error:', e);
+    }
+  }, 250);
 });
 </script>
 </body>
