@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ANDRO-FX Precision Forex Trading </title>
+  <title>ANDRO-FX Precision Forex Trading</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
@@ -417,6 +417,26 @@
       font-size: 0.9rem;
       font-weight: 600;
     }
+
+    /* Loading Spinner */
+    .spinner-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .chart-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 20px;
+      border-radius: 8px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -472,7 +492,11 @@
 
 <div class="row g-4">
   <div class="col-lg-8">
-    <div class="card-soft">
+    <div class="card-soft position-relative">
+      <div class="chart-loading" id="chartLoading">
+        <div class="spinner-border text-primary" role="status"></div>
+        <span class="ms-2">Loading chart data...</span>
+      </div>
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div class="section-title">
@@ -858,17 +882,22 @@ function calculatePivotPoints(high, low, close) {
   };
 }
 
-// Improved date formatting function
-function fmt(d){
+// Improved date formatting function for different timeframes
+function fmt(d, timeframe = '1D') {
   try {
     if (typeof d === 'string') {
-      if (d.includes('T')) {
-        return d.split('T')[0];
-      } else {
-        return d;
+      // Jika sudah string, return as-is untuk intraday
+      if (timeframe !== '1D' && d.includes('T')) {
+        return d; // Keep full datetime for intraday
       }
+      return d.split('T')[0]; // Hanya date untuk daily
     } else if (d instanceof Date) {
-      return d.toISOString().split('T')[0];
+      if (timeframe === '1D') {
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD untuk daily
+      } else {
+        // Untuk intraday, format dengan waktu
+        return d.toISOString().replace('Z', ''); // YYYY-MM-DDTHH:mm:ss.sss
+      }
     }
     return String(d);
   } catch (e) {
@@ -1144,6 +1173,7 @@ const statusIndicator = document.getElementById('statusIndicator');
 const backtestResultsEl = document.getElementById('backtestResults');
 const backtestStatusEl = document.getElementById('backtestStatus');
 const currentPriceEl = document.getElementById('currentPrice');
+const chartLoading = document.getElementById('chartLoading');
 
 /* ===== Data state ===== */
 let auto = false, autoRefreshInterval = null, livePriceInterval = null;
@@ -1167,15 +1197,45 @@ function updateStatusIndicator(isLive) {
   }
 }
 
-// Generate sample price data for testing
-function generateSamplePriceData() {
+// Generate sample price data for testing - FIXED for timeframe 4H
+function generateSamplePriceData(timeframe = '1D') {
   const data = [];
   const basePrice = 148.75;
   const now = new Date();
   
-  for (let i = 100; i >= 0; i--) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - i);
+  let periods = 100;
+  let timeIncrement;
+  
+  // Set time increment berdasarkan timeframe
+  switch(timeframe) {
+    case '4H':
+      periods = 200; // More data for 4H
+      timeIncrement = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+      break;
+    case '1H':
+      periods = 400;
+      timeIncrement = 60 * 60 * 1000; // 1 hour
+      break;
+    case 'M30':
+      periods = 800;
+      timeIncrement = 30 * 60 * 1000; // 30 minutes
+      break;
+    case '1D':
+    default:
+      periods = 100;
+      timeIncrement = 24 * 60 * 60 * 1000; // 1 day
+  }
+  
+  for (let i = periods; i >= 0; i--) {
+    const date = new Date(now.getTime() - (i * timeIncrement));
+    
+    // Untuk intraday, pastikan waktu tidak selalu 00:00
+    if (timeframe !== '1D') {
+      // Set random hour within trading hours untuk variasi
+      const hour = Math.floor(Math.random() * 24);
+      const minute = timeframe === 'M30' ? (Math.random() > 0.5 ? 30 : 0) : 0;
+      date.setHours(hour, minute, 0, 0);
+    }
     
     const open = basePrice + (Math.random() - 0.5) * 2;
     const close = open + (Math.random() - 0.5) * 1.5;
@@ -1183,7 +1243,7 @@ function generateSamplePriceData() {
     const low = Math.min(open, close) - Math.random() * 0.8;
     
     data.push({
-      time: fmt(date),
+      time: fmt(date, timeframe),
       open: open,
       high: high,
       low: low,
@@ -1235,6 +1295,9 @@ function generateSampleSupportResistance(currentPrice) {
 async function analyze(){
   const pair = pairSelect.value, tf = timeframeSelect.value;
   
+  // Show loading indicator
+  chartLoading.style.display = 'block';
+  
   // Update pair ticker text
   updatePairTicker(pair);
   
@@ -1255,7 +1318,7 @@ async function analyze(){
     if (j.price_series && j.price_series.length > 0) {
       console.log(`Processing ${j.price_series.length} price series data points`);
       chartData = j.price_series.map(p => ({
-        time: fmt(p.date),
+        time: fmt(p.date, tf), // Pass timeframe to formatter
         open: parseFloat(p.open) || 0,
         high: parseFloat(p.high) || 0,
         low: parseFloat(p.low) || 0,
@@ -1263,7 +1326,7 @@ async function analyze(){
       }));
     } else {
       console.warn('No price_series data, using sample data');
-      chartData = generateSamplePriceData();
+      chartData = generateSamplePriceData(tf); // Pass timeframe to generator
     }
     
     // Clean and set chart data
@@ -1309,6 +1372,20 @@ async function analyze(){
       macdHist.setData(histSeriesData);
       
       lastCandleTime = cleanData[cleanData.length - 1]?.time;
+      
+      // Update time scale format berdasarkan timeframe
+      try {
+        chart.timeScale().applyOptions({
+          timeVisible: true,
+          secondsVisible: false
+        });
+        macdChart.timeScale().applyOptions({
+          timeVisible: true,
+          secondsVisible: false
+        });
+      } catch (e) {
+        console.log('Time scale update error:', e);
+      }
       
       // Resize charts
       setTimeout(() => {
@@ -1403,6 +1480,9 @@ async function analyze(){
     // Show error to user
     aiSummaryEl.textContent = `Error: ${error.message}`;
     aiSummaryEl.style.color = '#ef4444';
+  } finally {
+    // Hide loading indicator
+    chartLoading.style.display = 'none';
   }
 }
 
