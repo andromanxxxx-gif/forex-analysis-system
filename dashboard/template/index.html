@@ -875,7 +875,48 @@ function resetUserActivity() {
     }, 120000);
   }
 }
+// Enhanced error handling
+async function analyze() {
+  try {
+    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Check for fallback data
+    if (data.fallback_data) {
+      showNotification('Using fallback data - some features limited', 'warning');
+    }
+    
+    // Process data...
+    
+  } catch (error) {
+    console.error('Analysis error:', error);
+    showNotification(`Analysis failed: ${error.message}`, 'error');
+    updateStatusIndicator(false);
+  }
+}
 
+// Add notification system
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `alert alert-${type} alert-dismissible fade show`;
+  notification.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+  
+  document.querySelector('.container').prepend(notification);
+  
+  setTimeout(() => {
+    notification.remove();
+  }, 5000);
+}
+  
 // ==================== UTILITY FUNCTIONS ====================
 function calcEMA(values, period) {
   if (!values || values.length === 0) return [];
