@@ -1,990 +1,1619 @@
-# [FILE: app_enhanced.py] - DUAL TWELVEDATA API KEYS + ALPHA VANTAGE OPTIMIZATION
-from flask import Flask, request, jsonify, render_template
-import pandas as pd
-import numpy as np
-import requests
-import os
-import json
-import sqlite3
-from datetime import datetime, timedelta
-import logging
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
-import talib
-import yfinance as yf
-import random
-import time
-import glob
-from functools import wraps
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ANDRO-FX Precision Forex Trading</title>
 
-# ==================== RATE LIMITING DECORATOR ====================
-def rate_limited(max_per_minute):
-    """Decorator untuk rate limiting API calls"""
-    min_interval = 60.0 / max_per_minute
-    def decorator(func):
-        last_time_called = [0.0]
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            elapsed = time.time() - last_time_called[0]
-            left_to_wait = min_interval - elapsed
-            if left_to_wait > 0:
-                time.sleep(left_to_wait)
-            ret = func(*args, **kwargs)
-            last_time_called[0] = time.time()
-            return ret
-        return wrapper
-    return decorator
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-# ==================== KONFIGURASI LOGGING ====================
-def setup_logging():
-    """Setup logging yang compatible dengan Windows"""
-    logger = logging.getLogger()
+  <style>
+    :root {
+      --primary-blue: #1e40af;
+      --success-green: #059669;
+      --danger-red: #dc2626;
+      --warning-orange: #d97706;
+    }
     
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
+    body {
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
     
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    .dashboard-header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+      color: white;
+      padding: 1.5rem 0;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
     
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      margin-bottom: 1.5rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
     
-    file_handler = logging.FileHandler('forex_trading.log', encoding='utf-8')
-    file_handler.setFormatter(formatter)
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
     
-    logger.addHandler(stream_handler)
-    logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
+    .card-header {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: 600;
+      color: #1e293b;
+      padding: 1rem 1.25rem;
+    }
     
-    return logger
+    .metric-card {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary-blue);
+      margin-bottom: 1rem;
+    }
+    
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    
+    .small-muted {
+      font-size: 0.875rem;
+      color: #64748b;
+      font-weight: 500;
+    }
+    
+    .price-change {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .change-positive {
+      color: var(--success-green);
+    }
+    
+    .change-negative {
+      color: var(--danger-red);
+    }
+    
+    .ai-signal-buy {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 25px;
+      font-weight: 700;
+      text-align: center;
+    }
+    
+    .ai-signal-sell {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 25px;
+      font-weight: 700;
+      text-align: center;
+    }
+    
+    .ai-signal-hold {
+      background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 25px;
+      font-weight: 700;
+      text-align: center;
+    }
+    
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 0.5rem;
+    }
+    
+    .status-live {
+      background-color: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+      animation: pulse 2s infinite;
+    }
+    
+    .status-offline {
+      background-color: #ef4444;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    .risk-factor-card {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .risk-factor-card.low {
+      background: #f0fdf4;
+      border-left: 3px solid #10b981;
+    }
+    
+    .risk-factor-card.medium {
+      background: #fffbeb;
+      border-left: 3px solid #f59e0b;
+    }
+    
+    .risk-factor-card.high {
+      background: #fef2f2;
+      border-left: 3px solid #ef4444;
+    }
+    
+    .chart-container {
+      background: white;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .control-panel {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-blue) 0%, #3730a3 100%);
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+    }
+    
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      border-radius: 12px;
+    }
+    
+    .realtime-indicator {
+      background: #10b981;
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .performance-grade {
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    
+    .grade-a { background: #f0fdf4; color: #059669; border: 2px solid #10b981; }
+    .grade-b { background: #fffbeb; color: #d97706; border: 2px solid #f59e0b; }
+    .grade-c { background: #fef3c7; color: #b45309; border: 2px solid #f59e0b; }
+    .grade-d { background: #fef2f2; color: #dc2626; border: 2px solid #ef4444; }
+    
+    .api-status {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      background: #f1f5f9;
+    }
+    
+    .api-status.good {
+      background: #f0fdf4;
+      color: #059669;
+    }
+    
+    .api-status.warning {
+      background: #fffbeb;
+      color: #d97706;
+    }
+    
+    .api-status.critical {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+  </style>
+</head>
+<body>
 
-logger = setup_logging()
+<!-- Dashboard Header -->
+<div class="dashboard-header">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <h1 class="h3 mb-1">
+          <i class="fas fa-chart-line me-2"></i>
+          ANDRO-FX Precision Trading
+        </h1>
+        <p class="mb-0 opacity-75">Advanced AI-Powered Forex Analysis System</p>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <div class="d-flex align-items-center justify-content-md-end gap-3">
+          <div class="d-flex align-items-center">
+            <span class="status-indicator status-live" id="statusIndicator"></span>
+            <span class="text-white">System Live</span>
+          </div>
+          <span class="realtime-indicator" id="realtimeIndicator" style="display: none;">
+            <i class="fas fa-bolt"></i> REAL-TIME
+          </span>
+          <span class="api-status good" id="apiStatus">API: Optimal</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
+<div class="container">
+  <!-- Control Panel -->
+  <div class="control-panel">
+    <div class="row align-items-center">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Currency Pair</label>
+        <select class="form-select" id="pairSelect">
+          <option value="USDJPY">USD/JPY</option>
+          <option value="EURUSD">EUR/USD</option>
+          <option value="GBPUSD">GBP/USD</option>
+          <option value="USDCHF">USD/CHF</option>
+          <option value="AUDUSD">AUD/USD</option>
+          <option value="USDCAD">USD/CAD</option>
+          <option value="NZDUSD">NZD/USD</option>
+          <option value="EURJPY">EUR/JPY</option>
+          <option value="GBPJPY">GBP/JPY</option>
+          <option value="CHFJPY">CHF/JPY</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Timeframe</label>
+        <select class="form-select" id="timeframeSelect">
+          <option value="M30">30 Minutes</option>
+          <option value="1H">1 Hour</option>
+          <option value="4H" selected>4 Hours</option>
+          <option value="1D">Daily</option>
+          <option value="1W">Weekly</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Live Price</label>
+        <div class="d-flex align-items-center">
+          <span class="fs-3 fw-bold text-primary me-2" id="livePrice">-</span>
+          <span class="price-change" id="pairChange">(0.00%)</span>
+        </div>
+        <div class="small-muted" id="selectedPair">USDJPY – Loading...</div>
+        <div class="small-muted" id="updateInfo">Next update: <span id="nextUpdateTime">-</span></div>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100" id="analyzeBtn">
+          <i class="fas fa-sync-alt me-2"></i>Analyze
+        </button>
+      </div>
+    </div>
+  </div>
 
-# ==================== KONFIGURASI SISTEM DENGAN DUAL API KEYS ====================
-@dataclass
-class SystemConfig:
-    # API Configuration - DUAL TWELVEDATA KEYS
-    DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
-    NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
-    TWELVE_DATA_KEY_REALTIME: str = os.environ.get("TWELVE_DATA_KEY_REALTIME", "demo")  # Key untuk real-time
-    TWELVE_DATA_KEY_HISTORICAL: str = os.environ.get("TWELVE_DATA_KEY_HISTORICAL", "demo")  # Key untuk historical
-    ALPHA_VANTAGE_KEY: str = os.environ.get("ALPHA_VANTAGE_KEY", "demo")
-    
-    # Enhanced Trading Parameters
-    INITIAL_BALANCE: float = 10000.0
-    RISK_PER_TRADE: float = 0.02
-    MAX_DAILY_LOSS: float = 0.03
-    MAX_DRAWDOWN: float = 0.10
-    MAX_POSITIONS: int = 3
-    STOP_LOSS_PCT: float = 0.01
-    TAKE_PROFIT_PCT: float = 0.02
-    
-    # Risk Management Parameters
-    CORRELATION_THRESHOLD: float = 0.7
-    VOLATILITY_THRESHOLD: float = 0.02
-    DAILY_TRADE_LIMIT: int = 50
-    MAX_POSITION_SIZE_PCT: float = 0.05
-    
-    # Backtesting-specific parameters
-    BACKTEST_DAILY_TRADE_LIMIT: int = 100
-    BACKTEST_MIN_CONFIDENCE: int = 40
-    BACKTEST_RISK_SCORE_THRESHOLD: int = 8
-    
-    # Rate limiting untuk multiple APIs
-    ALPHA_VANTAGE_RATE_LIMIT: int = 3
-    TWELVEDATA_HISTORICAL_RATE_LIMIT: int = 8  # Lebih tinggi untuk historical
-    TWELVEDATA_REALTIME_RATE_LIMIT: int = 10   # Tinggi untuk real-time
-    
-    # Supported Instruments
-    FOREX_PAIRS: List[str] = field(default_factory=lambda: [
-        "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", 
-        "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
-    ])
-    
-    # Data source mapping - STRATEGI BARU!
-    DATA_SOURCE_MAPPING: Dict[str, str] = field(default_factory=lambda: {
-        'M30': 'TWELVEDATA_HISTORICAL',
-        '1H': 'TWELVEDATA_HISTORICAL', 
-        '4H': 'TWELVEDATA_HISTORICAL',
-        '1D': 'ALPHA_VANTAGE',
-        '1W': 'ALPHA_VANTAGE'
-    })
-    
-    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
-    
-    # Backtesting
-    DEFAULT_BACKTEST_DAYS: int = 90
-    MIN_DATA_POINTS: int = 100
-    
-    # Trading Hours (UTC)
-    HIGH_IMPACT_HOURS: List[Tuple[int, int]] = field(default_factory=lambda: [(8, 10), (13, 15)])
+  <div class="row">
+    <!-- Left Column: Charts -->
+    <div class="col-lg-8">
+      <!-- Main Price Chart -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Price Chart with EMA</span>
+          <div>
+            <span class="small-muted me-2" id="currentPrice">Current: -</span>
+            <span class="badge bg-secondary" id="chartDataInfo">0 bars</span>
+          </div>
+        </div>
+        <div class="card-body position-relative p-0">
+          <div id="chartRoot"></div>
+          <div class="loading-overlay" id="chartLoading" style="display: none;">
+            <div class="text-center">
+              <div class="spinner-border text-primary mb-2" role="status"></div>
+              <div>Loading chart data...</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-config = SystemConfig()
+      <!-- MACD Chart -->
+      <div class="card">
+        <div class="card-header">MACD Indicator</div>
+        <div class="card-body p-0">
+          <div id="macdRoot"></div>
+        </div>
+      </div>
+    </div>
 
-# ==================== TWELVEDATA HISTORICAL CLIENT ====================
-class TwelveDataHistoricalClient:
-    """Client khusus untuk data historical dari TwelveData"""
-    def __init__(self):
-        self.api_key = config.TWELVE_DATA_KEY_HISTORICAL
-        self.base_url = "https://api.twelvedata.com"
-        self.historical_cache = {}
-        self.cache_timeout = 3600  # 1 jam cache
-        self.demo_mode = not self.api_key or self.api_key == "demo"
-        
-        self.session = self._create_session_with_retry()
-        
-        if self.demo_mode:
-            logger.info("TwelveData Historical running in DEMO mode")
-        else:
-            logger.info("TwelveData Historical running in LIVE mode")
+    <!-- Right Column: Analysis Panels -->
+    <div class="col-lg-4">
+      <!-- AI Analysis Panel -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>AI Trading Signal</span>
+          <span class="badge bg-primary" id="aiProvider">DeepSeek AI</span>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-3">
+            <div id="aiSignalBadge" class="ai-signal-hold">HOLD</div>
+          </div>
+          
+          <div class="mb-3">
+            <div class="small-muted">AI Analysis</div>
+            <div id="aiSummary" class="fw-semibold">Waiting for analysis...</div>
+          </div>
+          
+          <div class="row">
+            <div class="col-6">
+              <div class="small-muted">Confidence</div>
+              <div id="aiConfidence" class="fw-bold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">Risk Level</div>
+              <div id="aiRisk" class="fw-bold">-</div>
+            </div>
+          </div>
+          
+          <hr>
+          
+          <div class="small-muted mb-2">Trading Levels</div>
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="small-muted">Entry</div>
+              <div id="aiEntry" class="fw-semibold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">Stop Loss</div>
+              <div id="aiSL" class="fw-semibold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">Take Profit 1</div>
+              <div id="aiTP1" class="fw-semibold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">Take Profit 2</div>
+              <div id="aiTP2" class="fw-semibold">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    def _create_session_with_retry(self):
-        """Create requests session dengan retry strategy"""
-        session = requests.Session()
-        
-        retry_strategy = Retry(
-            total=3,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET"],
-            backoff_factor=1
-        )
-        
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        return session
+      <!-- Risk Assessment Panel -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Risk Assessment</span>
+          <span class="badge bg-secondary" id="riskScoreBadge">Score: 0/100</span>
+        </div>
+        <div class="card-body">
+          <div id="riskStatus" class="p-3 rounded mb-3 text-center">
+            <div class="risk-icon mb-2">
+              <i class="fas fa-clock text-warning fa-2x"></i>
+            </div>
+            <div class="fw-bold fs-5" id="riskMainStatus">ANALYZING</div>
+            <div class="small-muted" id="riskSubStatus">Calculating risk factors...</div>
+          </div>
+          
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small-muted mb-1">
+              <span>Risk Meter</span>
+              <span id="riskLevelText">LOW</span>
+            </div>
+            <div class="progress" style="height: 8px;">
+              <div id="riskMeterFill" class="progress-bar bg-success" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <div id="riskDetails" style="display: none;">
+            <div class="small-muted mb-2">Risk Factors</div>
+            <div class="row g-2" id="riskFactorsContainer">
+              <!-- Risk factors will be populated here -->
+            </div>
+          </div>
+        </div>
+      </div>
 
-    @rate_limited(8)  # 8 requests per minute untuk historical
-    def get_historical_data(self, pair: str, interval: str, days: int = 30) -> pd.DataFrame:
-        """Ambil data historical dari TwelveData untuk M30, 1H, 4H"""
-        cache_key = f"{pair}_{interval}_{days}"
-        
-        # Check cache
-        if cache_key in self.historical_cache:
-            cached_time, df = self.historical_cache[cache_key]
-            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
-                logger.info(f"Using cached TwelveData historical data for {pair}-{interval}")
-                return df.copy()
-        
-        if self.demo_mode:
-            return self._generate_simulated_historical_data(pair, interval, days)
-        
-        try:
-            # Format pair untuk TwelveData
-            formatted_pair = f"{pair[:3]}/{pair[3:]}"
-            
-            # Map interval ke format TwelveData
-            interval_map = {
-                'M30': '30min',
-                '1H': '1h', 
-                '4H': '4h'
-            }
-            
-            if interval not in interval_map:
-                logger.error(f"Unsupported interval for TwelveData historical: {interval}")
-                return self._generate_simulated_historical_data(pair, interval, days)
-            
-            # Calculate outputsize berdasarkan days
-            if interval == 'M30':
-                outputsize = min(days * 48, 5000)
-            elif interval == '1H':
-                outputsize = min(days * 24, 5000)
-            elif interval == '4H':
-                outputsize = min(days * 6, 5000)
-            else:
-                outputsize = 1000
-            
-            params = {
-                'symbol': formatted_pair,
-                'interval': interval_map[interval],
-                'outputsize': outputsize,
-                'apikey': self.api_key,
-                'format': 'JSON'
-            }
-            
-            logger.info(f"Fetching historical data from TwelveData for {pair}-{interval}...")
-            response = self.session.get(f"{self.base_url}/time_series", params=params, timeout=15)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if 'values' in data:
-                    records = []
-                    for item in data['values']:
-                        try:
-                            records.append({
-                                'date': pd.to_datetime(item['datetime']),
-                                'open': float(item['open']),
-                                'high': float(item['high']),
-                                'low': float(item['low']),
-                                'close': float(item['close']),
-                                'volume': int(float(item.get('volume', 0)))
-                            })
-                        except (ValueError, KeyError) as e:
-                            logger.warning(f"Skipping invalid data point: {e}")
-                            continue
-                    
-                    if records:
-                        df = pd.DataFrame(records)
-                        df = df.sort_values('date').reset_index(drop=True)
-                        
-                        # Cache the data
-                        self.historical_cache[cache_key] = (datetime.now(), df.copy())
-                        self._save_data_to_file(df, pair, interval)
-                        
-                        logger.info(f"Successfully fetched {len(df)} historical records from TwelveData for {pair}-{interval}")
-                        return df
-                    else:
-                        logger.error("No valid records processed from TwelveData")
-                        return self._generate_simulated_historical_data(pair, interval, days)
-                else:
-                    logger.error(f"Invalid TwelveData historical response: {data}")
-                    return self._generate_simulated_historical_data(pair, interval, days)
-            else:
-                logger.error(f"TwelveData historical API error: {response.status_code}")
-                return self._generate_simulated_historical_data(pair, interval, days)
-                
-        except Exception as e:
-            logger.error(f"Error getting historical data from TwelveData for {pair}-{interval}: {e}")
-            return self._generate_simulated_historical_data(pair, interval, days)
+      <!-- Technical Indicators -->
+      <div class="card">
+        <div class="card-header">Technical Indicators</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="small-muted">RSI (14)</div>
+              <div id="rsiVal" class="fw-bold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">MACD</div>
+              <div id="macdVal" class="fw-bold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">MACD Hist</div>
+              <div id="macdHistVal" class="fw-bold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">ADX</div>
+              <div id="adxVal" class="fw-bold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">ATR</div>
+              <div id="atrVal" class="fw-bold">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">Volatility</div>
+              <div id="volVal" class="fw-bold">-</div>
+            </div>
+            <div class="col-12">
+              <div class="small-muted">Trend Direction</div>
+              <div id="trendVal" class="fw-bold">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Support & Resistance -->
+      <div class="card">
+        <div class="card-header">Support & Resistance</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="small-muted">Support</div>
+              <div id="supportLevel" class="fw-bold text-success">-</div>
+              <div class="small-muted" id="supportDistance">-</div>
+            </div>
+            <div class="col-6">
+              <div class="small-muted">Resistance</div>
+              <div id="resistanceLevel" class="fw-bold text-danger">-</div>
+              <div class="small-muted" id="resistanceDistance">-</div>
+            </div>
+          </div>
+          <hr>
+          <div class="small-muted mb-2">Pivot Points</div>
+          <div class="row g-2">
+            <div class="col-4 text-center">
+              <div class="small-muted">R3</div>
+              <div id="pivotR3" class="fw-semibold small">-</div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="small-muted">R2</div>
+              <div id="pivotR2" class="fw-semibold small">-</div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="small-muted">R1</div>
+              <div id="pivotR1" class="fw-semibold small">-</div>
+            </div>
+            <div class="col-12 text-center my-2">
+              <div class="small-muted">Pivot</div>
+              <div id="pivotPoint" class="fw-bold">-</div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="small-muted">S1</div>
+              <div id="pivotS1" class="fw-semibold small">-</div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="small-muted">S2</div>
+              <div id="pivotS2" class="fw-semibold small">-</div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="small-muted">S3</div>
+              <div id="pivotS3" class="fw-semibold small">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="row mt-3">
+    <div class="col-12 text-center">
+      <button class="btn btn-outline-primary me-2" id="runBacktestBtn">
+        <i class="fas fa-chart-bar me-2"></i>Run Backtest
+      </button>
+      <button class="btn btn-outline-success me-2" id="exportBtn">
+        <i class="fas fa-file-export me-2"></i>Export Analysis
+      </button>
+      <button class="btn btn-outline-info" id="settingsBtn">
+        <i class="fas fa-cog me-2"></i>System Settings
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Backtest Modal -->
+<div class="modal fade" id="backtestModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Strategy Backtesting</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Initial Balance ($)</label>
+            <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Backtest Period (Days)</label>
+            <input type="number" class="form-control" id="backtestDays" value="90" min="30" max="365">
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Strategy Type</label>
+            <select class="form-select" id="backtestType">
+              <option value="TREND_FOLLOWING">Trend Following</option>
+              <option value="MEAN_REVERSION">Mean Reversion</option>
+              <option value="BREAKOUT">Breakout</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Status</label>
+            <div>
+              <span class="badge bg-secondary" id="backtestStatus">Ready</span>
+            </div>
+          </div>
+        </div>
+        <div id="backtestResults">
+          <div class="text-center text-muted py-4">
+            <i class="fas fa-chart-line fa-3x mb-3 opacity-50"></i>
+            <div>Configure parameters and run backtest to see results</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="startBacktestBtn">
+          <i class="fas fa-play me-2"></i>Run Backtest
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- API Status Modal -->
+<div class="modal fade" id="apiStatusModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">API Usage Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-12">
+            <div class="mb-3">
+              <div class="small-muted">Current Update Interval</div>
+              <div class="fw-bold" id="currentIntervalDisplay">-</div>
+            </div>
+            <div class="mb-3">
+              <div class="small-muted">Estimated Daily API Calls</div>
+              <div class="fw-bold" id="dailyApiCalls">-</div>
+            </div>
+            <div class="mb-3">
+              <div class="small-muted">API Health</div>
+              <div>
+                <span class="badge bg-success" id="apiHealthBadge">Healthy</span>
+              </div>
+            </div>
+            <hr>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="enableLiveUpdates" checked>
+              <label class="form-check-label" for="enableLiveUpdates">Enable Live Updates</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="aggressiveMode">
+              <label class="form-check-label" for="aggressiveMode">Aggressive Mode (Use with caution)</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ==================== GLOBAL VARIABLES ====================
+let currentChartData = [];
+let currentEmaData = [];
+let currentMacdData = { macd: [], signal: [], hist: [] };
+let realtimeCandle = null;
+let isRealtimeMode = false;
+let currentPair = 'USDJPY';
+let currentTimeframe = '4H';
+
+// API Optimization Variables
+let liveUpdateInterval = null;
+let isTabActive = true;
+let consecutiveErrors = 0;
+let currentUpdateInterval = 30000; // Start dengan 30 detik
+let totalApiCalls = 0;
+let apiCallTimestamps = [];
+let isAggressiveMode = false;
+
+// Strategy berdasarkan timeframe
+const timeframeUpdateStrategy = {
+    'M30': 15000,    // 15 detik
+    '1H': 20000,     // 20 detik
+    '4H': 30000,     // 30 detik
+    '1D': 60000,     // 1 menit
+    '1W': 300000     // 5 menit
+};
+
+// ==================== CHART INITIALIZATION ====================
+const chartOptions = {
+  layout: { 
+    backgroundColor: '#fff', 
+    textColor: '#111' 
+  },
+  grid: {
+    vertLines: { color: '#f3f4f6' },
+    horzLines: { color: '#f3f4f6' }
+  },
+  timeScale: {
+    borderColor: '#eee',
+    timeVisible: true,
+    secondsVisible: false,
+    barSpacing: 8,
+    minBarSpacing: 2,
+    fixLeftEdge: true,
+    fixRightEdge: true
+  },
+  rightPriceScale: {
+    borderColor: '#eee',
+    scaleMargins: {
+      top: 0.1,
+      bottom: 0.1
+    }
+  },
+  width: document.getElementById('chartRoot').clientWidth,
+  height: 520
+};
+
+const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
+const candleSeries = chart.addCandlestickSeries({
+  upColor: '#16a34a',
+  downColor: '#dc2626', 
+  borderVisible: true,
+  wickUpColor: '#16a34a',
+  wickDownColor: '#dc2626',
+  priceScaleId: 'right'
+});
+
+const ema26Series = chart.addLineSeries({
+  color: '#2563eb',
+  lineWidth: 1.5,
+  priceScaleId: 'right'
+});
+
+// MACD Chart
+const macdChartOptions = {
+  layout: { 
+    backgroundColor: '#fff', 
+    textColor: '#111' 
+  },
+  grid: {
+    vertLines: { color: '#f3f4f6' },
+    horzLines: { color: '#f3f4f6' }
+  },
+  timeScale: {
+    borderColor: '#eee',
+    timeVisible: true,
+    secondsVisible: false,
+    barSpacing: 8,
+    minBarSpacing: 2
+  },
+  width: document.getElementById('macdRoot').clientWidth,
+  height: 160
+};
+
+const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), macdChartOptions);
+const macdLineSeries = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1 });
+const macdSignalSeries = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
+const macdHistSeries = macdChart.addHistogramSeries({ color: '#a78bfa' });
+
+// Sync time scales between charts
+chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+  try {
+    macdChart.timeScale().setVisibleRange(timeRange);
+  } catch (e) {
+    console.log('Time scale sync error:', e);
+  }
+});
+
+// ==================== API OPTIMIZATION FUNCTIONS ====================
+function trackApiCall() {
+  totalApiCalls++;
+  apiCallTimestamps.push(Date.now());
+  
+  // Clean old timestamps (keep only last hour)
+  const oneHourAgo = Date.now() - 3600000;
+  apiCallTimestamps = apiCallTimestamps.filter(timestamp => timestamp > oneHourAgo);
+  
+  updateApiStatusDisplay();
+}
+
+function updateApiStatusDisplay() {
+  const apiStatusEl = document.getElementById('apiStatus');
+  const callsLastHour = apiCallTimestamps.length;
+  
+  let status = 'good';
+  let text = 'API: Optimal';
+  
+  if (callsLastHour > 100) {
+    status = 'critical';
+    text = 'API: High Usage';
+  } else if (callsLastHour > 50) {
+    status = 'warning';
+    text = 'API: Moderate';
+  }
+  
+  apiStatusEl.className = `api-status ${status}`;
+  apiStatusEl.textContent = text;
+  
+  // Update next update time
+  const nextUpdateTime = new Date(Date.now() + currentUpdateInterval);
+  document.getElementById('nextUpdateTime').textContent = 
+    nextUpdateTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+}
+
+function getOptimalUpdateInterval(timeframe, volatility, isMarketHours) {
+  let baseInterval = timeframeUpdateStrategy[timeframe] || 30000;
+  
+  if (isAggressiveMode) {
+    baseInterval = Math.max(10000, baseInterval * 0.5); // 50% lebih cepat di aggressive mode
+  }
+  
+  // Adjust berdasarkan volatilitas
+  let adjustment = 1.0;
+  if (volatility === 'HIGH') adjustment = 0.7;
+  if (volatility === 'LOW') adjustment = 1.3;
+  
+  // Adjust berdasarkan jam market
+  const now = new Date();
+  const hour = now.getUTCHours();
+  const isActiveHours = (hour >= 8 && hour <= 16);
+  
+  if (isActiveHours && isMarketHours) {
+    adjustment *= 0.8;
+  } else {
+    adjustment *= 1.5;
+  }
+  
+  // Adjust berdasarkan error rate
+  if (consecutiveErrors > 0) {
+    adjustment *= (1 + consecutiveErrors * 0.3);
+  }
+  
+  return Math.max(10000, Math.min(300000, baseInterval * adjustment));
+}
+
+function handleVisibilityChange() {
+  isTabActive = !document.hidden;
+  
+  if (isTabActive) {
+    startOptimizedUpdates();
+    console.log('Tab active - resuming live updates');
+  } else {
+    stopLiveUpdates();
+    console.log('Tab inactive - pausing live updates');
+  }
+}
+
+function startOptimizedUpdates() {
+  stopLiveUpdates();
+  
+  // Immediate update saat mulai
+  optimizedLivePriceUpdate();
+  
+  // Schedule periodic updates
+  liveUpdateInterval = setInterval(optimizedLivePriceUpdate, currentUpdateInterval);
+  
+  console.log(`Started optimized live updates every ${currentUpdateInterval/1000} seconds`);
+}
+
+function stopLiveUpdates() {
+  if (liveUpdateInterval) {
+    clearInterval(liveUpdateInterval);
+    liveUpdateInterval = null;
+  }
+}
+
+// User activity detection
+let userActivityTimeout;
+function resetUserActivity() {
+  if (currentUpdateInterval > 15000 && isAggressiveMode) {
+    const originalInterval = currentUpdateInterval;
+    currentUpdateInterval = Math.max(10000, currentUpdateInterval * 0.7);
     
-    def _save_data_to_file(self, df: pd.DataFrame, pair: str, interval: str):
-        """Save data to CSV"""
-        if df.empty:
-            return
-            
-        try:
-            os.makedirs('historical_data', exist_ok=True)
-            filename = f"historical_data/TD_{pair}_{interval}_{datetime.now().strftime('%Y%m%d')}.csv"
-            df.to_csv(filename, index=False)
-            logger.info(f"Saved TwelveData historical data to {filename}")
-        except Exception as e:
-            logger.warning(f"Failed to save TwelveData data to file: {e}")
+    if (liveUpdateInterval) {
+      stopLiveUpdates();
+      startOptimizedUpdates();
+    }
     
-    def _generate_simulated_historical_data(self, pair: str, interval: str, days: int) -> pd.DataFrame:
-        """Generate simulated historical data untuk fallback"""
-        try:
-            intervals_per_day = {
-                'M30': 48, '1H': 24, '4H': 6, '1D': 1, '1W': 1/7
-            }
-            
-            points = int(days * intervals_per_day.get(interval, 6))
-            points = max(50, min(points, 1000))
-            
-            base_prices = {
-                'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-                'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
-                'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
-            }
-            
-            base_price = base_prices.get(pair, 150.0)
-            prices = []
-            current_price = base_price
-            
-            start_date = datetime.now() - timedelta(days=days)
-            
-            for i in range(points):
-                volatility = 0.001
-                drift = (base_price - current_price) * 0.0005
-                random_shock = np.random.normal(0, volatility)
-                change = drift + random_shock
-                current_price = current_price * (1 + change)
-                
-                open_price = current_price
-                close_variation = np.random.normal(0, volatility * 0.2)
-                close_price = current_price * (1 + close_variation)
-                
-                price_range = abs(change) * base_price * 0.8
-                high = max(open_price, close_price) + price_range
-                low = min(open_price, close_price) - price_range
-                
-                high = max(high, max(open_price, close_price) + 0.0001)
-                low = min(low, min(open_price, close_price) - 0.0001)
-                
-                if interval == 'M30':
-                    current_date = start_date + timedelta(minutes=30*i)
-                elif interval == '1H':
-                    current_date = start_date + timedelta(hours=i)
-                elif interval == '4H':
-                    current_date = start_date + timedelta(hours=4*i)
-                else:
-                    current_date = start_date + timedelta(days=i)
-                
-                prices.append({
-                    'date': current_date,
-                    'open': round(float(open_price), 4),
-                    'high': round(float(high), 4),
-                    'low': round(float(low), 4),
-                    'close': round(float(close_price), 4),
-                    'volume': int(np.random.randint(5000, 30000))
-                })
-            
-            df = pd.DataFrame(prices)
-            logger.info(f"Generated simulated historical data for {pair}-{interval}: {len(df)} records")
-            
-            self._save_data_to_file(df, pair, interval)
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error generating simulated data for {pair}: {e}")
-            return pd.DataFrame({
-                'date': [datetime.now() - timedelta(days=i) for i in range(10)],
-                'open': [150.0] * 10, 
-                'high': [150.5] * 10, 
-                'low': [149.5] * 10, 
-                'close': [150.2] * 10,
-                'volume': [10000] * 10
-            })
+    clearTimeout(userActivityTimeout);
+    userActivityTimeout = setTimeout(() => {
+      currentUpdateInterval = originalInterval;
+      if (liveUpdateInterval) {
+        stopLiveUpdates();
+        startOptimizedUpdates();
+      }
+    }, 120000);
+  }
+}
 
-# ==================== TWELVEDATA REALTIME CLIENT ====================
-class TwelveDataRealtimeClient:
-    """Client khusus untuk real-time prices dari TwelveData"""
-    def __init__(self):
-        self.api_key = config.TWELVE_DATA_KEY_REALTIME
-        self.base_url = "https://api.twelvedata.com"
-        self.price_cache = {}
-        self.cache_timeout = 30  # 30 detik cache untuk real-time
-        self.demo_mode = not self.api_key or self.api_key == "demo"
-        
-        self.session = self._create_session_with_retry()
-        
-        if self.demo_mode:
-            logger.info("TwelveData Realtime running in DEMO mode")
-        else:
-            logger.info("TwelveData Realtime running in LIVE mode")
+// ==================== UTILITY FUNCTIONS ====================
+function calcEMA(values, period) {
+  if (!values || values.length === 0) return [];
+  const k = 2 / (period + 1);
+  let ema = [values[0]];
+  for (let i = 1; i < values.length; i++) {
+    ema.push(values[i] * k + ema[i - 1] * (1 - k));
+  }
+  return ema;
+}
 
-    def _create_session_with_retry(self):
-        """Create requests session dengan retry strategy"""
-        session = requests.Session()
-        
-        retry_strategy = Retry(
-            total=2,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET"],
-            backoff_factor=0.5
-        )
-        
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        return session
+function calcMACDSeries(closes, short = 12, long = 26, signal = 9) {
+  if (!closes || closes.length === 0) return { macd: [], sig: [], hist: [] };
+  const emaS = calcEMA(closes, short);
+  const emaL = calcEMA(closes, long);
+  const macd = closes.map((_, i) => emaS[i] - emaL[i]);
+  const sig = calcEMA(macd, signal);
+  const hist = macd.map((v, i) => v - (sig[i] || 0));
+  return { macd, sig, hist };
+}
 
-    @rate_limited(10)  # 10 requests per minute untuk real-time
-    def get_real_time_price(self, pair: str) -> float:
-        """Ambil current price real-time dari TwelveData"""
-        cache_key = pair
-        
-        # Check cache
-        if pair in self.price_cache:
-            cached_time, price = self.price_cache[pair]
-            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
-                return price
-        
-        if self.demo_mode:
-            return self._get_simulated_real_time_price(pair)
-        
-        try:
-            formatted_pair = f"{pair[:3]}/{pair[3:]}"
-            url = f"{self.base_url}/price?symbol={formatted_pair}&apikey={self.api_key}"
-            
-            response = self.session.get(url, timeout=5)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if 'price' in data and data['price'] is not None:
-                    price = float(data['price'])
-                    
-                    self.price_cache[pair] = (datetime.now(), price)
-                    logger.info(f"TwelveData Real-time price for {pair}: {price}")
-                    return price
-                else:
-                    logger.error(f"Invalid real-time response from TwelveData: {data}")
-                    return self._get_simulated_real_time_price(pair)
-            else:
-                logger.error(f"TwelveData real-time API error: {response.status_code}")
-                return self._get_simulated_real_time_price(pair)
-                
-        except Exception as e:
-            logger.error(f"Error getting real-time price for {pair}: {e}")
-            return self._get_simulated_real_time_price(pair)
-    
-    def _get_simulated_real_time_price(self, pair: str) -> float:
-        """Harga real-time simulasi untuk demo mode"""
-        try:
-            base_prices = {
-                'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
-                'EURUSD': 1.0835, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
-                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095
-            }
-            
-            base_price = base_prices.get(pair, 150.0)
-            
-            variation = random.uniform(-0.0005, 0.0005)
-            simulated_price = round(base_price * (1 + variation), 4)
-            
-            self.price_cache[pair] = (datetime.now(), simulated_price)
-            
-            return simulated_price
-            
-        except Exception as e:
-            logger.error(f"Error in simulated real-time price for {pair}: {e}")
-            return 150.0
+function formatDateForChart(dateString, timeframe) {
+  try {
+    let date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date:', dateString);
+      return Math.floor(Date.now() / 1000);
+    }
+    return date.getTime() / 1000;
+  } catch (e) {
+    console.error('Date formatting error:', e);
+    return Math.floor(Date.now() / 1000);
+  }
+}
 
-# ==================== ALPHA VANTAGE CLIENT (UNTUK 1D & 1W) ====================
-class AlphaVantageClient:
-    def __init__(self):
-        self.api_key = config.ALPHA_VANTAGE_KEY
-        self.base_url = "https://www.alphavantage.co/query"
-        self.historical_cache = {}
-        self.cache_timeout = 86400  # 24 jam cache untuk daily data
-        self.demo_mode = not self.api_key or self.api_key == "demo"
-        
-        self.session = self._create_session_with_retry()
-        
-        if self.demo_mode:
-            logger.info("Alpha Vantage running in DEMO mode")
-        else:
-            logger.info("Alpha Vantage running in LIVE mode for 1D/1W data")
+function cleanChartData(data) {
+  return data.filter(item => 
+    item && 
+    item.time && 
+    item.open !== null && item.open !== undefined &&
+    item.high !== null && item.high !== undefined &&
+    item.low !== null && item.low !== undefined &&
+    item.close !== null && item.close !== undefined
+  ).map(item => ({
+    time: item.time,
+    open: parseFloat(item.open) || 0,
+    high: parseFloat(item.high) || 0,
+    low: parseFloat(item.low) || 0,
+    close: parseFloat(item.close) || 0
+  }));
+}
 
-    def _create_session_with_retry(self):
-        """Create requests session dengan retry strategy"""
-        session = requests.Session()
-        
-        retry_strategy = Retry(
-            total=2,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET"],
-            backoff_factor=1
-        )
-        
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        return session
+function getNextCandleTime(lastCandleTime, timeframe) {
+  const lastTime = new Date(lastCandleTime * 1000);
+  let nextTime = new Date(lastTime);
+  
+  switch(timeframe) {
+    case 'M30':
+      nextTime.setMinutes(nextTime.getMinutes() + 30);
+      break;
+    case '1H':
+      nextTime.setHours(nextTime.getHours() + 1);
+      break;
+    case '4H':
+      nextTime.setHours(nextTime.getHours() + 4);
+      break;
+    case '1D':
+      nextTime.setDate(nextTime.getDate() + 1);
+      break;
+    case '1W':
+      nextTime.setDate(nextTime.getDate() + 7);
+      break;
+    default:
+      nextTime.setHours(nextTime.getHours() + 1);
+  }
+  
+  return Math.floor(nextTime.getTime() / 1000);
+}
 
-    @rate_limited(3)  # 3 calls per minute untuk Alpha Vantage free tier
-    def get_historical_data(self, pair: str, interval: str, days: int = 30) -> pd.DataFrame:
-        """Ambil data historis dari Alpha Vantage hanya untuk 1D dan 1W"""
-        cache_key = f"{pair}_{interval}_{days}"
+// ==================== UI UPDATE FUNCTIONS ====================
+function updatePairTicker(pair) {
+  document.getElementById('selectedPair').textContent = `${pair} – Real-time Analysis`;
+  currentPair = pair;
+  document.getElementById('chartDataInfo').textContent = `${currentChartData.length} bars`;
+}
+
+function updateStatusIndicator(isLive) {
+  const statusIndicator = document.getElementById('statusIndicator');
+  const realtimeIndicator = document.getElementById('realtimeIndicator');
+  
+  if (isLive) {
+    statusIndicator.className = 'status-indicator status-live';
+    realtimeIndicator.style.display = 'inline-flex';
+  } else {
+    statusIndicator.className = 'status-indicator status-offline';
+    realtimeIndicator.style.display = 'none';
+  }
+}
+
+function setSignal(signal) {
+  const aiSignal = document.getElementById('aiSignalBadge');
+  aiSignal.textContent = signal;
+  aiSignal.className = signal === 'BUY' ? 'ai-signal-buy' : 
+                      signal === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
+}
+
+function updateRiskAssessment(riskData) {
+  const riskScore = riskData.risk_score || 0;
+  const approved = riskData.approved || false;
+  const violations = riskData.violations || [];
+  const riskFactors = riskData.risk_factors || {};
+
+  // Update risk score badge
+  const riskScoreBadge = document.getElementById('riskScoreBadge');
+  riskScoreBadge.textContent = `Score: ${riskScore}`;
+  riskScoreBadge.className = `badge ${
+    riskScore <= 30 ? 'bg-success' : 
+    riskScore <= 70 ? 'bg-warning' : 'bg-danger'
+  }`;
+
+  // Update risk status display
+  const riskMainStatus = document.getElementById('riskMainStatus');
+  const riskSubStatus = document.getElementById('riskSubStatus');
+  const riskStatus = document.getElementById('riskStatus');
+  const riskIcon = riskStatus.querySelector('.risk-icon i');
+
+  if (approved) {
+    riskMainStatus.textContent = 'APPROVED';
+    riskSubStatus.textContent = 'Trade meets risk criteria';
+    riskStatus.style.background = 'linear-gradient(135deg, #f0f9ff, #e0f2fe)';
+    riskStatus.style.border = '2px solid #bae6fd';
+    riskIcon.className = 'fas fa-check-circle fa-2x text-success';
+  } else {
+    riskMainStatus.textContent = 'REJECTED';
+    riskSubStatus.textContent = violations.length > 0 ? 
+      violations[0] : 'Trade does not meet risk criteria';
+    riskStatus.style.background = 'linear-gradient(135deg, #fef2f2, #fee2e2)';
+    riskStatus.style.border = '2px solid #fecaca';
+    riskIcon.className = 'fas fa-times-circle fa-2x text-danger';
+  }
+
+  // Update risk meter
+  const riskMeterFill = document.getElementById('riskMeterFill');
+  riskMeterFill.style.width = `${riskScore}%`;
+  riskMeterFill.style.background = riskScore <= 30 ? '#10b981' : 
+                                  riskScore <= 70 ? '#f59e0b' : '#ef4444';
+
+  // Update risk factors display
+  const riskFactorsContainer = document.getElementById('riskFactorsContainer');
+  riskFactorsContainer.innerHTML = '';
+
+  if (Object.keys(riskFactors).length > 0) {
+    for (const [key, value] of Object.entries(riskFactors)) {
+      if (typeof value === 'number') {
+        const factorElement = document.createElement('div');
+        factorElement.className = 'col-6';
         
-        # Check cache
-        if cache_key in self.historical_cache:
-            cached_time, df = self.historical_cache[cache_key]
-            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
-                logger.info(f"Using cached Alpha Vantage data for {pair}-{interval}")
-                return df.copy()
+        let statusClass = 'medium';
+        let statusIcon = 'exclamation-triangle';
         
-        # Hanya handle 1D dan 1W
-        if interval not in ['1D', '1W']:
-            logger.warning(f"Alpha Vantage only supports 1D/1W, not {interval}")
-            return pd.DataFrame()
-        
-        if self.demo_mode:
-            return self._generate_simulated_historical_data(pair, interval, days)
-        
-        try:
-            # Tentukan function
-            function = 'FX_DAILY' if interval == '1D' else 'FX_WEEKLY'
-            
-            params = {
-                'function': function,
-                'from_symbol': pair[:3],
-                'to_symbol': pair[3:],
-                'apikey': self.api_key,
-                'datatype': 'json',
-                'outputsize': 'compact'
-            }
-            
-            logger.info(f"Fetching {interval} data from Alpha Vantage for {pair}...")
-            response = self.session.get(self.base_url, params=params, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                time_series_key = 'Time Series FX (Daily)' if interval == '1D' else 'Time Series FX (Weekly)'
-                
-                if time_series_key in data:
-                    records = []
-                    for timestamp, values in data[time_series_key].items():
-                        try:
-                            records.append({
-                                'date': pd.to_datetime(timestamp),
-                                'open': float(values['1. open']),
-                                'high': float(values['2. high']),
-                                'low': float(values['3. low']),
-                                'close': float(values['4. close']),
-                                'volume': 0
-                            })
-                        except (ValueError, KeyError) as e:
-                            logger.warning(f"Skipping invalid data point {timestamp}: {e}")
-                            continue
-                    
-                    if records:
-                        df = pd.DataFrame(records)
-                        df = df.sort_values('date').reset_index(drop=True)
-                        
-                        # Filter berdasarkan days
-                        start_date = datetime.now() - timedelta(days=min(days, 365))
-                        df = df[df['date'] >= start_date]
-                        
-                        self.historical_cache[cache_key] = (datetime.now(), df.copy())
-                        self._save_data_to_file(df, pair, interval)
-                        
-                        logger.info(f"Successfully fetched {len(df)} {interval} records from Alpha Vantage for {pair}")
-                        return df
-                else:
-                    if 'Information' in data:
-                        logger.warning(f"Alpha Vantage API limit: {data['Information']}")
-                    elif 'Error Message' in data:
-                        logger.error(f"Alpha Vantage API error: {data['Error Message']}")
-            
-            return self._generate_simulated_historical_data(pair, interval, days)
-                
-        except Exception as e:
-            logger.error(f"Error getting data from Alpha Vantage for {pair}-{interval}: {e}")
-            return self._generate_simulated_historical_data(pair, interval, days)
-    
-    def _save_data_to_file(self, df: pd.DataFrame, pair: str, interval: str):
-        """Save data to CSV"""
-        if df.empty:
-            return
-            
-        try:
-            os.makedirs('historical_data', exist_ok=True)
-            filename = f"historical_data/AV_{pair}_{interval}_{datetime.now().strftime('%Y%m%d')}.csv"
-            df.to_csv(filename, index=False)
-            logger.info(f"Saved Alpha Vantage data to {filename}")
-        except Exception as e:
-            logger.warning(f"Failed to save Alpha Vantage data to file: {e}")
-    
-    def _generate_simulated_historical_data(self, pair: str, interval: str, days: int) -> pd.DataFrame:
-        """Generate simulated data untuk Alpha Vantage fallback"""
-        points = days
-        points = max(20, min(points, 365))
-        
-        base_prices = {
-            'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-            'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
-            'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
+        if (value <= 30) {
+          statusClass = 'low';
+          statusIcon = 'check-circle';
+        } else if (value >= 70) {
+          statusClass = 'high';
+          statusIcon = 'times-circle';
         }
         
-        base_price = base_prices.get(pair, 150.0)
-        prices = []
-        current_price = base_price
+        const factorName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         
-        start_date = datetime.now() - timedelta(days=days)
+        factorElement.innerHTML = `
+          <div class="risk-factor-card ${statusClass}">
+            <i class="fas fa-${statusIcon} me-2"></i>
+            <div>
+              <div class="risk-factor-name">${factorName}</div>
+              <div class="risk-factor-status">${value}%</div>
+            </div>
+          </div>
+        `;
+        riskFactorsContainer.appendChild(factorElement);
+      }
+    }
+    document.getElementById('riskDetails').style.display = 'block';
+  }
+}
+
+function updateSupportResistance(levelsData) {
+  const levels = levelsData.levels || {};
+  const currentPrice = levelsData.current_price || 0;
+
+  // Update Support & Resistance levels
+  const supportLevel = levels.support || (currentPrice * 0.995).toFixed(4);
+  const resistanceLevel = levels.resistance || (currentPrice * 1.005).toFixed(4);
+
+  document.getElementById('supportLevel').textContent = supportLevel;
+  document.getElementById('resistanceLevel').textContent = resistanceLevel;
+
+  // Calculate and display distances
+  if (currentPrice > 0) {
+    const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
+    const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
+
+    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
+    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
+  }
+
+  // Calculate pivot points
+  const recentHigh = levels.recent_high || currentPrice * 1.01;
+  const recentLow = levels.recent_low || currentPrice * 0.99;
+  const pivot = levels.pivot || currentPrice;
+
+  document.getElementById('pivotPoint').textContent = pivot.toFixed(4);
+  document.getElementById('pivotR1').textContent = (levels.resistance || (pivot * 1.01)).toFixed(4);
+  document.getElementById('pivotR2').textContent = (levels.resistance2 || (pivot * 1.02)).toFixed(4);
+  document.getElementById('pivotR3').textContent = (pivot * 1.03).toFixed(4);
+  document.getElementById('pivotS1').textContent = (levels.support || (pivot * 0.99)).toFixed(4);
+  document.getElementById('pivotS2').textContent = (levels.support2 || (pivot * 0.98)).toFixed(4);
+  document.getElementById('pivotS3').textContent = (pivot * 0.97).toFixed(4);
+}
+
+// ==================== REALTIME CANDLE MANAGEMENT ====================
+function initializeRealtimeCandle(historicalData, timeframe) {
+    if (historicalData.length === 0) return null;
+    
+    const lastHistoricalCandle = historicalData[historicalData.length - 1];
+    
+    // Create realtime candle untuk periode berikutnya
+    const nextCandleTime = getNextCandleTime(lastHistoricalCandle.time, timeframe);
+    
+    return {
+        time: nextCandleTime,
+        open: lastHistoricalCandle.close,
+        high: lastHistoricalCandle.close,
+        low: lastHistoricalCandle.close,
+        close: lastHistoricalCandle.close,
+        isRealtime: true
+    };
+}
+
+function updateRealtimeCandle(currentPrice) {
+    if (!realtimeCandle) return null;
+    
+    const updatedCandle = {
+        time: realtimeCandle.time,
+        open: realtimeCandle.open,
+        high: Math.max(realtimeCandle.high, currentPrice),
+        low: Math.min(realtimeCandle.low, currentPrice),
+        close: currentPrice,
+        isRealtime: true
+    };
+    
+    realtimeCandle = updatedCandle;
+    return updatedCandle;
+}
+
+// ==================== OPTIMIZED LIVE PRICE UPDATE ====================
+async function optimizedLivePriceUpdate() {
+    if (!isTabActive) return;
+    
+    const pair = currentPair;
+    const timeframe = currentTimeframe;
+    
+    try {
+        trackApiCall();
+        const startTime = Date.now();
         
-        for i in range(points):
-            volatility = 0.008 if interval == '1D' else 0.015
-            drift = (base_price - current_price) * 0.001
-            random_shock = np.random.normal(0, volatility)
-            change = drift + random_shock
-            current_price = current_price * (1 + change)
-            
-            open_price = current_price
-            close_variation = np.random.normal(0, volatility * 0.3)
-            close_price = current_price * (1 + close_variation)
-            
-            price_range = abs(change) * base_price
-            high = max(open_price, close_price) + price_range * 0.5
-            low = min(open_price, close_price) - price_range * 0.5
-            
-            high = max(high, max(open_price, close_price) + 0.0001)
-            low = min(low, min(open_price, close_price) - 0.0001)
-            
-            if interval == '1D':
-                current_date = start_date + timedelta(days=i)
-            else:  # 1W
-                current_date = start_date + timedelta(days=7*i)
-            
-            prices.append({
-                'date': current_date,
-                'open': round(float(open_price), 4),
-                'high': round(float(high), 4),
-                'low': round(float(low), 4),
-                'close': round(float(close_price), 4),
-                'volume': int(np.random.randint(10000, 50000))
-            })
+        const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
         
-        df = pd.DataFrame(prices)
-        logger.info(f"Generated simulated {interval} data for {pair}: {len(df)} records")
-        
-        self._save_data_to_file(df, pair, interval)
-        
-        return df
-
-# ==================== DATA MANAGER YANG DIOPTIMISASI ====================
-class DataManager:
-    def __init__(self):
-        self.historical_data = {}
-        self.alpha_vantage_client = AlphaVantageClient()
-        self.twelve_data_historical_client = TwelveDataHistoricalClient()
-        self.twelve_data_realtime_client = TwelveDataRealtimeClient()
-        
-        logger.info("Data Manager initialized with DUAL TwelveData API keys + Alpha Vantage")
-
-    def get_price_data_with_timezone(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga dengan timezone awareness"""
-        try:
-            df = self.get_price_data(pair, timeframe, days)
-            
-            if df.empty:
-                logger.warning(f"No data returned for {pair}-{timeframe}, generating fallback data")
-                return self._generate_simple_data(pair, timeframe, days)
-                
-            if 'date' in df.columns:
-                if not pd.api.types.is_datetime64_any_dtype(df['date']):
-                    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-                
-                if df['date'].dt.tz is None:
-                    df['date'] = df['date'].dt.tz_localize('UTC')
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error in get_price_data_with_timezone for {pair}-{timeframe}: {e}")
-            return self._generate_simple_data(pair, timeframe, days)
-
-    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga dari sumber yang optimal berdasarkan mapping"""
-        try:
-            # Tentukan sumber data berdasarkan mapping
-            data_source = config.DATA_SOURCE_MAPPING.get(timeframe, 'TWELVEDATA_HISTORICAL')
-            
-            if data_source == 'TWELVEDATA_HISTORICAL' and timeframe in ['M30', '1H', '4H']:
-                # Gunakan TwelveData Historical untuk intraday
-                api_data = self.twelve_data_historical_client.get_historical_data(pair, timeframe, days)
-                if not api_data.empty and len(api_data) > 10:
-                    logger.info(f"Using TwelveData Historical for {pair}-{timeframe}: {len(api_data)} records")
-                    
-                    if pair not in self.historical_data:
-                        self.historical_data[pair] = {}
-                    self.historical_data[pair][timeframe] = api_data
-                    
-                    return api_data
-            
-            elif data_source == 'ALPHA_VANTAGE' and timeframe in ['1D', '1W']:
-                # Gunakan Alpha Vantage untuk daily/weekly
-                api_data = self.alpha_vantage_client.get_historical_data(pair, timeframe, days)
-                if not api_data.empty and len(api_data) > 5:
-                    logger.info(f"Using Alpha Vantage for {pair}-{timeframe}: {len(api_data)} records")
-                    
-                    if pair not in self.historical_data:
-                        self.historical_data[pair] = {}
-                    self.historical_data[pair][timeframe] = api_data
-                    
-                    return api_data
-            
-            # Fallback ke cached data
-            if pair in self.historical_data and timeframe in self.historical_data[pair]:
-                df = self.historical_data[pair][timeframe]
-                if not df.empty:
-                    required_points = self._calculate_required_points(timeframe, days)
-                    if len(df) > required_points:
-                        return df.tail(required_points).copy()
-                    else:
-                        return df.copy()
-            
-            # Final fallback
-            logger.info(f"Generating fallback data for {pair}-{timeframe}")
-            return self._generate_simple_data(pair, timeframe, days)
-            
-        except Exception as e:
-            logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
-            return self._generate_simple_data(pair, timeframe, days)
-
-    def get_real_time_price(self, pair: str) -> float:
-        """Dapatkan harga real-time dari TwelveData Realtime"""
-        return self.twelve_data_realtime_client.get_real_time_price(pair)
-
-    def _calculate_required_points(self, timeframe: str, days: int) -> int:
-        """Hitung jumlah data points yang diperlukan"""
-        if timeframe == 'M30':
-            return days * 48
-        elif timeframe == '1H':
-            return days * 24
-        elif timeframe == '4H':
-            return days * 6
-        else:
-            return days
-
-    def ensure_fresh_data(self, pair: str, timeframe: str, min_records: int = 50):
-        """Pastikan data fresh tersedia"""
-        try:
-            data_source = config.DATA_SOURCE_MAPPING.get(timeframe, 'TWELVEDATA_HISTORICAL')
-            
-            if data_source == 'TWELVEDATA_HISTORICAL':
-                api_data = self.twelve_data_historical_client.get_historical_data(pair, timeframe, 30)
-            else:
-                api_data = self.alpha_vantage_client.get_historical_data(pair, timeframe, 30)
-            
-            if not api_data.empty and len(api_data) >= min_records:
-                if pair not in self.historical_data:
-                    self.historical_data[pair] = {}
-                self.historical_data[pair][timeframe] = api_data
-                logger.info(f"Fresh data ensured for {pair}-{timeframe}: {len(api_data)} records")
-                return
-                
-        except Exception as e:
-            logger.error(f"Error ensuring fresh data for {pair}-{timeframe}: {e}")
-
-    def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate simple synthetic data untuk fallback"""
-        if timeframe == 'M30':
-            points = days * 48
-        elif timeframe == '1H':
-            points = days * 24
-        elif timeframe == '4H':
-            points = days * 6
-        else:
-            points = days
-            
-        base_prices = {
-            'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-            'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
-            'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
         
-        base_price = base_prices.get(pair, 150.0)
-        prices = []
-        current_price = base_price
+        const data = await response.json();
+        const currentPrice = data.price_data?.current;
         
-        start_date = datetime.now() - timedelta(days=days)
-        
-        for i in range(points):
-            change = np.random.normal(0, 0.001)
-            current_price = current_price * (1 + change)
+        if (currentPrice) {
+            // Update price display
+            updatePriceDisplay(currentPrice, data.technical_analysis?.momentum?.price_change_pct || 0);
             
-            open_price = current_price
-            close_price = current_price * (1 + np.random.normal(0, 0.0005))
-            high = max(open_price, close_price) + abs(change) * 0.1
-            low = min(open_price, close_price) - abs(change) * 0.1
+            // Update realtime candle
+            const updatedCandle = updateRealtimeCandle(currentPrice);
+            if (updatedCandle) {
+                candleSeries.update(updatedCandle);
+            }
             
-            if high <= low:
-                high = low + 0.0001
+            // Reset error counter
+            consecutiveErrors = 0;
             
-            if timeframe == 'M30':
-                current_date = start_date + timedelta(minutes=30*i)
-            elif timeframe == '1H':
-                current_date = start_date + timedelta(hours=i)
-            elif timeframe == '4H':
-                current_date = start_date + timedelta(hours=4*i)
-            else:
-                current_date = start_date + timedelta(days=i)
+            // Adjust interval berdasarkan kondisi
+            const volatility = data.technical_analysis?.volatility?.volatility_class || 'MEDIUM';
+            const now = new Date();
+            const hour = now.getUTCHours();
+            const isMarketHours = (hour >= 8 && hour <= 16);
             
-            prices.append({
-                'date': current_date,
-                'open': round(float(open_price), 4),
-                'high': round(float(high), 4),
-                'low': round(float(low), 4),
-                'close': round(float(close_price), 4),
-                'volume': int(np.random.randint(10000, 50000))
-            })
-        
-        return pd.DataFrame(prices)
-
-# ==================== INISIALISASI KOMPONEN SISTEM ====================
-# [TechnicalAnalysisEngine, FundamentalAnalysisEngine, DeepSeekAnalyzer, 
-# AdvancedRiskManager, AdvancedBacktestingEngine tetap sama seperti sebelumnya]
-# ... (kode untuk komponen-komponen ini tidak berubah)
-
-# Inisialisasi dengan konfigurasi baru
-logger.info("Initializing Enhanced Forex System with DUAL TwelveData API Keys...")
-
-tech_engine = TechnicalAnalysisEngine()
-fundamental_engine = FundamentalAnalysisEngine()
-deepseek_analyzer = DeepSeekAnalyzer()
-data_manager = DataManager()  # Ini yang sudah diperbarui dengan dual keys
-advanced_backtester = AdvancedBacktestingEngine()
-risk_manager = AdvancedRiskManager()
-
-# Load data dengan strategi baru
-logger.info("Loading historical data with optimized data source mapping...")
-for pair in config.FOREX_PAIRS:
-    for timeframe in config.TIMEFRAMES:
-        data_source = config.DATA_SOURCE_MAPPING.get(timeframe, 'TWELVEDATA_HISTORICAL')
-        logger.info(f"Loading {pair}-{timeframe} from {data_source}")
-        data_manager.ensure_fresh_data(pair, timeframe, min_records=30)
-
-# Tampilkan status sistem yang diperbarui
-logger.info("=== SYSTEM STATUS ===")
-logger.info(f"TwelveData Realtime: {'LIVE' if not data_manager.twelve_data_realtime_client.demo_mode else 'DEMO'}")
-logger.info(f"TwelveData Historical: {'LIVE' if not data_manager.twelve_data_historical_client.demo_mode else 'DEMO'}")
-logger.info(f"Alpha Vantage: {'LIVE' if not data_manager.alpha_vantage_client.demo_mode else 'DEMO'}")
-logger.info("Data Source Mapping:")
-for tf, source in config.DATA_SOURCE_MAPPING.items():
-    logger.info(f"  {tf} -> {source}")
-logger.info("All system components initialized successfully")
-
-# ==================== FLASK ROUTES (TIDAK BERUBAH) ====================
-@app.route('/')
-def index():
-    return render_template('index.html', 
-                         pairs=config.FOREX_PAIRS,
-                         timeframes=config.TIMEFRAMES,
-                         initial_balance=config.INITIAL_BALANCE)
-
-@app.route('/api/analyze')
-def api_analyze():
-    """Endpoint untuk analisis market dengan data source yang dioptimasi"""
-    try:
-        pair = request.args.get('pair', 'USDJPY').upper()
-        timeframe = request.args.get('timeframe', '4H').upper()
-        
-        if pair not in config.FOREX_PAIRS:
-            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
-        
-        # 1) Harga realtime dari TwelveData Realtime
-        real_time_price = data_manager.get_real_time_price(pair)
-        
-        # 2) Data historis dari sumber optimal
-        price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
-        
-        if price_data.empty:
-            price_data = data_manager._generate_simple_data(pair, timeframe, 60)
-        
-        # 3) Analisis teknikal
-        technical_analysis = tech_engine.calculate_all_indicators(price_data)
-        technical_analysis['levels']['current_price'] = real_time_price
-        
-        # 4) Analisis fundamental
-        fundamental_news = fundamental_engine.get_forex_news(pair)
-        
-        # 5) Analisis AI
-        ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
-        
-        # 6) Risk assessment
-        risk_assessment = risk_manager.validate_trade(
-            pair=pair,
-            signal=ai_analysis.get('signal', 'HOLD'),
-            confidence=ai_analysis.get('confidence', 50),
-            proposed_lot_size=0.1,
-            account_balance=config.INITIAL_BALANCE,
-            current_price=real_time_price,
-            open_positions=[]
-        )
-        
-        # 7) Price series untuk chart
-        price_series = []
-        try:
-            if not price_data.empty:
-                price_data = price_data.sort_values('date')
-                for _, row in price_data.iterrows():
-                    date_value = row['date']
-                    
-                    if hasattr(date_value, 'isoformat'):
-                        if date_value.tzinfo is None:
-                            date_str = date_value.isoformat() + 'Z'
-                        else:
-                            date_str = date_value.isoformat()
-                    else:
-                        date_str = str(date_value)
-                    
-                    price_series.append({
-                        'date': date_str,
-                        'open': float(row['open']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'close': float(row['close']),
-                        'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else 0
-                    })
-                    
-                logger.info(f"Prepared {len(price_series)} price series records for {pair}-{timeframe}")
-        except Exception as e:
-            logger.error(f"Error preparing price series: {e}")
-            price_series = []
-        
-        # 8) Tentukan data source untuk response
-        data_source = config.DATA_SOURCE_MAPPING.get(timeframe, 'TWELVEDATA_HISTORICAL')
-        source_description = {
-            'TWELVEDATA_HISTORICAL': 'TwelveData Historical API',
-            'ALPHA_VANTAGE': 'Alpha Vantage API'
-        }.get(data_source, 'Optimized Data Source')
-        
-        # 9) Susun response
-        response = {
-            'pair': pair,
-            'timeframe': timeframe,
-            'timestamp': datetime.now().isoformat(),
-            'technical_analysis': technical_analysis,
-            'fundamental_analysis': fundamental_news,
-            'ai_analysis': ai_analysis,
-            'risk_assessment': risk_assessment,
-            'price_data': {
-                'current': real_time_price,
-                'support': technical_analysis.get('levels', {}).get('support'),
-                'resistance': technical_analysis.get('levels', {}).get('resistance'),
-                'change_pct': technical_analysis.get('momentum', {}).get('price_change_pct', 0)
-            },
-            'price_series': price_series,
-            'analysis_summary': f"{pair} trading at {real_time_price:.4f}",
-            'ai_provider': ai_analysis.get('ai_provider', 'DeepSeek AI'),
-            'data_source': f"{source_description} + TwelveData Real-time",
-            'data_source_mapping': config.DATA_SOURCE_MAPPING,
-            'timezone_info': 'UTC',
-            'data_points': len(price_series)
+            currentUpdateInterval = getOptimalUpdateInterval(timeframe, volatility, isMarketHours);
+            
+            // Restart interval dengan waktu baru
+            if (liveUpdateInterval) {
+                stopLiveUpdates();
+                startOptimizedUpdates();
+            }
+            
+            updateStatusIndicator(true);
+            
+            // Log performance
+            const responseTime = Date.now() - startTime;
+            console.log(`Live price updated in ${responseTime}ms. Next update in ${currentUpdateInterval/1000}s`);
         }
         
-        return jsonify(response)
-    
-    except Exception as e:
-        logger.error(f"Analysis error: {e}", exc_info=True)
-        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+    } catch (error) {
+        console.error('Live price update error:', error);
+        consecutiveErrors++;
+        
+        // Exponential backoff pada error
+        if (consecutiveErrors > 2) {
+            currentUpdateInterval = Math.min(300000, currentUpdateInterval * (1 + consecutiveErrors * 0.5));
+            console.warn(`Slowing updates due to errors. New interval: ${currentUpdateInterval/1000}s`);
+            
+            if (liveUpdateInterval) {
+                stopLiveUpdates();
+                startOptimizedUpdates();
+            }
+        }
+        
+        updateStatusIndicator(false);
+    }
+}
 
-# [Backtest routes dan lainnya tetap sama...]
+// ==================== MAIN ANALYSIS FUNCTION ====================
+async function analyze() {
+  const pair = document.getElementById('pairSelect').value;
+  const timeframe = document.getElementById('timeframeSelect').value;
+  currentPair = pair;
+  currentTimeframe = timeframe;
 
-@app.route('/api/system_status')
-def api_system_status():
-    """Status sistem dengan informasi dual API keys"""
-    return jsonify({
-        'system': 'RUNNING',
-        'data_sources': {
-            'twelvedata_realtime': 'LIVE' if not data_manager.twelve_data_realtime_client.demo_mode else 'DEMO',
-            'twelvedata_historical': 'LIVE' if not data_manager.twelve_data_historical_client.demo_mode else 'DEMO',
-            'alpha_vantage': 'LIVE' if not data_manager.alpha_vantage_client.demo_mode else 'DEMO'
-        },
-        'data_source_mapping': config.DATA_SOURCE_MAPPING,
-        'supported_pairs': config.FOREX_PAIRS,
-        'server_time': datetime.now().isoformat(),
-        'version': '4.0',
-        'features': [
-            'Dual TwelveData API Keys',
-            'Optimized Data Source Mapping', 
-            'Alpha Vantage for Daily/Weekly',
-            'TwelveData Historical for Intraday',
-            'TwelveData Real-time for Live Prices',
-            'Advanced Risk Management',
-            'AI-Powered Analysis'
-        ]
-    })
+  // Show loading indicator
+  document.getElementById('chartLoading').style.display = 'flex';
+  updateStatusIndicator(false);
 
-# ==================== RUN APPLICATION ====================
-if __name__ == '__main__':
-    logger.info("Starting Enhanced Forex System with DUAL TwelveData API Keys...")
-    logger.info("=== DATA SOURCE MAPPING ===")
-    for timeframe, source in config.DATA_SOURCE_MAPPING.items():
-        logger.info(f"  {timeframe} -> {source}")
+  try {
+    trackApiCall();
+    console.log(`Fetching analysis for ${pair}-${timeframe}...`);
     
-    logger.info("=== API STATUS ===")
-    logger.info(f"TwelveData Realtime: {'LIVE MODE' if not data_manager.twelve_data_realtime_client.demo_mode else 'DEMO MODE'}")
-    logger.info(f"TwelveData Historical: {'LIVE MODE' if not data_manager.twelve_data_historical_client.demo_mode else 'DEMO MODE'}")
-    logger.info(f"Alpha Vantage: {'LIVE MODE' if not data_manager.alpha_vantage_client.demo_mode else 'DEMO MODE'}")
+    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
     
-    # Create necessary directories
-    os.makedirs('historical_data', exist_ok=True)
-    os.makedirs('logs', exist_ok=True)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
-    logger.info("Forex Analysis System is ready and running on http://localhost:5000")
+    const data = await response.json();
+    console.log('Analysis response:', data);
+
+    // Update price series chart
+    let chartData = [];
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    if (data.price_series && data.price_series.length > 0) {
+      console.log(`Processing ${data.price_series.length} price series data points`);
+      chartData = data.price_series.map(item => ({
+        time: formatDateForChart(item.date, timeframe),
+        open: parseFloat(item.open),
+        high: parseFloat(item.high),
+        low: parseFloat(item.low),
+        close: parseFloat(item.close)
+      }));
+    } else {
+      console.warn('No price_series data available');
+      chartData = [];
+    }
+
+    // Clean and set chart data
+    const cleanData = cleanChartData(chartData);
+    
+    if (cleanData.length > 0) {
+      currentChartData = cleanData;
+      candleSeries.setData(currentChartData);
+      
+      // Initialize realtime candle
+      realtimeCandle = initializeRealtimeCandle(cleanData, timeframe);
+      isRealtimeMode = true;
+      
+      // Calculate and update EMA
+      const closes = currentChartData.map(d => d.close);
+      const ema = calcEMA(closes, 26);
+      currentEmaData = ema.map((value, index) => ({
+        time: currentChartData[index].time, 
+        value: isNaN(value) ? 0 : value
+      }));
+      ema26Series.setData(currentEmaData);
+      
+      // Calculate and update MACD
+      const { macd, sig, hist } = calcMACDSeries(closes);
+      currentMacdData = { 
+        macd: macd.map(v => isNaN(v) ? 0 : v),
+        signal: sig.map(v => isNaN(v) ? 0 : v),
+        hist: hist.map(v => isNaN(v) ? 0 : v)
+      };
+      
+      const macdSeriesData = macd.map((value, index) => ({
+        time: currentChartData[index].time, 
+        value: isNaN(value) ? 0 : value
+      }));
+      const signalSeriesData = sig.map((value, index) => ({
+        time: currentChartData[index].time, 
+        value: isNaN(value) ? 0 : value
+      }));
+      const histSeriesData = hist.map((value, index) => ({
+        time: currentChartData[index].time, 
+        value: isNaN(value) ? 0 : value
+      }));
+      
+      macdLineSeries.setData(macdSeriesData);
+      macdSignalSeries.setData(signalSeriesData);
+      macdHistSeries.setData(histSeriesData);
+      
+      // Update realtime candle jika ada
+      if (realtimeCandle) {
+        candleSeries.update(realtimeCandle);
+      }
+      
+      // Fit content to show all data
+      chart.timeScale().fitContent();
+      macdChart.timeScale().fitContent();
+      
+      // Update chart info
+      document.getElementById('chartDataInfo').textContent = `${currentChartData.length} bars`;
+    }
+    
+    // Update technical indicators
+    const technical = data.technical_analysis || {};
+    updateTechnicalIndicators(technical);
+    
+    // Update price data
+    const currentPrice = data.price_data?.current || 0;
+    updatePriceDisplay(currentPrice, technical.momentum?.price_change_pct || 0);
+    
+    // Update AI analysis
+    const aiAnalysis = data.ai_analysis || {};
+    updateAIAnalysis(aiAnalysis);
+    
+    // Update risk assessment
+    const riskAssessment = data.risk_assessment || {};
+    updateRiskAssessment(riskAssessment);
+    
+    // Update support & resistance
+    updateSupportResistance({
+      levels: technical.levels || {},
+      current_price: currentPrice
+    });
+    
+    // Update data source info
+    if (data.ai_provider) {
+      document.getElementById('aiProvider').textContent = data.ai_provider;
+    }
+    
+    updateStatusIndicator(true);
+    
+  } catch (error) {
+    console.error('Analysis error:', error);
+    updateStatusIndicator(false);
+    
+    // Show error to user
+    document.getElementById('aiSummary').textContent = `Error: ${error.message}`;
+    document.getElementById('aiSummary').style.color = '#ef4444';
+  } finally {
+    // Hide loading indicator
+    document.getElementById('chartLoading').style.display = 'none';
+  }
+}
+
+function updateTechnicalIndicators(technical) {
+  // Momentum indicators
+  const momentum = technical.momentum || {};
+  document.getElementById('rsiVal').textContent = momentum.rsi ? momentum.rsi.toFixed(2) : '-';
+  document.getElementById('macdVal').textContent = momentum.macd ? momentum.macd.toFixed(4) : '-';
+  document.getElementById('macdHistVal').textContent = momentum.macd_histogram ? momentum.macd_histogram.toFixed(4) : '-';
+  
+  // Trend indicators
+  const trend = technical.trend || {};
+  document.getElementById('adxVal').textContent = trend.adx ? trend.adx.toFixed(2) : '-';
+  document.getElementById('trendVal').textContent = trend.direction || '-';
+  
+  // Volatility indicators
+  const volatility = technical.volatility || {};
+  document.getElementById('atrVal').textContent = volatility.atr ? volatility.atr.toFixed(4) : '-';
+  document.getElementById('volVal').textContent = volatility.atr_pct ? volatility.atr_pct.toFixed(2) + '%' : '-';
+}
+
+function updatePriceDisplay(currentPrice, changePct) {
+  const livePriceEl = document.getElementById('livePrice');
+  const currentPriceEl = document.getElementById('currentPrice');
+  const changeEl = document.getElementById('pairChange');
+  
+  livePriceEl.textContent = currentPrice.toFixed(4);
+  currentPriceEl.textContent = `Current: ${currentPrice.toFixed(4)}`;
+  changeEl.textContent = `(${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
+  changeEl.className = `price-change ${changePct >= 0 ? 'change-positive' : 'change-negative'}`;
+}
+
+function updateAIAnalysis(aiAnalysis) {
+  document.getElementById('aiSummary').textContent = aiAnalysis.reasoning || 'No analysis available';
+  setSignal(aiAnalysis.signal || 'HOLD');
+  document.getElementById('aiConfidence').textContent = aiAnalysis.confidence ? aiAnalysis.confidence + '%' : '-';
+  document.getElementById('aiRisk').textContent = aiAnalysis.risk_rating || '-';
+  
+  const keyLevels = aiAnalysis.key_levels || {};
+  document.getElementById('aiEntry').textContent = keyLevels.entry || '-';
+  document.getElementById('aiSL').textContent = keyLevels.stop_loss || '-';
+  document.getElementById('aiTP1').textContent = keyLevels.take_profit || '-';
+  document.getElementById('aiTP2').textContent = keyLevels.take_profit_2 || '-';
+}
+
+// ==================== BACKTEST FUNCTIONS ====================
+function showBacktestModal() {
+  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
+  modal.show();
+}
+
+async function runBacktest() {
+  const pair = currentPair;
+  const timeframe = currentTimeframe;
+  const initialBalance = document.getElementById('initialBalance').value;
+  const days = document.getElementById('backtestDays').value;
+  const strategy = document.getElementById('backtestType').value;
+  
+  const backtestStatusEl = document.getElementById('backtestStatus');
+  const backtestResultsEl = document.getElementById('backtestResults');
+  
+  backtestStatusEl.textContent = 'Running...';
+  backtestStatusEl.className = 'badge bg-warning';
+  backtestResultsEl.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
+  
+  try {
+    trackApiCall();
+    console.log('Starting backtest with:', { pair, timeframe, days, initialBalance, strategy });
+    
+    const response = await fetch(`/api/backtest?pair=${pair}&strategy=${strategy}&timeframe=${timeframe}&days=${days}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Backtest result:', result);
+    
+    displayBacktestResults(result);
+    backtestStatusEl.textContent = 'Completed';
+    backtestStatusEl.className = 'badge bg-success';
+    
+  } catch (error) {
+    console.error('Backtest error:', error);
+    backtestResultsEl.innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
+    backtestStatusEl.textContent = 'Failed';
+    backtestStatusEl.className = 'badge bg-danger';
+  }
+}
+
+function displayBacktestResults(result) {
+  const backtestResultsEl = document.getElementById('backtestResults');
+  let html = '';
+  
+  // Performance metrics
+  html += `
+    <div class="performance-grade grade-${result.total_return_pct >= 10 ? 'a' : result.total_return_pct >= 5 ? 'b' : result.total_return_pct >= 0 ? 'c' : 'd'}">
+      Return: ${result.total_return_pct ? result.total_return_pct.toFixed(2) + '%' : 'N/A'}
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Initial Balance</div>
+          <div class="metric-value">$${(result.initial_balance || 0).toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Final Equity</div>
+          <div class="metric-value">$${(result.final_equity || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Total Trades</div>
+          <div class="metric-value">${result.total_trades || 0}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Win Rate</div>
+          <div class="metric-value ${((result.winning_trades || 0) / (result.total_trades || 1) * 100) >= 50 ? 'change-positive' : 'change-negative'}">
+            ${((result.winning_trades || 0) / (result.total_trades || 1) * 100).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Max Drawdown</div>
+          <div class="metric-value change-negative">${(result.max_drawdown_pct || 0).toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="metric-card">
+          <div class="small-muted">Sharpe Ratio</div>
+          <div class="metric-value">${(result.sharpe_ratio || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  backtestResultsEl.innerHTML = html;
+}
+
+// ==================== SETTINGS & EXPORT FUNCTIONS ====================
+function showApiStatusModal() {
+  const modal = new bootstrap.Modal(document.getElementById('apiStatusModal'));
+  
+  // Update modal content
+  document.getElementById('currentIntervalDisplay').textContent = `${currentUpdateInterval/1000} seconds`;
+  
+  const estimatedDailyCalls = Math.floor((24 * 60 * 60 * 1000) / currentUpdateInterval);
+  document.getElementById('dailyApiCalls').textContent = `${estimatedDailyCalls} calls/day`;
+  
+  const apiHealth = apiCallTimestamps.length > 100 ? 'Critical' : 
+                   apiCallTimestamps.length > 50 ? 'Warning' : 'Healthy';
+  const healthClass = apiCallTimestamps.length > 100 ? 'bg-danger' : 
+                     apiCallTimestamps.length > 50 ? 'bg-warning' : 'bg-success';
+  document.getElementById('apiHealthBadge').textContent = apiHealth;
+  document.getElementById('apiHealthBadge').className = `badge ${healthClass}`;
+  
+  modal.show();
+}
+
+function exportAnalysis() {
+  const analysisData = {
+    pair: currentPair,
+    timeframe: currentTimeframe,
+    timestamp: new Date().toISOString(),
+    price: document.getElementById('livePrice').textContent,
+    signal: document.getElementById('aiSignalBadge').textContent,
+    confidence: document.getElementById('aiConfidence').textContent,
+    riskScore: document.getElementById('riskScoreBadge').textContent
+  };
+  
+  const dataStr = JSON.stringify(analysisData, null, 2);
+  const dataBlob = new Blob([dataStr], {type: 'application/json'});
+  
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `forex-analysis-${currentPair}-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// ==================== EVENT LISTENERS ====================
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+document.getElementById('exportBtn').addEventListener('click', exportAnalysis);
+document.getElementById('settingsBtn').addEventListener('click', showApiStatusModal);
+
+document.getElementById('pairSelect').addEventListener('change', function() {
+  updatePairTicker(this.value);
+  analyze();
+});
+
+document.getElementById('timeframeSelect').addEventListener('change', analyze);
+
+// Settings modal event listeners
+document.getElementById('enableLiveUpdates').addEventListener('change', function() {
+  if (this.checked) {
+    startOptimizedUpdates();
+  } else {
+    stopLiveUpdates();
+  }
+});
+
+document.getElementById('aggressiveMode').addEventListener('change', function() {
+  isAggressiveMode = this.checked;
+  if (liveUpdateInterval) {
+    stopLiveUpdates();
+    startOptimizedUpdates();
+  }
+});
+
+// ==================== INITIALIZATION ====================
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize the dashboard
+  updatePairTicker(currentPair);
+  analyze();
+  
+  // Setup visibility detection
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+  // User activity detection
+  document.addEventListener('mousemove', resetUserActivity);
+  document.addEventListener('keypress', resetUserActivity);
+  document.addEventListener('click', resetUserActivity);
+  
+  // Start dengan interval normal
+  startOptimizedUpdates();
+  
+  // Full analysis setiap 10 menit (bukan realtime)
+  setInterval(analyze, 600000);
+  
+  // Handle window resize
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      try {
+        const chartWidth = document.getElementById('chartRoot').clientWidth;
+        const macdWidth = document.getElementById('macdRoot').clientWidth;
+        
+        chart.resize(chartWidth, 520);
+        macdChart.resize(macdWidth, 160);
+        
+        chart.timeScale().fitContent();
+        macdChart.timeScale().fitContent();
+      } catch (e) {
+        console.log('Resize error:', e);
+      }
+    }, 250);
+  });
+});
+
+// Cleanup saat page unload
+window.addEventListener('beforeunload', function() {
+  stopLiveUpdates();
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
+</script>
+</body>
+</html>
