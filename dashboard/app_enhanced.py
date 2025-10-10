@@ -23,6 +23,8 @@ from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import aiohttp
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # ==================== ENHANCED CACHE CONFIG ====================
 cache = Cache(config={
@@ -520,3 +522,35 @@ if __name__ == '__main__':
     logger.info("✓ System ready: http://localhost:5000")
     
     app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+# Initialize limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "100 per hour", "30 per minute"],
+    storage_uri="memory://",
+)
+
+# Custom rate limits for different endpoints
+@app.route('/api/analyze')
+@limiter.limit("60 per minute")  # Increased from 30 to 60
+def api_analyze():
+    # ... existing code
+
+@app.route('/api/system_status')
+@limiter.limit("120 per minute")  # More lenient for status checks
+def api_system_status():
+    # ... existing code
+
+@app.route('/api/health')  
+@limiter.limit("300 per minute")  # Very lenient for health checks
+def api_health():
+    # ... existing code
+
+# Custom error handler for rate limits
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        'error': 'Rate limit exceeded',
+        'message': 'Too many requests. Please slow down.',
+        'retry_after': e.description.split(' ')[-1] if e.description else '60'
+    }), 429
