@@ -57,7 +57,7 @@ class SystemConfig:
     DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
     NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
-    ALPHA_VANTAGE_KEY: str = "0423KY87N67VSJ8W"  # API Key Alpha Vantage Anda
+    ALPHA_VANTAGE_KEY: str = "   "  # API Key Alpha Vantage Anda
     
     # Enhanced Trading Parameters
     INITIAL_BALANCE: float = 10000.0
