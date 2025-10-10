@@ -1,4 +1,4 @@
-# [FILE: app_enhanced.py] - PERBAIKAN TIMEZONE HANDLING
+# [FILE: app_enhanced.py] - PERBAIKAN DENGAN ALPHA VANTAGE HISTORICAL DATA
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -57,6 +57,7 @@ class SystemConfig:
     DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
     NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
+    ALPHA_VANTAGE_KEY: str = "0423KY87N67VSJ8W"  # API Key Alpha Vantage Anda
     
     # Enhanced Trading Parameters
     INITIAL_BALANCE: float = 10000.0
@@ -83,6 +84,16 @@ class SystemConfig:
         "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", 
         "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
     ])
+    
+    # Alpha Vantage supported intervals
+    ALPHA_VANTAGE_INTERVALS: Dict[str, str] = field(default_factory=lambda: {
+        'M30': '30min',
+        '1H': '60min', 
+        '4H': '60min',  # Will be resampled
+        '1D': 'DAILY',
+        '1W': 'WEEKLY'
+    })
+    
     TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
     
     # Backtesting
@@ -93,6 +104,336 @@ class SystemConfig:
     HIGH_IMPACT_HOURS: List[Tuple[int, int]] = field(default_factory=lambda: [(8, 10), (13, 15)])
 
 config = SystemConfig()
+
+# ==================== ALPHA VANTAGE HISTORICAL DATA INTEGRATION ====================
+class AlphaVantageClient:
+    def __init__(self):
+        self.api_key = config.ALPHA_VANTAGE_KEY
+        self.base_url = "https://www.alphavantage.co/query"
+        self.historical_cache = {}
+        self.cache_timeout = 3600  # 1 jam cache untuk data historis
+        self.demo_mode = not self.api_key or self.api_key == "demo"
+        
+        if self.demo_mode:
+            logger.info("Alpha Vantage running in DEMO mode with simulated data")
+        else:
+            logger.info("Alpha Vantage running in LIVE mode with real API data")
+    
+    def get_historical_data(self, pair: str, interval: str, days: int = 30) -> pd.DataFrame:
+        """Ambil data historis dari Alpha Vantage API untuk pair forex"""
+        cache_key = f"{pair}_{interval}_{days}"
+        
+        # Check cache dulu
+        if cache_key in self.historical_cache:
+            cached_time, df = self.historical_cache[cache_key]
+            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
+                logger.info(f"Using cached Alpha Vantage data for {pair}-{interval}")
+                return df.copy()
+        
+        # Jika demo mode, gunakan data simulasi
+        if self.demo_mode:
+            df = self._generate_simulated_historical_data(pair, interval, days)
+            self.historical_cache[cache_key] = (datetime.now(), df.copy())
+            return df
+        
+        try:
+            # Format pair untuk Alpha Vantage (EURUSD -> EURUSD)
+            # Alpha Vantage menggunakan format "FROMTO" untuk forex
+            formatted_pair = pair
+            
+            # Map timeframe ke interval Alpha Vantage
+            interval_map = config.ALPHA_VANTAGE_INTERVALS
+            av_interval = interval_map.get(interval, '60min')
+            
+            # Tentukan function berdasarkan interval
+            if interval in ['1D', '1W']:
+                function = 'FX_DAILY' if interval == '1D' else 'FX_WEEKLY'
+            else:
+                function = 'FX_INTRADAY'
+            
+            params = {
+                'function': function,
+                'from_symbol': pair[:3],
+                'to_symbol': pair[3:],
+                'apikey': self.api_key,
+                'datatype': 'json'
+            }
+            
+            # Tambahkan parameter interval untuk intraday
+            if function == 'FX_INTRADAY':
+                params['interval'] = av_interval
+                params['outputsize'] = 'full' if days > 30 else 'compact'
+            
+            logger.info(f"Fetching historical data from Alpha Vantage for {pair}-{interval}...")
+            response = requests.get(self.base_url, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Process data berdasarkan function
+                if function == 'FX_INTRADAY' and 'Time Series FX (' + av_interval + ')' in data:
+                    time_series_key = 'Time Series FX (' + av_interval + ')'
+                    df = self._process_intraday_data(data[time_series_key], pair)
+                elif function == 'FX_DAILY' and 'Time Series FX (Daily)' in data:
+                    df = self._process_daily_data(data['Time Series FX (Daily)'], pair)
+                elif function == 'FX_WEEKLY' and 'Time Series FX (Weekly)' in data:
+                    df = self._process_weekly_data(data['Time Series FX (Weekly)'], pair)
+                else:
+                    logger.error(f"Unexpected Alpha Vantage response format: {data}")
+                    return self._generate_simulated_historical_data(pair, interval, days)
+                
+                # Filter data berdasarkan jumlah hari yang diminta
+                if not df.empty:
+                    start_date = datetime.now() - timedelta(days=days)
+                    df = df[df['date'] >= start_date]
+                    
+                    # Resample jika diperlukan (untuk 4H dari data 60min)
+                    if interval == '4H':
+                        df = self._resample_to_4h(df)
+                    
+                    logger.info(f"Successfully fetched {len(df)} historical records from Alpha Vantage for {pair}-{interval}")
+                    
+                    # Cache the data
+                    self.historical_cache[cache_key] = (datetime.now(), df.copy())
+                    return df
+                else:
+                    logger.error(f"No historical data processed for {pair}-{interval}")
+                    return self._generate_simulated_historical_data(pair, interval, days)
+            else:
+                logger.error(f"Alpha Vantage API error: {response.status_code} - {response.text}")
+                return self._generate_simulated_historical_data(pair, interval, days)
+                
+        except Exception as e:
+            logger.error(f"Error getting historical data from Alpha Vantage for {pair}-{interval}: {e}")
+            return self._generate_simulated_historical_data(pair, interval, days)
+    
+    def _process_intraday_data(self, time_series: Dict, pair: str) -> pd.DataFrame:
+        """Process intraday data dari Alpha Vantage"""
+        records = []
+        for timestamp, values in time_series.items():
+            records.append({
+                'date': pd.to_datetime(timestamp),
+                'open': float(values['1. open']),
+                'high': float(values['2. high']),
+                'low': float(values['3. low']),
+                'close': float(values['4. close']),
+                'volume': 0  # Alpha Vantage tidak menyediakan volume untuk forex
+            })
+        
+        df = pd.DataFrame(records)
+        df = df.sort_values('date').reset_index(drop=True)
+        return df
+    
+    def _process_daily_data(self, time_series: Dict, pair: str) -> pd.DataFrame:
+        """Process daily data dari Alpha Vantage"""
+        records = []
+        for timestamp, values in time_series.items():
+            records.append({
+                'date': pd.to_datetime(timestamp),
+                'open': float(values['1. open']),
+                'high': float(values['2. high']),
+                'low': float(values['3. low']),
+                'close': float(values['4. close']),
+                'volume': 0
+            })
+        
+        df = pd.DataFrame(records)
+        df = df.sort_values('date').reset_index(drop=True)
+        return df
+    
+    def _process_weekly_data(self, time_series: Dict, pair: str) -> pd.DataFrame:
+        """Process weekly data dari Alpha Vantage"""
+        records = []
+        for timestamp, values in time_series.items():
+            records.append({
+                'date': pd.to_datetime(timestamp),
+                'open': float(values['1. open']),
+                'high': float(values['2. high']),
+                'low': float(values['3. low']),
+                'close': float(values['4. close']),
+                'volume': 0
+            })
+        
+        df = pd.DataFrame(records)
+        df = df.sort_values('date').reset_index(drop=True)
+        return df
+    
+    def _resample_to_4h(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Resample data 60min ke 4H"""
+        if df.empty:
+            return df
+            
+        # Set date as index untuk resampling
+        df_resampled = df.set_index('date')
+        
+        # Resample ke 4H
+        ohlc_dict = {
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }
+        
+        df_4h = df_resampled.resample('4H').apply(ohlc_dict)
+        df_4h = df_4h.dropna().reset_index()
+        
+        return df_4h
+    
+    def _generate_simulated_historical_data(self, pair: str, interval: str, days: int) -> pd.DataFrame:
+        """Generate simulated historical data ketika API tidak tersedia"""
+        try:
+            # Tentukan points berdasarkan interval
+            intervals_per_day = {
+                'M30': 48, '1H': 24, '4H': 6, '1D': 1, '1W': 1/7
+            }
+            
+            points = int(days * intervals_per_day.get(interval, 6))
+            points = max(100, min(points, 5000))  # Between 100-5000 points
+            
+            base_prices = {
+                'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
+                'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
+                'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
+            }
+            
+            base_price = base_prices.get(pair, 150.0)
+            prices = []
+            current_price = base_price
+            
+            start_date = datetime.now() - timedelta(days=days)
+            
+            for i in range(points):
+                # Random walk yang realistis
+                volatility = 0.0015
+                drift = (base_price - current_price) * 0.001  # Mean reversion
+                random_shock = np.random.normal(0, volatility)
+                change = drift + random_shock
+                current_price = current_price * (1 + change)
+                
+                # Generate OHLC
+                open_price = current_price
+                close_price = current_price * (1 + np.random.normal(0, volatility * 0.3))
+                high = max(open_price, close_price) + abs(change) * base_price * 0.5
+                low = min(open_price, close_price) - abs(change) * base_price * 0.5
+                
+                # Ensure high > low
+                high = max(high, max(open_price, close_price) + 0.0001)
+                low = min(low, min(open_price, close_price) - 0.0001)
+                
+                # Generate date berdasarkan interval
+                if interval == 'M30':
+                    current_date = start_date + timedelta(minutes=30*i)
+                elif interval == '1H':
+                    current_date = start_date + timedelta(hours=i)
+                elif interval == '4H':
+                    current_date = start_date + timedelta(hours=4*i)
+                else:  # 1D or 1W
+                    current_date = start_date + timedelta(days=i)
+                
+                prices.append({
+                    'date': current_date,
+                    'open': round(float(open_price), 4),
+                    'high': round(float(high), 4),
+                    'low': round(float(low), 4),
+                    'close': round(float(close_price), 4),
+                    'volume': int(np.random.randint(10000, 50000))
+                })
+            
+            df = pd.DataFrame(prices)
+            logger.info(f"Generated simulated historical data for {pair}-{interval}: {len(df)} records")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error generating simulated data for {pair}: {e}")
+            # Fallback ke data minimal
+            return pd.DataFrame({
+                'date': [datetime.now()],
+                'open': [150.0], 'high': [150.5], 'low': [149.5], 'close': [150.2],
+                'volume': [10000]
+            })
+
+# ==================== TWELVEDATA REAL-TIME INTEGRATION ====================
+class TwelveDataClient:
+    def __init__(self):
+        self.api_key = config.TWELVE_DATA_KEY
+        self.base_url = "https://api.twelvedata.com"
+        self.price_cache = {}
+        self.cache_timeout = 60
+        self.demo_mode = not self.api_key or self.api_key == "demo"
+        
+        if self.demo_mode:
+            logger.info("TwelveData running in DEMO mode with simulated real-time prices")
+        else:
+            logger.info("TwelveData running in LIVE mode with real API data")
+    
+    def get_real_time_price(self, pair: str) -> float:
+        """Ambil current price real-time dari TwelveData atau simulasi"""
+        cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H%M')}"
+        
+        # Check cache dulu
+        if pair in self.price_cache:
+            cached_time, price = self.price_cache[pair]
+            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
+                return price
+        
+        # Jika demo mode, gunakan harga simulasi yang lebih realistis
+        if self.demo_mode:
+            return self._get_simulated_real_time_price(pair)
+        
+        try:
+            # Format pair untuk TwelveData (USDJPY -> USD/JPY)
+            formatted_pair = f"{pair[:3]}/{pair[3:]}"
+            url = f"{self.base_url}/price?symbol={formatted_pair}&apikey={self.api_key}"
+            
+            logger.info(f"Fetching real-time price for {pair} from TwelveData...")
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'price' in data and data['price'] is not None:
+                    price = float(data['price'])
+                    
+                    # Cache the price
+                    self.price_cache[pair] = (datetime.now(), price)
+                    logger.info(f"Real-time price for {pair}: {price}")
+                    return price
+                else:
+                    logger.error(f"Invalid response from TwelveData: {data}")
+                    return self._get_simulated_real_time_price(pair)
+            else:
+                logger.error(f"TwelveData API error: {response.status_code} - {response.text}")
+                return self._get_simulated_real_time_price(pair)
+                
+        except Exception as e:
+            logger.error(f"Error getting real-time price for {pair}: {e}")
+            return self._get_simulated_real_time_price(pair)
+    
+    def _get_simulated_real_time_price(self, pair: str) -> float:
+        """Harga real-time simulasi untuk demo mode"""
+        try:
+            # Base prices dengan variasi kecil untuk simulasi real-time
+            base_prices = {
+                'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
+                'EURUSD': 1.0835, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
+                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095
+            }
+            
+            base_price = base_prices.get(pair, 150.0)
+            
+            # Tambahkan variasi acak kecil (±0.1%) untuk simulasi pergerakan market
+            variation = random.uniform(-0.001, 0.001)  # ±0.1%
+            simulated_price = round(base_price * (1 + variation), 4)
+            
+            # Cache the price
+            self.price_cache[pair] = (datetime.now(), simulated_price)
+            
+            logger.info(f"Simulated real-time price for {pair}: {simulated_price:.4f}")
+            return simulated_price
+            
+        except Exception as e:
+            logger.error(f"Error in simulated price for {pair}: {e}")
+            return 150.0
 
 # ==================== ENGINE ANALISIS TEKNIKAL YANG DIPERBAIKI ====================
 class TechnicalAnalysisEngine:
@@ -271,88 +612,6 @@ class TechnicalAnalysisEngine:
                 'pivot_point': current_price
             }
         }
-
-# ==================== TWELVEDATA REAL-TIME INTEGRATION ====================
-class TwelveDataClient:
-    def __init__(self):
-        self.api_key = config.TWELVE_DATA_KEY
-        self.base_url = "https://api.twelvedata.com"
-        self.price_cache = {}
-        self.cache_timeout = 60
-        self.demo_mode = not self.api_key or self.api_key == "demo"
-        
-        if self.demo_mode:
-            logger.info("TwelveData running in DEMO mode with simulated real-time prices")
-        else:
-            logger.info("TwelveData running in LIVE mode with real API data")
-    
-    def get_real_time_price(self, pair: str) -> float:
-        """Ambil current price real-time dari TwelveData atau simulasi"""
-        cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H%M')}"
-        
-        # Check cache dulu
-        if pair in self.price_cache:
-            cached_time, price = self.price_cache[pair]
-            if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
-                return price
-        
-        # Jika demo mode, gunakan harga simulasi yang lebih realistis
-        if self.demo_mode:
-            return self._get_simulated_real_time_price(pair)
-        
-        try:
-            # Format pair untuk TwelveData (USDJPY -> USD/JPY)
-            formatted_pair = f"{pair[:3]}/{pair[3:]}"
-            url = f"{self.base_url}/price?symbol={formatted_pair}&apikey={self.api_key}"
-            
-            logger.info(f"Fetching real-time price for {pair} from TwelveData...")
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if 'price' in data and data['price'] is not None:
-                    price = float(data['price'])
-                    
-                    # Cache the price
-                    self.price_cache[pair] = (datetime.now(), price)
-                    logger.info(f"Real-time price for {pair}: {price}")
-                    return price
-                else:
-                    logger.error(f"Invalid response from TwelveData: {data}")
-                    return self._get_simulated_real_time_price(pair)
-            else:
-                logger.error(f"TwelveData API error: {response.status_code} - {response.text}")
-                return self._get_simulated_real_time_price(pair)
-                
-        except Exception as e:
-            logger.error(f"Error getting real-time price for {pair}: {e}")
-            return self._get_simulated_real_time_price(pair)
-    
-    def _get_simulated_real_time_price(self, pair: str) -> float:
-        """Harga real-time simulasi untuk demo mode"""
-        try:
-            # Base prices dengan variasi kecil untuk simulasi real-time
-            base_prices = {
-                'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
-                'EURUSD': 1.0835, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
-                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095
-            }
-            
-            base_price = base_prices.get(pair, 150.0)
-            
-            # Tambahkan variasi acak kecil (±0.1%) untuk simulasi pergerakan market
-            variation = random.uniform(-0.001, 0.001)  # ±0.1%
-            simulated_price = round(base_price * (1 + variation), 4)
-            
-            # Cache the price
-            self.price_cache[pair] = (datetime.now(), simulated_price)
-            
-            logger.info(f"Simulated real-time price for {pair}: {simulated_price:.4f}")
-            return simulated_price
-            
-        except Exception as e:
-            logger.error(f"Error in simulated price for {pair}: {e}")
-            return 150.0
 
 # ==================== ADVANCED RISK MANAGEMENT SYSTEM ====================
 class AdvancedRiskManager:
@@ -950,19 +1209,23 @@ Pertimbangkan:
             "timestamp": datetime.now().isoformat()
         }
 
-# ==================== DATA MANAGER YANG DIPERBAIKI ====================
+# ==================== DATA MANAGER YANG DIPERBAIKI DENGAN ALPHA VANTAGE ====================
 class DataManager:
     def __init__(self):
         self.historical_data = {}
-        self.load_historical_data()
+        self.alpha_vantage_client = AlphaVantageClient()
+        self.twelve_data_client = TwelveDataClient()
+        self.use_api_primary = True  # Gunakan API sebagai sumber utama
+        logger.info("Data Manager initialized with Alpha Vantage API integration")
 
     def get_price_data_with_timezone(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga dengan timezone awareness untuk timeframe 4H"""
+        """Dapatkan data harga dengan timezone awareness dari Alpha Vantage API"""
         try:
             df = self.get_price_data(pair, timeframe, days)
             
             if df.empty:
-                return df
+                logger.warning(f"No data returned for {pair}-{timeframe}, generating fallback data")
+                return self._generate_simple_data(pair, timeframe, days)
                 
             # Pastikan kolom date adalah datetime dengan timezone
             if 'date' in df.columns:
@@ -977,281 +1240,100 @@ class DataManager:
             
         except Exception as e:
             logger.error(f"Error in get_price_data_with_timezone for {pair}-{timeframe}: {e}")
-            return self.get_price_data(pair, timeframe, days)
-
-    def ensure_fresh_data(self, pair: str, timeframe: str, min_records: int = 100):
-        """Pastikan data fresh tersedia untuk pair dan timeframe tertentu"""
-        try:
-            if pair not in self.historical_data or timeframe not in self.historical_data[pair]:
-                self._generate_sample_data(pair, timeframe)
-                return
-                
-            df = self.historical_data[pair][timeframe]
-            if df.empty or len(df) < min_records:
-                self._generate_sample_data(pair, timeframe)
-                return
-                
-            # Check if latest data is recent (within 1 day for 4H)
-            latest_date = pd.to_datetime(df['date'].iloc[-1])
-            if datetime.now().replace(tzinfo=None) - latest_date.replace(tzinfo=None) > timedelta(days=1):
-                logger.info(f"Data for {pair}-{timeframe} is stale, regenerating...")
-                self._generate_sample_data(pair, timeframe)
-                
-        except Exception as e:
-            logger.error(f"Error ensuring fresh data for {pair}-{timeframe}: {e}")
-            self._generate_sample_data(pair, timeframe)
-
-    def validate_and_fix_data(self, pair: str, timeframe: str):
-        """Validasi dan perbaiki data yang rusak"""
-        try:
-            if pair in self.historical_data and timeframe in self.historical_data[pair]:
-                df = self.historical_data[pair][timeframe]
-                
-                # Check if dataframe is empty or has missing columns
-                if df.empty or len(df) == 0:
-                    logger.warning(f"Empty dataframe for {pair}-{timeframe}, regenerating data")
-                    self._generate_sample_data(pair, timeframe)
-                    return
-                
-                # Check for required columns
-                required_cols = ['open', 'high', 'low', 'close', 'date']
-                missing_cols = [col for col in required_cols if col not in df.columns]
-                
-                if missing_cols:
-                    logger.warning(f"Missing columns {missing_cols} for {pair}-{timeframe}, regenerating data")
-                    self._generate_sample_data(pair, timeframe)
-                    return
-                    
-                # Check for NaN values in critical columns
-                critical_cols = ['open', 'high', 'low', 'close']
-                for col in critical_cols:
-                    if df[col].isna().any():
-                        logger.warning(f"NaN values found in {col} for {pair}-{timeframe}, regenerating data")
-                        self._generate_sample_data(pair, timeframe)
-                        return
-                        
-                logger.info(f"Data validation passed for {pair}-{timeframe}")
-                
-        except Exception as e:
-            logger.error(f"Data validation error for {pair}-{timeframe}: {e}")
-            self._generate_sample_data(pair, timeframe)
-    
-    def load_historical_data(self):
-        """Load data historis dari file CSV dengan handling error yang lebih baik"""
-        try:
-            data_dir = "historical_data"
-            if not os.path.exists(data_dir):
-                os.makedirs(data_dir)
-                logger.info("Created historical_data directory")
-                self._create_sample_data()
-                return
-            
-            loaded_count = 0
-            for filename in os.listdir(data_dir):
-                if filename.endswith('.csv'):
-                    file_path = os.path.join(data_dir, filename)
-                    try:
-                        df = pd.read_csv(file_path)
-                        
-                        # PERBAIKAN: Cek dan standardisasi kolom
-                        df = self._standardize_columns(df)
-                        
-                        # Pastikan kolom date ada dan konversi ke datetime
-                        if 'date' in df.columns:
-                            df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
-                            df = df.dropna(subset=['date'])
-                        
-                        # PERBAIKAN: Pastikan kolom required ada
-                        required_cols = ['open', 'high', 'low', 'close']
-                        missing_cols = [col for col in required_cols if col not in df.columns]
-                        if missing_cols:
-                            logger.warning(f"File {filename} missing columns: {missing_cols}. Generating synthetic data.")
-                            continue
-                        
-                        # Extract pair dan timeframe dari filename
-                        name_parts = filename.replace('.csv', '').split('_')
-                        if len(name_parts) >= 2:
-                            pair = name_parts[0].upper()
-                            timeframe = name_parts[1].upper()
-                            
-                            if pair not in config.FOREX_PAIRS:
-                                continue
-                                
-                            if pair not in self.historical_data:
-                                self.historical_data[pair] = {}
-                            
-                            self.historical_data[pair][timeframe] = df
-                            loaded_count += 1
-                            logger.info(f"Loaded {pair}-{timeframe}: {len(df)} records")
-                            
-                    except Exception as e:
-                        logger.error(f"Error loading {filename}: {e}")
-                        continue
-            
-            logger.info(f"Total loaded datasets: {loaded_count}")
-            
-            # Jika tidak ada data yang berhasil diload, buat sample
-            if loaded_count == 0:
-                logger.warning("No valid data found, creating sample data...")
-                self._create_sample_data()
-            
-        except Exception as e:
-            logger.error(f"Error in load_historical_data: {e}")
-            self._create_sample_data()
-    
-    def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Standardisasi nama kolom untuk menghindari error"""
-        column_mapping = {
-            'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
-            'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close',
-            'Date': 'date', 'TIME': 'date', 'Timestamp': 'date'
-        }
-        
-        df.columns = [column_mapping.get(col, col.lower()) for col in df.columns]
-        return df
-
-    def _create_sample_data(self):
-        """Buat sample data jika tidak ada data historis"""
-        logger.info("Creating sample historical data...")
-        
-        for pair in config.FOREX_PAIRS[:6]:
-            for timeframe in ['M30', '1H', '4H', '1D']:
-                self._generate_sample_data(pair, timeframe)
-    
-    def _generate_sample_data(self, pair: str, timeframe: str):
-        """Generate sample data yang realistis dengan timezone awareness"""
-        try:
-            # Tentukan periods berdasarkan timeframe
-            if timeframe == 'M30':
-                periods = 2000
-            elif timeframe == '1H':
-                periods = 1500
-            elif timeframe == '4H':
-                periods = 1000  # Sekitar 166 hari data
-            else:  # 1D
-                periods = 500
-                
-            base_prices = {
-                'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-                'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
-                'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
-            }
-            
-            base_price = base_prices.get(pair, 150.0)
-            prices = []
-            current_price = base_price
-            
-            # Start dari waktu terkini mundur untuk memastikan data fresh
-            end_date = datetime.now().replace(tzinfo=None)
-            
-            # Hitung start date berdasarkan timeframe dan periods
-            if timeframe == 'M30':
-                start_date = end_date - timedelta(hours=periods*0.5)
-            elif timeframe == '1H':
-                start_date = end_date - timedelta(hours=periods)
-            elif timeframe == '4H':
-                start_date = end_date - timedelta(hours=periods*4)
-            else:  # 1D
-                start_date = end_date - timedelta(days=periods)
-            
-            current_date = start_date
-            
-            for i in range(periods):
-                # Random walk yang lebih realistis
-                volatility = 0.0015
-                drift = (base_price - current_price) * 0.001  # Mean reversion
-                random_shock = np.random.normal(0, volatility)
-                change = drift + random_shock
-                current_price = current_price * (1 + change)
-                
-                # Generate OHLC dengan spread yang realistis
-                open_price = current_price
-                close_price = current_price * (1 + np.random.normal(0, volatility * 0.3))
-                high = max(open_price, close_price) + abs(change) * base_price * 0.5
-                low = min(open_price, close_price) - abs(change) * base_price * 0.5
-                
-                # Ensure high > low dan reasonable values
-                high = max(high, max(open_price, close_price) + 0.0001)
-                low = min(low, min(open_price, close_price) - 0.0001)
-                
-                # Generate date berdasarkan timeframe dengan timezone
-                if timeframe == 'M30':
-                    current_date = start_date + timedelta(minutes=30*i)
-                elif timeframe == '1H':
-                    current_date = start_date + timedelta(hours=i)
-                elif timeframe == '4H':
-                    # Untuk 4H, pastikan jam: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
-                    hours_to_add = (i * 4) % 24
-                    days_to_add = (i * 4) // 24
-                    current_date = start_date + timedelta(days=days_to_add, hours=hours_to_add)
-                else:  # 1D
-                    current_date = start_date + timedelta(days=i)
-                
-                # Add timezone info
-                current_date_utc = current_date.replace(tzinfo=None)
-                
-                prices.append({
-                    'date': current_date_utc,
-                    'open': round(float(open_price), 4),
-                    'high': round(float(high), 4),
-                    'low': round(float(low), 4),
-                    'close': round(float(close_price), 4),
-                    'volume': int(np.random.randint(10000, 50000))
-                })
-            
-            df = pd.DataFrame(prices)
-            
-            # Save to file
-            data_dir = "historical_data"
-            os.makedirs(data_dir, exist_ok=True)
-            filename = f"{data_dir}/{pair}_{timeframe}.csv"
-            df.to_csv(filename, index=False)
-            
-            # Store in memory
-            if pair not in self.historical_data:
-                self.historical_data[pair] = {}
-            self.historical_data[pair][timeframe] = df
-            
-            logger.info(f"Created sample data: {filename} with {len(df)} records")
-            
-        except Exception as e:
-            logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
+            return self._generate_simple_data(pair, timeframe, days)
 
     def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga untuk backtesting dengan fallback yang lebih baik"""
+        """Dapatkan data harga dari Alpha Vantage API dengan fallback ke data lokal"""
         try:
+            # Priority 1: Alpha Vantage API
+            if self.use_api_primary:
+                api_data = self.alpha_vantage_client.get_historical_data(pair, timeframe, days)
+                if not api_data.empty and len(api_data) > 10:
+                    logger.info(f"Using Alpha Vantage API data for {pair}-{timeframe}: {len(api_data)} records")
+                    
+                    # Store in memory cache
+                    if pair not in self.historical_data:
+                        self.historical_data[pair] = {}
+                    self.historical_data[pair][timeframe] = api_data
+                    
+                    return api_data
+                else:
+                    logger.warning(f"Alpha Vantage API data empty for {pair}-{timeframe}, falling back to local data")
+            
+            # Priority 2: Local cached data
             if pair in self.historical_data and timeframe in self.historical_data[pair]:
                 df = self.historical_data[pair][timeframe]
-                if df.empty:
-                    return self._generate_simple_data(pair, timeframe, days)
-                
-                # Return data untuk periode tertentu
-                if timeframe == 'M30':
-                    required_points = min(len(df), days * 48)
-                elif timeframe == '1H':
-                    required_points = min(len(df), days * 24)
-                elif timeframe == '4H':
-                    required_points = min(len(df), days * 6)
-                else:  # 1D or 1W
-                    required_points = min(len(df), days)
-                    
-                result_df = df.tail(required_points).copy()
-                
-                # PERBAIKAN: Pastikan kolom yang diperlukan ada
-                required_cols = ['date', 'open', 'high', 'low', 'close']
-                for col in required_cols:
-                    if col not in result_df.columns:
-                        logger.warning(f"Column {col} missing, generating synthetic data")
-                        return self._generate_simple_data(pair, timeframe, days)
-                
-                return result_df
+                if not df.empty:
+                    # Return subset berdasarkan days
+                    required_points = self._calculate_required_points(timeframe, days)
+                    if len(df) > required_points:
+                        return df.tail(required_points).copy()
+                    else:
+                        return df.copy()
             
-            # Fallback: generate simple synthetic data
+            # Priority 3: Generate simple data
+            logger.info(f"Generating fallback data for {pair}-{timeframe}")
             return self._generate_simple_data(pair, timeframe, days)
             
         except Exception as e:
             logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
             return self._generate_simple_data(pair, timeframe, days)
+
+    def _calculate_required_points(self, timeframe: str, days: int) -> int:
+        """Hitung jumlah data points yang diperlukan berdasarkan timeframe"""
+        if timeframe == 'M30':
+            return days * 48
+        elif timeframe == '1H':
+            return days * 24
+        elif timeframe == '4H':
+            return days * 6
+        else:  # 1D, 1W
+            return days
+
+    def ensure_fresh_data(self, pair: str, timeframe: str, min_records: int = 100):
+        """Pastikan data fresh tersedia - selalu gunakan API untuk data terbaru"""
+        try:
+            # Selama API aktif, kita akan selalu mengambil data fresh
+            if self.use_api_primary:
+                logger.info(f"Ensuring fresh data from Alpha Vantage API for {pair}-{timeframe}")
+                api_data = self.alpha_vantage_client.get_historical_data(pair, timeframe, 30)  # 30 hari terakhir
+                
+                if not api_data.empty and len(api_data) >= min_records:
+                    if pair not in self.historical_data:
+                        self.historical_data[pair] = {}
+                    self.historical_data[pair][timeframe] = api_data
+                    logger.info(f"Fresh data ensured for {pair}-{timeframe}: {len(api_data)} records")
+                    return
+            
+            # Fallback ke data existing
+            if pair in self.historical_data and timeframe in self.historical_data[pair]:
+                df = self.historical_data[pair][timeframe]
+                if not df.empty and len(df) >= min_records:
+                    return
+            
+            # Generate sample data sebagai last resort
+            logger.warning(f"Generating sample data as last resort for {pair}-{timeframe}")
+            self._generate_sample_data(pair, timeframe)
+                
+        except Exception as e:
+            logger.error(f"Error ensuring fresh data for {pair}-{timeframe}: {e}")
+            self._generate_sample_data(pair, timeframe)
+
+    def load_historical_data(self):
+        """Load data historis - sekarang menggunakan API sebagai primary source"""
+        logger.info("Using Alpha Vantage API as primary historical data source")
+        # Tidak perlu load dari file CSV lagi
+        
+    def _generate_sample_data(self, pair: str, timeframe: str):
+        """Generate sample data untuk fallback"""
+        try:
+            df = self._generate_simple_data(pair, timeframe, 30)
+            if pair not in self.historical_data:
+                self.historical_data[pair] = {}
+            self.historical_data[pair][timeframe] = df
+            logger.info(f"Generated sample data for {pair}-{timeframe}")
+        except Exception as e:
+            logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
 
     def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
         """Generate simple synthetic data untuk backtesting"""
@@ -2152,7 +2234,7 @@ class AdvancedBacktestingEngine:
         }
 
 # ==================== INITIALIZE SYSTEM ====================
-logger.info("Initializing Forex Analysis System...")
+logger.info("Initializing Forex Analysis System with Alpha Vantage...")
 
 # Inisialisasi komponen sistem dengan urutan yang benar
 tech_engine = TechnicalAnalysisEngine()
@@ -2162,7 +2244,7 @@ data_manager = DataManager()
 twelve_data_client = TwelveDataClient()
 
 # Validasi dan perbaiki data yang rusak, pastikan data fresh
-logger.info("Validating and refreshing historical data...")
+logger.info("Validating and refreshing historical data from Alpha Vantage...")
 for pair in config.FOREX_PAIRS:
     for timeframe in ['M30', '1H', '4H', '1D']:
         data_manager.ensure_fresh_data(pair, timeframe, min_records=50)
@@ -2172,7 +2254,7 @@ risk_manager = AdvancedRiskManager()
 
 # Tampilkan status yang lebih informatif
 logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
-logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
+logger.info(f"Alpha Vantage API: {'LIVE MODE' if not data_manager.alpha_vantage_client.demo_mode else 'DEMO MODE'}")
 logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE'}")
 logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
 logger.info(f"Advanced Risk Management: ENABLED")
@@ -2191,7 +2273,7 @@ def index():
 
 @app.route('/api/analyze')
 def api_analyze():
-    """Endpoint untuk analisis market real-time dengan timezone awareness"""
+    """Endpoint untuk analisis market real-time dengan data historis dari Alpha Vantage"""
     try:
         pair = request.args.get('pair', 'USDJPY').upper()
         timeframe = request.args.get('timeframe', '4H').upper()
@@ -2203,12 +2285,12 @@ def api_analyze():
         # 1) Ambil harga realtime (TwelveData)
         real_time_price = twelve_data_client.get_real_time_price(pair)
         
-        # 2) Ambil data harga historis dengan timezone awareness
+        # 2) Ambil data harga historis dari Alpha Vantage API
         price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
+        
         if price_data.empty:
             logger.warning(f"No price data for {pair}-{timeframe}, generating sample data")
-            data_manager._generate_sample_data(pair, timeframe)
-            price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
+            price_data = data_manager._generate_simple_data(pair, timeframe, 60)
         
         # 3) Analisis teknikal
         technical_analysis = tech_engine.calculate_all_indicators(price_data)
@@ -2233,15 +2315,15 @@ def api_analyze():
             open_positions=[]
         )
         
-        # 7) Siapkan price_series dengan format waktu yang konsisten
+        # 7) Siapkan price_series untuk chart dengan data dari Alpha Vantage
         price_series = []
         try:
-            hist_df = data_manager.get_price_data_with_timezone(pair, timeframe, days=200)
-            if not hist_df.empty:
-                hist_df = hist_df.sort_values('date')
+            # Gunakan data yang sudah diambil (dari API)
+            if not price_data.empty:
+                price_data = price_data.sort_values('date')
                 
                 # Format datetime untuk frontend
-                for _, row in hist_df.iterrows():
+                for _, row in price_data.iterrows():
                     date_value = row['date']
                     
                     # Convert to ISO format dengan timezone
@@ -2263,7 +2345,9 @@ def api_analyze():
                         'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else 0
                     })
                     
-                logger.info(f"Prepared {len(price_series)} price series records for {pair}-{timeframe}")
+                logger.info(f"Prepared {len(price_series)} price series records from Alpha Vantage for {pair}-{timeframe}")
+            else:
+                logger.warning("No price data available for chart")
                 
         except Exception as e:
             logger.error(f"Error preparing price series for {pair}-{timeframe}: {e}")
@@ -2287,8 +2371,9 @@ def api_analyze():
             'price_series': price_series,
             'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
             'ai_provider': ai_analysis.get('ai_provider', 'DeepSeek AI'),
-            'data_source': 'TwelveData Live' if not getattr(twelve_data_client, 'demo_mode', True) else 'TwelveData Demo',
-            'timezone_info': 'UTC'
+            'data_source': 'Alpha Vantage Historical + TwelveData Real-time',
+            'timezone_info': 'UTC',
+            'data_points': len(price_series)
         }
         
         return jsonify(response)
@@ -2312,7 +2397,7 @@ def api_backtest():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # Dapatkan data harga
+        # Dapatkan data harga dari Alpha Vantage
         price_data = data_manager.get_price_data(pair, timeframe, days)
         
         if price_data.empty:
@@ -2348,7 +2433,7 @@ def api_advanced_backtest():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # Dapatkan data harga
+        # Dapatkan data harga dari Alpha Vantage
         price_data = data_manager.get_price_data(pair, timeframe, days)
         
         if price_data.empty:
@@ -2391,7 +2476,7 @@ def api_advanced_backtest():
 
 @app.route('/api/market_overview')
 def api_market_overview():
-    """Overview market untuk semua pair dengan REAL-TIME prices dari TwelveData"""
+    """Overview market untuk semua pair dengan REAL-TIME prices dari TwelveData dan historical dari Alpha Vantage"""
     overview = {}
     
     for pair in config.FOREX_PAIRS[:6]:  # Limit to 6 pairs for performance
@@ -2399,6 +2484,7 @@ def api_market_overview():
             # Dapatkan current price REAL-TIME dari TwelveData
             real_time_price = twelve_data_client.get_real_time_price(pair)
             
+            # Dapatkan data historis dari Alpha Vantage
             price_data = data_manager.get_price_data(pair, '1D', days=5)
             
             if not price_data.empty:
@@ -2441,7 +2527,7 @@ def api_market_overview():
                     'confidence': confidence,
                     'support': tech['levels']['support'],
                     'resistance': tech['levels']['resistance'],
-                    'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                    'data_source': 'Alpha Vantage Historical + TwelveData Real-time'
                 }
             else:
                 overview[pair] = {
@@ -2454,7 +2540,7 @@ def api_market_overview():
                     'recommendation': 'HOLD',
                     'confidence': 'LOW',
                     'error': 'No historical data available',
-                    'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                    'data_source': 'Alpha Vantage Historical + TwelveData Real-time'
                 }
         except Exception as e:
             logger.error(f"Error getting overview for {pair}: {e}")
@@ -2485,6 +2571,7 @@ def api_risk_dashboard():
                 # Gunakan real-time price untuk risk analysis
                 real_time_price = twelve_data_client.get_real_time_price(pair)
                 
+                # Dapatkan data dari Alpha Vantage
                 data = data_manager.get_price_data(pair, '1D', days=5)
                 if not data.empty:
                     tech = tech_engine.calculate_all_indicators(data)
@@ -2504,7 +2591,7 @@ def api_risk_dashboard():
                         'rsi': round(tech['momentum']['rsi'], 1),
                         'risk_level': risk_level,
                         'atr': round(tech['volatility']['atr'], 4),
-                        'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                        'data_source': 'Alpha Vantage Historical + TwelveData Real-time'
                     }
             except Exception as e:
                 logger.error(f"Error analyzing {pair} for risk dashboard: {e}")
@@ -2514,6 +2601,7 @@ def api_risk_dashboard():
         trading_recommendations = []
         for pair in config.FOREX_PAIRS[:4]:
             try:
+                # Dapatkan data dari Alpha Vantage
                 data = data_manager.get_price_data(pair, '4H', days=10)
                 if not data.empty:
                     tech = tech_engine.calculate_all_indicators(data)
@@ -2567,7 +2655,7 @@ def api_risk_dashboard():
                 'total_pairs_monitored': len(config.FOREX_PAIRS),
                 'risk_manager_status': 'ACTIVE',
                 'last_update': datetime.now().isoformat(),
-                'data_provider': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                'data_provider': 'Alpha Vantage Historical + TwelveData Real-time'
             }
         })
         
@@ -2582,6 +2670,7 @@ def api_system_status():
         'system': 'RUNNING',
         'historical_data': f"{len(data_manager.historical_data)} pairs loaded",
         'supported_pairs': config.FOREX_PAIRS,
+        'alpha_vantage': 'LIVE MODE' if not data_manager.alpha_vantage_client.demo_mode else 'DEMO MODE',
         'deepseek_ai': 'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE',
         'news_api': 'ENABLED' if config.NEWS_API_KEY and config.NEWS_API_KEY != "demo" else 'DISABLED',
         'twelve_data': 'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE',
@@ -2590,6 +2679,7 @@ def api_system_status():
         'server_time': datetime.now().isoformat(),
         'version': '3.0',
         'features': [
+            'Alpha Vantage Historical Data',
             'Advanced Risk Management',
             'Multi-Timeframe Analysis', 
             'AI-Powered Analysis',
@@ -2602,9 +2692,9 @@ def api_system_status():
 
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
-    logger.info("Starting Enhanced Forex Analysis System...")
+    logger.info("Starting Enhanced Forex Analysis System with Alpha Vantage...")
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
-    logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
+    logger.info(f"Alpha Vantage API: {'LIVE MODE' if not data_manager.alpha_vantage_client.demo_mode else 'DEMO MODE'}")
     logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE'}")
     logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
     logger.info(f"Advanced Risk Management: ENABLED")
