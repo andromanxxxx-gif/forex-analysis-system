@@ -648,6 +648,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ==================== GLOBAL VARIABLES ====================
+// ==================== ENHANCED REQUEST MANAGEMENT ====================
 let currentChartData = [];
 let currentEmaData = [];
 let currentMacdData = { macd: [], signal: [], hist: [] };
@@ -656,14 +657,207 @@ let isRealtimeMode = false;
 let currentPair = 'USDJPY';
 let currentTimeframe = '4H';
 
-// API Optimization Variables
+// Enhanced API Optimization Variables
 let liveUpdateInterval = null;
 let isTabActive = true;
 let consecutiveErrors = 0;
-let currentUpdateInterval = 30000; // Start dengan 30 detik
+let currentUpdateInterval = 45000; // Start dengan 45 detik (lebih lambat)
 let totalApiCalls = 0;
 let apiCallTimestamps = [];
 let isAggressiveMode = false;
+
+// Request management
+let isAnalyzing = false;
+let pendingAnalysis = false;
+let lastAnalysisTime = 0;
+const ANALYSIS_COOLDOWN = 2000; // 2 detik minimum antara requests
+
+// Enhanced strategy berdasarkan timeframe
+const timeframeUpdateStrategy = {
+    'M30': 30000,    // 30 detik
+    '1H': 45000,     // 45 detik  
+    '4H': 60000,     // 60 detik
+    '1D': 120000,    // 2 menit
+    '1W': 300000     // 5 menit
+};
+
+// ==================== ENHANCED REQUEST QUEUE ====================
+async function analyze() {
+    // Prevent too frequent requests
+    const now = Date.now();
+    if (now - lastAnalysisTime < ANALYSIS_COOLDOWN) {
+        console.log('Too soon since last analysis, skipping...');
+        pendingAnalysis = true;
+        setTimeout(() => {
+            if (pendingAnalysis) {
+                pendingAnalysis = false;
+                analyze();
+            }
+        }, ANALYSIS_COOLDOWN - (now - lastAnalysisTime));
+        return;
+    }
+
+    // Prevent concurrent requests
+    if (isAnalyzing) {
+        console.log('Analysis already in progress, queuing...');
+        pendingAnalysis = true;
+        return;
+    }
+
+    isAnalyzing = true;
+    const pair = document.getElementById('pairSelect').value;
+    const timeframe = document.getElementById('timeframeSelect').value;
+    currentPair = pair;
+    currentTimeframe = timeframe;
+
+    // Show loading indicator
+    document.getElementById('chartLoading').style.display = 'flex';
+    updateStatusIndicator(false);
+
+    try {
+        trackApiCall();
+        console.log(`Fetching analysis for ${pair}-${timeframe}...`);
+        
+        const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
+        
+        if (response.status === 429) {
+            // Rate limited - handle gracefully
+            const errorData = await response.json();
+            const retryAfter = errorData.retry_after || 60;
+            console.warn(`Rate limited. Retrying after ${retryAfter} seconds`);
+            
+            showNotification(`Too many requests. Waiting ${retryAfter} seconds...`, 'warning');
+            
+            // Stop updates and retry later
+            stopLiveUpdates();
+            setTimeout(() => {
+                analyze();
+                startOptimizedUpdates();
+            }, retryAfter * 1000);
+            
+            return;
+        }
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Analysis response received');
+        
+        // Process the data (existing code)
+        processAnalysisData(data, pair, timeframe);
+        
+        // Reset error counter on success
+        consecutiveErrors = 0;
+        lastAnalysisTime = Date.now();
+        
+    } catch (error) {
+        console.error('Analysis error:', error);
+        handleAnalysisError(error);
+    } finally {
+        isAnalyzing = false;
+        document.getElementById('chartLoading').style.display = 'none';
+        
+        // Process pending analysis if any
+        if (pendingAnalysis) {
+            pendingAnalysis = false;
+            setTimeout(analyze, 1000);
+        }
+    }
+}
+
+function processAnalysisData(data, pair, timeframe) {
+    // Update price series chart
+    let chartData = [];
+    
+    if (data.price_series && data.price_series.length > 0) {
+        console.log(`Processing ${data.price_series.length} price series data points`);
+        chartData = data.price_series.map(item => ({
+            time: formatDateForChart(item.date, timeframe),
+            open: parseFloat(item.open),
+            high: parseFloat(item.high),
+            low: parseFloat(item.low),
+            close: parseFloat(item.close)
+        }));
+    }
+
+    // Clean and set chart data
+    const cleanData = cleanChartData(chartData);
+    
+    if (cleanData.length > 0) {
+        currentChartData = cleanData;
+        candleSeries.setData(currentChartData);
+        
+        // Initialize realtime candle
+        realtimeCandle = initializeRealtimeCandle(cleanData, timeframe);
+        isRealtimeMode = true;
+        
+        // Calculate and update indicators
+        updateChartIndicators(cleanData);
+        
+        // Update realtime candle jika ada
+        if (realtimeCandle) {
+            candleSeries.update(realtimeCandle);
+        }
+        
+        // Fit content to show all data
+        chart.timeScale().fitContent();
+        macdChart.timeScale().fitContent();
+        
+        // Update chart info
+        document.getElementById('chartDataInfo').textContent = `${currentChartData.length} bars`;
+    }
+    
+    // Update all displays
+    updateAllDisplays(data);
+    updateStatusIndicator(true);
+}
+
+function updateChartIndicators(cleanData) {
+    // Calculate and update EMA
+    const closes = cleanData.map(d => d.close);
+    const ema = calcEMA(closes, 26);
+    currentEmaData = ema.map((value, index) => ({
+        time: cleanData[index].time, 
+        value: isNaN(value) ? 0 : value
+    }));
+    ema26Series.setData(currentEmaData);
+    
+    // Calculate and update MACD
+    const { macd, sig, hist } = calcMACDSeries(closes);
+    currentMacdData = { 
+        macd: macd.map(v => isNaN(v) ? 0 : v),
+        signal: sig.map(v => isNaN(v) ? 0 : v),
+        hist: hist.map(v => isNaN(v) ? 0 : v)
+    };
+    
+    const macdSeriesData = macd.map((value, index) => ({
+        time: cleanData[index].time, 
+        value: isNaN(value) ? 0 : value
+    }));
+    const signalSeriesData = sig.map((value, index) => ({
+        time: cleanData[index].time, 
+        value: isNaN(value) ? 0 : value
+    }));
+    const histSeriesData = hist.map((value, index) => ({
+        time: cleanData[index].time, 
+        value: isNaN(value) ? 0 : value
+    }));
+    
+    macdLineSeries.setData(macdSeriesData);
+    macdSignalSeries.setData(signalSeriesData);
+    macdHistSeries.setData(histSeriesData);
+}
+
+function updateAllDisplays(data) {
+    // Update technical indicators
+    const technical = data.technical_analysis || {};
+    updateTechnicalIndicators(technical);
+    
+    // Update price data
+    const currentPrice = data.price_data?.current || 0;
+    updatePriceDisplay(currentPrice, technical.momentum
 
 // Strategy berdasarkan timeframe
 const timeframeUpdateStrategy = {
