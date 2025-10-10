@@ -20,6 +20,8 @@ import psutil
 import hashlib
 import jwt
 from threading import Lock
+from functools import lru_cache
+import time
 
 # ==================== FIX: JSON SERIALIZATION UTILS ====================
 def convert_numpy_types(obj):
@@ -30,7 +32,7 @@ def convert_numpy_types(obj):
         return int(obj)
     elif isinstance(obj, (np.floating, np.float32, np.float64)):
         return float(obj)
-    elif isinstance(obj, (np.bool_, np.bool8)):
+    elif isinstance(obj, np.bool_):
         return bool(obj)
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
@@ -928,6 +930,11 @@ def internal_error(error):
 @app.errorhandler(400)
 def bad_request(error):
     return jsonify({'error': 'Bad request'}), 400
+@lru_cache(maxsize=100)
+def cached_analysis(pair: str, timeframe: str):
+    """Cache analysis results untuk mengurangi beban"""
+    # Implementasi analisis di sini
+    return analysis_data
 
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
