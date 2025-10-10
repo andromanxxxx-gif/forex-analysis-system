@@ -1,4 +1,4 @@
-# [FILE: app_enhanced.py] - PERBAIKAN DENGAN ALPHA VANTAGE HISTORICAL DATA
+# [FILE: app_enhanced_fixed.py] - PERBAIKAN LENGKAP DENGAN ALPHA VANTAGE
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -13,6 +13,29 @@ from dataclasses import dataclass, field
 import talib
 import yfinance as yf
 import random
+import time
+import glob
+from functools import wraps
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# ==================== RATE LIMITING DECORATOR ====================
+def rate_limited(max_per_minute):
+    """Decorator untuk rate limiting API calls"""
+    min_interval = 60.0 / max_per_minute
+    def decorator(func):
+        last_time_called = [0.0]
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            elapsed = time.time() - last_time_called[0]
+            left_to_wait = min_interval - elapsed
+            if left_to_wait > 0:
+                time.sleep(left_to_wait)
+            ret = func(*args, **kwargs)
+            last_time_called[0] = time.time()
+            return ret
+        return wrapper
+    return decorator
 
 # ==================== KONFIGURASI LOGGING YANG DIPERBAIKI ====================
 def setup_logging():
@@ -53,11 +76,11 @@ app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
 # ==================== KONFIGURASI SISTEM YANG DIPERBAIKI ====================
 @dataclass
 class SystemConfig:
-    # API Configuration
+    # API Configuration - SEMUA API KEY DARI ENVIRONMENT VARIABLE
     DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
     NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
-    ALPHA_VANTAGE_KEY: str = "   "  # API Key Alpha Vantage Anda
+    ALPHA_VANTAGE_KEY: str = os.environ.get("ALPHA_VANTAGE_KEY", "demo")  # Fixed: dari environment variable
     
     # Enhanced Trading Parameters
     INITIAL_BALANCE: float = 10000.0
@@ -78,6 +101,9 @@ class SystemConfig:
     BACKTEST_DAILY_TRADE_LIMIT: int = 100  # Higher limit for backtesting
     BACKTEST_MIN_CONFIDENCE: int = 40  # Lower confidence threshold for backtesting
     BACKTEST_RISK_SCORE_THRESHOLD: int = 8  # Higher risk tolerance for backtesting
+    
+    # Alpha Vantage rate limiting
+    ALPHA_VANTAGE_RATE_LIMIT: int = 5  # 5 calls per minute untuk free tier
     
     # Supported Instruments
     FOREX_PAIRS: List[str] = field(default_factory=lambda: [
@@ -105,7 +131,7 @@ class SystemConfig:
 
 config = SystemConfig()
 
-# ==================== ALPHA VANTAGE HISTORICAL DATA INTEGRATION ====================
+# ==================== ALPHA VANTAGE HISTORICAL DATA INTEGRATION YANG DIPERBAIKI ====================
 class AlphaVantageClient:
     def __init__(self):
         self.api_key = config.ALPHA_VANTAGE_KEY
@@ -113,14 +139,47 @@ class AlphaVantageClient:
         self.historical_cache = {}
         self.cache_timeout = 3600  # 1 jam cache untuk data historis
         self.demo_mode = not self.api_key or self.api_key == "demo"
+        self.request_times = []  # Track API calls untuk rate limiting
+        self.max_cache_size = 100  # Maximum cache entries
+        
+        # Buat session dengan retry mechanism
+        self.session = self._create_session_with_retry()
         
         if self.demo_mode:
             logger.info("Alpha Vantage running in DEMO mode with simulated data")
         else:
             logger.info("Alpha Vantage running in LIVE mode with real API data")
     
+    def _create_session_with_retry(self):
+        """Create requests session dengan retry strategy"""
+        session = requests.Session()
+        
+        retry_strategy = Retry(
+            total=3,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+            backoff_factor=1
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        return session
+    
+    def _manage_cache_size(self):
+        """Manage cache size untuk prevent memory issues"""
+        if len(self.historical_cache) > self.max_cache_size:
+            # Remove oldest entries
+            oldest_keys = sorted(self.historical_cache.keys(), 
+                               key=lambda k: self.historical_cache[k][0])[:20]
+            for key in oldest_keys:
+                del self.historical_cache[key]
+            logger.info(f"Cleaned cache, removed {len(oldest_keys)} old entries")
+    
+    @rate_limited(5)  # 5 calls per minute untuk Alpha Vantage free tier
     def get_historical_data(self, pair: str, interval: str, days: int = 30) -> pd.DataFrame:
-        """Ambil data historis dari Alpha Vantage API untuk pair forex"""
+        """Ambil data historis dari Alpha Vantage API untuk pair forex dengan rate limiting"""
         cache_key = f"{pair}_{interval}_{days}"
         
         # Check cache dulu
@@ -134,11 +193,11 @@ class AlphaVantageClient:
         if self.demo_mode:
             df = self._generate_simulated_historical_data(pair, interval, days)
             self.historical_cache[cache_key] = (datetime.now(), df.copy())
+            self._manage_cache_size()
             return df
         
         try:
             # Format pair untuk Alpha Vantage (EURUSD -> EURUSD)
-            # Alpha Vantage menggunakan format "FROMTO" untuk forex
             formatted_pair = pair
             
             # Map timeframe ke interval Alpha Vantage
@@ -165,14 +224,14 @@ class AlphaVantageClient:
                 params['outputsize'] = 'full' if days > 30 else 'compact'
             
             logger.info(f"Fetching historical data from Alpha Vantage for {pair}-{interval}...")
-            response = requests.get(self.base_url, params=params, timeout=15)
+            response = self.session.get(self.base_url, params=params, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()
                 
                 # Process data berdasarkan function
-                if function == 'FX_INTRADAY' and 'Time Series FX (' + av_interval + ')' in data:
-                    time_series_key = 'Time Series FX (' + av_interval + ')'
+                if function == 'FX_INTRADAY' and f'Time Series FX ({av_interval})' in data:
+                    time_series_key = f'Time Series FX ({av_interval})'
                     df = self._process_intraday_data(data[time_series_key], pair)
                 elif function == 'FX_DAILY' and 'Time Series FX (Daily)' in data:
                     df = self._process_daily_data(data['Time Series FX (Daily)'], pair)
@@ -182,19 +241,33 @@ class AlphaVantageClient:
                     logger.error(f"Unexpected Alpha Vantage response format: {data}")
                     return self._generate_simulated_historical_data(pair, interval, days)
                 
+                # Validasi kualitas data
+                if not self._validate_alpha_vantage_data(df, pair, interval):
+                    logger.warning(f"Data validation failed for {pair}-{interval}, using simulated data")
+                    return self._generate_simulated_historical_data(pair, interval, days)
+                
                 # Filter data berdasarkan jumlah hari yang diminta
                 if not df.empty:
                     start_date = datetime.now() - timedelta(days=days)
                     df = df[df['date'] >= start_date]
                     
+                    # Validasi data freshness
+                    latest_date = df['date'].max() if not df.empty else None
+                    if latest_date:
+                        data_age = datetime.now().replace(tzinfo=latest_date.tzinfo) - latest_date
+                        if data_age > timedelta(days=1):
+                            logger.warning(f"Data for {pair}-{interval} may be stale. Latest: {latest_date}")
+                    
                     # Resample jika diperlukan (untuk 4H dari data 60min)
                     if interval == '4H':
                         df = self._resample_to_4h(df)
                     
-                    logger.info(f"Successfully fetched {len(df)} historical records from Alpha Vantage for {pair}-{interval}")
-                    
-                    # Cache the data
+                    # Simpan ke cache dan file
                     self.historical_cache[cache_key] = (datetime.now(), df.copy())
+                    self._manage_cache_size()
+                    self._save_data_to_file(df, pair, interval)
+                    
+                    logger.info(f"Successfully fetched {len(df)} historical records from Alpha Vantage for {pair}-{interval}")
                     return df
                 else:
                     logger.error(f"No historical data processed for {pair}-{interval}")
@@ -208,55 +281,134 @@ class AlphaVantageClient:
             return self._generate_simulated_historical_data(pair, interval, days)
     
     def _process_intraday_data(self, time_series: Dict, pair: str) -> pd.DataFrame:
-        """Process intraday data dari Alpha Vantage"""
+        """Process intraday data dari Alpha Vantage dengan validasi"""
+        if not time_series or not isinstance(time_series, dict):
+            logger.error(f"Invalid time_series data for {pair}")
+            return pd.DataFrame()
+        
         records = []
         for timestamp, values in time_series.items():
-            records.append({
-                'date': pd.to_datetime(timestamp),
-                'open': float(values['1. open']),
-                'high': float(values['2. high']),
-                'low': float(values['3. low']),
-                'close': float(values['4. close']),
-                'volume': 0  # Alpha Vantage tidak menyediakan volume untuk forex
-            })
+            try:
+                # Validasi semua field required ada
+                required_fields = ['1. open', '2. high', '3. low', '4. close']
+                if not all(field in values for field in required_fields):
+                    continue
+                    
+                records.append({
+                    'date': pd.to_datetime(timestamp),
+                    'open': float(values['1. open']),
+                    'high': float(values['2. high']),
+                    'low': float(values['3. low']),
+                    'close': float(values['4. close']),
+                    'volume': 0  # Alpha Vantage tidak menyediakan volume untuk forex
+                })
+            except (ValueError, KeyError) as e:
+                logger.warning(f"Skipping invalid data point {timestamp}: {e}")
+                continue
         
+        if not records:
+            return pd.DataFrame()
+            
         df = pd.DataFrame(records)
         df = df.sort_values('date').reset_index(drop=True)
         return df
     
     def _process_daily_data(self, time_series: Dict, pair: str) -> pd.DataFrame:
-        """Process daily data dari Alpha Vantage"""
+        """Process daily data dari Alpha Vantage dengan validasi"""
+        if not time_series or not isinstance(time_series, dict):
+            logger.error(f"Invalid time_series data for {pair}")
+            return pd.DataFrame()
+            
         records = []
         for timestamp, values in time_series.items():
-            records.append({
-                'date': pd.to_datetime(timestamp),
-                'open': float(values['1. open']),
-                'high': float(values['2. high']),
-                'low': float(values['3. low']),
-                'close': float(values['4. close']),
-                'volume': 0
-            })
+            try:
+                required_fields = ['1. open', '2. high', '3. low', '4. close']
+                if not all(field in values for field in required_fields):
+                    continue
+                    
+                records.append({
+                    'date': pd.to_datetime(timestamp),
+                    'open': float(values['1. open']),
+                    'high': float(values['2. high']),
+                    'low': float(values['3. low']),
+                    'close': float(values['4. close']),
+                    'volume': 0
+                })
+            except (ValueError, KeyError) as e:
+                logger.warning(f"Skipping invalid data point {timestamp}: {e}")
+                continue
         
+        if not records:
+            return pd.DataFrame()
+            
         df = pd.DataFrame(records)
         df = df.sort_values('date').reset_index(drop=True)
         return df
     
     def _process_weekly_data(self, time_series: Dict, pair: str) -> pd.DataFrame:
-        """Process weekly data dari Alpha Vantage"""
+        """Process weekly data dari Alpha Vantage dengan validasi"""
+        if not time_series or not isinstance(time_series, dict):
+            logger.error(f"Invalid time_series data for {pair}")
+            return pd.DataFrame()
+            
         records = []
         for timestamp, values in time_series.items():
-            records.append({
-                'date': pd.to_datetime(timestamp),
-                'open': float(values['1. open']),
-                'high': float(values['2. high']),
-                'low': float(values['3. low']),
-                'close': float(values['4. close']),
-                'volume': 0
-            })
+            try:
+                required_fields = ['1. open', '2. high', '3. low', '4. close']
+                if not all(field in values for field in required_fields):
+                    continue
+                    
+                records.append({
+                    'date': pd.to_datetime(timestamp),
+                    'open': float(values['1. open']),
+                    'high': float(values['2. high']),
+                    'low': float(values['3. low']),
+                    'close': float(values['4. close']),
+                    'volume': 0
+                })
+            except (ValueError, KeyError) as e:
+                logger.warning(f"Skipping invalid data point {timestamp}: {e}")
+                continue
         
+        if not records:
+            return pd.DataFrame()
+            
         df = pd.DataFrame(records)
         df = df.sort_values('date').reset_index(drop=True)
         return df
+    
+    def _validate_alpha_vantage_data(self, df: pd.DataFrame, pair: str, interval: str) -> bool:
+        """Validasi kualitas data dari Alpha Vantage"""
+        if df.empty:
+            logger.warning(f"Empty DataFrame for {pair}-{interval}")
+            return False
+            
+        # Check for missing values
+        if df.isnull().any().any():
+            logger.warning(f"Missing values detected in {pair}-{interval} data")
+            # Coba fill missing values
+            df.fillna(method='ffill', inplace=True)
+            df.fillna(method='bfill', inplace=True)
+        
+        # Check for zero or negative prices
+        price_columns = ['open', 'high', 'low', 'close']
+        if (df[price_columns] <= 0).any().any():
+            logger.error(f"Invalid prices (<=0) in {pair}-{interval} data")
+            return False
+        
+        # Check for high-low consistency
+        invalid_hl = (df['high'] < df['low']).any()
+        if invalid_hl:
+            logger.error(f"High < Low detected in {pair}-{interval} data")
+            return False
+            
+        # Check for reasonable price movements
+        if len(df) > 1:
+            price_changes = df['close'].pct_change().abs()
+            if (price_changes > 0.1).any():  # 10% movement in single period
+                logger.warning(f"Large price movements detected in {pair}-{interval}")
+        
+        return True
     
     def _resample_to_4h(self, df: pd.DataFrame) -> pd.DataFrame:
         """Resample data 60min ke 4H"""
@@ -280,9 +432,69 @@ class AlphaVantageClient:
         
         return df_4h
     
+    def _save_data_to_file(self, df: pd.DataFrame, pair: str, interval: str):
+        """Save data to CSV untuk mengurangi API calls di future"""
+        if df.empty:
+            return
+            
+        try:
+            os.makedirs('historical_data', exist_ok=True)
+            filename = f"historical_data/{pair}_{interval}_{datetime.now().strftime('%Y%m%d')}.csv"
+            df.to_csv(filename, index=False)
+            logger.info(f"Saved historical data to {filename}")
+        except Exception as e:
+            logger.warning(f"Failed to save data to file: {e}")
+    
+    def load_cached_data_from_file(self, pair: str, interval: str, days: int) -> Optional[pd.DataFrame]:
+        """Load data dari file cache jika masih fresh"""
+        try:
+            # Cari file terbaru
+            pattern = f"historical_data/{pair}_{interval}_*.csv"
+            files = glob.glob(pattern)
+            if not files:
+                return None
+                
+            latest_file = max(files)
+            file_date_str = latest_file.split('_')[-1].replace('.csv', '')
+            file_date = datetime.strptime(file_date_str, '%Y%m%d')
+            
+            # Jika file lebih baru dari 1 hari, gunakan
+            if (datetime.now() - file_date).days <= 1:
+                df = pd.read_csv(latest_file)
+                df['date'] = pd.to_datetime(df['date'])
+                
+                # Filter berdasarkan days yang diminta
+                start_date = datetime.now() - timedelta(days=days)
+                df = df[df['date'] >= start_date]
+                
+                logger.info(f"Loaded cached data from {latest_file} with {len(df)} records")
+                return df
+        except Exception as e:
+            logger.warning(f"Error loading cached data: {e}")
+        
+        return None
+    
+    def get_multiple_pairs_historical_data(self, pairs: List[str], interval: str, days: int) -> Dict[str, pd.DataFrame]:
+        """Ambil data historis untuk multiple pairs secara efisien"""
+        results = {}
+        for pair in pairs:
+            try:
+                # Rate limiting antara requests
+                time.sleep(12)  # 12 detik antara requests untuk free tier (5 requests/min)
+                results[pair] = self.get_historical_data(pair, interval, days)
+            except Exception as e:
+                logger.error(f"Failed to get data for {pair}: {e}")
+                results[pair] = pd.DataFrame()
+        return results
+    
     def _generate_simulated_historical_data(self, pair: str, interval: str, days: int) -> pd.DataFrame:
         """Generate simulated historical data ketika API tidak tersedia"""
         try:
+            # Coba load dari file cache dulu
+            cached_data = self.load_cached_data_from_file(pair, interval, days)
+            if cached_data is not None and not cached_data.empty:
+                return cached_data
+            
             # Tentukan points berdasarkan interval
             intervals_per_day = {
                 'M30': 48, '1H': 24, '4H': 6, '1D': 1, '1W': 1/7
@@ -342,6 +554,10 @@ class AlphaVantageClient:
             
             df = pd.DataFrame(prices)
             logger.info(f"Generated simulated historical data for {pair}-{interval}: {len(df)} records")
+            
+            # Simpan data simulasi ke file untuk cache
+            self._save_data_to_file(df, pair, interval)
+            
             return df
             
         except Exception as e:
@@ -362,10 +578,30 @@ class TwelveDataClient:
         self.cache_timeout = 60
         self.demo_mode = not self.api_key or self.api_key == "demo"
         
+        # Buat session dengan retry mechanism
+        self.session = self._create_session_with_retry()
+        
         if self.demo_mode:
             logger.info("TwelveData running in DEMO mode with simulated real-time prices")
         else:
             logger.info("TwelveData running in LIVE mode with real API data")
+    
+    def _create_session_with_retry(self):
+        """Create requests session dengan retry strategy"""
+        session = requests.Session()
+        
+        retry_strategy = Retry(
+            total=3,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+            backoff_factor=1
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        return session
     
     def get_real_time_price(self, pair: str) -> float:
         """Ambil current price real-time dari TwelveData atau simulasi"""
@@ -387,7 +623,7 @@ class TwelveDataClient:
             url = f"{self.base_url}/price?symbol={formatted_pair}&apikey={self.api_key}"
             
             logger.info(f"Fetching real-time price for {pair} from TwelveData...")
-            response = requests.get(url, timeout=10)
+            response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()
