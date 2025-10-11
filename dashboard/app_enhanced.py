@@ -1,4 +1,4 @@
-# [FILE: app_enhanced.py] - COMPLETE FIXED VERSION
+# [FILE: app_enhanced.py] - ENHANCED VERSION WITH DEEPSEEK, TWELVEDATA, NEWSAPI
 from flask import Flask, request, jsonify, render_template
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -67,10 +67,11 @@ class SystemConfig:
     YAHOO_FINANCE_ENABLED: bool = True
     SIMULATED_DATA_ENABLED: bool = True
     
-    # Optional Premium APIs (if available)
+    # Premium APIs (if available)
     ALPHA_VANTAGE_KEY: str = os.environ.get("ALPHA_VANTAGE_KEY", "demo")
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
     DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
+    NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo")
     
     # Trading Parameters
     INITIAL_BALANCE: float = 10000.0
@@ -84,10 +85,10 @@ class SystemConfig:
     
     # Data source mapping - PRIORITIZE FREE SOURCES
     DATA_SOURCE_PRIORITY: List[str] = field(default_factory=lambda: [
+        'TWELVE_DATA',  # Prioritize TwelveData if available
         'YAHOO_FINANCE',
         'SIMULATED_DATA',
-        'ALPHA_VANTAGE',
-        'TWELVE_DATA'
+        'ALPHA_VANTAGE'
     ])
     
     TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
@@ -321,17 +322,17 @@ class TechnicalAnalysisEngine:
             logger.error(f"Error generating signals: {e}")
             return {'primary': 'HOLD', 'confidence': 50}
 
-# ==================== FREE DATA MANAGER ====================
-class FreeDataManager:
-    """Data manager yang menggunakan sumber data GRATIS"""
+# ==================== ENHANCED DATA MANAGER ====================
+class EnhancedDataManager:
+    """Data manager yang menggunakan sumber data GRATIS dan PREMIUM"""
     
     def __init__(self):
         self.cache = {}
         self.cache_timeout = 300  # 5 minutes
-        logger.info("Free Data Manager initialized")
+        logger.info("Enhanced Data Manager initialized")
 
     def get_price_data(self, pair: str, timeframe: str, days: int = 60) -> pd.DataFrame:
-        """Dapatkan data harga dari sumber gratis"""
+        """Dapatkan data harga dari sumber yang tersedia"""
         try:
             cache_key = f"{pair}_{timeframe}_{days}"
             if cache_key in self.cache:
@@ -339,13 +340,23 @@ class FreeDataManager:
                 if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
                     return data
 
-            # Priority 1: Yahoo Finance (FREE)
-            df = self._get_yahoo_data(pair, timeframe, days)
-            if df is not None and not df.empty:
-                self.cache[cache_key] = (datetime.now(), df)
-                return df
+            # Coba sumber data berdasarkan prioritas
+            for source in config.DATA_SOURCE_PRIORITY:
+                df = None
+                if source == 'TWELVE_DATA' and config.TWELVE_DATA_KEY != "demo":
+                    df = self._get_twelvedata_data(pair, timeframe, days)
+                elif source == 'YAHOO_FINANCE':
+                    df = self._get_yahoo_data(pair, timeframe, days)
+                elif source == 'ALPHA_VANTAGE' and config.ALPHA_VANTAGE_KEY != "demo":
+                    df = self._get_alphavantage_data(pair, timeframe, days)
+                elif source == 'SIMULATED_DATA':
+                    df = self._generate_simulated_data(pair, timeframe, days)
+                
+                if df is not None and not df.empty:
+                    self.cache[cache_key] = (datetime.now(), df)
+                    return df
 
-            # Priority 2: Simulated Data (FALLBACK)
+            # Fallback ke simulated data
             df = self._generate_simulated_data(pair, timeframe, days)
             self.cache[cache_key] = (datetime.now(), df)
             return df
@@ -353,6 +364,91 @@ class FreeDataManager:
         except Exception as e:
             logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
             return self._generate_simulated_data(pair, timeframe, days)
+
+    def _get_twelvedata_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Dapatkan data dari Twelve Data (PREMIUM)"""
+        try:
+            # Convert pair to TwelveData format
+            symbol = self._convert_to_twelvedata_symbol(pair)
+            if not symbol:
+                return None
+
+            # Convert timeframe
+            interval = self._convert_to_twelvedata_interval(timeframe)
+            if not interval:
+                return None
+
+            # Calculate start and end dates
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+
+            url = "https://api.twelvedata.com/time_series"
+            params = {
+                'symbol': symbol,
+                'interval': interval,
+                'start_date': start_date.strftime('%Y-%m-%d'),
+                'end_date': end_date.strftime('%Y-%m-%d'),
+                'apikey': config.TWELVE_DATA_KEY
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                return None
+
+            data = response.json()
+            if 'values' not in data:
+                return None
+
+            # Convert to DataFrame
+            df = pd.DataFrame(data['values'])
+            df = df.iloc[::-1].reset_index(drop=True)  # Reverse to chronological order
+
+            # Rename columns
+            df = df.rename(columns={
+                'datetime': 'date',
+                'open': 'open',
+                'high': 'high',
+                'low': 'low',
+                'close': 'close',
+                'volume': 'volume'
+            })
+
+            # Convert types
+            df['date'] = pd.to_datetime(df['date'])
+            for col in ['open', 'high', 'low', 'close', 'volume']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            df = df.dropna()
+
+            if len(df) < 20:
+                return None
+
+            logger.info(f"TwelveData data for {pair}-{timeframe}: {len(df)} records")
+            return df
+
+        except Exception as e:
+            logger.warning(f"TwelveData failed for {pair}: {e}")
+            return None
+
+    def _convert_to_twelvedata_symbol(self, pair: str) -> str:
+        """Convert forex pair to TwelveData symbol"""
+        # TwelveData uses format like "USD/JPY"
+        if len(pair) != 6:
+            return None
+        base = pair[:3]
+        quote = pair[3:]
+        return f"{base}/{quote}"
+
+    def _convert_to_twelvedata_interval(self, timeframe: str) -> str:
+        """Convert timeframe to TwelveData interval"""
+        intervals = {
+            'M30': '30min',
+            '1H': '1h',
+            '4H': '4h',
+            '1D': '1day',
+            '1W': '1week'
+        }
+        return intervals.get(timeframe)
 
     def _get_yahoo_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
         """Dapatkan data dari Yahoo Finance (GRATIS)"""
@@ -420,6 +516,11 @@ class FreeDataManager:
         }
         return intervals.get(timeframe, '1h')
 
+    def _get_alphavantage_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Dapatkan data dari Alpha Vantage (PREMIUM)"""
+        # Implementasi Alpha Vantage bisa ditambahkan di sini
+        return None
+
     def _generate_simulated_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
         """Generate realistic simulated data sebagai fallback"""
         # Base price for different pairs
@@ -476,8 +577,15 @@ class FreeDataManager:
         return df
 
     def get_real_time_price(self, pair: str) -> float:
-        """Get real-time price dari Yahoo Finance"""
+        """Get real-time price dari sumber terbaik"""
         try:
+            # Coba TwelveData dulu
+            if config.TWELVE_DATA_KEY != "demo":
+                price = self._get_twelvedata_realtime(pair)
+                if price:
+                    return price
+
+            # Fallback ke Yahoo Finance
             yahoo_symbol = self._convert_to_yahoo_symbol(pair)
             ticker = yf.Ticker(yahoo_symbol)
             data = ticker.history(period='1d', interval='1m')
@@ -488,6 +596,29 @@ class FreeDataManager:
         
         # Fallback to simulated price
         return self._get_simulated_price(pair)
+
+    def _get_twelvedata_realtime(self, pair: str) -> float:
+        """Get real-time price dari TwelveData"""
+        try:
+            symbol = self._convert_to_twelvedata_symbol(pair)
+            if not symbol:
+                return None
+
+            url = "https://api.twelvedata.com/price"
+            params = {
+                'symbol': symbol,
+                'apikey': config.TWELVE_DATA_KEY
+            }
+
+            response = requests.get(url, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                return float(data['price'])
+            else:
+                return None
+        except Exception as e:
+            logger.warning(f"TwelveData real-time failed for {pair}: {e}")
+            return None
 
     def _get_simulated_price(self, pair: str) -> float:
         """Get simulated real-time price"""
@@ -539,11 +670,135 @@ class EnhancedAIAnalyzer:
             return None
             
         try:
-            # Simulate API call (replace with actual implementation)
-            return None
+            # Siapkan prompt untuk DeepSeek
+            prompt = self._create_deepseek_prompt(pair, technical, fundamental)
+            
+            # Panggil API DeepSeek
+            headers = {
+                'Authorization': f'Bearer {config.DEEPSEEK_API_KEY}',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                'model': 'deepseek-chat',
+                'messages': [
+                    {
+                        'role': 'system',
+                        'content': 'Anda adalah analis pasar forex yang ahli. Berikan analisis teknis dan rekomendasi trading berdasarkan data yang diberikan.'
+                    },
+                    {
+                        'role': 'user',
+                        'content': prompt
+                    }
+                ],
+                'max_tokens': 1000,
+                'temperature': 0.7
+            }
+            
+            response = requests.post(
+                'https://api.deepseek.com/v1/chat/completions',
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"DeepSeek API returned status {response.status_code}")
+                return None
+                
+            result = response.json()
+            analysis_text = result['choices'][0]['message']['content']
+            
+            # Parse response (sederhana)
+            return self._parse_deepseek_response(analysis_text, technical)
+            
         except Exception as e:
             logger.warning(f"DeepSeek analysis failed: {e}")
             return None
+
+    def _create_deepseek_prompt(self, pair: str, technical: Dict, fundamental: Dict) -> str:
+        """Buat prompt untuk DeepSeek"""
+        trend = technical.get('trend', {})
+        momentum = technical.get('momentum', {})
+        levels = technical.get('levels', {})
+        
+        prompt = f"""
+        Analisis pair forex {pair} dengan kondisi berikut:
+        
+        TREND:
+        - Arah: {trend.get('direction', 'NEUTRAL')}
+        - Kekuatan: {trend.get('strength', 50)}
+        - SMA 20: {trend.get('sma_20', 0)}
+        - SMA 50: {trend.get('sma_50', 0)}
+        
+        MOMENTUM:
+        - RSI: {momentum.get('rsi', 50)}
+        - MACD: {momentum.get('macd', 0)}
+        - Signal: {momentum.get('signal', 0)}
+        - Histogram: {momentum.get('histogram', 0)}
+        
+        LEVELS:
+        - Support: {levels.get('support', 0)}
+        - Resistance: {levels.get('resistance', 0)}
+        - Pivot: {levels.get('pivot', 0)}
+        - Harga Sekarang: {levels.get('current_price', 0)}
+        
+        VOLATILITY:
+        - ATR: {technical.get('volatility', {}).get('atr', 0)}
+        - Klasifikasi Volatilitas: {technical.get('volatility', {}).get('volatility_class', 'MEDIUM')}
+        
+        Berikan analisis teknis dan rekomendasi trading dalam format JSON dengan keys:
+        - signal (BUY/SELL/HOLD)
+        - confidence (0-100)
+        - reasoning (penjelasan analisis)
+        - key_levels (entry, stop_loss, take_profit, take_profit_2)
+        - risk_rating (LOW/MEDIUM/HIGH)
+        - timeframe (rekomendasi timeframe trading)
+        """
+        
+        return prompt
+
+    def _parse_deepseek_response(self, analysis_text: str, technical: Dict) -> Dict[str, Any]:
+        """Parse response dari DeepSeek"""
+        try:
+            # Coba parse JSON dari response
+            lines = analysis_text.strip().split('\n')
+            json_str = None
+            for line in lines:
+                if line.strip().startswith('{') and line.strip().endswith('}'):
+                    json_str = line.strip()
+                    break
+            
+            if json_str:
+                analysis = json.loads(json_str)
+            else:
+                # Jika tidak ada JSON, gunakan rule-based
+                return self._rule_based_analysis("", technical, {})
+            
+            # Validasi analysis
+            required_keys = ['signal', 'confidence', 'reasoning']
+            if all(key in analysis for key in required_keys):
+                return {
+                    'signal': analysis['signal'],
+                    'confidence': analysis['confidence'],
+                    'reasoning': analysis['reasoning'],
+                    'key_levels': analysis.get('key_levels', {
+                        'entry': 0,
+                        'stop_loss': 0,
+                        'take_profit': 0,
+                        'take_profit_2': 0
+                    }),
+                    'risk_rating': analysis.get('risk_rating', 'MEDIUM'),
+                    'timeframe': analysis.get('timeframe', '4H'),
+                    'ai_provider': 'DeepSeek',
+                    'timestamp': datetime.now().isoformat()
+                }
+            else:
+                return self._rule_based_analysis("", technical, {})
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse DeepSeek response: {e}")
+            return self._rule_based_analysis("", technical, {})
 
     def _rule_based_analysis(self, pair: str, technical: Dict, fundamental: Dict) -> Dict[str, Any]:
         """Rule-based AI analysis sebagai fallback"""
@@ -623,12 +878,138 @@ class EnhancedAIAnalyzer:
             'timestamp': datetime.now().isoformat()
         }
 
+# ==================== NEWS ANALYZER ====================
+class NewsAnalyzer:
+    """Analyzer for news sentiment"""
+    
+    def __init__(self):
+        self.cache = {}
+        self.cache_timeout = 1800  # 30 minutes
+        
+    def get_news_sentiment(self, pair: str) -> Dict[str, Any]:
+        """Get news sentiment for a currency pair"""
+        try:
+            cache_key = f"news_{pair}"
+            if cache_key in self.cache:
+                cached_time, news_data = self.cache[cache_key]
+                if datetime.now() - cached_time < timedelta(seconds=self.cache_timeout):
+                    return news_data
+
+            # Jika tidak ada API key, return default
+            if not config.NEWS_API_KEY or config.NEWS_API_KEY == "demo":
+                return self._get_default_news_sentiment(pair)
+
+            # Dapatkan berita
+            news_articles = self._fetch_news(pair)
+            sentiment = self._analyze_sentiment(news_articles)
+            
+            news_data = {
+                'sentiment': sentiment,
+                'articles': news_articles,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.cache[cache_key] = (datetime.now(), news_data)
+            return news_data
+            
+        except Exception as e:
+            logger.error(f"News analysis failed for {pair}: {e}")
+            return self._get_default_news_sentiment(pair)
+
+    def _fetch_news(self, pair: str) -> List[Dict]:
+        """Fetch news articles for the currency pair"""
+        try:
+            # Convert pair to currencies
+            base_currency = pair[:3]
+            quote_currency = pair[3:]
+            
+            # Query for both currencies
+            query = f"{base_currency} OR {quote_currency} OR forex OR \"foreign exchange\""
+            
+            url = "https://newsapi.org/v2/everything"
+            params = {
+                'q': query,
+                'language': 'en',
+                'sortBy': 'publishedAt',
+                'pageSize': 10,
+                'apiKey': config.NEWS_API_KEY
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                return []
+                
+            data = response.json()
+            articles = []
+            
+            for article in data.get('articles', []):
+                articles.append({
+                    'title': article.get('title', ''),
+                    'description': article.get('description', ''),
+                    'url': article.get('url', ''),
+                    'publishedAt': article.get('publishedAt', ''),
+                    'source': article.get('source', {}).get('name', '')
+                })
+                
+            return articles
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch news: {e}")
+            return []
+
+    def _analyze_sentiment(self, articles: List[Dict]) -> Dict[str, float]:
+        """Analyze sentiment from news articles"""
+        if not articles:
+            return {'positive': 0, 'negative': 0, 'neutral': 1}
+        
+        # Simple keyword-based sentiment analysis
+        positive_keywords = ['bullish', 'rise', 'gain', 'up', 'strong', 'buy', 'positive']
+        negative_keywords = ['bearish', 'fall', 'drop', 'down', 'weak', 'sell', 'negative']
+        
+        positive_count = 0
+        negative_count = 0
+        neutral_count = 0
+        
+        for article in articles:
+            title = article.get('title', '').lower()
+            description = article.get('description', '').lower()
+            text = title + " " + description
+            
+            positive_matches = sum(1 for keyword in positive_keywords if keyword in text)
+            negative_matches = sum(1 for keyword in negative_keywords if keyword in text)
+            
+            if positive_matches > negative_matches:
+                positive_count += 1
+            elif negative_matches > positive_matches:
+                negative_count += 1
+            else:
+                neutral_count += 1
+        
+        total = len(articles)
+        if total == 0:
+            return {'positive': 0, 'negative': 0, 'neutral': 1}
+        
+        return {
+            'positive': positive_count / total,
+            'negative': negative_count / total,
+            'neutral': neutral_count / total
+        }
+
+    def _get_default_news_sentiment(self, pair: str) -> Dict[str, Any]:
+        """Return default news sentiment when news API is not available"""
+        return {
+            'sentiment': {'positive': 0.3, 'negative': 0.2, 'neutral': 0.5},
+            'articles': [],
+            'timestamp': datetime.now().isoformat()
+        }
+
 # ==================== INITIALIZE COMPONENTS ====================
 logger.info("Initializing ENHANCED Forex Trading System...")
 
 tech_engine = TechnicalAnalysisEngine()
-data_manager = FreeDataManager()
+data_manager = EnhancedDataManager()
 ai_analyzer = EnhancedAIAnalyzer()
+news_analyzer = NewsAnalyzer()
 
 # Initialize limiter AFTER app is created
 limiter = Limiter(
@@ -674,6 +1055,9 @@ def api_analyze():
         technical_analysis = tech_engine.calculate_all_indicators(price_data)
         technical_analysis['levels']['current_price'] = real_time_price
         
+        # News analysis
+        news_analysis = news_analyzer.get_news_sentiment(pair)
+        
         # AI analysis
         ai_analysis = ai_analyzer.analyze_market(pair, technical_analysis, {})
         
@@ -681,7 +1065,7 @@ def api_analyze():
         price_series = _prepare_price_series(price_data)
         
         # Risk assessment
-        risk_assessment = _calculate_risk_assessment(technical_analysis, ai_analysis)
+        risk_assessment = _calculate_risk_assessment(technical_analysis, ai_analysis, news_analysis)
         
         response = {
             'pair': pair,
@@ -689,6 +1073,7 @@ def api_analyze():
             'timestamp': datetime.now().isoformat(),
             'technical_analysis': technical_analysis,
             'ai_analysis': ai_analysis,
+            'news_analysis': news_analysis,
             'risk_assessment': risk_assessment,
             'price_data': {
                 'current': real_time_price,
@@ -732,12 +1117,13 @@ def _prepare_price_series(price_data):
         logger.error(f"Error preparing price series: {e}")
         return []
 
-def _calculate_risk_assessment(technical_analysis, ai_analysis):
+def _calculate_risk_assessment(technical_analysis, ai_analysis, news_analysis):
     """Calculate risk assessment"""
     try:
         volatility = technical_analysis.get('volatility', {}).get('volatility_class', 'MEDIUM')
         confidence = ai_analysis.get('confidence', 50)
         signal = ai_analysis.get('signal', 'HOLD')
+        news_sentiment = news_analysis.get('sentiment', {})
         
         risk_score = 50
         if volatility == 'HIGH':
@@ -752,6 +1138,12 @@ def _calculate_risk_assessment(technical_analysis, ai_analysis):
             
         if signal == 'HOLD':
             risk_score = 50
+            
+        # Adjust for news sentiment
+        if news_sentiment.get('negative', 0) > 0.5:
+            risk_score += 10
+        elif news_sentiment.get('positive', 0) > 0.5:
+            risk_score -= 5
             
         risk_score = max(0, min(100, risk_score))
         
@@ -768,12 +1160,38 @@ def _calculate_risk_assessment(technical_analysis, ai_analysis):
             'factors': {
                 'volatility': volatility,
                 'signal_confidence': confidence,
-                'signal': signal
+                'signal': signal,
+                'news_sentiment': news_sentiment
             }
         }
     except Exception as e:
         logger.error(f"Error calculating risk assessment: {e}")
         return {'risk_score': 50, 'risk_rating': 'MEDIUM', 'factors': {}}
+
+@app.route('/api/news')
+@limiter.limit("60 per hour")
+def api_news():
+    """Get news for a currency pair"""
+    try:
+        pair = request.args.get('pair', 'USDJPY').upper()
+        
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        news_analysis = news_analyzer.get_news_sentiment(pair)
+        
+        return jsonify({
+            'pair': pair,
+            'news': news_analysis,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"News API error: {e}")
+        return jsonify({
+            'error': 'Failed to fetch news',
+            'message': str(e)
+        }), 500
 
 @app.route('/api/system_status')
 def api_system_status():
@@ -781,14 +1199,16 @@ def api_system_status():
     return jsonify({
         'system': 'RUNNING',
         'timestamp': datetime.now().isoformat(),
-        'version': '6.0',
+        'version': '7.0',
         'features': [
             'Enhanced Technical Analysis',
-            'Free Data Sources', 
-            'Rule-based AI Engine',
+            'Multiple Data Sources (TwelveData, Yahoo Finance, Simulated)', 
+            'DeepSeek AI Analysis',
+            'News Sentiment Analysis',
             'Rate Limiting & Caching'
         ],
-        'data_sources': ['Yahoo Finance', 'Simulated Data'],
+        'data_sources': ['TwelveData', 'Yahoo Finance', 'Simulated Data'],
+        'ai_providers': ['DeepSeek', 'Rule-based Engine'],
         'rate_limits': {
             'per_minute': config.REQUESTS_PER_MINUTE,
             'per_hour': config.REQUESTS_PER_HOUR
@@ -828,9 +1248,10 @@ def ratelimit_handler(e):
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
     logger.info("=== ENHANCED FOREX TRADING SYSTEM ===")
-    logger.info("✓ Free Data Sources: Yahoo Finance + Simulated Data")
+    logger.info("✓ Multiple Data Sources: TwelveData, Yahoo Finance, Simulated Data")
     logger.info("✓ Enhanced Technical Analysis with Caching") 
-    logger.info("✓ Rule-based AI Engine (No API Required)")
+    logger.info("✓ DeepSeek AI Engine + Rule-based Fallback")
+    logger.info("✓ News Sentiment Analysis")
     logger.info("✓ Rate Limiting: 30 requests/minute")
     logger.info("✓ System ready: http://localhost:5000")
     
