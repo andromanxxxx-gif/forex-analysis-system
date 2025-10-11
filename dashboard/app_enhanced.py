@@ -519,14 +519,6 @@ def api_health():
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return jsonify({'status': 'degraded', 'error': str(e)}), 500
-
-# Custom rate limits for different endpoints
-@app.route('/api/health')  
-@limiter.limit("300 per minute")  # Very lenient for health checks
-def api_health():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy"})
-
 # Custom error handler for rate limits
 @app.errorhandler(429)
 def ratelimit_handler(e):
