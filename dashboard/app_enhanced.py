@@ -521,16 +521,6 @@ def api_health():
         return jsonify({'status': 'degraded', 'error': str(e)}), 500
 
 # Custom rate limits for different endpoints
-@app.route('/api/system_status')
-@limiter.limit("120 per minute")  # More lenient for status checks
-def api_system_status():
-    """Endpoint untuk mengecek status sistem"""
-    return jsonify({
-        "status": "running",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
-    })
-
 @app.route('/api/health')  
 @limiter.limit("300 per minute")  # Very lenient for health checks
 def api_health():
