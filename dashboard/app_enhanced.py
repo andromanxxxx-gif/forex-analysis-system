@@ -394,6 +394,14 @@ tech_engine = TechnicalAnalysisEngine()
 data_manager = FreeDataManager()
 ai_analyzer = EnhancedAIAnalyzer()
 
+
+# Initialize limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "100 per hour", "30 per minute"],
+    storage_uri="memory://",
+)
 # ==================== ENHANCED FLASK ROUTES ====================
 @app.route('/')
 def index():
@@ -554,10 +562,3 @@ if __name__ == '__main__':
     
  app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
 
-# Initialize limiter
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "100 per hour", "30 per minute"],
-    storage_uri="memory://",
-)
