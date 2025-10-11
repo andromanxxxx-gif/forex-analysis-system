@@ -512,25 +512,6 @@ def api_health():
         logger.error(f"Health check error: {e}")
         return jsonify({'status': 'degraded', 'error': str(e)}), 500
 
-# ==================== RUN APPLICATION ====================
-if __name__ == '__main__':
-    logger.info("=== ENHANCED FOREX TRADING SYSTEM ===")
-    logger.info("✓ Free Data Sources: Yahoo Finance + Simulated Data")
-    logger.info("✓ Enhanced Technical Analysis with Caching") 
-    logger.info("✓ Rule-based AI Engine (No API Required)")
-    logger.info("✓ Rate Limiting: 30 requests/minute")
-    logger.info("✓ System ready: http://localhost:5000")
-    
- app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
-
-# Initialize limiter
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "100 per hour", "30 per minute"],
-    storage_uri="memory://",
-)
-
 # Custom rate limits for different endpoints
 @app.route('/api/analyze')
 @limiter.limit("60 per minute")  # Increased from 30 to 60
@@ -562,3 +543,21 @@ def ratelimit_handler(e):
         'message': 'Too many requests. Please slow down.',
         'retry_after': e.description.split(' ')[-1] if e.description else '60'
     }), 429
+# ==================== RUN APPLICATION ====================
+if __name__ == '__main__':
+    logger.info("=== ENHANCED FOREX TRADING SYSTEM ===")
+    logger.info("✓ Free Data Sources: Yahoo Finance + Simulated Data")
+    logger.info("✓ Enhanced Technical Analysis with Caching") 
+    logger.info("✓ Rule-based AI Engine (No API Required)")
+    logger.info("✓ Rate Limiting: 30 requests/minute")
+    logger.info("✓ System ready: http://localhost:5000")
+    
+ app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+
+# Initialize limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "100 per hour", "30 per minute"],
+    storage_uri="memory://",
+)
