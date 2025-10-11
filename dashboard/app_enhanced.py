@@ -521,7 +521,8 @@ if __name__ == '__main__':
     logger.info("✓ Rate Limiting: 30 requests/minute")
     logger.info("✓ System ready: http://localhost:5000")
     
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+ app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+
 # Initialize limiter
 limiter = Limiter(
     app=app,
@@ -535,16 +536,23 @@ limiter = Limiter(
 @limiter.limit("60 per minute")  # Increased from 30 to 60
 def api_analyze():
     # ... existing code
+    return jsonify({"status": "analysis complete"})  # Contoh return
 
 @app.route('/api/system_status')
 @limiter.limit("120 per minute")  # More lenient for status checks
 def api_system_status():
-    # ... existing code
+    """Endpoint untuk mengecek status sistem"""
+    return jsonify({
+        "status": "running",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0"
+    })
 
 @app.route('/api/health')  
 @limiter.limit("300 per minute")  # Very lenient for health checks
 def api_health():
-    # ... existing code
+    """Health check endpoint"""
+    return jsonify({"status": "healthy"})
 
 # Custom error handler for rate limits
 @app.errorhandler(429)
