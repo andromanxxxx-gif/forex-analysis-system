@@ -1,1854 +1,465 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ANDRO-FX Precision Forex Trading</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Analysis System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
 
-  <style>
-    :root {
-      --primary-blue: #1e40af;
-      --success-green: #059669;
-      --danger-red: #dc2626;
-      --warning-orange: #d97706;
-    }
-    
-    body {
-      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    }
-    
-    .dashboard-header {
-      background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
-      color: white;
-      padding: 1.5rem 0;
-      margin-bottom: 2rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    
-    .card {
-      border: none;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-      margin-bottom: 1.5rem;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-    
-    .card-header {
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-      border-bottom: 1px solid #e2e8f0;
-      font-weight: 600;
-      color: #1e293b;
-      padding: 1rem 1.25rem;
-    }
-    
-    .metric-card {
-      background: white;
-      padding: 1rem;
-      border-radius: 8px;
-      border-left: 4px solid var(--primary-blue);
-      margin-bottom: 1rem;
-    }
-    
-    .metric-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1e293b;
-    }
-    
-    .small-muted {
-      font-size: 0.875rem;
-      color: #64748b;
-      font-weight: 500;
-    }
-    
-    .price-change {
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-    
-    .change-positive {
-      color: var(--success-green);
-    }
-    
-    .change-negative {
-      color: var(--danger-red);
-    }
-    
-    .ai-signal-buy {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      padding: 0.5rem 1rem;
-      border-radius: 25px;
-      font-weight: 700;
-      text-align: center;
-    }
-    
-    .ai-signal-sell {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-      color: white;
-      padding: 0.5rem 1rem;
-      border-radius: 25px;
-      font-weight: 700;
-      text-align: center;
-    }
-    
-    .ai-signal-hold {
-      background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
-      color: white;
-      padding: 0.5rem 1rem;
-      border-radius: 25px;
-      font-weight: 700;
-      text-align: center;
-    }
-    
-    .status-indicator {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 0.5rem;
-    }
-    
-    .status-live {
-      background-color: #10b981;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
-      animation: pulse 2s infinite;
-    }
-    
-    .status-offline {
-      background-color: #ef4444;
-    }
-    
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-    
-    .risk-factor-card {
-      display: flex;
-      align-items: center;
-      padding: 0.75rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      font-size: 0.875rem;
-    }
-    
-    .risk-factor-card.low {
-      background: #f0fdf4;
-      border-left: 3px solid #10b981;
-    }
-    
-    .risk-factor-card.medium {
-      background: #fffbeb;
-      border-left: 3px solid #f59e0b;
-    }
-    
-    .risk-factor-card.high {
-      background: #fef2f2;
-      border-left: 3px solid #ef4444;
-    }
-    
-    .chart-container {
-      background: white;
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    
-    .control-panel {
-      background: white;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary-blue) 0%, #3730a3 100%);
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      padding: 0.75rem 1.5rem;
-    }
-    
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
-    }
-    
-    .loading-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      border-radius: 12px;
-    }
-    
-    .realtime-indicator {
-      background: #10b981;
-      color: white;
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    
-    .performance-grade {
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-      font-weight: 700;
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
-    }
-    
-    .grade-a { background: #f0fdf4; color: #059669; border: 2px solid #10b981; }
-    .grade-b { background: #fffbeb; color: #d97706; border: 2px solid #f59e0b; }
-    .grade-c { background: #fef3c7; color: #b45309; border: 2px solid #f59e0b; }
-    .grade-d { background: #fef2f2; color: #dc2626; border: 2px solid #ef4444; }
-    
-    .api-status {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      background: #f1f5f9;
-    }
-    
-    .api-status.good {
-      background: #f0fdf4;
-      color: #059669;
-    }
-    
-    .api-status.warning {
-      background: #fffbeb;
-      color: #d97706;
-    }
-    
-    .api-status.critical {
-      background: #fef2f2;
-      color: #dc2626;
-    }
-  </style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        select, button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select {
+            background: white;
+            border: 2px solid #e2e8f0;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: bold;
+            min-width: 120px;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        .result-item {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-item h4 {
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .result-item p {
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-operational {
+            background: #48bb78;
+        }
+
+        .status-warning {
+            background: #ed8936;
+        }
+
+        .status-error {
+            background: #f56565;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); }
+            40% { color: #667eea; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); }
+            60% { text-shadow: .25em 0 0 #667eea, .5em 0 0 rgba(0,0,0,0); }
+            80%, 100% { text-shadow: .25em 0 0 #667eea, .5em 0 0 #667eea; }
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #c6f6d5;
+            color: #2f855a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .signal-buy {
+            border-left-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        .signal-sell {
+            border-left-color: #f56565;
+            background: #fff5f5;
+        }
+
+        .signal-hold {
+            border-left-color: #ed8936;
+            background: #fffaf0;
+        }
+
+        .technical-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .tech-item {
+            background: #edf2f7;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .tech-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #2d3748;
+        }
+
+        .tech-label {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 5px;
+        }
+    </style>
 </head>
 <body>
-
-<!-- Dashboard Header -->
-<div class="dashboard-header">
-  <div class="container">
-    <div class="row align-items-center">
-      <div class="col-md-6">
-        <h1 class="h3 mb-1">
-          <i class="fas fa-chart-line me-2"></i>
-          ANDRO-FX Precision Trading
-        </h1>
-        <p class="mb-0 opacity-75">Advanced AI-Powered Forex Analysis System</p>
-      </div>
-      <div class="col-md-6 text-md-end">
-        <div class="d-flex align-items-center justify-content-md-end gap-3">
-          <div class="d-flex align-items-center">
-            <span class="status-indicator status-live" id="statusIndicator"></span>
-            <span class="text-white">System Live</span>
-          </div>
-          <span class="realtime-indicator" id="realtimeIndicator" style="display: none;">
-            <i class="fas fa-bolt"></i> REAL-TIME
-          </span>
-          <span class="api-status good" id="apiStatus">API: Optimal</span>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Forex Analysis System</h1>
+            <p>Real-time technical analysis and market insights</p>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="container">
-  <!-- Control Panel -->
-  <div class="control-panel">
-    <div class="row align-items-center">
-      <div class="col-md-3">
-        <label class="form-label fw-semibold">Currency Pair</label>
-        <select class="form-select" id="pairSelect">
-          <option value="USDJPY">USD/JPY</option>
-          <option value="EURUSD">EUR/USD</option>
-          <option value="GBPUSD">GBP/USD</option>
-          <option value="USDCHF">USD/CHF</option>
-          <option value="AUDUSD">AUD/USD</option>
-          <option value="USDCAD">USD/CAD</option>
-          <option value="NZDUSD">NZD/USD</option>
-          <option value="EURJPY">EUR/JPY</option>
-          <option value="GBPJPY">GBP/JPY</option>
-          <option value="CHFJPY">CHF/JPY</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold">Timeframe</label>
-        <select class="form-select" id="timeframeSelect">
-          <option value="M30">30 Minutes</option>
-          <option value="1H">1 Hour</option>
-          <option value="4H" selected>4 Hours</option>
-          <option value="1D">Daily</option>
-          <option value="1W">Weekly</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">Live Price</label>
-        <div class="d-flex align-items-center">
-          <span class="fs-3 fw-bold text-primary me-2" id="livePrice">-</span>
-          <span class="price-change" id="pairChange">(0.00%)</span>
-        </div>
-        <div class="small-muted" id="selectedPair">USDJPY – Loading...</div>
-        <div class="small-muted" id="updateInfo">Next update: <span id="nextUpdateTime">-</span></div>
-      </div>
-      <div class="col-md-2">
-        <button class="btn btn-primary w-100" id="analyzeBtn">
-          <i class="fas fa-sync-alt me-2"></i>Analyze
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="row">
-    <!-- Left Column: Charts -->
-    <div class="col-lg-8">
-      <!-- Main Price Chart -->
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Price Chart with EMA</span>
-          <div>
-            <span class="small-muted me-2" id="currentPrice">Current: -</span>
-            <span class="badge bg-secondary" id="chartDataInfo">0 bars</span>
-          </div>
-        </div>
-        <div class="card-body position-relative p-0">
-          <div id="chartRoot"></div>
-          <div class="loading-overlay" id="chartLoading" style="display: none;">
-            <div class="text-center">
-              <div class="spinner-border text-primary mb-2" role="status"></div>
-              <div>Loading chart data...</div>
+        <div class="dashboard">
+            <!-- Analysis Card -->
+            <div class="card">
+                <h2>Market Analysis</h2>
+                <div class="controls">
+                    <select id="currencyPair">
+                        <option value="USDJPY">USD/JPY</option>
+                        <option value="EURJPY">EUR/JPY</option>
+                        <option value="GBPJPY">GBP/JPY</option>
+                        <option value="CHFJPY">CHF/JPY</option>
+                        <option value="EURUSD">EUR/USD</option>
+                        <option value="GBPUSD">GBP/USD</option>
+                        <option value="USDCHF">USD/CHF</option>
+                        <option value="AUDUSD">AUD/USD</option>
+                        <option value="USDCAD">USD/CAD</option>
+                        <option value="NZDUSD">NZD/USD</option>
+                    </select>
+                    <select id="timeframe">
+                        <option value="M30">30 Minutes</option>
+                        <option value="1H">1 Hour</option>
+                        <option value="4H" selected>4 Hours</option>
+                        <option value="1D">1 Day</option>
+                        <option value="1W">1 Week</option>
+                    </select>
+                    <button id="analyzeBtn" onclick="analyzeMarket()">Analyze</button>
+                </div>
+                <div id="analysisResults" class="results">
+                    <div class="loading" id="loading" style="display: none;">Analyzing Market Data</div>
+                    <div id="resultsContent"></div>
+                </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- MACD Chart -->
-      <div class="card">
-        <div class="card-header">MACD Indicator</div>
-        <div class="card-body p-0">
-          <div id="macdRoot"></div>
+            <!-- System Status Card -->
+            <div class="card">
+                <h2>System Status</h2>
+                <div id="systemStatus">
+                    <div class="loading">Checking system status</div>
+                </div>
+            </div>
         </div>
-      </div>
+
+        <!-- Technical Analysis Details Card -->
+        <div class="card" id="technicalDetails" style="display: none;">
+            <h2>Technical Analysis Details</h2>
+            <div id="technicalContent"></div>
+        </div>
+
+        <!-- Additional Info Card -->
+        <div class="card">
+            <h2>About This System</h2>
+            <div class="result-item">
+                <h4>🚀 Features</h4>
+                <p>• Real-time technical analysis using Yahoo Finance<br>
+                   • Multiple currency pairs support<br>
+                   • Various timeframe analysis (30min to 1 Week)<br>
+                   • Advanced indicators: RSI, MACD, Moving Averages<br>
+                   • AI-powered trading signals<br>
+                   • Rate-limited API protection</p>
+            </div>
+            <div class="result-item">
+                <h4>🔧 Technical Stack</h4>
+                <p>• Backend: Flask Python with rate limiting<br>
+                   • Data: Yahoo Finance API + Fallback simulation<br>
+                   • Analysis: TA-Lib technical indicators<br>
+                   • Frontend: Pure HTML/CSS/JavaScript<br>
+                   • Caching: Flask-Caching for performance</p>
+            </div>
+        </div>
     </div>
 
-    <!-- Right Column: Analysis Panels -->
-    <div class="col-lg-4">
-      <!-- AI Analysis Panel -->
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>AI Trading Signal</span>
-          <span class="badge bg-primary" id="aiProvider">DeepSeek AI</span>
-        </div>
-        <div class="card-body">
-          <div class="text-center mb-3">
-            <div id="aiSignalBadge" class="ai-signal-hold">HOLD</div>
-          </div>
-          
-          <div class="mb-3">
-            <div class="small-muted">AI Analysis</div>
-            <div id="aiSummary" class="fw-semibold">Waiting for analysis...</div>
-          </div>
-          
-          <div class="row">
-            <div class="col-6">
-              <div class="small-muted">Confidence</div>
-              <div id="aiConfidence" class="fw-bold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">Risk Level</div>
-              <div id="aiRisk" class="fw-bold">-</div>
-            </div>
-          </div>
-          
-          <hr>
-          
-          <div class="small-muted mb-2">Trading Levels</div>
-          <div class="row g-2">
-            <div class="col-6">
-              <div class="small-muted">Entry</div>
-              <div id="aiEntry" class="fw-semibold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">Stop Loss</div>
-              <div id="aiSL" class="fw-semibold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">Take Profit 1</div>
-              <div id="aiTP1" class="fw-semibold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">Take Profit 2</div>
-              <div id="aiTP2" class="fw-semibold">-</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <script>
+        // Initialize system status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSystemStatus();
+        });
 
-      <!-- Risk Assessment Panel -->
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Risk Assessment</span>
-          <span class="badge bg-secondary" id="riskScoreBadge">Score: 0/100</span>
-        </div>
-        <div class="card-body">
-          <div id="riskStatus" class="p-3 rounded mb-3 text-center">
-            <div class="risk-icon mb-2">
-              <i class="fas fa-clock text-warning fa-2x"></i>
-            </div>
-            <div class="fw-bold fs-5" id="riskMainStatus">ANALYZING</div>
-            <div class="small-muted" id="riskSubStatus">Calculating risk factors...</div>
-          </div>
-          
-          <div class="mb-3">
-            <div class="d-flex justify-content-between small-muted mb-1">
-              <span>Risk Meter</span>
-              <span id="riskLevelText">LOW</span>
-            </div>
-            <div class="progress" style="height: 8px;">
-              <div id="riskMeterFill" class="progress-bar bg-success" style="width: 0%"></div>
-            </div>
-          </div>
-          
-          <div id="riskDetails" style="display: none;">
-            <div class="small-muted mb-2">Risk Factors</div>
-            <div class="row g-2" id="riskFactorsContainer">
-              <!-- Risk factors will be populated here -->
-            </div>
-          </div>
-        </div>
-      </div>
+        async function analyzeMarket() {
+            const pair = document.getElementById('currencyPair').value;
+            const timeframe = document.getElementById('timeframe').value;
+            const button = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const resultsContent = document.getElementById('resultsContent');
+            const technicalDetails = document.getElementById('technicalDetails');
+            const technicalContent = document.getElementById('technicalContent');
 
-      <!-- Technical Indicators -->
-      <div class="card">
-        <div class="card-header">Technical Indicators</div>
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-6">
-              <div class="small-muted">RSI (14)</div>
-              <div id="rsiVal" class="fw-bold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">MACD</div>
-              <div id="macdVal" class="fw-bold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">MACD Hist</div>
-              <div id="macdHistVal" class="fw-bold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">ADX</div>
-              <div id="adxVal" class="fw-bold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">ATR</div>
-              <div id="atrVal" class="fw-bold">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">Volatility</div>
-              <div id="volVal" class="fw-bold">-</div>
-            </div>
-            <div class="col-12">
-              <div class="small-muted">Trend Direction</div>
-              <div id="trendVal" class="fw-bold">-</div>
-            </div>
-          </div>
-        </div>
-      </div>
+            // Show loading, hide previous results
+            loading.style.display = 'block';
+            resultsContent.innerHTML = '';
+            technicalDetails.style.display = 'none';
+            button.disabled = true;
+            button.textContent = 'Analyzing...';
 
-      <!-- Support & Resistance -->
-      <div class="card">
-        <div class="card-header">Support & Resistance</div>
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-6">
-              <div class="small-muted">Support</div>
-              <div id="supportLevel" class="fw-bold text-success">-</div>
-              <div class="small-muted" id="supportDistance">-</div>
-            </div>
-            <div class="col-6">
-              <div class="small-muted">Resistance</div>
-              <div id="resistanceLevel" class="fw-bold text-danger">-</div>
-              <div class="small-muted" id="resistanceDistance">-</div>
-            </div>
-          </div>
-          <hr>
-          <div class="small-muted mb-2">Pivot Points</div>
-          <div class="row g-2">
-            <div class="col-4 text-center">
-              <div class="small-muted">R3</div>
-              <div id="pivotR3" class="fw-semibold small">-</div>
-            </div>
-            <div class="col-4 text-center">
-              <div class="small-muted">R2</div>
-              <div id="pivotR2" class="fw-semibold small">-</div>
-            </div>
-            <div class="col-4 text-center">
-              <div class="small-muted">R1</div>
-              <div id="pivotR1" class="fw-semibold small">-</div>
-            </div>
-            <div class="col-12 text-center my-2">
-              <div class="small-muted">Pivot</div>
-              <div id="pivotPoint" class="fw-bold">-</div>
-            </div>
-            <div class="col-4 text-center">
-              <div class="small-muted">S1</div>
-              <div id="pivotS1" class="fw-semibold small">-</div>
-            </div>
-            <div class="col-4 text-center">
-              <div class="small-muted">S2</div>
-              <div id="pivotS2" class="fw-semibold small">-</div>
-            </div>
-            <div class="col-4 text-center">
-              <div class="small-muted">S3</div>
-              <div id="pivotS3" class="fw-semibold small">-</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+            try {
+                const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
+                const data = await response.json();
 
-  <!-- Action Buttons -->
-  <div class="row mt-3">
-    <div class="col-12 text-center">
-      <button class="btn btn-outline-primary me-2" id="runBacktestBtn">
-        <i class="fas fa-chart-bar me-2"></i>Run Backtest
-      </button>
-      <button class="btn btn-outline-success me-2" id="exportBtn">
-        <i class="fas fa-file-export me-2"></i>Export Analysis
-      </button>
-      <button class="btn btn-outline-info" id="settingsBtn">
-        <i class="fas fa-cog me-2"></i>System Settings
-      </button>
-    </div>
-  </div>
-</div>
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || 'Analysis failed');
+                }
 
-<!-- Backtest Modal -->
-<div class="modal fade" id="backtestModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Strategy Backtesting</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row mb-3">
-          <div class="col-md-6">
-            <label class="form-label">Initial Balance ($)</label>
-            <input type="number" class="form-control" id="initialBalance" value="10000" min="1000" step="1000">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Backtest Period (Days)</label>
-            <input type="number" class="form-control" id="backtestDays" value="90" min="30" max="365">
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-6">
-            <label class="form-label">Strategy Type</label>
-            <select class="form-select" id="backtestType">
-              <option value="TREND_FOLLOWING">Trend Following</option>
-              <option value="MEAN_REVERSION">Mean Reversion</option>
-              <option value="BREAKOUT">Breakout</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Status</label>
-            <div>
-              <span class="badge bg-secondary" id="backtestStatus">Ready</span>
-            </div>
-          </div>
-        </div>
-        <div id="backtestResults">
-          <div class="text-center text-muted py-4">
-            <i class="fas fa-chart-line fa-3x mb-3 opacity-50"></i>
-            <div>Configure parameters and run backtest to see results</div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" id="startBacktestBtn">
-          <i class="fas fa-play me-2"></i>Run Backtest
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+                // Display main results
+                const signalClass = `signal-${data.ai_analysis.signal.toLowerCase()}`;
+                
+                resultsContent.innerHTML = `
+                    <div class="result-item ${signalClass}">
+                        <h4>🎯 ${data.ai_analysis.signal} Signal (${data.ai_analysis.confidence}% Confidence)</h4>
+                        <p><strong>Reason:</strong> ${data.ai_analysis.reasoning}</p>
+                        <p><strong>Current Price:</strong> ${data.price_data.current}</p>
+                        <p><strong>Risk Rating:</strong> ${data.risk_assessment.risk_rating}</p>
+                        <p><strong>AI Provider:</strong> ${data.ai_analysis.ai_provider}</p>
+                    </div>
+                `;
 
-<!-- API Status Modal -->
-<div class="modal fade" id="apiStatusModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">API Usage Status</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row">
-          <div class="col-12">
-            <div class="mb-3">
-              <div class="small-muted">Current Update Interval</div>
-              <div class="fw-bold" id="currentIntervalDisplay">-</div>
-            </div>
-            <div class="mb-3">
-              <div class="small-muted">Estimated Daily API Calls</div>
-              <div class="fw-bold" id="dailyApiCalls">-</div>
-            </div>
-            <div class="mb-3">
-              <div class="small-muted">API Health</div>
-              <div>
-                <span class="badge bg-success" id="apiHealthBadge">Healthy</span>
-              </div>
-            </div>
-            <hr>
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="enableLiveUpdates" checked>
-              <label class="form-check-label" for="enableLiveUpdates">Enable Live Updates</label>
-            </div>
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="aggressiveMode">
-              <label class="form-check-label" for="aggressiveMode">Aggressive Mode (Use with caution)</label>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
+                // Display technical details
+                technicalDetails.style.display = 'block';
+                technicalContent.innerHTML = `
+                    <div class="technical-grid">
+                        <div class="tech-item">
+                            <div class="tech-value">${data.technical_analysis.trend.direction}</div>
+                            <div class="tech-label">Trend</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-value">${data.technical_analysis.momentum.rsi.toFixed(1)}</div>
+                            <div class="tech-label">RSI</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-value">${data.technical_analysis.momentum.macd.toFixed(4)}</div>
+                            <div class="tech-label">MACD</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-value">${data.technical_analysis.volatility.volatility_class}</div>
+                            <div class="tech-label">Volatility</div>
+                        </div>
+                    </div>
+                    <div class="result-item">
+                        <h4>📊 Support & Resistance</h4>
+                        <p><strong>Support:</strong> ${data.technical_analysis.levels.support}</p>
+                        <p><strong>Resistance:</strong> ${data.technical_analysis.levels.resistance}</p>
+                        <p><strong>Pivot:</strong> ${data.technical_analysis.levels.pivot}</p>
+                    </div>
+                    <div class="result-item">
+                        <h4>⚡ Performance Metrics</h4>
+                        <p><strong>Processing Time:</strong> ${data.performance_metrics.processing_time}s</p>
+                        <p><strong>Data Points:</strong> ${data.performance_metrics.data_points}</p>
+                        <p><strong>Cache:</strong> ${data.performance_metrics.cache_status}</p>
+                    </div>
+                `;
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-// ==================== GLOBAL VARIABLES ====================
-// ==================== ENHANCED REQUEST MANAGEMENT ====================
-let currentChartData = [];
-let currentEmaData = [];
-let currentMacdData = { macd: [], signal: [], hist: [] };
-let realtimeCandle = null;
-let isRealtimeMode = false;
-let currentPair = 'USDJPY';
-let currentTimeframe = '4H';
-
-// Enhanced API Optimization Variables
-let liveUpdateInterval = null;
-let isTabActive = true;
-let consecutiveErrors = 0;
-let currentUpdateInterval = 45000; // Start dengan 45 detik (lebih lambat)
-let totalApiCalls = 0;
-let apiCallTimestamps = [];
-let isAggressiveMode = false;
-
-// Request management
-let isAnalyzing = false;
-let pendingAnalysis = false;
-let lastAnalysisTime = 0;
-const ANALYSIS_COOLDOWN = 2000; // 2 detik minimum antara requests
-
-// Enhanced strategy berdasarkan timeframe
-const timeframeUpdateStrategy = {
-    'M30': 30000,    // 30 detik
-    '1H': 45000,     // 45 detik  
-    '4H': 60000,     // 60 detik
-    '1D': 120000,    // 2 menit
-    '1W': 300000     // 5 menit
-};
-
-// ==================== ENHANCED REQUEST QUEUE ====================
-async function analyze() {
-    // Prevent too frequent requests
-    const now = Date.now();
-    if (now - lastAnalysisTime < ANALYSIS_COOLDOWN) {
-        console.log('Too soon since last analysis, skipping...');
-        pendingAnalysis = true;
-        setTimeout(() => {
-            if (pendingAnalysis) {
-                pendingAnalysis = false;
-                analyze();
-            }
-        }, ANALYSIS_COOLDOWN - (now - lastAnalysisTime));
-        return;
-    }
-
-    // Prevent concurrent requests
-    if (isAnalyzing) {
-        console.log('Analysis already in progress, queuing...');
-        pendingAnalysis = true;
-        return;
-    }
-
-    isAnalyzing = true;
-    const pair = document.getElementById('pairSelect').value;
-    const timeframe = document.getElementById('timeframeSelect').value;
-    currentPair = pair;
-    currentTimeframe = timeframe;
-
-    // Show loading indicator
-    document.getElementById('chartLoading').style.display = 'flex';
-    updateStatusIndicator(false);
-
-    try {
-        trackApiCall();
-        console.log(`Fetching analysis for ${pair}-${timeframe}...`);
-        
-        const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-        
-        if (response.status === 429) {
-            // Rate limited - handle gracefully
-            const errorData = await response.json();
-            const retryAfter = errorData.retry_after || 60;
-            console.warn(`Rate limited. Retrying after ${retryAfter} seconds`);
-            
-            showNotification(`Too many requests. Waiting ${retryAfter} seconds...`, 'warning');
-            
-            // Stop updates and retry later
-            stopLiveUpdates();
-            setTimeout(() => {
-                analyze();
-                startOptimizedUpdates();
-            }, retryAfter * 1000);
-            
-            return;
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Analysis response received');
-        
-        // Process the data (existing code)
-        processAnalysisData(data, pair, timeframe);
-        
-        // Reset error counter on success
-        consecutiveErrors = 0;
-        lastAnalysisTime = Date.now();
-        
-    } catch (error) {
-        console.error('Analysis error:', error);
-        handleAnalysisError(error);
-    } finally {
-        isAnalyzing = false;
-        document.getElementById('chartLoading').style.display = 'none';
-        
-        // Process pending analysis if any
-        if (pendingAnalysis) {
-            pendingAnalysis = false;
-            setTimeout(analyze, 1000);
-        }
-    }
-}
-
-function processAnalysisData(data, pair, timeframe) {
-    // Update price series chart
-    let chartData = [];
-    
-    if (data.price_series && data.price_series.length > 0) {
-        console.log(`Processing ${data.price_series.length} price series data points`);
-        chartData = data.price_series.map(item => ({
-            time: formatDateForChart(item.date, timeframe),
-            open: parseFloat(item.open),
-            high: parseFloat(item.high),
-            low: parseFloat(item.low),
-            close: parseFloat(item.close)
-        }));
-    }
-
-    // Clean and set chart data
-    const cleanData = cleanChartData(chartData);
-    
-    if (cleanData.length > 0) {
-        currentChartData = cleanData;
-        candleSeries.setData(currentChartData);
-        
-        // Initialize realtime candle
-        realtimeCandle = initializeRealtimeCandle(cleanData, timeframe);
-        isRealtimeMode = true;
-        
-        // Calculate and update indicators
-        updateChartIndicators(cleanData);
-        
-        // Update realtime candle jika ada
-        if (realtimeCandle) {
-            candleSeries.update(realtimeCandle);
-        }
-        
-        // Fit content to show all data
-        chart.timeScale().fitContent();
-        macdChart.timeScale().fitContent();
-        
-        // Update chart info
-        document.getElementById('chartDataInfo').textContent = `${currentChartData.length} bars`;
-    }
-    
-    // Update all displays
-    updateAllDisplays(data);
-    updateStatusIndicator(true);
-}
-
-function updateChartIndicators(cleanData) {
-    // Calculate and update EMA
-    const closes = cleanData.map(d => d.close);
-    const ema = calcEMA(closes, 26);
-    currentEmaData = ema.map((value, index) => ({
-        time: cleanData[index].time, 
-        value: isNaN(value) ? 0 : value
-    }));
-    ema26Series.setData(currentEmaData);
-    
-    // Calculate and update MACD
-    const { macd, sig, hist } = calcMACDSeries(closes);
-    currentMacdData = { 
-        macd: macd.map(v => isNaN(v) ? 0 : v),
-        signal: sig.map(v => isNaN(v) ? 0 : v),
-        hist: hist.map(v => isNaN(v) ? 0 : v)
-    };
-    
-    const macdSeriesData = macd.map((value, index) => ({
-        time: cleanData[index].time, 
-        value: isNaN(value) ? 0 : value
-    }));
-    const signalSeriesData = sig.map((value, index) => ({
-        time: cleanData[index].time, 
-        value: isNaN(value) ? 0 : value
-    }));
-    const histSeriesData = hist.map((value, index) => ({
-        time: cleanData[index].time, 
-        value: isNaN(value) ? 0 : value
-    }));
-    
-    macdLineSeries.setData(macdSeriesData);
-    macdSignalSeries.setData(signalSeriesData);
-    macdHistSeries.setData(histSeriesData);
-}
-
-function updateAllDisplays(data) {
-    // Update technical indicators
-    const technical = data.technical_analysis || {};
-    updateTechnicalIndicators(technical);
-    
-    // Update price data
-    const currentPrice = data.price_data?.current || 0;
-    updatePriceDisplay(currentPrice, technical.momentum
-
-// Strategy berdasarkan timeframe
-const timeframeUpdateStrategy = {
-    'M30': 15000,    // 15 detik
-    '1H': 30000,     // 30 detik
-    '4H': 60000,     // 60 detik
-    '1D': 300000,     // 1 menit
-    '1W': 900000     // 5 menit
-};
-
-// ==================== CHART INITIALIZATION ====================
-const chartOptions = {
-  layout: { 
-    backgroundColor: '#fff', 
-    textColor: '#111' 
-  },
-  grid: {
-    vertLines: { color: '#f3f4f6' },
-    horzLines: { color: '#f3f4f6' }
-  },
-  timeScale: {
-    borderColor: '#eee',
-    timeVisible: true,
-    secondsVisible: false,
-    barSpacing: 8,
-    minBarSpacing: 2,
-    fixLeftEdge: true,
-    fixRightEdge: true
-  },
-  rightPriceScale: {
-    borderColor: '#eee',
-    scaleMargins: {
-      top: 0.1,
-      bottom: 0.1
-    }
-  },
-  width: document.getElementById('chartRoot').clientWidth,
-  height: 520
-};
-
-const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
-const candleSeries = chart.addCandlestickSeries({
-  upColor: '#16a34a',
-  downColor: '#dc2626', 
-  borderVisible: true,
-  wickUpColor: '#16a34a',
-  wickDownColor: '#dc2626',
-  priceScaleId: 'right'
-});
-
-const ema26Series = chart.addLineSeries({
-  color: '#2563eb',
-  lineWidth: 1.5,
-  priceScaleId: 'right'
-});
-
-// MACD Chart
-const macdChartOptions = {
-  layout: { 
-    backgroundColor: '#fff', 
-    textColor: '#111' 
-  },
-  grid: {
-    vertLines: { color: '#f3f4f6' },
-    horzLines: { color: '#f3f4f6' }
-  },
-  timeScale: {
-    borderColor: '#eee',
-    timeVisible: true,
-    secondsVisible: false,
-    barSpacing: 8,
-    minBarSpacing: 2
-  },
-  width: document.getElementById('macdRoot').clientWidth,
-  height: 160
-};
-
-const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), macdChartOptions);
-const macdLineSeries = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1 });
-const macdSignalSeries = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
-const macdHistSeries = macdChart.addHistogramSeries({ color: '#a78bfa' });
-
-// Sync time scales between charts
-chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
-  try {
-    macdChart.timeScale().setVisibleRange(timeRange);
-  } catch (e) {
-    console.log('Time scale sync error:', e);
-  }
-});
-
-// ==================== API OPTIMIZATION FUNCTIONS ====================
-function trackApiCall() {
-  totalApiCalls++;
-  apiCallTimestamps.push(Date.now());
-  
-  // Clean old timestamps (keep only last hour)
-  const oneHourAgo = Date.now() - 3600000;
-  apiCallTimestamps = apiCallTimestamps.filter(timestamp => timestamp > oneHourAgo);
-  
-  updateApiStatusDisplay();
-}
-
-function updateApiStatusDisplay() {
-  const apiStatusEl = document.getElementById('apiStatus');
-  const callsLastHour = apiCallTimestamps.length;
-  
-  let status = 'good';
-  let text = 'API: Optimal';
-  
-  if (callsLastHour > 100) {
-    status = 'critical';
-    text = 'API: High Usage';
-  } else if (callsLastHour > 50) {
-    status = 'warning';
-    text = 'API: Moderate';
-  }
-  
-  apiStatusEl.className = `api-status ${status}`;
-  apiStatusEl.textContent = text;
-  
-  // Update next update time
-  const nextUpdateTime = new Date(Date.now() + currentUpdateInterval);
-  document.getElementById('nextUpdateTime').textContent = 
-    nextUpdateTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-}
-
-function getOptimalUpdateInterval(timeframe, volatility, isMarketHours) {
-  let baseInterval = timeframeUpdateStrategy[timeframe] || 30000;
-  
-  if (isAggressiveMode) {
-    baseInterval = Math.max(10000, baseInterval * 0.5); // 50% lebih cepat di aggressive mode
-  }
-  
-  // Adjust berdasarkan volatilitas
-  let adjustment = 1.0;
-  if (volatility === 'HIGH') adjustment = 0.7;
-  if (volatility === 'LOW') adjustment = 1.3;
-  
-  // Adjust berdasarkan jam market
-  const now = new Date();
-  const hour = now.getUTCHours();
-  const isActiveHours = (hour >= 8 && hour <= 16);
-  
-  if (isActiveHours && isMarketHours) {
-    adjustment *= 0.8;
-  } else {
-    adjustment *= 1.5;
-  }
-  
-  // Adjust berdasarkan error rate
-  if (consecutiveErrors > 0) {
-    adjustment *= (1 + consecutiveErrors * 0.3);
-  }
-  
-  return Math.max(10000, Math.min(300000, baseInterval * adjustment));
-}
-
-function handleVisibilityChange() {
-  isTabActive = !document.hidden;
-  
-  if (isTabActive) {
-    startOptimizedUpdates();
-    console.log('Tab active - resuming live updates');
-  } else {
-    stopLiveUpdates();
-    console.log('Tab inactive - pausing live updates');
-  }
-}
-
-function startOptimizedUpdates() {
-  stopLiveUpdates();
-  
-  // Immediate update saat mulai
-  optimizedLivePriceUpdate();
-  
-  // Schedule periodic updates
-  liveUpdateInterval = setInterval(optimizedLivePriceUpdate, currentUpdateInterval);
-  
-  console.log(`Started optimized live updates every ${currentUpdateInterval/1000} seconds`);
-}
-
-function stopLiveUpdates() {
-  if (liveUpdateInterval) {
-    clearInterval(liveUpdateInterval);
-    liveUpdateInterval = null;
-  }
-}
-
-// User activity detection
-let userActivityTimeout;
-function resetUserActivity() {
-  if (currentUpdateInterval > 15000 && isAggressiveMode) {
-    const originalInterval = currentUpdateInterval;
-    currentUpdateInterval = Math.max(10000, currentUpdateInterval * 0.7);
-    
-    if (liveUpdateInterval) {
-      stopLiveUpdates();
-      startOptimizedUpdates();
-    }
-    
-    clearTimeout(userActivityTimeout);
-    userActivityTimeout = setTimeout(() => {
-      currentUpdateInterval = originalInterval;
-      if (liveUpdateInterval) {
-        stopLiveUpdates();
-        startOptimizedUpdates();
-      }
-    }, 120000);
-  }
-}
-// Enhanced error handling
-async function analyze() {
-  try {
-    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Check for fallback data
-    if (data.fallback_data) {
-      showNotification('Using fallback data - some features limited', 'warning');
-    }
-    
-    // Process data...
-    
-  } catch (error) {
-    console.error('Analysis error:', error);
-    showNotification(`Analysis failed: ${error.message}`, 'error');
-    updateStatusIndicator(false);
-  }
-}
-
-// Add notification system
-function showNotification(message, type = 'info') {
-  const notification = document.createElement('div');
-  notification.className = `alert alert-${type} alert-dismissible fade show`;
-  notification.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  `;
-  
-  document.querySelector('.container').prepend(notification);
-  
-  setTimeout(() => {
-    notification.remove();
-  }, 5000);
-}
-  
-// ==================== UTILITY FUNCTIONS ====================
-function calcEMA(values, period) {
-  if (!values || values.length === 0) return [];
-  const k = 2 / (period + 1);
-  let ema = [values[0]];
-  for (let i = 1; i < values.length; i++) {
-    ema.push(values[i] * k + ema[i - 1] * (1 - k));
-  }
-  return ema;
-}
-
-function calcMACDSeries(closes, short = 12, long = 26, signal = 9) {
-  if (!closes || closes.length === 0) return { macd: [], sig: [], hist: [] };
-  const emaS = calcEMA(closes, short);
-  const emaL = calcEMA(closes, long);
-  const macd = closes.map((_, i) => emaS[i] - emaL[i]);
-  const sig = calcEMA(macd, signal);
-  const hist = macd.map((v, i) => v - (sig[i] || 0));
-  return { macd, sig, hist };
-}
-
-function formatDateForChart(dateString, timeframe) {
-  try {
-    let date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      console.warn('Invalid date:', dateString);
-      return Math.floor(Date.now() / 1000);
-    }
-    return date.getTime() / 1000;
-  } catch (e) {
-    console.error('Date formatting error:', e);
-    return Math.floor(Date.now() / 1000);
-  }
-}
-
-function cleanChartData(data) {
-  return data.filter(item => 
-    item && 
-    item.time && 
-    item.open !== null && item.open !== undefined &&
-    item.high !== null && item.high !== undefined &&
-    item.low !== null && item.low !== undefined &&
-    item.close !== null && item.close !== undefined
-  ).map(item => ({
-    time: item.time,
-    open: parseFloat(item.open) || 0,
-    high: parseFloat(item.high) || 0,
-    low: parseFloat(item.low) || 0,
-    close: parseFloat(item.close) || 0
-  }));
-}
-
-function getNextCandleTime(lastCandleTime, timeframe) {
-  const lastTime = new Date(lastCandleTime * 1000);
-  let nextTime = new Date(lastTime);
-  
-  switch(timeframe) {
-    case 'M30':
-      nextTime.setMinutes(nextTime.getMinutes() + 30);
-      break;
-    case '1H':
-      nextTime.setHours(nextTime.getHours() + 1);
-      break;
-    case '4H':
-      nextTime.setHours(nextTime.getHours() + 4);
-      break;
-    case '1D':
-      nextTime.setDate(nextTime.getDate() + 1);
-      break;
-    case '1W':
-      nextTime.setDate(nextTime.getDate() + 7);
-      break;
-    default:
-      nextTime.setHours(nextTime.getHours() + 1);
-  }
-  
-  return Math.floor(nextTime.getTime() / 1000);
-}
-
-// ==================== UI UPDATE FUNCTIONS ====================
-function updatePairTicker(pair) {
-  document.getElementById('selectedPair').textContent = `${pair} – Real-time Analysis`;
-  currentPair = pair;
-  document.getElementById('chartDataInfo').textContent = `${currentChartData.length} bars`;
-}
-
-function updateStatusIndicator(isLive) {
-  const statusIndicator = document.getElementById('statusIndicator');
-  const realtimeIndicator = document.getElementById('realtimeIndicator');
-  
-  if (isLive) {
-    statusIndicator.className = 'status-indicator status-live';
-    realtimeIndicator.style.display = 'inline-flex';
-  } else {
-    statusIndicator.className = 'status-indicator status-offline';
-    realtimeIndicator.style.display = 'none';
-  }
-}
-
-function setSignal(signal) {
-  const aiSignal = document.getElementById('aiSignalBadge');
-  aiSignal.textContent = signal;
-  aiSignal.className = signal === 'BUY' ? 'ai-signal-buy' : 
-                      signal === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
-}
-
-function updateRiskAssessment(riskData) {
-  const riskScore = riskData.risk_score || 0;
-  const approved = riskData.approved || false;
-  const violations = riskData.violations || [];
-  const riskFactors = riskData.risk_factors || {};
-
-  // Update risk score badge
-  const riskScoreBadge = document.getElementById('riskScoreBadge');
-  riskScoreBadge.textContent = `Score: ${riskScore}`;
-  riskScoreBadge.className = `badge ${
-    riskScore <= 30 ? 'bg-success' : 
-    riskScore <= 70 ? 'bg-warning' : 'bg-danger'
-  }`;
-
-  // Update risk status display
-  const riskMainStatus = document.getElementById('riskMainStatus');
-  const riskSubStatus = document.getElementById('riskSubStatus');
-  const riskStatus = document.getElementById('riskStatus');
-  const riskIcon = riskStatus.querySelector('.risk-icon i');
-
-  if (approved) {
-    riskMainStatus.textContent = 'APPROVED';
-    riskSubStatus.textContent = 'Trade meets risk criteria';
-    riskStatus.style.background = 'linear-gradient(135deg, #f0f9ff, #e0f2fe)';
-    riskStatus.style.border = '2px solid #bae6fd';
-    riskIcon.className = 'fas fa-check-circle fa-2x text-success';
-  } else {
-    riskMainStatus.textContent = 'REJECTED';
-    riskSubStatus.textContent = violations.length > 0 ? 
-      violations[0] : 'Trade does not meet risk criteria';
-    riskStatus.style.background = 'linear-gradient(135deg, #fef2f2, #fee2e2)';
-    riskStatus.style.border = '2px solid #fecaca';
-    riskIcon.className = 'fas fa-times-circle fa-2x text-danger';
-  }
-
-  // Update risk meter
-  const riskMeterFill = document.getElementById('riskMeterFill');
-  riskMeterFill.style.width = `${riskScore}%`;
-  riskMeterFill.style.background = riskScore <= 30 ? '#10b981' : 
-                                  riskScore <= 70 ? '#f59e0b' : '#ef4444';
-
-  // Update risk factors display
-  const riskFactorsContainer = document.getElementById('riskFactorsContainer');
-  riskFactorsContainer.innerHTML = '';
-
-  if (Object.keys(riskFactors).length > 0) {
-    for (const [key, value] of Object.entries(riskFactors)) {
-      if (typeof value === 'number') {
-        const factorElement = document.createElement('div');
-        factorElement.className = 'col-6';
-        
-        let statusClass = 'medium';
-        let statusIcon = 'exclamation-triangle';
-        
-        if (value <= 30) {
-          statusClass = 'low';
-          statusIcon = 'check-circle';
-        } else if (value >= 70) {
-          statusClass = 'high';
-          statusIcon = 'times-circle';
-        }
-        
-        const factorName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        
-        factorElement.innerHTML = `
-          <div class="risk-factor-card ${statusClass}">
-            <i class="fas fa-${statusIcon} me-2"></i>
-            <div>
-              <div class="risk-factor-name">${factorName}</div>
-              <div class="risk-factor-status">${value}%</div>
-            </div>
-          </div>
-        `;
-        riskFactorsContainer.appendChild(factorElement);
-      }
-    }
-    document.getElementById('riskDetails').style.display = 'block';
-  }
-}
-
-function updateSupportResistance(levelsData) {
-  const levels = levelsData.levels || {};
-  const currentPrice = levelsData.current_price || 0;
-
-  // Update Support & Resistance levels
-  const supportLevel = levels.support || (currentPrice * 0.995).toFixed(4);
-  const resistanceLevel = levels.resistance || (currentPrice * 1.005).toFixed(4);
-
-  document.getElementById('supportLevel').textContent = supportLevel;
-  document.getElementById('resistanceLevel').textContent = resistanceLevel;
-
-  // Calculate and display distances
-  if (currentPrice > 0) {
-    const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
-    const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
-
-    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
-    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
-  }
-
-  // Calculate pivot points
-  const recentHigh = levels.recent_high || currentPrice * 1.01;
-  const recentLow = levels.recent_low || currentPrice * 0.99;
-  const pivot = levels.pivot || currentPrice;
-
-  document.getElementById('pivotPoint').textContent = pivot.toFixed(4);
-  document.getElementById('pivotR1').textContent = (levels.resistance || (pivot * 1.01)).toFixed(4);
-  document.getElementById('pivotR2').textContent = (levels.resistance2 || (pivot * 1.02)).toFixed(4);
-  document.getElementById('pivotR3').textContent = (pivot * 1.03).toFixed(4);
-  document.getElementById('pivotS1').textContent = (levels.support || (pivot * 0.99)).toFixed(4);
-  document.getElementById('pivotS2').textContent = (levels.support2 || (pivot * 0.98)).toFixed(4);
-  document.getElementById('pivotS3').textContent = (pivot * 0.97).toFixed(4);
-}
-
-// ==================== REALTIME CANDLE MANAGEMENT ====================
-function initializeRealtimeCandle(historicalData, timeframe) {
-    if (historicalData.length === 0) return null;
-    
-    const lastHistoricalCandle = historicalData[historicalData.length - 1];
-    
-    // Create realtime candle untuk periode berikutnya
-    const nextCandleTime = getNextCandleTime(lastHistoricalCandle.time, timeframe);
-    
-    return {
-        time: nextCandleTime,
-        open: lastHistoricalCandle.close,
-        high: lastHistoricalCandle.close,
-        low: lastHistoricalCandle.close,
-        close: lastHistoricalCandle.close,
-        isRealtime: true
-    };
-}
-
-function updateRealtimeCandle(currentPrice) {
-    if (!realtimeCandle) return null;
-    
-    const updatedCandle = {
-        time: realtimeCandle.time,
-        open: realtimeCandle.open,
-        high: Math.max(realtimeCandle.high, currentPrice),
-        low: Math.min(realtimeCandle.low, currentPrice),
-        close: currentPrice,
-        isRealtime: true
-    };
-    
-    realtimeCandle = updatedCandle;
-    return updatedCandle;
-}
-
-// ==================== OPTIMIZED LIVE PRICE UPDATE ====================
-async function optimizedLivePriceUpdate() {
-    if (!isTabActive) return;
-    
-    const pair = currentPair;
-    const timeframe = currentTimeframe;
-    
-    try {
-        trackApiCall();
-        const startTime = Date.now();
-        
-        const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const currentPrice = data.price_data?.current;
-        
-        if (currentPrice) {
-            // Update price display
-            updatePriceDisplay(currentPrice, data.technical_analysis?.momentum?.price_change_pct || 0);
-            
-            // Update realtime candle
-            const updatedCandle = updateRealtimeCandle(currentPrice);
-            if (updatedCandle) {
-                candleSeries.update(updatedCandle);
-            }
-            
-            // Reset error counter
-            consecutiveErrors = 0;
-            
-            // Adjust interval berdasarkan kondisi
-            const volatility = data.technical_analysis?.volatility?.volatility_class || 'MEDIUM';
-            const now = new Date();
-            const hour = now.getUTCHours();
-            const isMarketHours = (hour >= 8 && hour <= 16);
-            
-            currentUpdateInterval = getOptimalUpdateInterval(timeframe, volatility, isMarketHours);
-            
-            // Restart interval dengan waktu baru
-            if (liveUpdateInterval) {
-                stopLiveUpdates();
-                startOptimizedUpdates();
-            }
-            
-            updateStatusIndicator(true);
-            
-            // Log performance
-            const responseTime = Date.now() - startTime;
-            console.log(`Live price updated in ${responseTime}ms. Next update in ${currentUpdateInterval/1000}s`);
-        }
-        
-    } catch (error) {
-        console.error('Live price update error:', error);
-        consecutiveErrors++;
-        
-        // Exponential backoff pada error
-        if (consecutiveErrors > 2) {
-            currentUpdateInterval = Math.min(300000, currentUpdateInterval * (1 + consecutiveErrors * 0.5));
-            console.warn(`Slowing updates due to errors. New interval: ${currentUpdateInterval/1000}s`);
-            
-            if (liveUpdateInterval) {
-                stopLiveUpdates();
-                startOptimizedUpdates();
+            } catch (error) {
+                resultsContent.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Analysis Failed</h4>
+                        <p>${error.message}</p>
+                        <p><small>Please check the console for details or try again later.</small></p>
+                    </div>
+                `;
+                console.error('Analysis error:', error);
+            } finally {
+                loading.style.display = 'none';
+                button.disabled = false;
+                button.textContent = 'Analyze';
             }
         }
-        
-        updateStatusIndicator(false);
-    }
-}
 
-// ==================== MAIN ANALYSIS FUNCTION ====================
-async function analyze() {
-  const pair = document.getElementById('pairSelect').value;
-  const timeframe = document.getElementById('timeframeSelect').value;
-  currentPair = pair;
-  currentTimeframe = timeframe;
+        async function checkSystemStatus() {
+            const statusDiv = document.getElementById('systemStatus');
 
-  // Show loading indicator
-  document.getElementById('chartLoading').style.display = 'flex';
-  updateStatusIndicator(false);
+            try {
+                const response = await fetch('/api/system_status');
+                const data = await response.json();
 
-  try {
-    trackApiCall();
-    console.log(`Fetching analysis for ${pair}-${timeframe}...`);
-    
-    const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframe}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log('Analysis response:', data);
+                if (!response.ok) {
+                    throw new Error(data.error || 'Status check failed');
+                }
 
-    // Update price series chart
-    let chartData = [];
-    
-    if (data.price_series && data.price_series.length > 0) {
-      console.log(`Processing ${data.price_series.length} price series data points`);
-      chartData = data.price_series.map(item => ({
-        time: formatDateForChart(item.date, timeframe),
-        open: parseFloat(item.open),
-        high: parseFloat(item.high),
-        low: parseFloat(item.low),
-        close: parseFloat(item.close)
-      }));
-    } else {
-      console.warn('No price_series data available');
-      chartData = [];
-    }
+                statusDiv.innerHTML = `
+                    <div class="result-item">
+                        <span class="status-indicator status-operational"></span>
+                        <strong>Overall Status:</strong> ${data.system}
+                    </div>
+                    <div class="result-item">
+                        <strong>Version:</strong> ${data.version}
+                    </div>
+                    <div class="result-item">
+                        <strong>Last Check:</strong> ${new Date().toLocaleString()}
+                    </div>
+                    <div class="result-item">
+                        <strong>Features:</strong><br>
+                        ${data.features.map(feature => `• ${feature}`).join('<br>')}
+                    </div>
+                    <div class="result-item">
+                        <strong>Data Sources:</strong><br>
+                        ${data.data_sources.map(source => `• ${source}`).join('<br>')}
+                    </div>
+                `;
 
-    // Clean and set chart data
-    const cleanData = cleanChartData(chartData);
-    
-    if (cleanData.length > 0) {
-      currentChartData = cleanData;
-      candleSeries.setData(currentChartData);
-      
-      // Initialize realtime candle
-      realtimeCandle = initializeRealtimeCandle(cleanData, timeframe);
-      isRealtimeMode = true;
-      
-      // Calculate and update EMA
-      const closes = currentChartData.map(d => d.close);
-      const ema = calcEMA(closes, 26);
-      currentEmaData = ema.map((value, index) => ({
-        time: currentChartData[index].time, 
-        value: isNaN(value) ? 0 : value
-      }));
-      ema26Series.setData(currentEmaData);
-      
-      // Calculate and update MACD
-      const { macd, sig, hist } = calcMACDSeries(closes);
-      currentMacdData = { 
-        macd: macd.map(v => isNaN(v) ? 0 : v),
-        signal: sig.map(v => isNaN(v) ? 0 : v),
-        hist: hist.map(v => isNaN(v) ? 0 : v)
-      };
-      
-      const macdSeriesData = macd.map((value, index) => ({
-        time: currentChartData[index].time, 
-        value: isNaN(value) ? 0 : value
-      }));
-      const signalSeriesData = sig.map((value, index) => ({
-        time: currentChartData[index].time, 
-        value: isNaN(value) ? 0 : value
-      }));
-      const histSeriesData = hist.map((value, index) => ({
-        time: currentChartData[index].time, 
-        value: isNaN(value) ? 0 : value
-      }));
-      
-      macdLineSeries.setData(macdSeriesData);
-      macdSignalSeries.setData(signalSeriesData);
-      macdHistSeries.setData(histSeriesData);
-      
-      // Update realtime candle jika ada
-      if (realtimeCandle) {
-        candleSeries.update(realtimeCandle);
-      }
-      
-      // Fit content to show all data
-      chart.timeScale().fitContent();
-      macdChart.timeScale().fitContent();
-      
-      // Update chart info
-      document.getElementById('chartDataInfo').textContent = `${currentChartData.length} bars`;
-    }
-    
-    // Update technical indicators
-    const technical = data.technical_analysis || {};
-    updateTechnicalIndicators(technical);
-    
-    // Update price data
-    const currentPrice = data.price_data?.current || 0;
-    updatePriceDisplay(currentPrice, technical.momentum?.price_change_pct || 0);
-    
-    // Update AI analysis
-    const aiAnalysis = data.ai_analysis || {};
-    updateAIAnalysis(aiAnalysis);
-    
-    // Update risk assessment
-    const riskAssessment = data.risk_assessment || {};
-    updateRiskAssessment(riskAssessment);
-    
-    // Update support & resistance
-    updateSupportResistance({
-      levels: technical.levels || {},
-      current_price: currentPrice
-    });
-    
-    // Update data source info
-    if (data.ai_provider) {
-      document.getElementById('aiProvider').textContent = data.ai_provider;
-    }
-    
-    updateStatusIndicator(true);
-    
-  } catch (error) {
-    console.error('Analysis error:', error);
-    updateStatusIndicator(false);
-    
-    // Show error to user
-    document.getElementById('aiSummary').textContent = `Error: ${error.message}`;
-    document.getElementById('aiSummary').style.color = '#ef4444';
-  } finally {
-    // Hide loading indicator
-    document.getElementById('chartLoading').style.display = 'none';
-  }
-}
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Status Check Failed</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
 
-function updateTechnicalIndicators(technical) {
-  // Momentum indicators
-  const momentum = technical.momentum || {};
-  document.getElementById('rsiVal').textContent = momentum.rsi ? momentum.rsi.toFixed(2) : '-';
-  document.getElementById('macdVal').textContent = momentum.macd ? momentum.macd.toFixed(4) : '-';
-  document.getElementById('macdHistVal').textContent = momentum.macd_histogram ? momentum.macd_histogram.toFixed(4) : '-';
-  
-  // Trend indicators
-  const trend = technical.trend || {};
-  document.getElementById('adxVal').textContent = trend.adx ? trend.adx.toFixed(2) : '-';
-  document.getElementById('trendVal').textContent = trend.direction || '-';
-  
-  // Volatility indicators
-  const volatility = technical.volatility || {};
-  document.getElementById('atrVal').textContent = volatility.atr ? volatility.atr.toFixed(4) : '-';
-  document.getElementById('volVal').textContent = volatility.atr_pct ? volatility.atr_pct.toFixed(2) + '%' : '-';
-}
+        // Auto-refresh status every 30 seconds
+        setInterval(checkSystemStatus, 30000);
 
-function updatePriceDisplay(currentPrice, changePct) {
-  const livePriceEl = document.getElementById('livePrice');
-  const currentPriceEl = document.getElementById('currentPrice');
-  const changeEl = document.getElementById('pairChange');
-  
-  livePriceEl.textContent = currentPrice.toFixed(4);
-  currentPriceEl.textContent = `Current: ${currentPrice.toFixed(4)}`;
-  changeEl.textContent = `(${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
-  changeEl.className = `price-change ${changePct >= 0 ? 'change-positive' : 'change-negative'}`;
-}
-
-function updateAIAnalysis(aiAnalysis) {
-  document.getElementById('aiSummary').textContent = aiAnalysis.reasoning || 'No analysis available';
-  setSignal(aiAnalysis.signal || 'HOLD');
-  document.getElementById('aiConfidence').textContent = aiAnalysis.confidence ? aiAnalysis.confidence + '%' : '-';
-  document.getElementById('aiRisk').textContent = aiAnalysis.risk_rating || '-';
-  
-  const keyLevels = aiAnalysis.key_levels || {};
-  document.getElementById('aiEntry').textContent = keyLevels.entry || '-';
-  document.getElementById('aiSL').textContent = keyLevels.stop_loss || '-';
-  document.getElementById('aiTP1').textContent = keyLevels.take_profit || '-';
-  document.getElementById('aiTP2').textContent = keyLevels.take_profit_2 || '-';
-}
-
-// ==================== BACKTEST FUNCTIONS ====================
-function showBacktestModal() {
-  const modal = new bootstrap.Modal(document.getElementById('backtestModal'));
-  modal.show();
-}
-
-async function runBacktest() {
-  const pair = currentPair;
-  const timeframe = currentTimeframe;
-  const initialBalance = document.getElementById('initialBalance').value;
-  const days = document.getElementById('backtestDays').value;
-  const strategy = document.getElementById('backtestType').value;
-  
-  const backtestStatusEl = document.getElementById('backtestStatus');
-  const backtestResultsEl = document.getElementById('backtestResults');
-  
-  backtestStatusEl.textContent = 'Running...';
-  backtestStatusEl.className = 'badge bg-warning';
-  backtestResultsEl.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Running backtest...</div>';
-  
-  try {
-    trackApiCall();
-    console.log('Starting backtest with:', { pair, timeframe, days, initialBalance, strategy });
-    
-    const response = await fetch(`/api/backtest?pair=${pair}&strategy=${strategy}&timeframe=${timeframe}&days=${days}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('Backtest result:', result);
-    
-    displayBacktestResults(result);
-    backtestStatusEl.textContent = 'Completed';
-    backtestStatusEl.className = 'badge bg-success';
-    
-  } catch (error) {
-    console.error('Backtest error:', error);
-    backtestResultsEl.innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
-    backtestStatusEl.textContent = 'Failed';
-    backtestStatusEl.className = 'badge bg-danger';
-  }
-}
-
-function displayBacktestResults(result) {
-  const backtestResultsEl = document.getElementById('backtestResults');
-  let html = '';
-  
-  // Performance metrics
-  html += `
-    <div class="performance-grade grade-${result.total_return_pct >= 10 ? 'a' : result.total_return_pct >= 5 ? 'b' : result.total_return_pct >= 0 ? 'c' : 'd'}">
-      Return: ${result.total_return_pct ? result.total_return_pct.toFixed(2) + '%' : 'N/A'}
-    </div>
-    
-    <div class="row">
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Initial Balance</div>
-          <div class="metric-value">$${(result.initial_balance || 0).toFixed(2)}</div>
-        </div>
-      </div>
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Final Equity</div>
-          <div class="metric-value">$${(result.final_equity || 0).toFixed(2)}</div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Total Trades</div>
-          <div class="metric-value">${result.total_trades || 0}</div>
-        </div>
-      </div>
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Win Rate</div>
-          <div class="metric-value ${((result.winning_trades || 0) / (result.total_trades || 1) * 100) >= 50 ? 'change-positive' : 'change-negative'}">
-            ${((result.winning_trades || 0) / (result.total_trades || 1) * 100).toFixed(1)}%
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Max Drawdown</div>
-          <div class="metric-value change-negative">${(result.max_drawdown_pct || 0).toFixed(2)}%</div>
-        </div>
-      </div>
-      <div class="col-6">
-        <div class="metric-card">
-          <div class="small-muted">Sharpe Ratio</div>
-          <div class="metric-value">${(result.sharpe_ratio || 0).toFixed(2)}</div>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  backtestResultsEl.innerHTML = html;
-}
-
-// ==================== SETTINGS & EXPORT FUNCTIONS ====================
-function showApiStatusModal() {
-  const modal = new bootstrap.Modal(document.getElementById('apiStatusModal'));
-  
-  // Update modal content
-  document.getElementById('currentIntervalDisplay').textContent = `${currentUpdateInterval/1000} seconds`;
-  
-  const estimatedDailyCalls = Math.floor((24 * 60 * 60 * 1000) / currentUpdateInterval);
-  document.getElementById('dailyApiCalls').textContent = `${estimatedDailyCalls} calls/day`;
-  
-  const apiHealth = apiCallTimestamps.length > 100 ? 'Critical' : 
-                   apiCallTimestamps.length > 50 ? 'Warning' : 'Healthy';
-  const healthClass = apiCallTimestamps.length > 100 ? 'bg-danger' : 
-                     apiCallTimestamps.length > 50 ? 'bg-warning' : 'bg-success';
-  document.getElementById('apiHealthBadge').textContent = apiHealth;
-  document.getElementById('apiHealthBadge').className = `badge ${healthClass}`;
-  
-  modal.show();
-}
-
-function exportAnalysis() {
-  const analysisData = {
-    pair: currentPair,
-    timeframe: currentTimeframe,
-    timestamp: new Date().toISOString(),
-    price: document.getElementById('livePrice').textContent,
-    signal: document.getElementById('aiSignalBadge').textContent,
-    confidence: document.getElementById('aiConfidence').textContent,
-    riskScore: document.getElementById('riskScoreBadge').textContent
-  };
-  
-  const dataStr = JSON.stringify(analysisData, null, 2);
-  const dataBlob = new Blob([dataStr], {type: 'application/json'});
-  
-  const url = URL.createObjectURL(dataBlob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `forex-analysis-${currentPair}-${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
-
-// ==================== EVENT LISTENERS ====================
-document.getElementById('analyzeBtn').addEventListener('click', analyze);
-document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
-document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
-document.getElementById('exportBtn').addEventListener('click', exportAnalysis);
-document.getElementById('settingsBtn').addEventListener('click', showApiStatusModal);
-
-document.getElementById('pairSelect').addEventListener('change', function() {
-  updatePairTicker(this.value);
-  analyze();
-});
-
-document.getElementById('timeframeSelect').addEventListener('change', analyze);
-
-// Settings modal event listeners
-document.getElementById('enableLiveUpdates').addEventListener('change', function() {
-  if (this.checked) {
-    startOptimizedUpdates();
-  } else {
-    stopLiveUpdates();
-  }
-});
-
-document.getElementById('aggressiveMode').addEventListener('change', function() {
-  isAggressiveMode = this.checked;
-  if (liveUpdateInterval) {
-    stopLiveUpdates();
-    startOptimizedUpdates();
-  }
-});
-
-// ==================== INITIALIZATION ====================
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize the dashboard
-  updatePairTicker(currentPair);
-  analyze();
-  
-  // Setup visibility detection
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-  
-  // User activity detection
-  document.addEventListener('mousemove', resetUserActivity);
-  document.addEventListener('keypress', resetUserActivity);
-  document.addEventListener('click', resetUserActivity);
-  
-  // Start dengan interval normal
-  startOptimizedUpdates();
-  
-  // Full analysis setiap 10 menit (bukan realtime)
-  setInterval(analyze, 600000);
-  
-  // Handle window resize
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      try {
-        const chartWidth = document.getElementById('chartRoot').clientWidth;
-        const macdWidth = document.getElementById('macdRoot').clientWidth;
-        
-        chart.resize(chartWidth, 520);
-        macdChart.resize(macdWidth, 160);
-        
-        chart.timeScale().fitContent();
-        macdChart.timeScale().fitContent();
-      } catch (e) {
-        console.log('Resize error:', e);
-      }
-    }, 250);
-  });
-});
-
-// Cleanup saat page unload
-window.addEventListener('beforeunload', function() {
-  stopLiveUpdates();
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
-});
-</script>
+        // Add keyboard shortcut (Ctrl+Enter) to trigger analysis
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                analyzeMarket();
+            }
+        });
+    </script>
 </body>
 </html>
