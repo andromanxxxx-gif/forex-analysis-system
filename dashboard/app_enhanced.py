@@ -521,12 +521,6 @@ def api_health():
         return jsonify({'status': 'degraded', 'error': str(e)}), 500
 
 # Custom rate limits for different endpoints
-@app.route('/api/analyze')
-@limiter.limit("60 per minute")  # Increased from 30 to 60
-def api_analyze():
-    # ... existing code
-    return jsonify({"status": "analysis complete"})  # Contoh return
-
 @app.route('/api/system_status')
 @limiter.limit("120 per minute")  # More lenient for status checks
 def api_system_status():
