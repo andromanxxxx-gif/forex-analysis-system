@@ -3,76 +3,189 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Forex AI Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>Forex AI Analysis Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0"></script>
+  <style>
+    body {
+      background-color: #f9fafb;
+      font-family: 'Inter', sans-serif;
+    }
+    .card {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      padding: 1.5rem;
+    }
+    .loading {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+  </style>
 </head>
-<body>
-  <div class="container">
-    <h1>💹 Forex AI Dashboard</h1>
-    <form id="pair-form">
-      <label for="pair">Pilih Pair:</label>
-      <select id="pair" name="pair">
-        {% for p in pairs %}
-          <option value="{{ p }}">{{ p }}</option>
-        {% endfor %}
-      </select>
+<body class="p-6">
 
-      <label for="timeframe">Timeframe:</label>
-      <select id="timeframe" name="timeframe">
-        <option value="1D">1D</option>
-        <option value="4H">4H</option>
-        <option value="1H">1H</option>
-      </select>
+  <!-- HEADER -->
+  <div class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-gray-800">💹 Forex AI Analysis Dashboard</h1>
+    <p class="text-gray-500 mt-2">Real-time Technical + Fundamental Analysis powered by ChatGPT 4.0</p>
+  </div>
 
-      <button type="submit">Tampilkan Chart</button>
-    </form>
+  <!-- CONTROLS -->
+  <div class="flex justify-center mb-8 space-x-4">
+    <select id="pairSelect" class="border rounded-lg px-4 py-2">
+      {% for pair in pairs %}
+      <option value="{{ pair }}">{{ pair }}</option>
+      {% endfor %}
+    </select>
+    <button id="analyzeBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">Analyze</button>
+  </div>
 
-    <div id="chart-container">
-      <canvas id="priceChart"></canvas>
+  <!-- MAIN GRID -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- CHART -->
+    <div class="lg:col-span-2 card">
+      <h2 class="text-xl font-semibold mb-4 text-gray-700">Candlestick Chart + EMA</h2>
+      <canvas id="chartCanvas" height="120"></canvas>
     </div>
 
-    <div class="analysis">
-      <h2>📈 Analisis AI (Teknikal + Fundamental)</h2>
-      <pre id="ai-analysis">Belum ada analisis.</pre>
+    <!-- ANALYSIS -->
+    <div class="card">
+      <h2 class="text-xl font-semibold mb-3 text-gray-700">AI Analysis</h2>
+      <div id="aiAnalysis" class="text-gray-700 whitespace-pre-line loading">Awaiting analysis...</div>
     </div>
   </div>
 
+  <!-- NEWS -->
+  <div class="card mt-8">
+    <h2 class="text-xl font-semibold mb-3 text-gray-700">Latest Economic News</h2>
+    <ul id="newsList" class="space-y-2 text-gray-700">
+      <li class="loading">Fetching news...</li>
+    </ul>
+  </div>
+
   <script>
-    const form = document.getElementById("pair-form");
-    const chartCanvas = document.getElementById("priceChart");
-    let chart;
+    const chartCanvas = document.getElementById("chartCanvas");
+    let candleChart;
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const pair = document.getElementById("pair").value;
-      const timeframe = document.getElementById("timeframe").value;
+    // === Helper: Hitung EMA ===
+    function calculateEMA(data, period) {
+      const k = 2 / (period + 1);
+      let emaArray = [];
+      let emaPrev = data[0];
+      emaArray.push(emaPrev);
+      for (let i = 1; i < data.length; i++) {
+        emaPrev = data[i] * k + emaPrev * (1 - k);
+        emaArray.push(emaPrev);
+      }
+      return emaArray;
+    }
 
-      const response = await fetch(`/get_analysis?pair=${pair}&timeframe=${timeframe}`);
-      const data = await response.json();
+    async function fetchAnalysis() {
+      const pair = document.getElementById("pairSelect").value;
+      const aiBox = document.getElementById("aiAnalysis");
+      const newsList = document.getElementById("newsList");
+      aiBox.textContent = "⏳ Analyzing with ChatGPT 4...";
+      aiBox.classList.add("loading");
+      newsList.innerHTML = "<li class='loading'>Fetching news...</li>";
 
-      if (chart) chart.destroy();
-      const ctx = chartCanvas.getContext("2d");
-      chart = new Chart(ctx, {
+      const formData = new FormData();
+      formData.append("pair", pair);
+
+      const res = await fetch("/analyze", { method: "POST", body: formData });
+      const data = await res.json();
+
+      // === AI Analysis ===
+      aiBox.classList.remove("loading");
+      aiBox.textContent = data.analysis;
+
+      // === News ===
+      newsList.innerHTML = "";
+      data.news.forEach(n => {
+        const li = document.createElement("li");
+        li.innerHTML = `📰 <a href="${n.url}" target="_blank" class="text-blue-600 hover:underline">${n.title}</a> 
+                        <span class="text-gray-400 text-sm">(${n.source})</span>`;
+        newsList.appendChild(li);
+      });
+
+      // === Chart Data ===
+      const prices = data.data.map(p => ({
+        x: new Date(p.datetime),
+        o: parseFloat(p.open),
+        h: parseFloat(p.high),
+        l: parseFloat(p.low),
+        c: parseFloat(p.close)
+      }));
+
+      // === EMA ===
+      const closes = prices.map(p => p.c);
+      const ema12 = calculateEMA(closes, 12);
+      const ema26 = calculateEMA(closes, 26);
+
+      // === Chart ===
+      if (candleChart) candleChart.destroy();
+      candleChart = new Chart(chartCanvas, {
         type: "candlestick",
         data: {
           datasets: [
             {
-              label: `${pair} (${timeframe})`,
-              data: data.candles,
-              borderColor: "#4e79a7",
+              label: pair,
+              data: prices,
+              borderColor: "#2563eb",
               color: {
-                up: "#26a69a",
-                down: "#ef5350",
-                unchanged: "#ccc"
+                up: "#16a34a",
+                down: "#dc2626",
+                unchanged: "#9ca3af"
               }
+            },
+            {
+              label: "EMA 12",
+              data: prices.map((p, i) => ({ x: p.x, y: ema12[i] })),
+              type: "line",
+              borderColor: "#f59e0b",
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.2
+            },
+            {
+              label: "EMA 26",
+              data: prices.map((p, i) => ({ x: p.x, y: ema26[i] })),
+              type: "line",
+              borderColor: "#8b5cf6",
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.2
             }
           ]
         },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              time: { unit: "minute" },
+              ticks: { color: "#6b7280" }
+            },
+            y: {
+              ticks: { color: "#6b7280" }
+            }
+          },
+          plugins: {
+            legend: { display: true, labels: { color: "#374151" } }
+          }
+        }
       });
+    }
 
-      document.getElementById("ai-analysis").textContent = data.analysis || "Analisis tidak tersedia.";
-    });
+    document.getElementById("analyzeBtn").addEventListener("click", fetchAnalysis);
+    setInterval(fetchAnalysis, 60000);
   </script>
 </body>
 </html>
