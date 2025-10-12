@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Forex AI Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+  <style>
+    body { font-family: Arial; background: #f8f9fb; padding: 20px; }
+    .chart-container { width: 90%; margin: auto; }
+    #analysis { margin-top: 20px; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+  <h2>💹 Forex AI Analysis Dashboard</h2>
+  <label>Pair:</label>
+  <select id="pairSelect"></select>
+  <label>Timeframe:</label>
+  <select id="timeframe">
+    <option value="1h">1H</option>
+    <option value="4h">4H</option>
+    <option value="1day">1D</option>
+  </select>
+  <button onclick="loadData()">Start Live Analysis</button>
+
+  <div class="chart-container">
+    <canvas id="mainChart" height="300"></canvas>
+    <canvas id="macdChart" height="150"></canvas>
+  </div>
+
+  <div id="analysis"></div>
+
+  <script>
+    const pairs = {{ pairs|tojson }};
+    const pairSelect = document.getElementById('pairSelect');
+    pairs.forEach(p => {
+      let opt = document.createElement('option');
+      opt.value = p; opt.text = p; pairSelect.appendChild(opt);
+    });
+
+    let candleChart, macdChart;
+
+    async function loadData() {
+      const pair = pairSelect.value;
+      const tf = document.getElementById('timeframe').value;
+      const res = await fetch(`/get_data?pair=${encodeURIComponent(pair)}&timeframe=${tf}`);
+      const data = await res.json();
+
+      const prices = data.prices.map(p => ({
+        x: p.date, o: p.open, h: p.high, l: p.low, c: p.close
+      }));
+
+      const ema12 = data.prices.map(p => ({ x: p.date, y: p.EMA12 }));
+      const ema26 = data.prices.map(p => ({ x: p.date, y: p.EMA26 }));
+      const macd = data.prices.map(p => ({ x: p.date, y: p.MACD }));
+      const signal = data.prices.map(p => ({ x: p.date, y: p.Signal }));
+
+      if (candleChart) { candleChart.destroy(); macdChart.destroy(); }
+
+      const ctx1 = document.getElementById('mainChart');
+      const ctx2 = document.getElementById('macdChart');
+
+      candleChart = new Chart(ctx1, {
+        type: 'candlestick',
+        data: {
+          datasets: [
+            { label: pair, data: prices, color: { up: '#0f0', down: '#f00', unchanged: '#999' }},
+            { label: 'EMA12', data: ema12, type: 'line', borderColor: 'blue', borderWidth: 1.2 },
+            { label: 'EMA26', data: ema26, type: 'line', borderColor: 'orange', borderWidth: 1.2 }
+          ]
+        }
+      });
+
+      macdChart = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          datasets: [
+            { label: 'MACD', data: macd, borderColor: 'purple', borderWidth: 1 },
+            { label: 'Signal', data: signal, borderColor: 'red', borderWidth: 1 }
+          ]
+        }
+      });
+
+      document.getElementById('analysis').innerText = data.analysis;
+      setTimeout(loadData, 60000); // auto-refresh 1 menit
+    }
+  </script>
+</body>
+</html>
