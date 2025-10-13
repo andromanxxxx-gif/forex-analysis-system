@@ -1219,7 +1219,7 @@ class DataManager:
             logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
 
     
-    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
+        def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
         """Dapatkan data harga untuk backtesting dengan fallback yang lebih baik"""
         try:
             # Normalisasi format timeframe agar konsisten
@@ -1269,6 +1269,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
             return self._generate_simple_data(pair, timeframe, days)
+
     def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
         """Generate simple synthetic data untuk backtesting"""
         # Tentukan points berdasarkan timeframe
