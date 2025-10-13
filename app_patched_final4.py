@@ -1219,12 +1219,14 @@ class DataManager:
             logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
 
     
-    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
+        def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
         """Dapatkan data harga untuk backtesting dengan fallback yang lebih baik"""
         try:
-            # ✅ PERBAIKAN FINAL:
-            # Jika timeframe = "1D", ambil seluruh data yang tersedia (hingga 500 baris)
-            if timeframe.upper() == "1D":
+            # Normalisasi format timeframe agar konsisten
+            timeframe = timeframe.upper()
+
+            # ✅ Jika timeframe = "1D", ambil seluruh data yang tersedia (hingga 500 baris)
+            if timeframe == "1D":
                 days = 500
 
             if pair in self.historical_data and timeframe in self.historical_data[pair]:
@@ -1232,6 +1234,18 @@ class DataManager:
                 if df.empty:
                     return self._generate_simple_data(pair, timeframe, days)
 
+                # Tentukan jumlah poin yang diperlukan berdasarkan timeframe
+                if timeframe == "M30":
+                    required_points = min(len(df), days * 48)
+                elif timeframe == "1H":
+                    required_points = min(len(df), days * 24)
+                elif timeframe == "4H":
+                    required_points = min(len(df), days * 6)
+                elif timeframe in ["1D", "1W"]:
+                    required_points = min(len(df), days)
+                else:
+                    # ✅ fallback: jika timeframe tidak dikenali
+                    required_points = min(len(df), days)
 
                 result_df = df.tail(required_points).copy()
 
@@ -1249,36 +1263,13 @@ class DataManager:
                 )
                 return result_df
 
-            # Fallback: generate simple synthetic data
+            # Jika data tidak ada, buat data sintetis
             return self._generate_simple_data(pair, timeframe, days)
 
         except Exception as e:
             logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
             return self._generate_simple_data(pair, timeframe, days)
 
-
-            # Fallback: generate simple synthetic data
-            return self._generate_simple_data(pair, timeframe, days)
-
-        except Exception as e:
-            logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
-            return self._generate_simple_data(pair, timeframe, days)
-                
-                    
-            # Fallback: generate simple synthetic data
-            return self._generate_simple_data(pair, timeframe, days)
-            
-        except Exception as e:
-            logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
-            return self._generate_simple_data(pair, timeframe, days)
-                
-                    
-            # Fallback: generate simple synthetic data
-            return self._generate_simple_data(pair, timeframe, days)
-            
-        except Exception as e:
-            logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
-            return self._generate_simple_data(pair, timeframe, days)
 
     def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
         """Generate simple synthetic data untuk backtesting"""
