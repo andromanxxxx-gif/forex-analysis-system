@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ANDRO-FX Precision Forex Trading</title>
+  <title>ANDRO-FX Trading Forex Presisi</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -459,12 +459,12 @@
 <div class="topbar">
   <div class="brand-logo">
     <i class="fas fa-brain"></i>
-    <span>ANDRO-FX Precision Forex Trading</span>
+    <span>ANDRO-FX Trading Forex Presisi</span>
   </div>
   
   <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
     <div class="d-flex align-items-center">
-      <label class="small-muted mb-0 me-2">Pair</label>
+      <label class="small-muted mb-0 me-2">Pasangan</label>
       <select id="pairSelect" class="form-select form-select-sm" style="width:130px;">
         <option>USDJPY</option>
         <option>EURJPY</option>
@@ -482,16 +482,15 @@
     <div class="d-flex align-items-center">
       <label class="small-muted mb-0 me-2">Timeframe</label>
       <select id="timeframeSelect" class="form-select form-select-sm" style="width:100px;">
-        <option>1D</option>
-        <option>4H</option>
         <option>1H</option>
         <option>M30</option>
         <option>M15</option>
+        <option>M5</option>
       </select>
     </div>
     
     <button id="analyzeBtn" class="btn btn-deepseek">
-      <i class="fas fa-chart-line me-2"></i>Analyze
+      <i class="fas fa-chart-line me-2"></i>Analisis
     </button>
     
     <button id="runBacktestBtn" class="btn btn-action">
@@ -512,7 +511,7 @@
     <div class="card-soft position-relative">
       <div class="chart-loading" id="chartLoading">
         <div class="spinner-border text-primary" role="status"></div>
-        <span class="ms-2">Loading chart data...</span>
+        <span class="ms-2">Memuat data chart...</span>
       </div>
       <div class="realtime-indicator" id="realtimeIndicator" style="display: none;">
         <i class="fas fa-circle me-1"></i> LIVE
@@ -521,12 +520,12 @@
         <div>
           <div class="section-title">
             <i class="fas fa-chart-candlestick"></i>
-            <span>Live Price Chart</span>
+            <span>Chart Harga Live</span>
           </div>
-          <div class="muted" id="chartSubtitle">Real-time Candlestick · EMA26 · MACD</div>
+          <div class="muted" id="chartSubtitle">Candlestick Real-time · EMA26 · MACD</div>
         </div>
         <div class="text-end">
-          <div class="small-muted">Current Price</div>
+          <div class="small-muted">Harga Saat Ini</div>
           <div class="price-ticker" id="currentPrice">-</div>
         </div>
       </div>
@@ -540,33 +539,33 @@
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-robot"></i>
-        <span>AI Trading Signal</span>
+        <span>Sinyal Trading AI</span>
       </div>
       
-      <div id="aiSummary" class="muted mb-3">No analysis yet. Click Analyze to start.</div>
+      <div id="aiSummary" class="muted mb-3">Belum ada analisis. Klik Analisis untuk memulai.</div>
       
       <div class="mb-3">
-        <div class="small-muted mb-2">TRADING SIGNAL</div>
-        <div id="aiSignalBadge" class="ai-signal-hold">HOLD</div>
+        <div class="small-muted mb-2">SINYAL TRADING</div>
+        <div id="aiSignalBadge" class="ai-signal-hold">TUNGGU</div>
       </div>
       
       <div class="row mb-3">
         <div class="col-6">
           <div class="metric-card">
-            <div class="small-muted">Confidence</div>
+            <div class="small-muted">Kepercayaan</div>
             <div class="metric-value" id="aiConfidence">-</div>
           </div>
         </div>
         <div class="col-6">
           <div class="metric-card">
-            <div class="small-muted">Risk Level</div>
+            <div class="small-muted">Tingkat Risiko</div>
             <div class="metric-value" id="aiRisk">-</div>
           </div>
         </div>
       </div>
       
       <div class="mb-3">
-        <div class="small-muted mb-2">TRADING LEVELS</div>
+        <div class="small-muted mb-2">LEVEL TRADING</div>
         <div class="trading-level level-entry">
           <i class="fas fa-sign-in-alt me-2"></i>Entry: <span id="aiEntry">-</span>
         </div>
@@ -586,32 +585,32 @@
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-shield-alt"></i>
-        <span>Risk Management</span>
+        <span>Manajemen Risiko</span>
       </div>
       
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <div class="small-muted">TRADE APPROVAL STATUS</div>
-          <div id="riskScoreBadge" class="badge bg-secondary">Score: -/10</div>
+          <div class="small-muted">STATUS PERSETUJUAN TRADE</div>
+          <div id="riskScoreBadge" class="badge bg-secondary">Skor: -/10</div>
         </div>
         
         <div id="riskStatus" class="text-center p-4 rounded-3 mb-3" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 2px solid #bae6fd;">
           <div class="risk-icon mb-2">
             <i class="fas fa-question-circle fa-2x text-muted"></i>
           </div>
-          <div id="riskMainStatus" class="fw-bold fs-5">Awaiting Analysis</div>
-          <div id="riskSubStatus" class="small text-muted mt-1">No risk assessment data available</div>
+          <div id="riskMainStatus" class="fw-bold fs-5">Menunggu Analisis</div>
+          <div id="riskSubStatus" class="small text-muted mt-1">Tidak ada data penilaian risiko</div>
         </div>
       </div>
 
       <!-- Risk Score Visualization -->
       <div class="mb-4">
-        <div class="small-muted mb-2">RISK SCORE BREAKDOWN</div>
+        <div class="small-muted mb-2">RINCIAN SKOR RISIKO</div>
         <div class="risk-score-container">
           <div class="risk-meter mb-3">
             <div class="d-flex justify-content-between mb-1">
-              <span class="small">Low Risk</span>
-              <span class="small">High Risk</span>
+              <span class="small">Risiko Rendah</span>
+              <span class="small">Risiko Tinggi</span>
             </div>
             <div class="risk-meter-bar">
               <div id="riskMeterFill" class="risk-meter-fill" style="width: 0%"></div>
@@ -630,14 +629,14 @@
 
       <!-- Risk Factors Grid -->
       <div class="mb-4">
-        <div class="small-muted mb-2">RISK FACTORS</div>
+        <div class="small-muted mb-2">FAKTOR RISIKO</div>
         <div id="riskFactors" class="row g-2">
           <div class="col-6">
             <div class="risk-factor-card pending">
               <i class="fas fa-clock me-2"></i>
               <div>
-                <div class="risk-factor-name">Market Volatility</div>
-                <div class="risk-factor-status">Pending</div>
+                <div class="risk-factor-name">Volatilitas Pasar</div>
+                <div class="risk-factor-status">Tertunda</div>
               </div>
             </div>
           </div>
@@ -645,8 +644,8 @@
             <div class="risk-factor-card pending">
               <i class="fas fa-clock me-2"></i>
               <div>
-                <div class="risk-factor-name">Position Size</div>
-                <div class="risk-factor-status">Pending</div>
+                <div class="risk-factor-name">Ukuran Posisi</div>
+                <div class="risk-factor-status">Tertunda</div>
               </div>
             </div>
           </div>
@@ -654,8 +653,8 @@
             <div class="risk-factor-card pending">
               <i class="fas fa-clock me-2"></i>
               <div>
-                <div class="risk-factor-name">Correlation</div>
-                <div class="risk-factor-status">Pending</div>
+                <div class="risk-factor-name">Korelasi</div>
+                <div class="risk-factor-status">Tertunda</div>
               </div>
             </div>
           </div>
@@ -663,8 +662,8 @@
             <div class="risk-factor-card pending">
               <i class="fas fa-clock me-2"></i>
               <div>
-                <div class="risk-factor-name">Daily Limits</div>
-                <div class="risk-factor-status">Pending</div>
+                <div class="risk-factor-name">Batas Harian</div>
+                <div class="risk-factor-status">Tertunda</div>
               </div>
             </div>
           </div>
@@ -673,19 +672,19 @@
 
       <!-- Risk Management Tips -->
       <div class="mt-3 pt-3 border-top">
-        <div class="small-muted mb-2">RISK MANAGEMENT TIPS</div>
+        <div class="small-muted mb-2">TIPS MANAJEMEN RISIKO</div>
         <div class="risk-tips">
           <div class="risk-tip">
             <i class="fas fa-lightbulb text-warning me-2"></i>
-            <span class="small">Always use stop-loss orders</span>
+            <span class="small">Selalu gunakan order stop-loss</span>
           </div>
           <div class="risk-tip">
             <i class="fas fa-lightbulb text-warning me-2"></i>
-            <span class="small">Risk only 1-2% per trade</span>
+            <span class="small">Risiko hanya 1-2% per trade</span>
           </div>
           <div class="risk-tip">
             <i class="fas fa-lightbulb text-warning me-2"></i>
-            <span class="small">Monitor correlation between pairs</span>
+            <span class="small">Pantau korelasi antar pair</span>
           </div>
         </div>
       </div>
@@ -747,17 +746,17 @@
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-newspaper"></i>
-        <span>Market News</span>
+        <span>Berita Pasar</span>
       </div>
       <div class="news-container" id="fundamentalNews">
-        No news available. Analyzing market conditions...
+        Tidak ada berita tersedia. Menganalisis kondisi pasar...
       </div>
     </div>
 
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-chart-bar"></i>
-        <span>Technical Analysis</span>
+        <span>Analisis Teknikal</span>
       </div>
       
       <div class="tech-indicator">
@@ -769,7 +768,7 @@
         <span class="indicator-value" id="macdVal">-</span>
       </div>
       <div class="tech-indicator">
-        <span class="small-muted">MACD Histogram</span>
+        <span class="small-muted">Histogram MACD</span>
         <span class="indicator-value" id="macdHistVal">-</span>
       </div>
       <div class="tech-indicator">
@@ -781,11 +780,11 @@
         <span class="indicator-value" id="atrVal">-</span>
       </div>
       <div class="tech-indicator">
-        <span class="small-muted">Volatility</span>
+        <span class="small-muted">Volatilitas</span>
         <span class="indicator-value" id="volVal">-</span>
       </div>
       <div class="tech-indicator">
-        <span class="small-muted">Trend</span>
+        <span class="small-muted">Tren</span>
         <span class="indicator-value" id="trendVal">-</span>
       </div>
     </div>
@@ -793,11 +792,11 @@
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-chart-line"></i>
-        <span>Backtest Results</span>
-        <span id="backtestStatus" class="badge bg-secondary ms-2">Not Run</span>
+        <span>Hasil Backtest</span>
+        <span id="backtestStatus" class="badge bg-secondary ms-2">Belum Dijalankan</span>
       </div>
       <div id="backtestResults" class="backtest-panel">
-        <div class="text-center muted">Run backtest to see performance results</div>
+        <div class="text-center muted">Jalankan backtest untuk melihat hasil performa</div>
       </div>
     </div>
   </div>
@@ -820,22 +819,22 @@
     script.src = 'https://cdn.jsdelivr.net/npm/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js';
     script.onload = initializeApp;
     script.onerror = function() {
-      console.error('Failed to load Lightweight Charts');
+      console.error('Gagal memuat Lightweight Charts');
       // Fallback: Tampilkan pesan error
-      document.getElementById('chartRoot').innerHTML = '<div class="alert alert-danger">Failed to load chart library. Please check your internet connection.</div>';
+      document.getElementById('chartRoot').innerHTML = '<div class="alert alert-danger">Gagal memuat library chart. Periksa koneksi internet Anda.</div>';
       initializeApp(); // Tetap initialize app tanpa charts
     };
     document.head.appendChild(script);
   });
 
   function initializeApp() {
-    console.log('Initializing ANDRO-FX Trading Dashboard...');
+    console.log('Menginisialisasi Dashboard Trading ANDRO-FX...');
     
     // Cek jika Lightweight Charts tersedia
     if (typeof LightweightCharts === 'undefined') {
-      console.warn('Lightweight Charts not available, running in limited mode');
-      document.getElementById('chartRoot').innerHTML = '<div class="alert alert-warning">Charts unavailable. Running in limited mode.</div>';
-      document.getElementById('macdRoot').innerHTML = '<div class="alert alert-warning">MACD Chart unavailable.</div>';
+      console.warn('Lightweight Charts tidak tersedia, berjalan dalam mode terbatas');
+      document.getElementById('chartRoot').innerHTML = '<div class="alert alert-warning">Chart tidak tersedia. Berjalan dalam mode terbatas.</div>';
+      document.getElementById('macdRoot').innerHTML = '<div class="alert alert-warning">Chart MACD tidak tersedia.</div>';
     } else {
       initializeCharts();
     }
@@ -849,7 +848,7 @@
 
   function initializeCharts() {
     try {
-      console.log('Initializing charts...');
+      console.log('Menginisialisasi chart...');
       
       // Chart utama
       const chartOptions = {
@@ -878,8 +877,8 @@
         wickDownColor: '#dc2626',
       });
       
-      // Generate data historis yang lebih banyak - 500 data point
-      const historicalData = generateHistoricalData(500);
+      // Generate data historis yang teratur - 200 data point dengan timeframe yang benar
+      const historicalData = generateHistoricalData(200);
       currentChartData = historicalData;
       candleSeries.setData(historicalData);
       
@@ -923,72 +922,79 @@
       });
       
       // Set visible range to show the most recent data
-      if (historicalData.length > 100) {
-        const from = historicalData[historicalData.length - 100].time;
+      if (historicalData.length > 50) {
+        const from = historicalData[historicalData.length - 50].time;
         const to = historicalData[historicalData.length - 1].time;
         chart.timeScale().setVisibleRange({ from, to });
       }
       
-      console.log('Charts initialized successfully with 500 data points');
+      console.log('Chart berhasil diinisialisasi dengan 200 data point');
       
     } catch (error) {
-      console.error('Error initializing charts:', error);
-      document.getElementById('chartRoot').innerHTML = '<div class="alert alert-danger">Error initializing charts: ' + error.message + '</div>';
+      console.error('Error menginisialisasi chart:', error);
+      document.getElementById('chartRoot').innerHTML = '<div class="alert alert-danger">Error menginisialisasi chart: ' + error.message + '</div>';
     }
   }
 
-  // Fungsi untuk menghasilkan data historis yang lebih banyak - 500 data point
+  // Fungsi untuk menghasilkan data historis yang teratur
   function generateHistoricalData(count) {
     const data = [];
-    let basePrice = 135.0; // Starting price
-    const baseDate = new Date('2022-06-01'); // Start date
+    const basePrice = 148.0; // Starting price
     
-    // Create realistic market movements with trends and volatility changes
-    let trend = 0; // -1 for downtrend, 0 for sideways, 1 for uptrend
-    let volatility = 0.008; // Base volatility
+    // Mulai dari waktu saat ini dan mundur sesuai count
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setHours(startDate.getHours() - count); // Untuk timeframe 1H, mundur count jam
+    
+    let currentPrice = basePrice;
+    let trend = 0; // -1 untuk downtrend, 0 untuk sideways, 1 untuk uptrend
+    let volatility = 0.002; // Base volatility untuk timeframe 1H
     
     for (let i = 0; i < count; i++) {
-      const date = new Date(baseDate);
-      date.setDate(date.getDate() + i);
+      const date = new Date(startDate);
+      date.setHours(date.getHours() + i);
       
-      // Occasionally change trend and volatility to simulate market conditions
-      if (i % 50 === 0) {
-        trend = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
-        volatility = 0.005 + Math.random() * 0.01; // 0.5% to 1.5% volatility
+      // Ubah trend dan volatilitas secara periodik
+      if (i % 24 === 0) { // Setiap 24 jam (1 hari)
+        trend = Math.floor(Math.random() * 3) - 1; // -1, 0, atau 1
+        volatility = 0.0015 + Math.random() * 0.002; // 0.15% hingga 0.35% volatilitas
       }
       
-      const open = basePrice;
+      const open = currentPrice;
       
-      // Price change influenced by trend and random factor
-      let change = (Math.random() - 0.5) * 2 * volatility * basePrice;
+      // Perubahan harga dipengaruhi trend dan faktor acak
+      let change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
       
-      // Add trend influence
+      // Tambah pengaruh trend
       if (trend === 1) {
-        change += volatility * basePrice * 0.3; // Uptrend bias
+        change += volatility * currentPrice * 0.3; // Bias uptrend
       } else if (trend === -1) {
-        change -= volatility * basePrice * 0.3; // Downtrend bias
+        change -= volatility * currentPrice * 0.3; // Bias downtrend
       }
       
       const close = open + change;
       
-      // High and low with realistic ranges
-      const range = volatility * basePrice * (0.8 + Math.random() * 0.4);
+      // High dan low dengan range realistis
+      const range = volatility * currentPrice * (0.8 + Math.random() * 0.4);
       const high = Math.max(open, close) + range * Math.random();
       const low = Math.min(open, close) - range * Math.random();
       
-      // Ensure high is always >= open and close, low is always <= open and close
+      // Pastikan high selalu >= open dan close, low selalu <= open dan close
       const finalHigh = Math.max(open, close, high);
       const finalLow = Math.min(open, close, low);
       
+      // Format waktu untuk Lightweight Charts (dalam detik sejak Unix epoch)
+      const time = Math.floor(date.getTime() / 1000);
+      
       data.push({
-        time: date.toISOString().split('T')[0],
+        time: time,
         open: parseFloat(open.toFixed(4)),
         high: parseFloat(finalHigh.toFixed(4)),
         low: parseFloat(finalLow.toFixed(4)),
         close: parseFloat(close.toFixed(4))
       });
       
-      basePrice = close;
+      currentPrice = close;
     }
     
     return data;
@@ -1073,24 +1079,24 @@
   }
 
   function initializeComponents() {
-    console.log('Initializing components...');
+    console.log('Menginisialisasi komponen...');
     
     // Initialize nilai default
     updatePriceForPair('USDJPY');
     
     // Initialize support & resistance
     document.getElementById('supportLevel').textContent = '147.85';
-    document.getElementById('resistanceLevel').textContent = '149.12';
-    document.getElementById('supportDistance').textContent = '0.27% below';
-    document.getElementById('resistanceDistance').textContent = '0.59% above';
+    document.getElementById('resistanceLevel').textContent = '148.45';
+    document.getElementById('supportDistance').textContent = '0.27% di bawah';
+    document.getElementById('resistanceDistance').textContent = '0.59% di atas';
     
     // Initialize pivot points
-    document.getElementById('pivotPoint').textContent = '148.45';
-    document.getElementById('pivotR1').textContent = '148.92';
-    document.getElementById('pivotR2').textContent = '149.35';
-    document.getElementById('pivotR3').textContent = '149.82';
-    document.getElementById('pivotS1').textContent = '148.02';
-    document.getElementById('pivotS2').textContent = '147.55';
+    document.getElementById('pivotPoint').textContent = '148.15';
+    document.getElementById('pivotR1').textContent = '148.52';
+    document.getElementById('pivotR2').textContent = '148.85';
+    document.getElementById('pivotR3').textContent = '149.22';
+    document.getElementById('pivotS1').textContent = '147.82';
+    document.getElementById('pivotS2').textContent = '147.45';
     document.getElementById('pivotS3').textContent = '147.12';
     
     // Setup event listeners
@@ -1112,7 +1118,7 @@
       updateChartForTimeframe(this.value);
     });
     
-    console.log('Components initialized successfully');
+    console.log('Komponen berhasil diinisialisasi');
   }
 
   // Fungsi untuk update harga berdasarkan pair
@@ -1141,7 +1147,7 @@
   }
 
   function updateChartForPair(pair) {
-    console.log('Updating chart for pair:', pair);
+    console.log('Memperbarui chart untuk pair:', pair);
     document.getElementById('chartLoading').style.display = 'flex';
     
     setTimeout(() => {
@@ -1149,7 +1155,7 @@
       updatePriceForPair(pair);
       
       // Update chart dengan data baru berdasarkan pair
-      const newData = generatePairSpecificData(pair, 500);
+      const newData = generatePairSpecificData(pair, 200);
       currentChartData = newData;
       
       if (candleSeries) {
@@ -1166,8 +1172,8 @@
         macdHistogram.setData(macdData.histogram);
         
         // Set visible range to show the most recent data
-        if (newData.length > 100) {
-          const from = newData[newData.length - 100].time;
+        if (newData.length > 50) {
+          const from = newData[newData.length - 50].time;
           const to = newData[newData.length - 1].time;
           chart.timeScale().setVisibleRange({ from, to });
         }
@@ -1191,20 +1197,20 @@
     };
     
     const volatilities = {
-      'USDJPY': 0.008,
-      'EURJPY': 0.009,
-      'GBPJPY': 0.012,
-      'CHFJPY': 0.007,
-      'GBPUSD': 0.006,
-      'USDCHF': 0.005,
-      'AUDUSD': 0.008,
-      'USDCAD': 0.007,
-      'NZDUSD': 0.009,
-      'XAUUSD': 0.015 // Gold has higher volatility
+      'USDJPY': 0.002,
+      'EURJPY': 0.0022,
+      'GBPJPY': 0.0028,
+      'CHFJPY': 0.0018,
+      'GBPUSD': 0.0015,
+      'USDCHF': 0.0013,
+      'AUDUSD': 0.002,
+      'USDCAD': 0.0018,
+      'NZDUSD': 0.0022,
+      'XAUUSD': 0.0035 // Gold memiliki volatilitas lebih tinggi
     };
     
     const basePrice = basePrices[pair] || 148.0;
-    const volatility = volatilities[pair] || 0.008;
+    const volatility = volatilities[pair] || 0.002;
     
     return generateHistoricalDataWithParams(count, basePrice, volatility);
   }
@@ -1213,15 +1219,19 @@
   function generateHistoricalDataWithParams(count, basePrice, volatility) {
     const data = [];
     let currentPrice = basePrice;
-    const baseDate = new Date('2022-06-01');
+    
+    // Mulai dari waktu saat ini dan mundur sesuai count
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setHours(startDate.getHours() - count);
     
     let trend = 0;
     
     for (let i = 0; i < count; i++) {
-      const date = new Date(baseDate);
-      date.setDate(date.getDate() + i);
+      const date = new Date(startDate);
+      date.setHours(date.getHours() + i);
       
-      if (i % 50 === 0) {
+      if (i % 24 === 0) {
         trend = Math.floor(Math.random() * 3) - 1;
       }
       
@@ -1242,8 +1252,11 @@
       const finalHigh = Math.max(open, close, high);
       const finalLow = Math.min(open, close, low);
       
+      // Format waktu untuk Lightweight Charts (dalam detik sejak Unix epoch)
+      const time = Math.floor(date.getTime() / 1000);
+      
       data.push({
-        time: date.toISOString().split('T')[0],
+        time: time,
         open: parseFloat(open.toFixed(4)),
         high: parseFloat(finalHigh.toFixed(4)),
         low: parseFloat(finalLow.toFixed(4)),
@@ -1257,26 +1270,21 @@
   }
 
   function updateChartForTimeframe(timeframe) {
-    console.log('Updating chart for timeframe:', timeframe);
+    console.log('Memperbarui chart untuk timeframe:', timeframe);
     document.getElementById('chartLoading').style.display = 'flex';
     
     setTimeout(() => {
       document.getElementById('chartLoading').style.display = 'none';
-      document.getElementById('chartSubtitle').textContent = `Real-time Candlestick · EMA26 · MACD · ${timeframe}`;
+      document.getElementById('chartSubtitle').textContent = `Candlestick Real-time · EMA26 · MACD · ${timeframe}`;
     }, 800);
   }
 
   // Fungsi untuk memulai update real-time
   function startRealtimeUpdates() {
-    // Update harga setiap 2 detik
+    // Update harga setiap 3 detik
     setInterval(() => {
       updateRealtimePrice();
-    }, 2000);
-    
-    // Update candle real-time setiap 5 detik
-    setInterval(() => {
-      updateRealtimeCandle();
-    }, 5000);
+    }, 3000);
   }
 
   // Fungsi untuk update harga real-time
@@ -1298,19 +1306,19 @@
     const range = pairPrices[pair] || { min: 147.8, max: 148.7 };
     const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
     
-    // Simulate small price movements
-    const change = (Math.random() - 0.5) * 0.1;
+    // Simulasi pergerakan harga kecil
+    const change = (Math.random() - 0.5) * 0.05;
     let newPrice = currentPrice + change;
     
-    // Ensure price stays within reasonable range
-    if (newPrice < range.min) newPrice = range.min + Math.random() * 0.1;
-    if (newPrice > range.max) newPrice = range.max - Math.random() * 0.1;
+    // Pastikan harga tetap dalam range yang wajar
+    if (newPrice < range.min) newPrice = range.min + Math.random() * 0.05;
+    if (newPrice > range.max) newPrice = range.max - Math.random() * 0.05;
     
     const priceStr = newPrice.toFixed(pair === 'XAUUSD' ? 2 : 4);
     document.getElementById('livePrice').textContent = priceStr;
     document.getElementById('currentPrice').textContent = priceStr;
     
-    // Update change percentage
+    // Update persentase perubahan
     const changePercent = ((newPrice - currentPrice) / currentPrice * 100).toFixed(2);
     const changeStr = changePercent >= 0 ? `+${changePercent}%` : `${changePercent}%`;
     document.getElementById('pairChange').textContent = `(${changeStr})`;
@@ -1325,159 +1333,9 @@
     lastUpdateTime = new Date();
   }
 
-  // Fungsi untuk update candle real-time
-  function updateRealtimeCandle() {
-    if (!candleSeries || currentChartData.length === 0) return;
-    
-    const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
-    const now = new Date();
-    const currentDate = now.toISOString().split('T')[0];
-    
-    // Cek apakah kita sudah memiliki candle untuk hari ini
-    const lastCandle = currentChartData[currentChartData.length - 1];
-    
-    if (lastCandle.time === currentDate) {
-      // Update candle yang sudah ada
-      lastCandle.close = currentPrice;
-      if (currentPrice > lastCandle.high) lastCandle.high = currentPrice;
-      if (currentPrice < lastCandle.low) lastCandle.low = currentPrice;
-      
-      candleSeries.update(lastCandle);
-    } else {
-      // Buat candle baru untuk hari ini
-      const newCandle = {
-        time: currentDate,
-        open: lastCandle.close,
-        high: currentPrice,
-        low: currentPrice,
-        close: currentPrice
-      };
-      
-      currentChartData.push(newCandle);
-      candleSeries.update(newCandle);
-      
-      // Update EMA dan MACD dengan data baru
-      const emaData = calculateEMA(currentChartData, 26);
-      emaSeries.setData(emaData);
-      
-      const macdData = calculateMACD(currentChartData);
-      macdLine.setData(macdData.macdLine);
-      macdSignal.setData(macdData.signalLine);
-      macdHistogram.setData(macdData.histogram);
-    }
-    
-    // Update technical indicators
-    updateTechnicalIndicators(currentChartData);
-  }
-
-  // Fungsi untuk update indikator teknikal
-  function updateTechnicalIndicators(data) {
-    if (data.length === 0) return;
-    
-    const lastCandle = data[data.length - 1];
-    const closes = data.map(d => d.close);
-    
-    // Calculate RSI
-    const rsi = calculateRSI(closes, 14);
-    document.getElementById('rsiVal').textContent = rsi.toFixed(2);
-    
-    // Calculate MACD values
-    const macdData = calculateMACD(data);
-    const lastMacd = macdData.macdLine[macdData.macdLine.length - 1].value;
-    const lastSignal = macdData.signalLine[macdData.signalLine.length - 1].value;
-    const lastHistogram = macdData.histogram[macdData.histogram.length - 1].value;
-    
-    document.getElementById('macdVal').textContent = lastMacd.toFixed(4);
-    document.getElementById('macdHistVal').textContent = lastHistogram.toFixed(4);
-    
-    // Calculate ADX (simplified)
-    const adx = 25 + Math.random() * 30; // Simulated ADX
-    document.getElementById('adxVal').textContent = adx.toFixed(2);
-    
-    // Calculate ATR
-    const atr = calculateATR(data, 14);
-    document.getElementById('atrVal').textContent = atr.toFixed(4);
-    
-    // Calculate Volatility
-    const volatility = calculateVolatility(closes, 20);
-    document.getElementById('volVal').textContent = (volatility * 100).toFixed(2) + '%';
-    
-    // Determine Trend
-    const trend = determineTrend(data);
-    document.getElementById('trendVal').textContent = trend;
-  }
-
-  // Fungsi untuk menghitung RSI
-  function calculateRSI(closes, period) {
-    if (closes.length < period + 1) return 50;
-    
-    let gains = 0;
-    let losses = 0;
-    
-    for (let i = 1; i <= period; i++) {
-      const difference = closes[closes.length - i] - closes[closes.length - i - 1];
-      if (difference >= 0) {
-        gains += difference;
-      } else {
-        losses -= difference;
-      }
-    }
-    
-    const avgGain = gains / period;
-    const avgLoss = losses / period;
-    
-    if (avgLoss === 0) return 100;
-    
-    const rs = avgGain / avgLoss;
-    return 100 - (100 / (1 + rs));
-  }
-
-  // Fungsi untuk menghitung ATR
-  function calculateATR(data, period) {
-    if (data.length < period + 1) return 0;
-    
-    let sum = 0;
-    for (let i = data.length - period; i < data.length; i++) {
-      const tr = Math.max(
-        data[i].high - data[i].low,
-        Math.abs(data[i].high - data[i-1].close),
-        Math.abs(data[i].low - data[i-1].close)
-      );
-      sum += tr;
-    }
-    
-    return sum / period;
-  }
-
-  // Fungsi untuk menghitung volatilitas
-  function calculateVolatility(closes, period) {
-    if (closes.length < period) return 0;
-    
-    const recentCloses = closes.slice(-period);
-    const mean = recentCloses.reduce((a, b) => a + b, 0) / period;
-    const variance = recentCloses.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
-    
-    return Math.sqrt(variance) / mean;
-  }
-
-  // Fungsi untuk menentukan tren
-  function determineTrend(data) {
-    if (data.length < 20) return 'Sideways';
-    
-    const recentData = data.slice(-20);
-    const firstPrice = recentData[0].close;
-    const lastPrice = recentData[recentData.length - 1].close;
-    
-    const change = (lastPrice - firstPrice) / firstPrice * 100;
-    
-    if (change > 2) return 'Up';
-    if (change < -2) return 'Down';
-    return 'Sideways';
-  }
-
   // Fungsi untuk melakukan analisis AI yang lebih komprehensif
   function performAIAnalysis() {
-    console.log('Performing AI analysis...');
+    console.log('Melakukan analisis AI...');
     
     // Show loading
     document.getElementById('chartLoading').style.display = 'flex';
@@ -1487,27 +1345,20 @@
       const pair = document.getElementById('pairSelect').value;
       const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
       
-      // Dapatkan data teknikal
-      const rsi = parseFloat(document.getElementById('rsiVal').textContent);
-      const macd = parseFloat(document.getElementById('macdVal').textContent);
-      const macdHist = parseFloat(document.getElementById('macdHistVal').textContent);
-      const adx = parseFloat(document.getElementById('adxVal').textContent);
-      const trend = document.getElementById('trendVal').textContent;
-      
       // Analisis fundamental berdasarkan pair
       const fundamentalAnalysis = getFundamentalAnalysis(pair);
       
       // Analisis teknikal
-      const technicalAnalysis = getTechnicalAnalysis(rsi, macd, macdHist, adx, trend);
+      const technicalAnalysis = getTechnicalAnalysis();
       
       // Gabungkan analisis untuk menghasilkan sinyal
-      const aiSignal = generateAISignal(fundamentalAnalysis, technicalAnalysis);
+      const aiSignal = generateAISignal(fundamentalAnalysis, technicalAnalysis, pair, currentPrice);
       
       // Update AI Signal
       document.getElementById('aiSignalBadge').textContent = aiSignal.signal;
       document.getElementById('aiSignalBadge').className = 
-        aiSignal.signal === 'BUY' ? 'ai-signal-buy' : 
-        aiSignal.signal === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
+        aiSignal.signal === 'BELI' ? 'ai-signal-buy' : 
+        aiSignal.signal === 'JUAL' ? 'ai-signal-sell' : 'ai-signal-hold';
       
       // Update other values
       document.getElementById('aiConfidence').textContent = aiSignal.confidence + '%';
@@ -1519,8 +1370,8 @@
       document.getElementById('aiSummary').textContent = aiSignal.summary;
       
       // Update risk assessment
-      const riskScore = aiSignal.risk === 'Low' ? 3 : aiSignal.risk === 'Medium' ? 6 : 9;
-      document.getElementById('riskScoreBadge').textContent = `Score: ${riskScore}/10`;
+      const riskScore = aiSignal.risk === 'Rendah' ? 3 : aiSignal.risk === 'Sedang' ? 6 : 9;
+      document.getElementById('riskScoreBadge').textContent = `Skor: ${riskScore}/10`;
       document.getElementById('riskScoreBadge').className = `badge ${
         riskScore <= 3 ? 'bg-success' : 
         riskScore <= 6 ? 'bg-warning' : 'bg-danger'
@@ -1532,14 +1383,14 @@
         riskScore <= 6 ? '#f59e0b' : '#ef4444';
       
       if (riskScore <= 5) {
-        document.getElementById('riskMainStatus').textContent = 'APPROVED';
-        document.getElementById('riskSubStatus').textContent = 'Trade meets risk criteria';
+        document.getElementById('riskMainStatus').textContent = 'DISETUJUI';
+        document.getElementById('riskSubStatus').textContent = 'Trade memenuhi kriteria risiko';
         document.getElementById('riskStatus').style.background = 'linear-gradient(135deg, #f0f9ff, #e0f2fe)';
         document.getElementById('riskStatus').style.border = '2px solid #bae6fd';
         document.querySelector('.risk-icon i').className = 'fas fa-check-circle fa-2x text-success';
       } else {
-        document.getElementById('riskMainStatus').textContent = 'REJECTED';
-        document.getElementById('riskSubStatus').textContent = 'Trade exceeds risk limits';
+        document.getElementById('riskMainStatus').textContent = 'DITOLAK';
+        document.getElementById('riskSubStatus').textContent = 'Trade melebihi batas risiko';
         document.getElementById('riskStatus').style.background = 'linear-gradient(135deg, #fef2f2, #fee2e2)';
         document.getElementById('riskStatus').style.border = '2px solid #fecaca';
         document.querySelector('.risk-icon i').className = 'fas fa-times-circle fa-2x text-danger';
@@ -1557,13 +1408,13 @@
         
         if (randomStatus === 'low') {
           icon.className = 'fas fa-check-circle me-2';
-          statusText.textContent = 'LOW';
+          statusText.textContent = 'RENDAH';
         } else if (randomStatus === 'medium') {
           icon.className = 'fas fa-exclamation-triangle me-2';
-          statusText.textContent = 'MEDIUM';
+          statusText.textContent = 'SEDANG';
         } else {
           icon.className = 'fas fa-times-circle me-2';
-          statusText.textContent = 'HIGH';
+          statusText.textContent = 'TINGGI';
         }
       });
       
@@ -1577,7 +1428,7 @@
       // Hide loading
       document.getElementById('chartLoading').style.display = 'none';
       
-      console.log('AI analysis completed');
+      console.log('Analisis AI selesai');
     }, 1500);
   }
 
@@ -1585,92 +1436,113 @@
   function getFundamentalAnalysis(pair) {
     const fundamentalData = {
       'USDJPY': {
-        news: "BOJ maintains ultra-loose policy, Yen weakens. Fed signals potential rate cuts in 2024.",
-        impact: 'Bearish for JPY'
+        news: "BOJ mempertahankan kebijakan ultra-longgar, Yen melemah. Fed memberi sinyal potensi pemotongan suku bunga di 2024.",
+        impact: 'Bearish untuk JPY'
       },
       'EURJPY': {
-        news: "ECB considering rate cuts amid slowing inflation. BOJ policy divergence supports EUR.",
-        impact: 'Bullish for EUR'
+        news: "ECB mempertimbangkan pemotongan suku bunga di tengah inflasi yang melambat. Perbedaan kebijakan BOJ mendukung EUR.",
+        impact: 'Bullish untuk EUR'
       },
       'GBPJPY': {
-        news: "Bank of England holds rates steady. UK inflation remains stubbornly high.",
-        impact: 'Neutral'
+        news: "Bank of England mempertahankan suku bunga tetap. Inflasi Inggris tetap tinggi secara membandel.",
+        impact: 'Netral'
       },
       'CHFJPY': {
-        news: "SNB intervenes to weaken Franc. Safe-haven flows support JPY.",
-        impact: 'Bearish for CHF'
+        news: "SNB melakukan intervensi untuk melemahkan Franc. Aliran safe-haven mendukung JPY.",
+        impact: 'Bearish untuk CHF'
       },
       'GBPUSD': {
-        news: "USD strength continues amid global uncertainty. UK economic data mixed.",
-        impact: 'Bearish for GBP'
+        news: "Kekuatan USD berlanjut di tengah ketidakpastian global. Data ekonomi Inggris beragam.",
+        impact: 'Bearish untuk GBP'
       },
       'USDCHF': {
-        news: "SNB continues FX interventions. USD remains strong on safe-haven flows.",
-        impact: 'Bullish for USD'
+        news: "SNB melanjutkan intervensi FX. USD tetap kuat pada aliran safe-haven.",
+        impact: 'Bullish untuk USD'
       },
       'AUDUSD': {
-        news: "RBA maintains hawkish stance. Commodity prices support AUD.",
-        impact: 'Bullish for AUD'
+        news: "RBA mempertahankan sikap hawkish. Harga komoditas mendukung AUD.",
+        impact: 'Bullish untuk AUD'
       },
       'USDCAD': {
-        news: "Bank of Canada holds rates. Oil prices volatile, impacting CAD.",
-        impact: 'Neutral'
+        news: "Bank of Canada mempertahankan suku bunga. Harga minyak volatil, berdampak pada CAD.",
+        impact: 'Netral'
       },
       'NZDUSD': {
-        news: "RBNZ dovish pivot surprises markets. NZ economic data weaker than expected.",
-        impact: 'Bearish for NZD'
+        news: "Pivot dovish RBNZ mengejutkan pasar. Data ekonomi NZ lebih lemah dari perkiraan.",
+        impact: 'Bearish untuk NZD'
       },
       'XAUUSD': {
-        news: "Gold prices supported by geopolitical tensions. Fed policy outlook key driver.",
-        impact: 'Bullish for Gold'
+        news: "Harga emas didukung oleh ketegangan geopolitik. Outlook kebijakan Fed menjadi pendorong utama.",
+        impact: 'Bullish untuk Emas'
       }
     };
     
     return fundamentalData[pair] || {
-      news: "Market awaiting key economic data releases. Volatility expected.",
-      impact: 'Neutral'
+      news: "Pasar menunggu rilis data ekonomi kunci. Volatilitas diperkirakan.",
+      impact: 'Netral'
     };
   }
 
   // Fungsi untuk analisis teknikal
-  function getTechnicalAnalysis(rsi, macd, macdHist, adx, trend) {
+  function getTechnicalAnalysis() {
+    // Simulasikan nilai indikator teknikal
+    const rsi = 30 + Math.random() * 40; // RSI antara 30-70
+    const macd = (Math.random() - 0.5) * 0.1; // MACD antara -0.05 hingga 0.05
+    const macdHist = (Math.random() - 0.5) * 0.05; // Histogram MACD
+    const adx = 20 + Math.random() * 30; // ADX antara 20-50
+    const atr = 0.05 + Math.random() * 0.15; // ATR
+    const volatility = (Math.random() * 5 + 2).toFixed(2); // Volatilitas 2-7%
+    
+    // Tentukan tren berdasarkan kondisi acak
+    const trends = ['Naik', 'Turun', 'Menyamping'];
+    const trend = trends[Math.floor(Math.random() * trends.length)];
+    
+    // Update tampilan indikator
+    document.getElementById('rsiVal').textContent = rsi.toFixed(2);
+    document.getElementById('macdVal').textContent = macd.toFixed(4);
+    document.getElementById('macdHistVal').textContent = macdHist.toFixed(4);
+    document.getElementById('adxVal').textContent = adx.toFixed(2);
+    document.getElementById('atrVal').textContent = atr.toFixed(4);
+    document.getElementById('volVal').textContent = volatility + '%';
+    document.getElementById('trendVal').textContent = trend;
+    
     let score = 0;
     let signals = [];
     
-    // RSI Analysis
+    // Analisis RSI
     if (rsi < 30) {
       score += 2;
-      signals.push('RSI indicates oversold conditions');
+      signals.push('RSI mengindikasikan kondisi oversold');
     } else if (rsi > 70) {
       score -= 2;
-      signals.push('RSI indicates overbought conditions');
+      signals.push('RSI mengindikasikan kondisi overbought');
     } else if (rsi > 50) {
       score += 1;
     } else {
       score -= 1;
     }
     
-    // MACD Analysis
+    // Analisis MACD
     if (macd > 0 && macdHist > 0) {
       score += 2;
-      signals.push('MACD bullish crossover detected');
+      signals.push('Crossover bullish MACD terdeteksi');
     } else if (macd < 0 && macdHist < 0) {
       score -= 2;
-      signals.push('MACD bearish crossover detected');
+      signals.push('Crossover bearish MACD terdeteksi');
     }
     
-    // ADX Analysis
+    // Analisis ADX
     if (adx > 25) {
       score += 1;
-      signals.push('Strong trend detected');
+      signals.push('Tren kuat terdeteksi');
     } else {
-      signals.push('Weak trend, ranging market');
+      signals.push('Tren lemah, pasar ranging');
     }
     
-    // Trend Analysis
-    if (trend === 'Up') {
+    // Analisis Tren
+    if (trend === 'Naik') {
       score += 1;
-    } else if (trend === 'Down') {
+    } else if (trend === 'Turun') {
       score -= 1;
     }
     
@@ -1678,10 +1550,7 @@
   }
 
   // Fungsi untuk menghasilkan sinyal AI berdasarkan analisis fundamental dan teknikal
-  function generateAISignal(fundamental, technical) {
-    const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
-    const pair = document.getElementById('pairSelect').value;
-    
+  function generateAISignal(fundamental, technical, pair, currentPrice) {
     // Tentukan arah sinyal berdasarkan analisis
     let signal, confidence, risk;
     
@@ -1697,33 +1566,33 @@
     
     // Tentukan sinyal berdasarkan skor
     if (totalScore >= 3) {
-      signal = 'BUY';
+      signal = 'BELI';
       confidence = 75 + Math.floor(Math.random() * 20);
-      risk = 'Low';
+      risk = 'Rendah';
     } else if (totalScore <= -3) {
-      signal = 'SELL';
+      signal = 'JUAL';
       confidence = 75 + Math.floor(Math.random() * 20);
-      risk = 'Low';
+      risk = 'Rendah';
     } else {
-      signal = 'HOLD';
+      signal = 'TUNGGU';
       confidence = 50 + Math.floor(Math.random() * 30);
-      risk = 'Medium';
+      risk = 'Sedang';
     }
     
     // Hitung level trading
     const volatility = parseFloat(document.getElementById('volVal').textContent) / 100;
     let entry, sl, tp1, tp2;
     
-    if (signal === 'BUY') {
-      entry = currentPrice * (1 + volatility * 0.1);
-      sl = currentPrice * (1 - volatility * 0.5);
-      tp1 = currentPrice * (1 + volatility * 1.0);
-      tp2 = currentPrice * (1 + volatility * 1.8);
-    } else if (signal === 'SELL') {
+    if (signal === 'BELI') {
       entry = currentPrice * (1 - volatility * 0.1);
+      sl = currentPrice * (1 - volatility * 0.5);
+      tp1 = currentPrice * (1 + volatility * 0.8);
+      tp2 = currentPrice * (1 + volatility * 1.5);
+    } else if (signal === 'JUAL') {
+      entry = currentPrice * (1 + volatility * 0.1);
       sl = currentPrice * (1 + volatility * 0.5);
-      tp1 = currentPrice * (1 - volatility * 1.0);
-      tp2 = currentPrice * (1 - volatility * 1.8);
+      tp1 = currentPrice * (1 - volatility * 0.8);
+      tp2 = currentPrice * (1 - volatility * 1.5);
     } else {
       entry = currentPrice;
       sl = currentPrice * (1 - volatility * 0.3);
@@ -1732,7 +1601,7 @@
     }
     
     // Buat ringkasan analisis
-    const summary = `AI analysis: ${signal} signal based on ${technical.signals.join(', ')}. ${fundamental.news} Fundamental impact: ${fundamental.impact}.`;
+    const summary = `Analisis AI: Sinyal ${signal} berdasarkan ${technical.signals.join(', ')}. ${fundamental.news} Dampak fundamental: ${fundamental.impact}.`;
     
     return {
       signal,
@@ -1747,26 +1616,26 @@
   }
 
   function simulateBacktest() {
-    console.log('Simulating backtest...');
+    console.log('Menjalankan simulasi backtest...');
     
-    document.getElementById('backtestStatus').textContent = 'Running...';
+    document.getElementById('backtestStatus').textContent = 'Menjalankan...';
     document.getElementById('backtestStatus').className = 'badge bg-warning';
     
     // Simulate backtest delay
     setTimeout(function() {
       const resultsHTML = `
-        <div class="performance-grade grade-a">Performance: A</div>
+        <div class="performance-grade grade-a">Performa: A</div>
         <div class="row">
           <div class="col-6">
             <div class="metric-card">
-              <div class="small-muted">Total Trades</div>
-              <div class="metric-value">142</div>
+              <div class="small-muted">Total Trade</div>
+              <div class="metric-value">87</div>
             </div>
           </div>
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Win Rate</div>
-              <div class="metric-value change-positive">67.5%</div>
+              <div class="metric-value change-positive">68.9%</div>
             </div>
           </div>
         </div>
@@ -1774,13 +1643,13 @@
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Total Profit</div>
-              <div class="metric-value change-positive">$3,250.75</div>
+              <div class="metric-value change-positive">$2,450.25</div>
             </div>
           </div>
           <div class="col-6">
             <div class="metric-card">
-              <div class="small-muted">Final Balance</div>
-              <div class="metric-value">$13,250.75</div>
+              <div class="small-muted">Saldo Akhir</div>
+              <div class="metric-value">$12,450.25</div>
             </div>
           </div>
         </div>
@@ -1788,23 +1657,23 @@
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Return %</div>
-              <div class="metric-value change-positive">32.5%</div>
+              <div class="metric-value change-positive">24.5%</div>
             </div>
           </div>
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Max Drawdown</div>
-              <div class="metric-value change-negative">-6.2%</div>
+              <div class="metric-value change-negative">-5.8%</div>
             </div>
           </div>
         </div>
       `;
       
       document.getElementById('backtestResults').innerHTML = resultsHTML;
-      document.getElementById('backtestStatus').textContent = 'Completed';
+      document.getElementById('backtestStatus').textContent = 'Selesai';
       document.getElementById('backtestStatus').className = 'badge bg-success';
       
-      console.log('Backtest simulation completed');
+      console.log('Simulasi backtest selesai');
     }, 2000);
   }
 </script>
