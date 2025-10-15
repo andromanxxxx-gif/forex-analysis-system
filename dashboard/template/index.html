@@ -475,6 +475,7 @@
         <option>AUDUSD</option>
         <option>USDCAD</option>
         <option>NZDUSD</option>
+        <option>XAUUSD</option>
       </select>
     </div>
     
@@ -485,6 +486,7 @@
         <option>4H</option>
         <option>1H</option>
         <option>M30</option>
+        <option>M15</option>
       </select>
     </div>
     
@@ -804,6 +806,13 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Load Lightweight Charts dengan approach yang lebih aman -->
 <script>
+  // Global variables untuk chart dan data
+  let chart, candleSeries, emaSeries, macdChart, macdLine, macdSignal, macdHistogram;
+  let currentChartData = [];
+  let realtimeCandle = null;
+  let isRealtimeMode = false;
+  let lastUpdateTime = null;
+
   // Tunggu sampai DOM siap
   document.addEventListener('DOMContentLoaded', function() {
     // Load Lightweight Charts secara dinamis
@@ -833,6 +842,9 @@
     
     // Initialize komponen lainnya
     initializeComponents();
+    
+    // Mulai update real-time
+    startRealtimeUpdates();
   }
 
   function initializeCharts() {
@@ -857,8 +869,8 @@
         height: 520
       };
 
-      const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
-      const candleSeries = chart.addCandlestickSeries({
+      chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
+      candleSeries = chart.addCandlestickSeries({
         upColor: '#16a34a',
         downColor: '#dc2626',
         borderVisible: false,
@@ -868,10 +880,11 @@
       
       // Generate data historis yang lebih banyak - 500 data point
       const historicalData = generateHistoricalData(500);
+      currentChartData = historicalData;
       candleSeries.setData(historicalData);
       
       // Tambahkan EMA
-      const emaSeries = chart.addLineSeries({
+      emaSeries = chart.addLineSeries({
         color: '#3b82f6',
         lineWidth: 2,
         priceScaleId: 'right',
@@ -881,7 +894,7 @@
       emaSeries.setData(emaData);
       
       // MACD Chart
-      const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
+      macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
         width: document.getElementById('macdRoot').clientWidth,
         height: 160,
         timeScale: {
@@ -890,9 +903,9 @@
         }
       });
       
-      const macdLine = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1 });
-      const macdSignal = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
-      const macdHistogram = macdChart.addHistogramSeries({ 
+      macdLine = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1 });
+      macdSignal = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
+      macdHistogram = macdChart.addHistogramSeries({ 
         color: '#a78bfa',
         priceFormat: {
           type: 'volume',
@@ -1063,10 +1076,7 @@
     console.log('Initializing components...');
     
     // Initialize nilai default
-    document.getElementById('livePrice').textContent = '148.25';
-    document.getElementById('currentPrice').textContent = '148.25';
-    document.getElementById('pairChange').textContent = '(+0.15%)';
-    document.getElementById('pairChange').className = 'price-change change-positive';
+    updatePriceForPair('USDJPY');
     
     // Initialize support & resistance
     document.getElementById('supportLevel').textContent = '147.85';
@@ -1085,7 +1095,7 @@
     
     // Setup event listeners
     document.getElementById('analyzeBtn').addEventListener('click', function() {
-      simulateAnalysis();
+      performAIAnalysis();
     });
     
     document.getElementById('runBacktestBtn').addEventListener('click', function() {
@@ -1105,30 +1115,145 @@
     console.log('Components initialized successfully');
   }
 
+  // Fungsi untuk update harga berdasarkan pair
+  function updatePriceForPair(pair) {
+    const pairPrices = {
+      'USDJPY': { price: '148.25', change: '+0.15%' },
+      'EURJPY': { price: '159.80', change: '-0.22%' },
+      'GBPJPY': { price: '183.45', change: '+0.08%' },
+      'CHFJPY': { price: '168.90', change: '-0.12%' },
+      'GBPUSD': { price: '1.2350', change: '+0.18%' },
+      'USDCHF': { price: '0.9050', change: '-0.05%' },
+      'AUDUSD': { price: '0.6520', change: '+0.32%' },
+      'USDCAD': { price: '1.3650', change: '-0.15%' },
+      'NZDUSD': { price: '0.5920', change: '+0.25%' },
+      'XAUUSD': { price: '1985.50', change: '+0.42%' }
+    };
+    
+    const pairData = pairPrices[pair] || { price: '148.25', change: '+0.15%' };
+    
+    document.getElementById('livePrice').textContent = pairData.price;
+    document.getElementById('currentPrice').textContent = pairData.price;
+    document.getElementById('pairChange').textContent = `(${pairData.change})`;
+    document.getElementById('pairChange').className = pairData.change.includes('+') 
+      ? 'price-change change-positive' 
+      : 'price-change change-negative';
+  }
+
   function updateChartForPair(pair) {
     console.log('Updating chart for pair:', pair);
-    // In a real app, this would fetch new data from the server
     document.getElementById('chartLoading').style.display = 'flex';
     
     setTimeout(() => {
       document.getElementById('chartLoading').style.display = 'none';
-      // Update price based on pair
-      const pairPrices = {
-        'USDJPY': '148.25',
-        'EURJPY': '159.80',
-        'GBPJPY': '183.45',
-        'CHFJPY': '168.90',
-        'GBPUSD': '1.2350',
-        'USDCHF': '0.9050',
-        'AUDUSD': '0.6520',
-        'USDCAD': '1.3650',
-        'NZDUSD': '0.5920'
-      };
+      updatePriceForPair(pair);
       
-      const newPrice = pairPrices[pair] || '148.25';
-      document.getElementById('livePrice').textContent = newPrice;
-      document.getElementById('currentPrice').textContent = newPrice;
+      // Update chart dengan data baru berdasarkan pair
+      const newData = generatePairSpecificData(pair, 500);
+      currentChartData = newData;
+      
+      if (candleSeries) {
+        candleSeries.setData(newData);
+        
+        // Update EMA
+        const emaData = calculateEMA(newData, 26);
+        emaSeries.setData(emaData);
+        
+        // Update MACD
+        const macdData = calculateMACD(newData);
+        macdLine.setData(macdData.macdLine);
+        macdSignal.setData(macdData.signalLine);
+        macdHistogram.setData(macdData.histogram);
+        
+        // Set visible range to show the most recent data
+        if (newData.length > 100) {
+          const from = newData[newData.length - 100].time;
+          const to = newData[newData.length - 1].time;
+          chart.timeScale().setVisibleRange({ from, to });
+        }
+      }
     }, 1000);
+  }
+
+  // Fungsi untuk menghasilkan data spesifik berdasarkan pair
+  function generatePairSpecificData(pair, count) {
+    const basePrices = {
+      'USDJPY': 148.0,
+      'EURJPY': 159.0,
+      'GBPJPY': 183.0,
+      'CHFJPY': 168.0,
+      'GBPUSD': 1.2350,
+      'USDCHF': 0.9050,
+      'AUDUSD': 0.6520,
+      'USDCAD': 1.3650,
+      'NZDUSD': 0.5920,
+      'XAUUSD': 1985.0
+    };
+    
+    const volatilities = {
+      'USDJPY': 0.008,
+      'EURJPY': 0.009,
+      'GBPJPY': 0.012,
+      'CHFJPY': 0.007,
+      'GBPUSD': 0.006,
+      'USDCHF': 0.005,
+      'AUDUSD': 0.008,
+      'USDCAD': 0.007,
+      'NZDUSD': 0.009,
+      'XAUUSD': 0.015 // Gold has higher volatility
+    };
+    
+    const basePrice = basePrices[pair] || 148.0;
+    const volatility = volatilities[pair] || 0.008;
+    
+    return generateHistoricalDataWithParams(count, basePrice, volatility);
+  }
+
+  // Fungsi untuk menghasilkan data historis dengan parameter khusus
+  function generateHistoricalDataWithParams(count, basePrice, volatility) {
+    const data = [];
+    let currentPrice = basePrice;
+    const baseDate = new Date('2022-06-01');
+    
+    let trend = 0;
+    
+    for (let i = 0; i < count; i++) {
+      const date = new Date(baseDate);
+      date.setDate(date.getDate() + i);
+      
+      if (i % 50 === 0) {
+        trend = Math.floor(Math.random() * 3) - 1;
+      }
+      
+      const open = currentPrice;
+      let change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
+      
+      if (trend === 1) {
+        change += volatility * currentPrice * 0.3;
+      } else if (trend === -1) {
+        change -= volatility * currentPrice * 0.3;
+      }
+      
+      const close = open + change;
+      const range = volatility * currentPrice * (0.8 + Math.random() * 0.4);
+      const high = Math.max(open, close) + range * Math.random();
+      const low = Math.min(open, close) - range * Math.random();
+      
+      const finalHigh = Math.max(open, close, high);
+      const finalLow = Math.min(open, close, low);
+      
+      data.push({
+        time: date.toISOString().split('T')[0],
+        open: parseFloat(open.toFixed(4)),
+        high: parseFloat(finalHigh.toFixed(4)),
+        low: parseFloat(finalLow.toFixed(4)),
+        close: parseFloat(close.toFixed(4))
+      });
+      
+      currentPrice = close;
+    }
+    
+    return data;
   }
 
   function updateChartForTimeframe(timeframe) {
@@ -1141,44 +1266,260 @@
     }, 800);
   }
 
-  function simulateAnalysis() {
-    console.log('Simulating analysis...');
+  // Fungsi untuk memulai update real-time
+  function startRealtimeUpdates() {
+    // Update harga setiap 2 detik
+    setInterval(() => {
+      updateRealtimePrice();
+    }, 2000);
+    
+    // Update candle real-time setiap 5 detik
+    setInterval(() => {
+      updateRealtimeCandle();
+    }, 5000);
+  }
+
+  // Fungsi untuk update harga real-time
+  function updateRealtimePrice() {
+    const pair = document.getElementById('pairSelect').value;
+    const pairPrices = {
+      'USDJPY': { min: 147.8, max: 148.7 },
+      'EURJPY': { min: 159.2, max: 160.3 },
+      'GBPJPY': { min: 182.8, max: 184.2 },
+      'CHFJPY': { min: 168.2, max: 169.5 },
+      'GBPUSD': { min: 1.2320, max: 1.2380 },
+      'USDCHF': { min: 0.9020, max: 0.9080 },
+      'AUDUSD': { min: 0.6490, max: 0.6550 },
+      'USDCAD': { min: 1.3620, max: 1.3680 },
+      'NZDUSD': { min: 0.5890, max: 0.5950 },
+      'XAUUSD': { min: 1980.0, max: 1992.0 }
+    };
+    
+    const range = pairPrices[pair] || { min: 147.8, max: 148.7 };
+    const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
+    
+    // Simulate small price movements
+    const change = (Math.random() - 0.5) * 0.1;
+    let newPrice = currentPrice + change;
+    
+    // Ensure price stays within reasonable range
+    if (newPrice < range.min) newPrice = range.min + Math.random() * 0.1;
+    if (newPrice > range.max) newPrice = range.max - Math.random() * 0.1;
+    
+    const priceStr = newPrice.toFixed(pair === 'XAUUSD' ? 2 : 4);
+    document.getElementById('livePrice').textContent = priceStr;
+    document.getElementById('currentPrice').textContent = priceStr;
+    
+    // Update change percentage
+    const changePercent = ((newPrice - currentPrice) / currentPrice * 100).toFixed(2);
+    const changeStr = changePercent >= 0 ? `+${changePercent}%` : `${changePercent}%`;
+    document.getElementById('pairChange').textContent = `(${changeStr})`;
+    document.getElementById('pairChange').className = changePercent >= 0 
+      ? 'price-change change-positive' 
+      : 'price-change change-negative';
+    
+    // Update status indicator
+    document.getElementById('statusIndicator').className = 'status-indicator status-live';
+    document.getElementById('realtimeIndicator').style.display = 'block';
+    
+    lastUpdateTime = new Date();
+  }
+
+  // Fungsi untuk update candle real-time
+  function updateRealtimeCandle() {
+    if (!candleSeries || currentChartData.length === 0) return;
+    
+    const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0];
+    
+    // Cek apakah kita sudah memiliki candle untuk hari ini
+    const lastCandle = currentChartData[currentChartData.length - 1];
+    
+    if (lastCandle.time === currentDate) {
+      // Update candle yang sudah ada
+      lastCandle.close = currentPrice;
+      if (currentPrice > lastCandle.high) lastCandle.high = currentPrice;
+      if (currentPrice < lastCandle.low) lastCandle.low = currentPrice;
+      
+      candleSeries.update(lastCandle);
+    } else {
+      // Buat candle baru untuk hari ini
+      const newCandle = {
+        time: currentDate,
+        open: lastCandle.close,
+        high: currentPrice,
+        low: currentPrice,
+        close: currentPrice
+      };
+      
+      currentChartData.push(newCandle);
+      candleSeries.update(newCandle);
+      
+      // Update EMA dan MACD dengan data baru
+      const emaData = calculateEMA(currentChartData, 26);
+      emaSeries.setData(emaData);
+      
+      const macdData = calculateMACD(currentChartData);
+      macdLine.setData(macdData.macdLine);
+      macdSignal.setData(macdData.signalLine);
+      macdHistogram.setData(macdData.histogram);
+    }
+    
+    // Update technical indicators
+    updateTechnicalIndicators(currentChartData);
+  }
+
+  // Fungsi untuk update indikator teknikal
+  function updateTechnicalIndicators(data) {
+    if (data.length === 0) return;
+    
+    const lastCandle = data[data.length - 1];
+    const closes = data.map(d => d.close);
+    
+    // Calculate RSI
+    const rsi = calculateRSI(closes, 14);
+    document.getElementById('rsiVal').textContent = rsi.toFixed(2);
+    
+    // Calculate MACD values
+    const macdData = calculateMACD(data);
+    const lastMacd = macdData.macdLine[macdData.macdLine.length - 1].value;
+    const lastSignal = macdData.signalLine[macdData.signalLine.length - 1].value;
+    const lastHistogram = macdData.histogram[macdData.histogram.length - 1].value;
+    
+    document.getElementById('macdVal').textContent = lastMacd.toFixed(4);
+    document.getElementById('macdHistVal').textContent = lastHistogram.toFixed(4);
+    
+    // Calculate ADX (simplified)
+    const adx = 25 + Math.random() * 30; // Simulated ADX
+    document.getElementById('adxVal').textContent = adx.toFixed(2);
+    
+    // Calculate ATR
+    const atr = calculateATR(data, 14);
+    document.getElementById('atrVal').textContent = atr.toFixed(4);
+    
+    // Calculate Volatility
+    const volatility = calculateVolatility(closes, 20);
+    document.getElementById('volVal').textContent = (volatility * 100).toFixed(2) + '%';
+    
+    // Determine Trend
+    const trend = determineTrend(data);
+    document.getElementById('trendVal').textContent = trend;
+  }
+
+  // Fungsi untuk menghitung RSI
+  function calculateRSI(closes, period) {
+    if (closes.length < period + 1) return 50;
+    
+    let gains = 0;
+    let losses = 0;
+    
+    for (let i = 1; i <= period; i++) {
+      const difference = closes[closes.length - i] - closes[closes.length - i - 1];
+      if (difference >= 0) {
+        gains += difference;
+      } else {
+        losses -= difference;
+      }
+    }
+    
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    
+    if (avgLoss === 0) return 100;
+    
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+  }
+
+  // Fungsi untuk menghitung ATR
+  function calculateATR(data, period) {
+    if (data.length < period + 1) return 0;
+    
+    let sum = 0;
+    for (let i = data.length - period; i < data.length; i++) {
+      const tr = Math.max(
+        data[i].high - data[i].low,
+        Math.abs(data[i].high - data[i-1].close),
+        Math.abs(data[i].low - data[i-1].close)
+      );
+      sum += tr;
+    }
+    
+    return sum / period;
+  }
+
+  // Fungsi untuk menghitung volatilitas
+  function calculateVolatility(closes, period) {
+    if (closes.length < period) return 0;
+    
+    const recentCloses = closes.slice(-period);
+    const mean = recentCloses.reduce((a, b) => a + b, 0) / period;
+    const variance = recentCloses.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
+    
+    return Math.sqrt(variance) / mean;
+  }
+
+  // Fungsi untuk menentukan tren
+  function determineTrend(data) {
+    if (data.length < 20) return 'Sideways';
+    
+    const recentData = data.slice(-20);
+    const firstPrice = recentData[0].close;
+    const lastPrice = recentData[recentData.length - 1].close;
+    
+    const change = (lastPrice - firstPrice) / firstPrice * 100;
+    
+    if (change > 2) return 'Up';
+    if (change < -2) return 'Down';
+    return 'Sideways';
+  }
+
+  // Fungsi untuk melakukan analisis AI yang lebih komprehensif
+  function performAIAnalysis() {
+    console.log('Performing AI analysis...');
     
     // Show loading
     document.getElementById('chartLoading').style.display = 'flex';
     
     // Simulate API call delay
     setTimeout(function() {
-      // Update AI Signal
-      const signals = ['BUY', 'SELL', 'HOLD'];
-      const randomSignal = signals[Math.floor(Math.random() * signals.length)];
+      const pair = document.getElementById('pairSelect').value;
+      const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
       
-      document.getElementById('aiSignalBadge').textContent = randomSignal;
+      // Dapatkan data teknikal
+      const rsi = parseFloat(document.getElementById('rsiVal').textContent);
+      const macd = parseFloat(document.getElementById('macdVal').textContent);
+      const macdHist = parseFloat(document.getElementById('macdHistVal').textContent);
+      const adx = parseFloat(document.getElementById('adxVal').textContent);
+      const trend = document.getElementById('trendVal').textContent;
+      
+      // Analisis fundamental berdasarkan pair
+      const fundamentalAnalysis = getFundamentalAnalysis(pair);
+      
+      // Analisis teknikal
+      const technicalAnalysis = getTechnicalAnalysis(rsi, macd, macdHist, adx, trend);
+      
+      // Gabungkan analisis untuk menghasilkan sinyal
+      const aiSignal = generateAISignal(fundamentalAnalysis, technicalAnalysis);
+      
+      // Update AI Signal
+      document.getElementById('aiSignalBadge').textContent = aiSignal.signal;
       document.getElementById('aiSignalBadge').className = 
-        randomSignal === 'BUY' ? 'ai-signal-buy' : 
-        randomSignal === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
+        aiSignal.signal === 'BUY' ? 'ai-signal-buy' : 
+        aiSignal.signal === 'SELL' ? 'ai-signal-sell' : 'ai-signal-hold';
       
       // Update other values
-      document.getElementById('aiConfidence').textContent = Math.floor(Math.random() * 30 + 70) + '%';
-      document.getElementById('aiRisk').textContent = ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)];
-      document.getElementById('aiEntry').textContent = (148 + Math.random() * 0.5).toFixed(3);
-      document.getElementById('aiSL').textContent = (147.5 + Math.random() * 0.5).toFixed(3);
-      document.getElementById('aiTP1').textContent = (148.5 + Math.random() * 0.5).toFixed(3);
-      document.getElementById('aiTP2').textContent = (149 + Math.random() * 0.5).toFixed(3);
-      document.getElementById('aiSummary').textContent = 'AI analysis completed. Market shows ' + 
-        (randomSignal === 'BUY' ? 'bullish' : randomSignal === 'SELL' ? 'bearish' : 'neutral') + ' signals.';
-      
-      // Update technical indicators
-      document.getElementById('rsiVal').textContent = (Math.random() * 30 + 40).toFixed(2);
-      document.getElementById('macdVal').textContent = (Math.random() * 0.1 - 0.05).toFixed(4);
-      document.getElementById('macdHistVal').textContent = (Math.random() * 0.05 - 0.025).toFixed(4);
-      document.getElementById('adxVal').textContent = (Math.random() * 20 + 20).toFixed(2);
-      document.getElementById('atrVal').textContent = (Math.random() * 0.2 + 0.1).toFixed(4);
-      document.getElementById('volVal').textContent = (Math.random() * 5 + 5).toFixed(2) + '%';
-      document.getElementById('trendVal').textContent = ['Up', 'Down', 'Sideways'][Math.floor(Math.random() * 3)];
+      document.getElementById('aiConfidence').textContent = aiSignal.confidence + '%';
+      document.getElementById('aiRisk').textContent = aiSignal.risk;
+      document.getElementById('aiEntry').textContent = aiSignal.entry.toFixed(pair === 'XAUUSD' ? 2 : 4);
+      document.getElementById('aiSL').textContent = aiSignal.sl.toFixed(pair === 'XAUUSD' ? 2 : 4);
+      document.getElementById('aiTP1').textContent = aiSignal.tp1.toFixed(pair === 'XAUUSD' ? 2 : 4);
+      document.getElementById('aiTP2').textContent = aiSignal.tp2.toFixed(pair === 'XAUUSD' ? 2 : 4);
+      document.getElementById('aiSummary').textContent = aiSignal.summary;
       
       // Update risk assessment
-      const riskScore = Math.floor(Math.random() * 11);
+      const riskScore = aiSignal.risk === 'Low' ? 3 : aiSignal.risk === 'Medium' ? 6 : 9;
       document.getElementById('riskScoreBadge').textContent = `Score: ${riskScore}/10`;
       document.getElementById('riskScoreBadge').className = `badge ${
         riskScore <= 3 ? 'bg-success' : 
@@ -1227,15 +1568,7 @@
       });
       
       // Update news
-      const newsItems = [
-        "BOJ maintains ultra-loose policy, Yen weakens",
-        "Fed signals potential rate cuts in 2024",
-        "USD strength continues amid global uncertainty",
-        "Technical analysis suggests potential breakout",
-        "Market volatility expected with upcoming economic data"
-      ];
-      document.getElementById('fundamentalNews').textContent = 
-        newsItems[Math.floor(Math.random() * newsItems.length)];
+      document.getElementById('fundamentalNews').textContent = fundamentalAnalysis.news;
       
       // Update status
       document.getElementById('statusIndicator').className = 'status-indicator status-live';
@@ -1244,8 +1577,173 @@
       // Hide loading
       document.getElementById('chartLoading').style.display = 'none';
       
-      console.log('Analysis simulation completed');
+      console.log('AI analysis completed');
     }, 1500);
+  }
+
+  // Fungsi untuk analisis fundamental berdasarkan pair
+  function getFundamentalAnalysis(pair) {
+    const fundamentalData = {
+      'USDJPY': {
+        news: "BOJ maintains ultra-loose policy, Yen weakens. Fed signals potential rate cuts in 2024.",
+        impact: 'Bearish for JPY'
+      },
+      'EURJPY': {
+        news: "ECB considering rate cuts amid slowing inflation. BOJ policy divergence supports EUR.",
+        impact: 'Bullish for EUR'
+      },
+      'GBPJPY': {
+        news: "Bank of England holds rates steady. UK inflation remains stubbornly high.",
+        impact: 'Neutral'
+      },
+      'CHFJPY': {
+        news: "SNB intervenes to weaken Franc. Safe-haven flows support JPY.",
+        impact: 'Bearish for CHF'
+      },
+      'GBPUSD': {
+        news: "USD strength continues amid global uncertainty. UK economic data mixed.",
+        impact: 'Bearish for GBP'
+      },
+      'USDCHF': {
+        news: "SNB continues FX interventions. USD remains strong on safe-haven flows.",
+        impact: 'Bullish for USD'
+      },
+      'AUDUSD': {
+        news: "RBA maintains hawkish stance. Commodity prices support AUD.",
+        impact: 'Bullish for AUD'
+      },
+      'USDCAD': {
+        news: "Bank of Canada holds rates. Oil prices volatile, impacting CAD.",
+        impact: 'Neutral'
+      },
+      'NZDUSD': {
+        news: "RBNZ dovish pivot surprises markets. NZ economic data weaker than expected.",
+        impact: 'Bearish for NZD'
+      },
+      'XAUUSD': {
+        news: "Gold prices supported by geopolitical tensions. Fed policy outlook key driver.",
+        impact: 'Bullish for Gold'
+      }
+    };
+    
+    return fundamentalData[pair] || {
+      news: "Market awaiting key economic data releases. Volatility expected.",
+      impact: 'Neutral'
+    };
+  }
+
+  // Fungsi untuk analisis teknikal
+  function getTechnicalAnalysis(rsi, macd, macdHist, adx, trend) {
+    let score = 0;
+    let signals = [];
+    
+    // RSI Analysis
+    if (rsi < 30) {
+      score += 2;
+      signals.push('RSI indicates oversold conditions');
+    } else if (rsi > 70) {
+      score -= 2;
+      signals.push('RSI indicates overbought conditions');
+    } else if (rsi > 50) {
+      score += 1;
+    } else {
+      score -= 1;
+    }
+    
+    // MACD Analysis
+    if (macd > 0 && macdHist > 0) {
+      score += 2;
+      signals.push('MACD bullish crossover detected');
+    } else if (macd < 0 && macdHist < 0) {
+      score -= 2;
+      signals.push('MACD bearish crossover detected');
+    }
+    
+    // ADX Analysis
+    if (adx > 25) {
+      score += 1;
+      signals.push('Strong trend detected');
+    } else {
+      signals.push('Weak trend, ranging market');
+    }
+    
+    // Trend Analysis
+    if (trend === 'Up') {
+      score += 1;
+    } else if (trend === 'Down') {
+      score -= 1;
+    }
+    
+    return { score, signals };
+  }
+
+  // Fungsi untuk menghasilkan sinyal AI berdasarkan analisis fundamental dan teknikal
+  function generateAISignal(fundamental, technical) {
+    const currentPrice = parseFloat(document.getElementById('livePrice').textContent);
+    const pair = document.getElementById('pairSelect').value;
+    
+    // Tentukan arah sinyal berdasarkan analisis
+    let signal, confidence, risk;
+    
+    // Hitung skor total (teknikal + fundamental)
+    let totalScore = technical.score;
+    
+    // Tambahkan pengaruh fundamental
+    if (fundamental.impact.includes('Bullish')) {
+      totalScore += 2;
+    } else if (fundamental.impact.includes('Bearish')) {
+      totalScore -= 2;
+    }
+    
+    // Tentukan sinyal berdasarkan skor
+    if (totalScore >= 3) {
+      signal = 'BUY';
+      confidence = 75 + Math.floor(Math.random() * 20);
+      risk = 'Low';
+    } else if (totalScore <= -3) {
+      signal = 'SELL';
+      confidence = 75 + Math.floor(Math.random() * 20);
+      risk = 'Low';
+    } else {
+      signal = 'HOLD';
+      confidence = 50 + Math.floor(Math.random() * 30);
+      risk = 'Medium';
+    }
+    
+    // Hitung level trading
+    const volatility = parseFloat(document.getElementById('volVal').textContent) / 100;
+    let entry, sl, tp1, tp2;
+    
+    if (signal === 'BUY') {
+      entry = currentPrice * (1 + volatility * 0.1);
+      sl = currentPrice * (1 - volatility * 0.5);
+      tp1 = currentPrice * (1 + volatility * 1.0);
+      tp2 = currentPrice * (1 + volatility * 1.8);
+    } else if (signal === 'SELL') {
+      entry = currentPrice * (1 - volatility * 0.1);
+      sl = currentPrice * (1 + volatility * 0.5);
+      tp1 = currentPrice * (1 - volatility * 1.0);
+      tp2 = currentPrice * (1 - volatility * 1.8);
+    } else {
+      entry = currentPrice;
+      sl = currentPrice * (1 - volatility * 0.3);
+      tp1 = currentPrice * (1 + volatility * 0.5);
+      tp2 = currentPrice * (1 + volatility * 1.0);
+    }
+    
+    // Buat ringkasan analisis
+    const summary = `AI analysis: ${signal} signal based on ${technical.signals.join(', ')}. ${fundamental.news} Fundamental impact: ${fundamental.impact}.`;
+    
+    return {
+      signal,
+      confidence,
+      risk,
+      entry,
+      sl,
+      tp1,
+      tp2,
+      summary
+    };
   }
 
   function simulateBacktest() {
