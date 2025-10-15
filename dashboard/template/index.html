@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ANDRO-FX Precision Forex Trading</title>
 
-  <!-- Pastikan CSS dan JS libraries di-load dengan benar -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
@@ -283,6 +282,144 @@
       border-left: 4px solid var(--deepseek-secondary);
     }
 
+    /* Risk Management Styles */
+    .risk-meter-bar {
+      background: #e5e7eb;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .risk-meter-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .risk-meter-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .risk-factor-card {
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+    }
+
+    .risk-factor-card.low {
+      border-left: 4px solid #10b981;
+    }
+
+    .risk-factor-card.medium {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .risk-factor-card.high {
+      border-left: 4px solid #ef4444;
+    }
+
+    .risk-factor-card.pending {
+      border-left: 4px solid #6b7280;
+    }
+
+    .risk-factor-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .risk-factor-status {
+      font-size: 0.7rem;
+      color: #6b7280;
+    }
+
+    .risk-tip {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+    }
+
+    .risk-tip:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Support Resistance Styles */
+    .levels-container {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .level-card {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .support-card {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .resistance-card {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .level-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .support-title {
+      color: #10b981;
+    }
+
+    .resistance-title {
+      color: #ef4444;
+    }
+
+    .level-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .level-distance {
+      font-size: 0.7rem;
+      color: #6b7280;
+      margin-top: 3px;
+    }
+
+    .pivot-levels {
+      margin-top: 15px;
+    }
+
+    .pivot-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .pivot-label {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .pivot-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
     /* Loading Spinner */
     .spinner-container {
       display: flex;
@@ -443,7 +580,178 @@
       </div>
     </div>
 
-    <!-- Technical Analysis Card -->
+    <!-- Risk Management Card -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-shield-alt"></i>
+        <span>Risk Management</span>
+      </div>
+      
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="small-muted">TRADE APPROVAL STATUS</div>
+          <div id="riskScoreBadge" class="badge bg-secondary">Score: -/10</div>
+        </div>
+        
+        <div id="riskStatus" class="text-center p-4 rounded-3 mb-3" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 2px solid #bae6fd;">
+          <div class="risk-icon mb-2">
+            <i class="fas fa-question-circle fa-2x text-muted"></i>
+          </div>
+          <div id="riskMainStatus" class="fw-bold fs-5">Awaiting Analysis</div>
+          <div id="riskSubStatus" class="small text-muted mt-1">No risk assessment data available</div>
+        </div>
+      </div>
+
+      <!-- Risk Score Visualization -->
+      <div class="mb-4">
+        <div class="small-muted mb-2">RISK SCORE BREAKDOWN</div>
+        <div class="risk-score-container">
+          <div class="risk-meter mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="small">Low Risk</span>
+              <span class="small">High Risk</span>
+            </div>
+            <div class="risk-meter-bar">
+              <div id="riskMeterFill" class="risk-meter-fill" style="width: 0%"></div>
+            </div>
+            <div class="risk-meter-labels">
+              <span>0</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
+              <span>10</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Factors Grid -->
+      <div class="mb-4">
+        <div class="small-muted mb-2">RISK FACTORS</div>
+        <div id="riskFactors" class="row g-2">
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Market Volatility</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Position Size</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Correlation</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="risk-factor-card pending">
+              <i class="fas fa-clock me-2"></i>
+              <div>
+                <div class="risk-factor-name">Daily Limits</div>
+                <div class="risk-factor-status">Pending</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Management Tips -->
+      <div class="mt-3 pt-3 border-top">
+        <div class="small-muted mb-2">RISK MANAGEMENT TIPS</div>
+        <div class="risk-tips">
+          <div class="risk-tip">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            <span class="small">Always use stop-loss orders</span>
+          </div>
+          <div class="risk-tip">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            <span class="small">Risk only 1-2% per trade</span>
+          </div>
+          <div class="risk-tip">
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+            <span class="small">Monitor correlation between pairs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Support & Resistance Card -->
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-layer-group"></i>
+        <span>Support & Resistance</span>
+      </div>
+      
+      <div class="levels-container">
+        <div class="level-card support-card">
+          <div class="level-title support-title">SUPPORT</div>
+          <div class="level-value" id="supportLevel">-</div>
+          <div class="level-distance" id="supportDistance">-</div>
+        </div>
+        <div class="level-card resistance-card">
+          <div class="level-title resistance-title">RESISTANCE</div>
+          <div class="level-value" id="resistanceLevel">-</div>
+          <div class="level-distance" id="resistanceDistance">-</div>
+        </div>
+      </div>
+
+      <div class="pivot-levels">
+        <div class="small-muted mb-2">PIVOT POINTS</div>
+        <div class="pivot-row">
+          <span class="pivot-label">R3</span>
+          <span class="pivot-value" id="pivotR3">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">R2</span>
+          <span class="pivot-value" id="pivotR2">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">R1</span>
+          <span class="pivot-value" id="pivotR1">-</span>
+        </div>
+        <div class="pivot-row" style="border-bottom: 2px solid #3b82f6;">
+          <span class="pivot-label">PIVOT</span>
+          <span class="pivot-value" id="pivotPoint">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S1</span>
+          <span class="pivot-value" id="pivotS1">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S2</span>
+          <span class="pivot-value" id="pivotS2">-</span>
+        </div>
+        <div class="pivot-row">
+          <span class="pivot-label">S3</span>
+          <span class="pivot-value" id="pivotS3">-</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-soft">
+      <div class="section-title">
+        <i class="fas fa-newspaper"></i>
+        <span>Market News</span>
+      </div>
+      <div class="news-container" id="fundamentalNews">
+        No news available. Analyzing market conditions...
+      </div>
+    </div>
+
     <div class="card-soft">
       <div class="section-title">
         <i class="fas fa-chart-bar"></i>
@@ -541,45 +849,214 @@
           vertLines: { color: '#f3f4f6' },
           horzLines: { color: '#f3f4f6' }
         },
+        timeScale: {
+          timeVisible: true,
+          secondsVisible: false,
+        },
         width: document.getElementById('chartRoot').clientWidth,
         height: 520
       };
 
       const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
-      const candleSeries = chart.addCandlestickSeries();
+      const candleSeries = chart.addCandlestickSeries({
+        upColor: '#16a34a',
+        downColor: '#dc2626',
+        borderVisible: false,
+        wickUpColor: '#16a34a',
+        wickDownColor: '#dc2626',
+      });
       
-      // Data sample untuk demo
-      const sampleData = [
-        { time: '2023-01-01', open: 145.0, high: 146.5, low: 144.5, close: 146.0 },
-        { time: '2023-01-02', open: 146.0, high: 147.2, low: 145.8, close: 146.5 },
-        { time: '2023-01-03', open: 146.5, high: 147.8, low: 146.2, close: 147.5 },
-        { time: '2023-01-04', open: 147.5, high: 148.0, low: 146.8, close: 147.2 },
-        { time: '2023-01-05', open: 147.2, high: 148.5, low: 147.0, close: 148.2 }
-      ];
+      // Generate data historis yang lebih banyak - 500 data point
+      const historicalData = generateHistoricalData(500);
+      candleSeries.setData(historicalData);
       
-      candleSeries.setData(sampleData);
+      // Tambahkan EMA
+      const emaSeries = chart.addLineSeries({
+        color: '#3b82f6',
+        lineWidth: 2,
+        priceScaleId: 'right',
+      });
+      
+      const emaData = calculateEMA(historicalData, 26);
+      emaSeries.setData(emaData);
       
       // MACD Chart
       const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), {
         width: document.getElementById('macdRoot').clientWidth,
-        height: 160
+        height: 160,
+        timeScale: {
+          timeVisible: true,
+          secondsVisible: false,
+        }
       });
       
-      const macdLine = macdChart.addLineSeries({ color: '#0ea5e9' });
-      macdLine.setData([
-        { time: '2023-01-01', value: 0.1 },
-        { time: '2023-01-02', value: 0.2 },
-        { time: '2023-01-03', value: 0.15 },
-        { time: '2023-01-04', value: 0.05 },
-        { time: '2023-01-05', value: 0.1 }
-      ]);
+      const macdLine = macdChart.addLineSeries({ color: '#0ea5e9', lineWidth: 1 });
+      const macdSignal = macdChart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
+      const macdHistogram = macdChart.addHistogramSeries({ 
+        color: '#a78bfa',
+        priceFormat: {
+          type: 'volume',
+        }
+      });
       
-      console.log('Charts initialized successfully');
+      const macdData = calculateMACD(historicalData);
+      macdLine.setData(macdData.macdLine);
+      macdSignal.setData(macdData.signalLine);
+      macdHistogram.setData(macdData.histogram);
+      
+      // Synchronize time scales
+      chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+        macdChart.timeScale().setVisibleRange(timeRange);
+      });
+      
+      // Set visible range to show the most recent data
+      if (historicalData.length > 100) {
+        const from = historicalData[historicalData.length - 100].time;
+        const to = historicalData[historicalData.length - 1].time;
+        chart.timeScale().setVisibleRange({ from, to });
+      }
+      
+      console.log('Charts initialized successfully with 500 data points');
       
     } catch (error) {
       console.error('Error initializing charts:', error);
       document.getElementById('chartRoot').innerHTML = '<div class="alert alert-danger">Error initializing charts: ' + error.message + '</div>';
     }
+  }
+
+  // Fungsi untuk menghasilkan data historis yang lebih banyak - 500 data point
+  function generateHistoricalData(count) {
+    const data = [];
+    let basePrice = 135.0; // Starting price
+    const baseDate = new Date('2022-06-01'); // Start date
+    
+    // Create realistic market movements with trends and volatility changes
+    let trend = 0; // -1 for downtrend, 0 for sideways, 1 for uptrend
+    let volatility = 0.008; // Base volatility
+    
+    for (let i = 0; i < count; i++) {
+      const date = new Date(baseDate);
+      date.setDate(date.getDate() + i);
+      
+      // Occasionally change trend and volatility to simulate market conditions
+      if (i % 50 === 0) {
+        trend = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+        volatility = 0.005 + Math.random() * 0.01; // 0.5% to 1.5% volatility
+      }
+      
+      const open = basePrice;
+      
+      // Price change influenced by trend and random factor
+      let change = (Math.random() - 0.5) * 2 * volatility * basePrice;
+      
+      // Add trend influence
+      if (trend === 1) {
+        change += volatility * basePrice * 0.3; // Uptrend bias
+      } else if (trend === -1) {
+        change -= volatility * basePrice * 0.3; // Downtrend bias
+      }
+      
+      const close = open + change;
+      
+      // High and low with realistic ranges
+      const range = volatility * basePrice * (0.8 + Math.random() * 0.4);
+      const high = Math.max(open, close) + range * Math.random();
+      const low = Math.min(open, close) - range * Math.random();
+      
+      // Ensure high is always >= open and close, low is always <= open and close
+      const finalHigh = Math.max(open, close, high);
+      const finalLow = Math.min(open, close, low);
+      
+      data.push({
+        time: date.toISOString().split('T')[0],
+        open: parseFloat(open.toFixed(4)),
+        high: parseFloat(finalHigh.toFixed(4)),
+        low: parseFloat(finalLow.toFixed(4)),
+        close: parseFloat(close.toFixed(4))
+      });
+      
+      basePrice = close;
+    }
+    
+    return data;
+  }
+
+  // Fungsi untuk menghitung EMA
+  function calculateEMA(data, period) {
+    const emaData = [];
+    let k = 2 / (period + 1);
+    let ema = data[0].close;
+    
+    for (let i = 0; i < data.length; i++) {
+      if (i < period) {
+        // Untuk periode awal, gunakan SMA
+        let sum = 0;
+        for (let j = 0; j <= i; j++) {
+          sum += data[j].close;
+        }
+        ema = sum / (i + 1);
+      } else {
+        ema = (data[i].close * k) + (ema * (1 - k));
+      }
+      
+      emaData.push({
+        time: data[i].time,
+        value: parseFloat(ema.toFixed(4))
+      });
+    }
+    
+    return emaData;
+  }
+
+  // Fungsi untuk menghitung MACD
+  function calculateMACD(data) {
+    const ema12 = calculateEMA(data, 12);
+    const ema26 = calculateEMA(data, 26);
+    
+    const macdLine = [];
+    const signalLine = [];
+    const histogram = [];
+    
+    // Hitung MACD Line (EMA12 - EMA26)
+    for (let i = 0; i < data.length; i++) {
+      const macdValue = ema12[i].value - ema26[i].value;
+      macdLine.push({
+        time: data[i].time,
+        value: parseFloat(macdValue.toFixed(4))
+      });
+    }
+    
+    // Hitung Signal Line (EMA9 dari MACD Line)
+    let signalEma = macdLine[0].value;
+    for (let i = 0; i < macdLine.length; i++) {
+      if (i < 9) {
+        // Untuk periode awal, gunakan SMA
+        let sum = 0;
+        for (let j = 0; j <= i; j++) {
+          sum += macdLine[j].value;
+        }
+        signalEma = sum / (i + 1);
+      } else {
+        signalEma = (macdLine[i].value * (2 / (9 + 1))) + (signalEma * (1 - (2 / (9 + 1))));
+      }
+      
+      signalLine.push({
+        time: data[i].time,
+        value: parseFloat(signalEma.toFixed(4))
+      });
+      
+      // Hitung Histogram (MACD Line - Signal Line)
+      histogram.push({
+        time: data[i].time,
+        value: parseFloat((macdLine[i].value - signalEma).toFixed(4))
+      });
+    }
+    
+    return {
+      macdLine,
+      signalLine,
+      histogram
+    };
   }
 
   function initializeComponents() {
@@ -590,6 +1067,21 @@
     document.getElementById('currentPrice').textContent = '148.25';
     document.getElementById('pairChange').textContent = '(+0.15%)';
     document.getElementById('pairChange').className = 'price-change change-positive';
+    
+    // Initialize support & resistance
+    document.getElementById('supportLevel').textContent = '147.85';
+    document.getElementById('resistanceLevel').textContent = '149.12';
+    document.getElementById('supportDistance').textContent = '0.27% below';
+    document.getElementById('resistanceDistance').textContent = '0.59% above';
+    
+    // Initialize pivot points
+    document.getElementById('pivotPoint').textContent = '148.45';
+    document.getElementById('pivotR1').textContent = '148.92';
+    document.getElementById('pivotR2').textContent = '149.35';
+    document.getElementById('pivotR3').textContent = '149.82';
+    document.getElementById('pivotS1').textContent = '148.02';
+    document.getElementById('pivotS2').textContent = '147.55';
+    document.getElementById('pivotS3').textContent = '147.12';
     
     // Setup event listeners
     document.getElementById('analyzeBtn').addEventListener('click', function() {
@@ -603,9 +1095,50 @@
     // Setup dropdown changes
     document.getElementById('pairSelect').addEventListener('change', function() {
       document.getElementById('selectedPair').textContent = this.value + ' –';
+      updateChartForPair(this.value);
+    });
+    
+    document.getElementById('timeframeSelect').addEventListener('change', function() {
+      updateChartForTimeframe(this.value);
     });
     
     console.log('Components initialized successfully');
+  }
+
+  function updateChartForPair(pair) {
+    console.log('Updating chart for pair:', pair);
+    // In a real app, this would fetch new data from the server
+    document.getElementById('chartLoading').style.display = 'flex';
+    
+    setTimeout(() => {
+      document.getElementById('chartLoading').style.display = 'none';
+      // Update price based on pair
+      const pairPrices = {
+        'USDJPY': '148.25',
+        'EURJPY': '159.80',
+        'GBPJPY': '183.45',
+        'CHFJPY': '168.90',
+        'GBPUSD': '1.2350',
+        'USDCHF': '0.9050',
+        'AUDUSD': '0.6520',
+        'USDCAD': '1.3650',
+        'NZDUSD': '0.5920'
+      };
+      
+      const newPrice = pairPrices[pair] || '148.25';
+      document.getElementById('livePrice').textContent = newPrice;
+      document.getElementById('currentPrice').textContent = newPrice;
+    }, 1000);
+  }
+
+  function updateChartForTimeframe(timeframe) {
+    console.log('Updating chart for timeframe:', timeframe);
+    document.getElementById('chartLoading').style.display = 'flex';
+    
+    setTimeout(() => {
+      document.getElementById('chartLoading').style.display = 'none';
+      document.getElementById('chartSubtitle').textContent = `Real-time Candlestick · EMA26 · MACD · ${timeframe}`;
+    }, 800);
   }
 
   function simulateAnalysis() {
@@ -644,6 +1177,66 @@
       document.getElementById('volVal').textContent = (Math.random() * 5 + 5).toFixed(2) + '%';
       document.getElementById('trendVal').textContent = ['Up', 'Down', 'Sideways'][Math.floor(Math.random() * 3)];
       
+      // Update risk assessment
+      const riskScore = Math.floor(Math.random() * 11);
+      document.getElementById('riskScoreBadge').textContent = `Score: ${riskScore}/10`;
+      document.getElementById('riskScoreBadge').className = `badge ${
+        riskScore <= 3 ? 'bg-success' : 
+        riskScore <= 6 ? 'bg-warning' : 'bg-danger'
+      }`;
+      
+      document.getElementById('riskMeterFill').style.width = `${riskScore * 10}%`;
+      document.getElementById('riskMeterFill').style.background = 
+        riskScore <= 3 ? '#10b981' : 
+        riskScore <= 6 ? '#f59e0b' : '#ef4444';
+      
+      if (riskScore <= 5) {
+        document.getElementById('riskMainStatus').textContent = 'APPROVED';
+        document.getElementById('riskSubStatus').textContent = 'Trade meets risk criteria';
+        document.getElementById('riskStatus').style.background = 'linear-gradient(135deg, #f0f9ff, #e0f2fe)';
+        document.getElementById('riskStatus').style.border = '2px solid #bae6fd';
+        document.querySelector('.risk-icon i').className = 'fas fa-check-circle fa-2x text-success';
+      } else {
+        document.getElementById('riskMainStatus').textContent = 'REJECTED';
+        document.getElementById('riskSubStatus').textContent = 'Trade exceeds risk limits';
+        document.getElementById('riskStatus').style.background = 'linear-gradient(135deg, #fef2f2, #fee2e2)';
+        document.getElementById('riskStatus').style.border = '2px solid #fecaca';
+        document.querySelector('.risk-icon i').className = 'fas fa-times-circle fa-2x text-danger';
+      }
+      
+      // Update risk factors
+      const riskFactors = document.querySelectorAll('.risk-factor-card');
+      riskFactors.forEach(factor => {
+        const statuses = ['low', 'medium', 'high'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+        
+        factor.className = `risk-factor-card ${randomStatus}`;
+        const icon = factor.querySelector('i');
+        const statusText = factor.querySelector('.risk-factor-status');
+        
+        if (randomStatus === 'low') {
+          icon.className = 'fas fa-check-circle me-2';
+          statusText.textContent = 'LOW';
+        } else if (randomStatus === 'medium') {
+          icon.className = 'fas fa-exclamation-triangle me-2';
+          statusText.textContent = 'MEDIUM';
+        } else {
+          icon.className = 'fas fa-times-circle me-2';
+          statusText.textContent = 'HIGH';
+        }
+      });
+      
+      // Update news
+      const newsItems = [
+        "BOJ maintains ultra-loose policy, Yen weakens",
+        "Fed signals potential rate cuts in 2024",
+        "USD strength continues amid global uncertainty",
+        "Technical analysis suggests potential breakout",
+        "Market volatility expected with upcoming economic data"
+      ];
+      document.getElementById('fundamentalNews').textContent = 
+        newsItems[Math.floor(Math.random() * newsItems.length)];
+      
       // Update status
       document.getElementById('statusIndicator').className = 'status-indicator status-live';
       document.getElementById('realtimeIndicator').style.display = 'block';
@@ -669,7 +1262,7 @@
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Total Trades</div>
-              <div class="metric-value">42</div>
+              <div class="metric-value">142</div>
             </div>
           </div>
           <div class="col-6">
@@ -683,13 +1276,27 @@
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Total Profit</div>
-              <div class="metric-value change-positive">$1,250.75</div>
+              <div class="metric-value change-positive">$3,250.75</div>
             </div>
           </div>
           <div class="col-6">
             <div class="metric-card">
               <div class="small-muted">Final Balance</div>
-              <div class="metric-value">$11,250.75</div>
+              <div class="metric-value">$13,250.75</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-6">
+            <div class="metric-card">
+              <div class="small-muted">Return %</div>
+              <div class="metric-value change-positive">32.5%</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="metric-card">
+              <div class="small-muted">Max Drawdown</div>
+              <div class="metric-value change-negative">-6.2%</div>
             </div>
           </div>
         </div>
