@@ -78,10 +78,10 @@ class SystemConfig:
     BACKTEST_MIN_CONFIDENCE: int = 40  # Lower confidence threshold for backtesting
     BACKTEST_RISK_SCORE_THRESHOLD: int = 8  # Higher risk tolerance for backtesting
     
-    # Supported Instruments
+    # Supported Instruments - DITAMBAHKAN XAUUSD
     FOREX_PAIRS: List[str] = field(default_factory=lambda: [
         "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", 
-        "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
+        "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD", "XAUUSD"
     ])
     TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
     
@@ -301,8 +301,12 @@ class TwelveDataClient:
             return self._get_simulated_real_time_price(pair)
         
         try:
-            # Format pair untuk TwelveData (USDJPY -> USD/JPY)
-            formatted_pair = f"{pair[:3]}/{pair[3:]}"
+            # Format pair untuk TwelveData (XAUUSD -> XAU/USD)
+            if pair == "XAUUSD":
+                formatted_pair = "XAU/USD"
+            else:
+                formatted_pair = f"{pair[:3]}/{pair[3:]}"
+                
             url = f"{self.base_url}/price?symbol={formatted_pair}&apikey={self.api_key}"
             
             logger.info(f"Fetching real-time price for {pair} from TwelveData...")
@@ -331,11 +335,11 @@ class TwelveDataClient:
     def _get_simulated_real_time_price(self, pair: str) -> float:
         """Harga real-time simulasi untuk demo mode"""
         try:
-            # Base prices dengan variasi kecil untuk simulasi real-time
+            # Base prices dengan variasi kecil untuk simulasi real-time - DITAMBAHKAN XAUUSD
             base_prices = {
                 'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
                 'EURUSD': 1.0835, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
-                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095
+                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095, 'XAUUSD': 1950.75
             }
             
             base_price = base_prices.get(pair, 150.0)
@@ -371,18 +375,19 @@ class AdvancedRiskManager:
         self.current_drawdown = 0.0
         self.last_reset_date = datetime.now().date()
         
-        # Correlation matrix untuk forex pairs
+        # Correlation matrix untuk forex pairs - DITAMBAHKAN XAUUSD
         self.correlation_matrix = {
-            'USDJPY': {'EURUSD': -0.7, 'GBPUSD': -0.6, 'USDCHF': 0.9, 'EURJPY': 0.8, 'GBPJPY': 0.7},
-            'EURUSD': {'USDJPY': -0.7, 'GBPUSD': 0.8, 'USDCHF': -0.7, 'EURJPY': 0.9, 'GBPJPY': 0.6},
-            'GBPUSD': {'USDJPY': -0.6, 'EURUSD': 0.8, 'USDCHF': -0.6, 'EURJPY': 0.7, 'GBPJPY': 0.9},
-            'USDCHF': {'USDJPY': 0.9, 'EURUSD': -0.7, 'GBPUSD': -0.6, 'EURJPY': -0.6, 'GBPJPY': -0.5},
-            'EURJPY': {'USDJPY': 0.8, 'EURUSD': 0.9, 'GBPUSD': 0.7, 'USDCHF': -0.6, 'GBPJPY': 0.8},
-            'GBPJPY': {'USDJPY': 0.7, 'EURUSD': 0.6, 'GBPUSD': 0.9, 'USDCHF': -0.5, 'EURJPY': 0.8},
-            'CHFJPY': {'USDJPY': 0.6, 'EURJPY': 0.6, 'GBPJPY': 0.5, 'USDCHF': 0.8, 'EURUSD': -0.5},
-            'AUDUSD': {'USDJPY': -0.5, 'EURUSD': 0.6, 'GBPUSD': 0.5, 'NZDUSD': 0.8, 'USDCAD': -0.4},
-            'USDCAD': {'USDJPY': 0.4, 'EURUSD': -0.5, 'GBPUSD': -0.4, 'AUDUSD': -0.4, 'USDCHF': 0.6},
-            'NZDUSD': {'USDJPY': -0.5, 'EURUSD': 0.5, 'GBPUSD': 0.4, 'AUDUSD': 0.8, 'USDCAD': -0.3}
+            'USDJPY': {'EURUSD': -0.7, 'GBPUSD': -0.6, 'USDCHF': 0.9, 'EURJPY': 0.8, 'GBPJPY': 0.7, 'XAUUSD': -0.6},
+            'EURUSD': {'USDJPY': -0.7, 'GBPUSD': 0.8, 'USDCHF': -0.7, 'EURJPY': 0.9, 'GBPJPY': 0.6, 'XAUUSD': 0.7},
+            'GBPUSD': {'USDJPY': -0.6, 'EURUSD': 0.8, 'USDCHF': -0.6, 'EURJPY': 0.7, 'GBPJPY': 0.9, 'XAUUSD': 0.5},
+            'USDCHF': {'USDJPY': 0.9, 'EURUSD': -0.7, 'GBPUSD': -0.6, 'EURJPY': -0.6, 'GBPJPY': -0.5, 'XAUUSD': -0.8},
+            'EURJPY': {'USDJPY': 0.8, 'EURUSD': 0.9, 'GBPUSD': 0.7, 'USDCHF': -0.6, 'GBPJPY': 0.8, 'XAUUSD': 0.6},
+            'GBPJPY': {'USDJPY': 0.7, 'EURUSD': 0.6, 'GBPUSD': 0.9, 'USDCHF': -0.5, 'EURJPY': 0.8, 'XAUUSD': 0.4},
+            'CHFJPY': {'USDJPY': 0.6, 'EURJPY': 0.6, 'GBPJPY': 0.5, 'USDCHF': 0.8, 'EURUSD': -0.5, 'XAUUSD': -0.3},
+            'AUDUSD': {'USDJPY': -0.5, 'EURUSD': 0.6, 'GBPUSD': 0.5, 'NZDUSD': 0.8, 'USDCAD': -0.4, 'XAUUSD': 0.7},
+            'USDCAD': {'USDJPY': 0.4, 'EURUSD': -0.5, 'GBPUSD': -0.4, 'AUDUSD': -0.4, 'USDCHF': 0.6, 'XAUUSD': -0.5},
+            'NZDUSD': {'USDJPY': -0.5, 'EURUSD': 0.5, 'GBPUSD': 0.4, 'AUDUSD': 0.8, 'USDCAD': -0.3, 'XAUUSD': 0.6},
+            'XAUUSD': {'USDJPY': -0.6, 'EURUSD': 0.7, 'GBPUSD': 0.5, 'USDCHF': -0.8, 'AUDUSD': 0.7, 'NZDUSD': 0.6, 'USDCAD': -0.5, 'EURJPY': 0.6, 'GBPJPY': 0.4, 'CHFJPY': -0.3}
         }
         
         logger.info(f"Advanced Risk Manager initialized - Backtest Mode: {backtest_mode}")
@@ -1115,12 +1120,12 @@ class DataManager:
         """Buat sample data jika tidak ada data historis"""
         logger.info("Creating sample historical data...")
         
-        for pair in config.FOREX_PAIRS[:6]:
+        for pair in config.FOREX_PAIRS:
             for timeframe in ['M30', '1H', '4H', '1D']:
                 self._generate_sample_data(pair, timeframe)
     
     def _generate_sample_data(self, pair: str, timeframe: str):
-        """Generate sample data yang realistis dengan timezone awareness"""
+        """Generate sample data yang realistis dengan timezone awareness - DITAMBAHKAN XAUUSD"""
         try:
             # Tentukan periods berdasarkan timeframe
             if timeframe == 'M30':
@@ -1132,10 +1137,11 @@ class DataManager:
             else:  # 1D
                 periods = 500
                 
+            # Base prices DITAMBAHKAN XAUUSD
             base_prices = {
                 'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
                 'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
-                'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
+                'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100, 'XAUUSD': 1950.0
             }
             
             base_price = base_prices.get(pair, 150.0)
@@ -1160,6 +1166,10 @@ class DataManager:
             for i in range(periods):
                 # Random walk yang lebih realistis
                 volatility = 0.0015
+                # Untuk XAUUSD, gunakan volatilitas yang lebih tinggi
+                if pair == 'XAUUSD':
+                    volatility = 0.003
+                
                 drift = (base_price - current_price) * 0.001  # Mean reversion
                 random_shock = np.random.normal(0, volatility)
                 change = drift + random_shock
@@ -1255,7 +1265,7 @@ class DataManager:
             return self._generate_simple_data(pair, timeframe, days)
 
     def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate simple synthetic data untuk backtesting"""
+        """Generate simple synthetic data untuk backtesting - DITAMBAHKAN XAUUSD"""
         # Tentukan points berdasarkan timeframe
         if timeframe == 'M30':
             points = days * 48  # 2 data points per hour
@@ -1266,10 +1276,11 @@ class DataManager:
         else:  # 1D
             points = days
             
+        # Base prices DITAMBAHKAN XAUUSD
         base_prices = {
             'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
             'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
-            'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
+            'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100, 'XAUUSD': 1950.0
         }
         
         base_price = base_prices.get(pair, 150.0)
@@ -1279,7 +1290,12 @@ class DataManager:
         start_date = datetime.now() - timedelta(days=days)
         
         for i in range(points):
-            change = np.random.normal(0, 0.001)
+            # Untuk XAUUSD, gunakan volatilitas yang lebih tinggi
+            if pair == 'XAUUSD':
+                change = np.random.normal(0, 0.002)  # Volatilitas lebih tinggi untuk emas
+            else:
+                change = np.random.normal(0, 0.001)
+                
             current_price = current_price * (1 + change)
             
             open_price = current_price
@@ -1321,7 +1337,7 @@ class FundamentalAnalysisEngine:
         logger.info(f"Fundamental Analysis Engine initialized - {'DEMO MODE' if self.demo_mode else 'LIVE MODE'}")
     
     def get_forex_news(self, pair: str) -> str:
-        """Mendapatkan berita fundamental untuk pair forex"""
+        """Mendapatkan berita fundamental untuk pair forex - DITAMBAHKAN XAUUSD"""
         # Check cache first
         cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H')}"
         if cache_key in self.news_cache:
@@ -1330,7 +1346,7 @@ class FundamentalAnalysisEngine:
                 return news
         
         try:
-            # Map pair ke negara terkait
+            # Map pair ke negara terkait - DITAMBAHKAN XAUUSD
             country_map = {
                 'USDJPY': 'Japan United States economy Bank of Japan Federal Reserve',
                 'GBPJPY': 'Japan UK economy Brexit Bank of England',
@@ -1341,7 +1357,8 @@ class FundamentalAnalysisEngine:
                 'USDCHF': 'United States Switzerland SNB Fed Swiss National Bank',
                 'AUDUSD': 'Australia United States RBA Fed Reserve Bank of Australia',
                 'USDCAD': 'United States Canada Fed Bank of Canada BOC',
-                'NZDUSD': 'New Zealand United States RBNZ Fed Reserve Bank of New Zealand'
+                'NZDUSD': 'New Zealand United States RBNZ Fed Reserve Bank of New Zealand',
+                'XAUUSD': 'Gold XAU USD Federal Reserve inflation geopolitics safe haven'
             }
             
             query = country_map.get(pair, 'forex market news')
@@ -1377,7 +1394,7 @@ class FundamentalAnalysisEngine:
             return self._get_fallback_news(pair)
     
     def _get_fallback_news(self, pair: str) -> str:
-        """Berita fallback ketika API tidak tersedia"""
+        """Berita fallback ketika API tidak tersedia - DITAMBAHKAN XAUUSD"""
         news_templates = {
             'USDJPY': [
                 "Bank of Japan maintains ultra-loose monetary policy. Fed signals potential rate cuts in 2024.",
@@ -1413,6 +1430,13 @@ class FundamentalAnalysisEngine:
                 "USD/CHF supported by safe-haven flows and interest rate differentials.",
                 "Swiss National Bank interventions influence USD/CHF price action.",
                 "USD/CHF reacts to global risk sentiment and US economic data."
+            ],
+            'XAUUSD': [
+                "Gold prices influenced by Federal Reserve policy outlook and inflation expectations.",
+                "XAU/USD reacts to geopolitical tensions and US dollar strength.",
+                "Gold maintains safe-haven status amid global economic uncertainty.",
+                "Central bank gold purchases support XAU/USD amid rate hike expectations.",
+                "Inflation data and real yields key drivers for gold price direction."
             ]
         }
         
