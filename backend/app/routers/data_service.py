@@ -5,7 +5,24 @@ import asyncio
 from datetime import datetime, timedelta
 import os
 import json
-from ..config import settings
+import logging
+
+# Direct import
+try:
+    from config import settings
+except ImportError:
+    # Fallback settings
+    class FallbackSettings:
+        DATA_PATH = "data/"
+        TWELVEDATA_BASE_URL = "https://api.twelvedata.com"
+        TWELVEDATA_API_KEY = "demo"
+        NEWS_API_BASE_URL = "https://newsapi.org/v2"
+        NEWS_API_KEY = "demo"
+        CACHE_TTL = 300
+    
+    settings = FallbackSettings()
+
+logger = logging.getLogger(__name__)
 
 class EnhancedDataService:
     def __init__(self):
