@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.config import settings
-from app.models.analysis import (
+from ..models.analysis import (
     AIAnalysis, 
     PricePrediction, 
     Trend, 
