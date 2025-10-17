@@ -4,15 +4,47 @@ import logging
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from app.config import settings
-from ..models.analysis import (
-    AIAnalysis, 
-    PricePrediction, 
-    Trend, 
-    Signal, 
-    RiskLevel,
-    FundamentalNews
-)
+
+# Direct imports
+try:
+    from config import settings
+    from models.analysis import AIAnalysis, PricePrediction, Trend, Signal, RiskLevel, FundamentalNews
+except ImportError:
+    # Fallback classes
+    class Signal:
+        BUY = "BUY"
+        SELL = "SELL"
+        HOLD = "HOLD"
+    
+    class Trend:
+        BULLISH = "BULLISH"
+        BEARISH = "BEARISH"
+        NEUTRAL = "NEUTRAL"
+    
+    class RiskLevel:
+        LOW = "LOW"
+        MEDIUM = "MEDIUM"
+        HIGH = "HIGH"
+    
+    class PricePrediction:
+        def __init__(self, short_term, medium_term=None, long_term=None, targets=None, probability=None):
+            self.short_term = short_term
+            self.medium_term = medium_term
+            self.long_term = long_term
+            self.targets = targets or {}
+            self.probability = probability
+    
+    class AIAnalysis:
+        def __init__(self, technical_summary, fundamental_impact, market_sentiment, price_prediction, risk_assessment, recommendation, confidence_score, key_factors=None, warnings=None):
+            self.technical_summary = technical_summary
+            self.fundamental_impact = fundamental_impact
+            self.market_sentiment = market_sentiment
+            self.price_prediction = price_prediction
+            self.risk_assessment = risk_assessment
+            self.recommendation = recommendation
+            self.confidence_score = confidence_score
+            self.key_factors = key_factors or []
+            self.warnings = warnings or []
 
 logger = logging.getLogger(__name__)
 
