@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import asyncio
 import logging
+import json
 
 from app.routers import analysis
 from app.config import settings
@@ -51,21 +52,40 @@ app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
 async def websocket_endpoint(websocket: WebSocket):
     await websocket_manager.connect(websocket)
     try:
+        # Send immediate welcome message
+        welcome_msg = {
+            "type": "connection_established",
+            "message": "Connected to XAUUSD AI Analysis",
+            "timestamp": websocket_manager._get_timestamp()
+        }
+        await websocket.send_json(welcome_msg)
+        
+        # Keep connection alive and listen for messages
         while True:
-            # Keep connection alive
-            await asyncio.sleep(10)
+            try:
+                data = await websocket.receive_text()
+                try:
+                    json_data = json.loads(data)
+                    await websocket_manager.handle_client_message(websocket, json_data)
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON received: {data}")
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"WebSocket receive error: {e}")
+                break
+                
     except WebSocketDisconnect:
-        websocket_manager.disconnect(websocket)
+        logger.info("Client disconnected normally")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
+    finally:
         websocket_manager.disconnect(websocket)
 
 @app.on_event("startup")
 async def startup_event():
     """Startup tasks"""
     logger.info("🚀 Starting XAUUSD AI Analyzer Backend")
-    
-    # HAPUS: start_websocket_server() - sekarang sudah terintegrasi di FastAPI
     
     # Start real-time price updates
     asyncio.create_task(realtime_service.start_price_updates())
