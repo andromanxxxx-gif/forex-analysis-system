@@ -2,8 +2,42 @@ import pandas as pd
 import numpy as np
 from talib import abstract
 import logging
-from ..models.analysis import TechnicalAnalysis, TechnicalIndicator, Trend, Signal
-from typing import List, Tuple, Dict, Any
+
+# Direct imports
+try:
+    from models.analysis import TechnicalAnalysis, TechnicalIndicator, Trend, Signal
+except ImportError:
+    # Fallback classes
+    from enum import Enum
+    
+    class Signal(Enum):
+        BUY = "BUY"
+        SELL = "SELL"
+        NEUTRAL = "NEUTRAL"
+    
+    class Trend(Enum):
+        BULLISH = "BULLISH"
+        BEARISH = "BEARISH"
+        NEUTRAL = "NEUTRAL"
+    
+    class TechnicalIndicator:
+        def __init__(self, name, value, signal, description=None, previous_value=None, strength=None):
+            self.name = name
+            self.value = value
+            self.signal = signal
+            self.description = description
+            self.previous_value = previous_value
+            self.strength = strength
+    
+    class TechnicalAnalysis:
+        def __init__(self, indicators, summary, confidence, support_levels, resistance_levels, trend_strength=None, volatility=None):
+            self.indicators = indicators
+            self.summary = summary
+            self.confidence = confidence
+            self.support_levels = support_levels
+            self.resistance_levels = resistance_levels
+            self.trend_strength = trend_strength
+            self.volatility = volatility
 
 logger = logging.getLogger(__name__)
 
