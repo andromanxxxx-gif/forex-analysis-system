@@ -7,11 +7,11 @@ from plotly.subplots import make_subplots
 import json
 import logging
 
-from app.services.data_service import data_service
-from app.services.technical_analysis import technical_analyzer
-from app.services.ai_analysis import ai_analysis_service
-from app.services.websocket_service import websocket_manager
-from app.models.analysis import AnalysisResponse
+from ..services.data_service import data_service
+from ..services.technical_analysis import technical_analyzer
+from ..services.ai_analysis import ai_analysis_service
+from ..services.websocket_service import websocket_manager
+from ..models.analysis import AnalysisResponse
 
 logger = logging.getLogger(__name__)
 
