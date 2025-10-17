@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from talib import abstract
 import logging
+from typing import List, Tuple, Dict, Any  # ✅ ADD THIS IMPORT
 
 # Direct imports
 try:
@@ -28,6 +29,16 @@ except ImportError:
             self.description = description
             self.previous_value = previous_value
             self.strength = strength
+        
+        def dict(self):
+            return {
+                "name": self.name,
+                "value": self.value,
+                "signal": self.signal.value if hasattr(self.signal, 'value') else self.signal,
+                "description": self.description,
+                "previous_value": self.previous_value,
+                "strength": self.strength
+            }
     
     class TechnicalAnalysis:
         def __init__(self, indicators, summary, confidence, support_levels, resistance_levels, trend_strength=None, volatility=None):
@@ -38,6 +49,17 @@ except ImportError:
             self.resistance_levels = resistance_levels
             self.trend_strength = trend_strength
             self.volatility = volatility
+        
+        def dict(self):
+            return {
+                "indicators": [ind.dict() for ind in self.indicators],
+                "summary": self.summary.value if hasattr(self.summary, 'value') else self.summary,
+                "confidence": self.confidence,
+                "support_levels": self.support_levels,
+                "resistance_levels": self.resistance_levels,
+                "trend_strength": self.trend_strength,
+                "volatility": self.volatility
+            }
 
 logger = logging.getLogger(__name__)
 
@@ -63,46 +85,83 @@ class EnhancedTechnicalAnalyzer:
             if col not in df.columns:
                 raise ValueError(f"Missing required column: {col}")
         
-        # Price-based indicators
-        for period in self.indicators_config['sma']:
-            df[f'sma_{period}'] = abstract.SMA(df['close'], timeperiod=period)
-        
-        for period in self.indicators_config['ema']:
-            df[f'ema_{period}'] = abstract.EMA(df['close'], timeperiod=period)
-        
-        # Momentum indicators
-        df['rsi_14'] = abstract.RSI(df['close'], timeperiod=14)
-        
-        macd, macd_signal, macd_hist = abstract.MACD(df['close'])
-        df['macd'] = macd
-        df['macd_signal'] = macd_signal
-        df['macd_histogram'] = macd_hist
-        
-        # Volatility indicators
-        bb_upper, bb_middle, bb_lower = abstract.BBANDS(df['close'])
-        df['bollinger_upper'] = bb_upper
-        df['bollinger_lower'] = bb_lower
-        df['bollinger_middle'] = bb_middle
-        
-        # Stochastic
-        stoch_k, stoch_d = abstract.STOCH(df['high'], df['low'], df['close'])
-        df['stoch_k'] = stoch_k
-        df['stoch_d'] = stoch_d
-        
-        # Volatility
-        df['atr_14'] = abstract.ATR(df['high'], df['low'], df['close'], timeperiod=14)
-        
-        # Volume indicators
-        df['volume_sma_20'] = abstract.SMA(df['volume'], timeperiod=20)
-        df['obv'] = abstract.OBV(df['close'], df['volume'])
-        
-        # Trend strength
-        df['adx_14'] = abstract.ADX(df['high'], df['low'], df['close'], timeperiod=14)
+        try:
+            # Price-based indicators
+            for period in self.indicators_config['sma']:
+                df[f'sma_{period}'] = abstract.SMA(df['close'], timeperiod=period)
+            
+            for period in self.indicators_config['ema']:
+                df[f'ema_{period}'] = abstract.EMA(df['close'], timeperiod=period)
+            
+            # Momentum indicators
+            df['rsi_14'] = abstract.RSI(df['close'], timeperiod=14)
+            
+            macd, macd_signal, macd_hist = abstract.MACD(df['close'])
+            df['macd'] = macd
+            df['macd_signal'] = macd_signal
+            df['macd_histogram'] = macd_hist
+            
+            # Volatility indicators
+            bb_upper, bb_middle, bb_lower = abstract.BBANDS(df['close'])
+            df['bollinger_upper'] = bb_upper
+            df['bollinger_lower'] = bb_lower
+            df['bollinger_middle'] = bb_middle
+            
+            # Stochastic
+            stoch_k, stoch_d = abstract.STOCH(df['high'], df['low'], df['close'])
+            df['stoch_k'] = stoch_k
+            df['stoch_d'] = stoch_d
+            
+            # Volatility
+            df['atr_14'] = abstract.ATR(df['high'], df['low'], df['close'], timeperiod=14)
+            
+            # Volume indicators
+            df['volume_sma_20'] = abstract.SMA(df['volume'], timeperiod=20)
+            df['obv'] = abstract.OBV(df['close'], df['volume'])
+            
+            # Trend strength
+            df['adx_14'] = abstract.ADX(df['high'], df['low'], df['close'], timeperiod=14)
+            
+        except Exception as e:
+            logger.warning(f"TA-Lib indicator calculation failed: {e}. Using fallback methods.")
+            # Fallback calculations if TA-Lib fails
+            df = self._calculate_fallback_indicators(df)
         
         # Calculate additional derived metrics
         df = self._calculate_derived_metrics(df)
         
         return df
+    
+    def _calculate_fallback_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Fallback indicator calculations without TA-Lib"""
+        # Simple SMA fallback
+        for period in self.indicators_config['sma']:
+            df[f'sma_{period}'] = df['close'].rolling(window=period).mean()
+        
+        # Simple EMA fallback
+        for period in self.indicators_config['ema']:
+            df[f'ema_{period}'] = df['close'].ewm(span=period).mean()
+        
+        # RSI fallback
+        df['rsi_14'] = self._calculate_rsi_fallback(df['close'], 14)
+        
+        # MACD fallback
+        ema_12 = df['close'].ewm(span=12).mean()
+        ema_26 = df['close'].ewm(span=26).mean()
+        df['macd'] = ema_12 - ema_26
+        df['macd_signal'] = df['macd'].ewm(span=9).mean()
+        df['macd_histogram'] = df['macd'] - df['macd_signal']
+        
+        return df
+    
+    def _calculate_rsi_fallback(self, prices: pd.Series, period: int = 14) -> pd.Series:
+        """Calculate RSI without TA-Lib"""
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
     
     def _calculate_derived_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate derived technical metrics"""
@@ -164,7 +223,7 @@ class EnhancedTechnicalAnalyzer:
         
         # RSI Signal with strength
         rsi = current.get('rsi_14')
-        if rsi is not None:
+        if rsi is not None and not pd.isna(rsi):
             if rsi < 30:
                 rsi_signal = Signal.BUY
                 rsi_strength = (30 - rsi) / 30  # 0-1 strength
@@ -187,7 +246,7 @@ class EnhancedTechnicalAnalyzer:
         # MACD Signal
         macd = current.get('macd')
         macd_signal = current.get('macd_signal')
-        if macd is not None and macd_signal is not None:
+        if macd is not None and not pd.isna(macd) and macd_signal is not None and not pd.isna(macd_signal):
             macd_histogram = current.get('macd_histogram', 0)
             prev_macd_histogram = previous.get('macd_histogram', 0)
             
@@ -213,7 +272,7 @@ class EnhancedTechnicalAnalyzer:
         # Moving Average Signals
         sma_20 = current.get('sma_20')
         sma_50 = current.get('sma_50')
-        if sma_20 is not None and sma_50 is not None:
+        if sma_20 is not None and not pd.isna(sma_20) and sma_50 is not None and not pd.isna(sma_50):
             price = current['close']
             
             # Multiple MA comparisons
@@ -244,7 +303,7 @@ class EnhancedTechnicalAnalyzer:
         close = current['close']
         bb_upper = current.get('bollinger_upper')
         bb_lower = current.get('bollinger_lower')
-        if bb_upper is not None and bb_lower is not None:
+        if bb_upper is not None and not pd.isna(bb_upper) and bb_lower is not None and not pd.isna(bb_lower):
             bb_middle = current.get('bollinger_middle', (bb_upper + bb_lower) / 2)
             
             if close <= bb_lower:
@@ -269,7 +328,7 @@ class EnhancedTechnicalAnalyzer:
         # Stochastic Signal
         stoch_k = current.get('stoch_k')
         stoch_d = current.get('stoch_d')
-        if stoch_k is not None and stoch_d is not None:
+        if stoch_k is not None and not pd.isna(stoch_k) and stoch_d is not None and not pd.isna(stoch_d):
             if stoch_k < 20 and stoch_d < 20:
                 stoch_signal = Signal.BUY
                 stoch_strength = (20 - min(stoch_k, stoch_d)) / 20
@@ -322,17 +381,19 @@ class EnhancedTechnicalAnalyzer:
         # Add moving averages as dynamic support/resistance
         if 'sma_50' in df.columns:
             sma_50_current = df['sma_50'].iloc[-1]
-            if sma_50_current < closes.iloc[-1]:
-                resistance_levels.append(sma_50_current)
-            else:
-                support_levels.append(sma_50_current)
+            if not pd.isna(sma_50_current):
+                if sma_50_current < closes.iloc[-1]:
+                    resistance_levels.append(sma_50_current)
+                else:
+                    support_levels.append(sma_50_current)
         
         if 'sma_200' in df.columns:
             sma_200_current = df['sma_200'].iloc[-1]
-            if sma_200_current < closes.iloc[-1]:
-                resistance_levels.append(sma_200_current)
-            else:
-                support_levels.append(sma_200_current)
+            if not pd.isna(sma_200_current):
+                if sma_200_current < closes.iloc[-1]:
+                    resistance_levels.append(sma_200_current)
+                else:
+                    support_levels.append(sma_200_current)
         
         # Remove duplicates and sort, keep only significant levels
         support_levels = sorted(list(set([round(level, 2) for level in support_levels])))
@@ -359,24 +420,35 @@ class EnhancedTechnicalAnalyzer:
         
         # ADX trend strength
         if 'adx_14' in df.columns:
-            adx_strength = min(current['adx_14'] / 100, 1.0)
-            strength_indicators.append(adx_strength)
+            adx_value = current['adx_14']
+            if not pd.isna(adx_value):
+                adx_strength = min(adx_value / 100, 1.0)
+                strength_indicators.append(adx_strength)
         
         # Moving average alignment
         if all(col in df.columns for col in ['sma_20', 'sma_50', 'sma_200']):
-            ma_alignment = 0
-            if (current['sma_20'] > current['sma_50'] > current['sma_200']):
-                ma_alignment = 1.0
-            elif (current['sma_20'] < current['sma_50'] < current['sma_200']):
-                ma_alignment = 1.0
-            strength_indicators.append(ma_alignment)
+            sma_20_val = current['sma_20']
+            sma_50_val = current['sma_50']
+            sma_200_val = current['sma_200']
+            
+            if not pd.isna(sma_20_val) and not pd.isna(sma_50_val) and not pd.isna(sma_200_val):
+                ma_alignment = 0
+                if (sma_20_val > sma_50_val > sma_200_val):
+                    ma_alignment = 1.0
+                elif (sma_20_val < sma_50_val < sma_200_val):
+                    ma_alignment = 1.0
+                strength_indicators.append(ma_alignment)
         
         # Price position relative to MAs
         if 'sma_20' in df.columns and 'sma_50' in df.columns:
-            price_vs_ma = abs(current['close'] - current['sma_20']) / current['sma_20']
-            ma_distance = abs(current['sma_20'] - current['sma_50']) / current['sma_50']
-            combined_strength = min(price_vs_ma + ma_distance, 1.0)
-            strength_indicators.append(combined_strength)
+            sma_20_val = current['sma_20']
+            sma_50_val = current['sma_50']
+            
+            if not pd.isna(sma_20_val) and not pd.isna(sma_50_val):
+                price_vs_ma = abs(current['close'] - sma_20_val) / sma_20_val
+                ma_distance = abs(sma_20_val - sma_50_val) / sma_50_val
+                combined_strength = min(price_vs_ma + ma_distance, 1.0)
+                strength_indicators.append(combined_strength)
         
         return np.mean(strength_indicators) if strength_indicators else 0.5
     
@@ -389,11 +461,15 @@ class EnhancedTechnicalAnalyzer:
         if 'atr_14' in df.columns:
             current_atr = df['atr_14'].iloc[-1]
             current_price = df['close'].iloc[-1]
-            return (current_atr / current_price) * 100  # Return as percentage
+            if not pd.isna(current_atr):
+                return (current_atr / current_price) * 100  # Return as percentage
         
         # Fallback to standard deviation
         returns = df['close'].pct_change().dropna()
-        return returns.std() * 100  # Annualized percentage
+        if len(returns) > 0:
+            return returns.std() * 100  # Annualized percentage
+        
+        return 0.0
     
     def analyze(self, df: pd.DataFrame) -> TechnicalAnalysis:
         """Perform complete enhanced technical analysis"""
