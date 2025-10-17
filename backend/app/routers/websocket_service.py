@@ -4,7 +4,16 @@ import logging
 from typing import Dict, List
 from fastapi import WebSocket, WebSocketDisconnect
 import redis.asyncio as redis
-from ..config import settings
+
+# Direct import
+try:
+    from config import settings
+except ImportError:
+    # Fallback settings
+    class FallbackSettings:
+        REDIS_URL = "redis://localhost:6379"
+    
+    settings = FallbackSettings()
 
 logger = logging.getLogger(__name__)
 
