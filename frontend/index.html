@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XAUUSD AI Analyzer - Professional Gold Trading Analysis</title>
+    <meta name="description" content="Real-time XAUUSD analysis with AI-powered technical and fundamental insights. Professional trading tools for gold market analysis.">
+    <meta name="keywords" content="XAUUSD, gold trading, technical analysis, AI analysis, forex, trading tools">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="XAUUSD AI Analyzer - Professional Gold Trading Analysis">
+    <meta property="og:description" content="Real-time XAUUSD analysis with AI-powered technical and fundamental insights">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://xauusd-analyzer.com">
+    <meta property="og:image" content="/og-image.png">
+    
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="XAUUSD AI Analyzer">
+    <meta name="twitter:description" content="Professional Gold Trading Analysis with AI">
+    
+    <!-- Preload Critical Resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#f97316">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <style>
+      /* Critical CSS for initial loading */
+      body {
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        background-color: #f9fafb;
+        color: #111827;
+      }
+      
+      /* Loading animation */
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #f3f4f6;
+        border-radius: 50%;
+        border-top-color: #f97316;
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Initial fade-in animation */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      .fade-in {
+        animation: fadeIn 0.5s ease-out;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Loading Screen -->
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #fffbeb 0%, #fed7aa 100%);">
+        <div style="text-align: center; animation: fadeIn 0.8s ease-out;">
+          <!-- Logo -->
+          <div style="margin-bottom: 2rem;">
+            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.3);">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3v18h18"></path>
+                <path d="m19 9-5 5-4-4-3 3"></path>
+              </svg>
+            </div>
+          </div>
+          
+          <!-- App Title -->
+          <h1 style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">
+            XAUUSD AI Analyzer
+          </h1>
+          <p style="color: #6b7280; margin-bottom: 2rem; font-size: 1.125rem;">
+            Professional Gold Trading Analysis
+          </p>
+          
+          <!-- Loading Indicator -->
+          <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+            <div class="loading-spinner"></div>
+            <span style="color: #4b5563; font-weight: 500;">Loading Application...</span>
+          </div>
+          
+          <!-- Status -->
+          <div style="margin-top: 2rem; padding: 1rem; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 300px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: #6b7280; font-size: 0.875rem;">Backend Status</span>
+              <span id="backend-status" style="display: flex; align-items: center; gap: 0.25rem;">
+                <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></span>
+                <span style="font-size: 0.875rem; color: #ef4444;">Connecting...</span>
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="color: #6b7280; font-size: 0.875rem;">WebSocket</span>
+              <span style="display: flex; align-items: center; gap: 0.25rem;">
+                <span style="display: inline-block; width: 8px; height: 8px; background: #6b7280; border-radius: 50%;"></span>
+                <span style="font-size: 0.875rem; color: #6b7280;">Disabled</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="position: absolute; bottom: 2rem; text-align: center;">
+          <p style="color: #9ca3af; font-size: 0.875rem;">
+            Powered by DeepSeek AI & Advanced Technical Analysis
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <script>
+      // Check backend connectivity on load
+      window.addEventListener('load', function() {
+        fetch('http://localhost:8000/api/health')
+          .then(response => response.json())
+          .then(data => {
+            const statusElement = document.getElementById('backend-status');
+            if (data.status === 'healthy') {
+              statusElement.innerHTML = `
+                <span style="display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span>
+                <span style="font-size: 0.875rem; color: #10b981;">Connected</span>
+              `;
+            }
+          })
+          .catch(error => {
+            console.log('Backend not available:', error);
+            const statusElement = document.getElementById('backend-status');
+            statusElement.innerHTML = `
+              <span style="display: inline-block; width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span>
+              <span style="font-size: 0.875rem; color: #f59e0b;">Backend Offline</span>
+            `;
+          });
+      });
+      
+      // Service Worker Registration for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+    
+    <!-- Analytics (optional) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+  </body>
+</html>
