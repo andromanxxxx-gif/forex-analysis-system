@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -9,7 +9,7 @@ import logging
 
 from app.routers import analysis
 from app.config import settings
-from app.services.websocket_service import start_websocket_server, websocket_manager
+from app.services.websocket_service import websocket_manager
 from app.services.realtime_service import realtime_service
 
 # Configure logging
@@ -35,7 +35,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",  # Tambahkan ini
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -45,13 +46,26 @@ app.add_middleware(
 # Include routers
 app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
 
+# WebSocket endpoint langsung di FastAPI
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket_manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive
+            await asyncio.sleep(10)
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        websocket_manager.disconnect(websocket)
+
 @app.on_event("startup")
 async def startup_event():
     """Startup tasks"""
     logger.info("🚀 Starting XAUUSD AI Analyzer Backend")
     
-    # Start WebSocket server in background
-    asyncio.create_task(start_websocket_server())
+    # HAPUS: start_websocket_server() - sekarang sudah terintegrasi di FastAPI
     
     # Start real-time price updates
     asyncio.create_task(realtime_service.start_price_updates())
@@ -63,6 +77,12 @@ async def shutdown_event():
     """Shutdown tasks"""
     logger.info("🛑 Shutting down services...")
     await realtime_service.stop_price_updates()
+    
+    # Disconnect all WebSocket clients
+    await websocket_manager.broadcast({"type": "server_shutdown", "message": "Server is shutting down"})
+    for connection in websocket_manager.connections:
+        await connection.close()
+    
     logger.info("✅ Services shut down successfully")
 
 @app.get("/")
@@ -119,7 +139,7 @@ async def health_check():
 async def websocket_info():
     """WebSocket connection information"""
     return {
-        "websocket_url": f"ws://{settings.WS_HOST}:{settings.WS_PORT}",
+        "websocket_url": "ws://localhost:8000/ws",  # Update URL
         "connected_clients": len(websocket_manager.connections),
         "supported_messages": [
             "price_update",
@@ -153,7 +173,7 @@ async def general_exception_handler(request, exc):
 
 if __name__ == "__main__":
     uvicorn.run(
-        "app.main:app",
+        "main:app",  # Update ini
         host="0.0.0.0",
         port=8000,
         reload=True,
