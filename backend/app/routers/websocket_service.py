@@ -1,8 +1,8 @@
 import asyncio
 import json
 import logging
-from typing import Dict, List
-from websockets import serve, WebSocketServerProtocol
+from typing import List
+from fastapi import WebSocket
 import redis.asyncio as redis
 from app.config import settings
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class WebSocketManager:
     def __init__(self):
-        self.connections: List[WebSocketServerProtocol] = []
+        self.connections: List[WebSocket] = []
         self.redis_client = None
         
     async def connect_redis(self):
@@ -31,7 +31,7 @@ class WebSocketManager:
         
         for connection in self.connections:
             try:
-                await connection.send(message_json)
+                await connection.send_text(message_json)
             except Exception as e:
                 logger.error(f"Failed to send message to client: {e}")
                 disconnected.append(connection)
@@ -40,8 +40,9 @@ class WebSocketManager:
         for connection in disconnected:
             self.connections.remove(connection)
             
-    async def register(self, websocket: WebSocketServerProtocol):
+    async def connect(self, websocket: WebSocket):
         """Register a new WebSocket connection"""
+        await websocket.accept()
         self.connections.append(websocket)
         logger.info(f"✅ New WebSocket connection. Total: {len(self.connections)}")
         
@@ -51,9 +52,9 @@ class WebSocketManager:
             "message": "Connected to XAUUSD Real-time Server",
             "timestamp": self._get_timestamp()
         }
-        await websocket.send(json.dumps(welcome_msg))
+        await websocket.send_text(json.dumps(welcome_msg))
         
-    async def unregister(self, websocket: WebSocketServerProtocol):
+    def disconnect(self, websocket: WebSocket):
         """Unregister a WebSocket connection"""
         if websocket in self.connections:
             self.connections.remove(websocket)
@@ -86,52 +87,4 @@ class WebSocketManager:
 # Global WebSocket manager instance
 websocket_manager = WebSocketManager()
 
-async def websocket_handler(websocket: WebSocketServerProtocol, path: str):
-    """Main WebSocket handler"""
-    await websocket_manager.register(websocket)
-    try:
-        async for message in websocket:
-            # Handle incoming messages from clients
-            try:
-                data = json.loads(message)
-                await handle_client_message(data, websocket)
-            except json.JSONDecodeError:
-                logger.error("Invalid JSON received from client")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-    finally:
-        await websocket_manager.unregister(websocket)
-
-async def handle_client_message(data: dict, websocket: WebSocketServerProtocol):
-    """Handle messages from clients"""
-    message_type = data.get("type")
-    
-    if message_type == "subscribe":
-        # Handle subscription requests
-        symbols = data.get("symbols", ["XAUUSD"])
-        logger.info(f"Client subscribed to: {symbols}")
-        
-        response = {
-            "type": "subscription_confirmed",
-            "symbols": symbols,
-            "timestamp": websocket_manager._get_timestamp()
-        }
-        await websocket.send(json.dumps(response))
-        
-    elif message_type == "unsubscribe":
-        # Handle unsubscription requests
-        symbols = data.get("symbols", [])
-        logger.info(f"Client unsubscribed from: {symbols}")
-
-async def start_websocket_server():
-    """Start the WebSocket server"""
-    await websocket_manager.connect_redis()
-    server = await serve(
-        websocket_handler,
-        settings.WS_HOST,
-        settings.WS_PORT,
-        ping_interval=20,
-        ping_timeout=10
-    )
-    logger.info(f"🚀 WebSocket server started on ws://{settings.WS_HOST}:{settings.WS_PORT}")
-    return server
+# Hapus fungsi-fungsi yang tidak digunakan lagi: websocket_handler, start_websocket_server, handle_client_message
