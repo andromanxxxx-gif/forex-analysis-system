@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 import os
 import json
-from app.config import settings
+from ..config import settings
 
 class EnhancedDataService:
     def __init__(self):
