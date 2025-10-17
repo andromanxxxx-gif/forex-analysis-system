@@ -159,3 +159,93 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+# Tambahkan di main.py setelah endpoint yang sudah ada
+@app.get("/api/v1/chart/{timeframe}")
+async def get_chart_data(
+    timeframe: str,
+    limit: int = Query(100, ge=10, le=1000),
+    include_indicators: bool = Query(True)
+):
+    """Get historical chart data with technical indicators"""
+    try:
+        # Load historical data
+        historical_data = await data_service.load_historical_data(timeframe, limit)
+        
+        if historical_data.empty:
+            raise HTTPException(status_code=404, detail="No data available for the specified timeframe")
+        
+        # Calculate technical indicators
+        if include_indicators:
+            df_with_indicators = technical_analyzer.calculate_indicators(historical_data)
+        else:
+            df_with_indicators = historical_data
+        
+        # Convert to list for JSON response
+        chart_data = []
+        for _, row in df_with_indicators.iterrows():
+            candle = {
+                'timestamp': row['timestamp'].isoformat(),
+                'open': float(row['open']),
+                'high': float(row['high']),
+                'low': float(row['low']),
+                'close': float(row['close']),
+                'volume': float(row.get('volume', 0))
+            }
+            
+            # Add technical indicators if available
+            if include_indicators:
+                indicators = {}
+                for indicator in settings.TECHNICAL_INDICATORS:
+                    if indicator in row and pd.notna(row[indicator]):
+                        indicators[indicator] = float(row[indicator])
+                candle['indicators'] = indicators
+            
+            chart_data.append(candle)
+        
+        return {
+            'symbol': 'XAUUSD',
+            'timeframe': timeframe,
+            'data_points': len(chart_data),
+            'data': chart_data,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Chart data error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get chart data: {str(e)}")
+
+@app.get("/api/v1/analysis/multi-timeframe")
+async def get_multi_timeframe_analysis():
+    """Get analysis for all timeframes"""
+    try:
+        timeframes = ["1D", "4H", "1H"]
+        results = {}
+        
+        for tf in timeframes:
+            try:
+                historical_data = await data_service.load_historical_data(tf, 100)
+                realtime_price = await data_service.get_realtime_price()
+                updated_data = data_service.update_realtime_candle(historical_data, realtime_price)
+                
+                # Technical analysis
+                analysis = technical_analyzer.analyze(updated_data)
+                
+                results[tf] = {
+                    "current_price": realtime_price,
+                    "trend": analysis.summary.value,
+                    "confidence": analysis.confidence,
+                    "support_levels": analysis.support_levels[-3:],
+                    "resistance_levels": analysis.resistance_levels[:3],
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                results[tf] = {"error": str(e)}
+        
+        return {
+            "symbol": "XAUUSD",
+            "timestamp": datetime.now().isoformat(),
+            "timeframes": results
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Multi-timeframe analysis failed: {str(e)}")
