@@ -8,6 +8,7 @@ class Settings:
     DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
     TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
     NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+    DEBUG: bool = True 
     
     # Database paths
     DATA_PATH = "data/"
