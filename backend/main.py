@@ -95,9 +95,11 @@ async def websocket_endpoint(websocket: WebSocket):
         if 'websocket_manager' in locals():
             websocket_manager.disconnect(websocket)
 
-@app.on_event("startup")
-async def startup_event():
-    """Startup tasks"""
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     logger.info("🚀 Starting XAUUSD AI Analyzer Backend")
     
     try:
@@ -113,10 +115,10 @@ async def startup_event():
         logger.info("✅ All services started successfully")
     except ImportError as e:
         logger.error(f"❌ Failed to start services: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown tasks"""
+    
+    yield
+    
+    # Shutdown
     logger.info("🛑 Shutting down services...")
     
     try:
@@ -131,7 +133,6 @@ async def shutdown_event():
                 "type": "server_shutdown", 
                 "message": "Server is shutting down"
             })
-            # Close all connections
             for connection in websocket_manager.connections[:]:
                 try:
                     await connection.close()
@@ -145,6 +146,15 @@ async def shutdown_event():
     
     logger.info("✅ Services shut down successfully")
 
+# Update app creation dengan lifespan
+app = FastAPI(
+    title="XAUUSD AI Analysis API",
+    description="Backend untuk analisis teknikal dan AI XAUUSD dengan DeepSeek", 
+    version="2.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    lifespan=lifespan  # ✅ Tambahkan ini
+)
 @app.get("/")
 async def root():
     return {
