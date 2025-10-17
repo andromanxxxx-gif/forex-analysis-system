@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from talib import abstract
 import logging
-from app.models.analysis import TechnicalAnalysis, TechnicalIndicator, Trend, Signal
+from ..models.analysis import TechnicalAnalysis, TechnicalIndicator, Trend, Signal
 from typing import List, Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
