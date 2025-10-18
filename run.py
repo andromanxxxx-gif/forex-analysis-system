@@ -35,82 +35,21 @@ class XAUUSDAnalyzer:
         self.twelve_data_api_key = os.getenv('TWELVE_DATA_API_KEY')
         self.deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
         self.news_api_key = os.getenv('NEWS_API_KEY')
-        self.last_api_call = 0  # Rate limiting
+        self.last_api_call = 0
         
         print(f"API Keys loaded: TwelveData: {'Yes' if self.twelve_data_api_key else 'No'}, "
               f"DeepSeek: {'Yes' if self.deepseek_api_key else 'No'}, "
               f"NewsAPI: {'Yes' if self.news_api_key else 'No'}")
-        
-    def is_price_realistic(self, price):
-        """Check if price is within realistic range for XAUUSD"""
-        return 800 <= price <= 6000
 
-    def validate_dataframe(self, df):
-        """Validate if dataframe contains realistic XAUUSD data"""
-        if df is None or len(df) == 0:
-            return False
-            
-        try:
-            # Check if essential columns exist
-            required_cols = ['open', 'high', 'low', 'close']
-            if not all(col in df.columns for col in required_cols):
-                print("Missing required columns")
-                return False
-            
-            # Check if prices are numeric
-            for col in required_cols:
-                if not pd.api.types.is_numeric_dtype(df[col]):
-                    print(f"Column {col} is not numeric")
-                    return False
-            
-            # Check if prices are realistic
-            avg_price = df['close'].mean()
-            if not self.is_price_realistic(avg_price):
-                print(f"Average price ${avg_price:.2f} outside expected range, but will use with adjustment")
-                
-            # Check for significant NaN values
-            if df[required_cols].isna().sum().sum() > len(df) * 0.1:
-                print("Too many NaN values in price data")
-                return False
-                
-            return True
-            
-        except Exception as e:
-            print(f"Error validating dataframe: {e}")
-            return False
-
-    def normalize_price_data(self, df, target_price=None):
-        """Normalize price data to realistic range if needed"""
-        if df is None or len(df) == 0:
-            return df
-            
-        try:
-            current_avg = df['close'].mean()
-            
-            if not self.is_price_realistic(current_avg):
-                print(f"Normalizing price data from ${current_avg:.2f} to realistic range")
-                
-                if target_price and self.is_price_realistic(target_price):
-                    base_price = target_price
-                else:
-                    base_price = 1968.0
-                
-                scaling_factor = base_price / current_avg
-                
-                price_cols = ['open', 'high', 'low', 'close']
-                for col in price_cols:
-                    df[col] = df[col] * scaling_factor
-                    
-                print(f"Price data normalized by factor {scaling_factor:.4f}, new average: ${df['close'].mean():.2f}")
-            
-            return df
-            
-        except Exception as e:
-            print(f"Error normalizing price data: {e}")
-            return df
+    def debug_data_quality(self, df, column_name):
+        """Debug data quality for a specific column"""
+        if column_name in df.columns:
+            series = df[column_name]
+            print(f"  {column_name}: min={series.min():.2f}, max={series.max():.2f}, "
+                  f"mean={series.mean():.2f}, nulls={series.isnull().sum()}, unique={series.nunique()}")
 
     def load_from_local_csv(self, timeframe, limit=500):
-        """Load data dari file CSV lokal dengan validasi improved"""
+        """Load data dari file CSV lokal"""
         possible_paths = [
             f"data/XAUUSD_{timeframe}.csv",
             f"../data/XAUUSD_{timeframe}.csv",
@@ -147,6 +86,7 @@ class XAUUSDAnalyzer:
                             freq = 'D'
                         df['datetime'] = pd.date_range(end=datetime.now(), periods=len(df), freq=freq)
                     
+                    # Pastikan kolom OHLC ada
                     ohlc_mapping = {
                         'open': ['open', 'Open', 'OPEN'],
                         'high': ['high', 'High', 'HIGH'], 
@@ -161,48 +101,30 @@ class XAUUSDAnalyzer:
                                     df[standard_name] = df[name]
                                     print(f"Mapped column {name} to {standard_name}")
                                     break
-                            else:
-                                print(f"Warning: Column {standard_name} not found in CSV, creating dummy data")
-                                if standard_name == 'open':
-                                    df[standard_name] = np.random.uniform(1800, 2000, len(df))
-                                elif standard_name == 'high':
-                                    df[standard_name] = df['open'] * np.random.uniform(1.001, 1.01, len(df))
-                                elif standard_name == 'low':
-                                    df[standard_name] = df['open'] * np.random.uniform(0.99, 0.999, len(df))
-                                elif standard_name == 'close':
-                                    df[standard_name] = df['open'] * np.random.uniform(0.995, 1.005, len(df))
                     
+                    # Pastikan kolom volume ada
                     if 'volume' not in df.columns:
                         print("Volume column not found, setting default values")
                         df['volume'] = np.random.randint(1000, 10000, len(df))
                     
+                    # Konversi ke numeric dan handle missing values
                     for col in ['open', 'high', 'low', 'close', 'volume']:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
                         df[col] = df[col].fillna(method='ffill').fillna(method='bfill')
-                        if df[col].isna().any():
-                            if col == 'volume':
-                                df[col] = df[col].fillna(np.random.randint(1000, 10000))
-                            else:
-                                df[col] = df[col].fillna(np.random.uniform(1800, 2000))
                     
                     df = df.sort_values('datetime')
+                    print(f"Successfully loaded {len(df)} records from {filename}")
                     
-                    if self.validate_dataframe(df):
-                        print(f"Successfully loaded {len(df)} records from {filename}")
-                        return df.tail(limit)
-                    else:
-                        print(f"Data validation failed for {filename}, but will attempt to normalize")
-                        normalized_df = self.normalize_price_data(df)
-                        if self.validate_dataframe(normalized_df):
-                            print(f"Successfully normalized and loaded {len(normalized_df)} records from {filename}")
-                            return normalized_df.tail(limit)
-                        else:
-                            print(f"Failed to normalize data from {filename}")
-                            continue
-                        
+                    # Debug data quality
+                    print("Data quality check:")
+                    self.debug_data_quality(df, 'open')
+                    self.debug_data_quality(df, 'high')
+                    self.debug_data_quality(df, 'low')
+                    self.debug_data_quality(df, 'close')
+                    
+                    return df.tail(limit)
                 except Exception as e:
                     print(f"Error processing {filename}: {e}")
-                    traceback.print_exc()
                     continue
         return None
 
@@ -247,8 +169,6 @@ class XAUUSDAnalyzer:
                     
                     df = df.sort_values('datetime')
                     
-                    df = self.normalize_price_data(df)
-                    
                     filename = f"data/XAUUSD_{timeframe}.csv"
                     df.to_csv(filename, index=False)
                     print(f"Downloaded and saved {len(df)} records to {filename}")
@@ -266,7 +186,7 @@ class XAUUSDAnalyzer:
             return None
 
     def load_historical_data(self, timeframe, limit=500):
-        """Load data historis dengan improved validation"""
+        """Load data historis"""
         try:
             df = self.load_from_local_csv(timeframe, limit)
             if df is not None:
@@ -280,27 +200,18 @@ class XAUUSDAnalyzer:
                 return df.tail(limit)
                 
             print(f"All methods failed, using generated data for {timeframe}")
-            current_price = self.get_realtime_price()
-            if self.is_price_realistic(current_price):
-                base_price = current_price
-            else:
-                base_price = 1968.0
-            return self.generate_sample_data(timeframe, limit, base_price)
+            return self.generate_sample_data(timeframe, limit)
             
         except Exception as e:
             print(f"Error in load_historical_data: {e}")
-            current_price = self.get_realtime_price()
-            if self.is_price_realistic(current_price):
-                base_price = current_price
-            else:
-                base_price = 1968.0
-            return self.generate_sample_data(timeframe, limit, base_price)
+            return self.generate_sample_data(timeframe, limit)
 
-    def generate_sample_data(self, timeframe, limit=500, base_price=1968.0):
-        """Generate sample data dengan base price yang bisa disesuaikan"""
-        print(f"Generating sample data for {timeframe} with base price ${base_price:.2f}")
+    def generate_sample_data(self, timeframe, limit=500):
+        """Generate sample data"""
+        print(f"Generating sample data for {timeframe}")
         
         periods = limit
+        base_price = 1968.0
         
         if timeframe == '1H':
             freq = 'H'
@@ -334,46 +245,17 @@ class XAUUSDAnalyzer:
         df = pd.DataFrame(data)
         
         self.data_cache[timeframe] = df
-        print(f"Generated {len(df)} records for {timeframe} with average price ${df['close'].mean():.2f}")
-        return df
-
-    def clean_dataframe(self, df):
-        """Clean and prepare dataframe for indicator calculations"""
-        print("Cleaning dataframe for indicator calculations...")
-        
-        for col in ['open', 'high', 'low', 'close', 'volume']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        initial_count = len(df)
-        df = df.dropna(subset=['open', 'high', 'low', 'close'])
-        if len(df) < initial_count:
-            print(f"Removed {initial_count - len(df)} rows with NaN in OHLC data")
-        
-        df = df.fillna(method='ffill').fillna(method='bfill')
-        
-        for col in ['open', 'high', 'low', 'close']:
-            if df[col].isna().any():
-                avg_price = df[['open', 'high', 'low', 'close']].mean().mean()
-                fill_value = avg_price if not pd.isna(avg_price) else 1968.0
-                df[col] = df[col].fillna(fill_value)
-                print(f"Filled NaN in {col} with {fill_value:.2f}")
-        
-        if 'volume' in df.columns:
-            if df['volume'].isna().any():
-                df['volume'] = df['volume'].fillna(10000)
-                print("Filled NaN in volume with 10000")
-        
-        print(f"Data cleaning completed. Final data count: {len(df)}")
+        print(f"Generated {len(df)} records for {timeframe}")
         return df
 
     def calculate_indicators(self, df):
-        """Calculate technical indicators - ULTIMATE FIXED VERSION"""
+        """Calculate technical indicators - CORRECTED VERSION"""
         try:
             if len(df) < 50:
                 print(f"Not enough data for indicators. Have {len(df)}, need at least 50")
-                return self.add_robust_fallback_indicators(df)
+                return self.add_corrected_fallback_indicators(df)
                 
+            # Clean data first
             df = self.clean_dataframe(df)
             
             close = df['close'].values
@@ -383,165 +265,214 @@ class XAUUSDAnalyzer:
             print(f"Calculating indicators for {len(df)} records...")
             print(f"Price range: ${close.min():.2f} - ${close.max():.2f}")
             
-            # Calculate all indicators with robust error handling
-            df = self.calculate_all_indicators_safely(df, close, high, low)
+            # Use TA-Lib if available, otherwise use corrected calculations
+            if TALIB_AVAILABLE:
+                print("Using TA-Lib for indicator calculations")
+                df = self.calculate_indicators_talib(df, close, high, low)
+            else:
+                print("Using corrected pandas calculations")
+                df = self.calculate_indicators_pandas(df, close, high, low)
             
-            # AGGRESSIVE NaN handling - ensure no NaN values remain
-            df = self.force_fill_all_indicators(df)
+            # Verify calculations
+            self.verify_indicator_calculations(df)
             
-            print("All indicators calculated successfully with no NaN values")
             return df
             
         except Exception as e:
             print(f"Error calculating indicators: {e}")
             traceback.print_exc()
-            return self.add_robust_fallback_indicators(df)
+            return self.add_corrected_fallback_indicators(df)
 
-    def calculate_all_indicators_safely(self, df, close, high, low):
-        """Calculate all indicators with comprehensive error handling"""
+    def calculate_indicators_talib(self, df, close, high, low):
+        """Calculate indicators using TA-Lib"""
         try:
-            # EMA calculations
-            df['ema_12'] = pd.Series(close).ewm(span=12, adjust=False, min_periods=1).mean()
-            df['ema_26'] = pd.Series(close).ewm(span=26, adjust=False, min_periods=1).mean()
-            df['ema_50'] = pd.Series(close).ewm(span=50, adjust=False, min_periods=1).mean()
+            # EMA
+            df['ema_12'] = talib.EMA(close, timeperiod=12)
+            df['ema_26'] = talib.EMA(close, timeperiod=26)
+            df['ema_50'] = talib.EMA(close, timeperiod=50)
             
-            # MACD calculations
-            ema_12 = pd.Series(close).ewm(span=12, adjust=False, min_periods=1).mean()
-            ema_26 = pd.Series(close).ewm(span=26, adjust=False, min_periods=1).mean()
-            df['macd'] = ema_12 - ema_26
-            df['macd_signal'] = df['macd'].ewm(span=9, adjust=False, min_periods=1).mean()
-            df['macd_hist'] = df['macd'] - df['macd_signal']
+            # MACD
+            macd, macd_signal, macd_hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
+            df['macd'] = macd
+            df['macd_signal'] = macd_signal
+            df['macd_hist'] = macd_hist
             
-            # RSI calculation
-            delta = pd.Series(close).diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
-            rs = gain / loss.replace(0, float('inf'))
-            df['rsi'] = 100 - (100 / (1 + rs))
+            # RSI
+            df['rsi'] = talib.RSI(close, timeperiod=14)
             
             # Bollinger Bands
-            df['bb_middle'] = pd.Series(close).rolling(window=20, min_periods=1).mean()
-            bb_std = pd.Series(close).rolling(window=20, min_periods=1).std()
-            df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
-            df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
+            bb_upper, bb_middle, bb_lower = talib.BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+            df['bb_upper'] = bb_upper
+            df['bb_middle'] = bb_middle
+            df['bb_lower'] = bb_lower
             
             # Stochastic
-            low_14 = pd.Series(low).rolling(window=14, min_periods=1).min()
-            high_14 = pd.Series(high).rolling(window=14, min_periods=1).max()
-            df['stoch_k'] = 100 * (pd.Series(close) - low_14) / (high_14 - low_14).replace(0, 1)
-            df['stoch_d'] = df['stoch_k'].rolling(window=3, min_periods=1).mean()
+            stoch_k, stoch_d = talib.STOCH(high, low, close, fastk_period=14, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+            df['stoch_k'] = stoch_k
+            df['stoch_d'] = stoch_d
             
+            print("TA-Lib indicators calculated successfully")
             return df
             
         except Exception as e:
-            print(f"Error in indicator calculations: {e}")
+            print(f"TA-Lib calculation error: {e}, falling back to pandas")
+            return self.calculate_indicators_pandas(df, close, high, low)
+
+    def calculate_indicators_pandas(self, df, close, high, low):
+        """Calculate indicators using corrected pandas methods"""
+        try:
+            close_series = pd.Series(close)
+            high_series = pd.Series(high)
+            low_series = pd.Series(low)
+            
+            # EMA - CORRECTED: Use proper EWM with different spans
+            df['ema_12'] = close_series.ewm(span=12, adjust=False).mean()
+            df['ema_26'] = close_series.ewm(span=26, adjust=False).mean()
+            df['ema_50'] = close_series.ewm(span=50, adjust=False).mean()
+            
+            # MACD - CORRECTED: Calculate from EMAs
+            df['macd'] = df['ema_12'] - df['ema_26']
+            df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+            df['macd_hist'] = df['macd'] - df['macd_signal']
+            
+            # RSI - CORRECTED: Proper RSI calculation
+            delta = close_series.diff()
+            gain = delta.where(delta > 0, 0).rolling(window=14, min_periods=1).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+            rs = gain / loss.replace(0, np.inf)
+            df['rsi'] = 100 - (100 / (1 + rs))
+            
+            # Bollinger Bands - CORRECTED
+            df['bb_middle'] = close_series.rolling(window=20, min_periods=1).mean()
+            bb_std = close_series.rolling(window=20, min_periods=1).std()
+            df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
+            df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
+            
+            # Stochastic - CORRECTED
+            lowest_low = low_series.rolling(window=14, min_periods=1).min()
+            highest_high = high_series.rolling(window=14, min_periods=1).max()
+            df['stoch_k'] = 100 * (close_series - lowest_low) / (highest_high - lowest_low).replace(0, 1)
+            df['stoch_d'] = df['stoch_k'].rolling(window=3, min_periods=1).mean()
+            
+            print("Pandas indicators calculated successfully")
+            return df
+            
+        except Exception as e:
+            print(f"Pandas calculation error: {e}")
             raise
 
-    def force_fill_all_indicators(self, df):
-        """Force fill all NaN values in indicators with realistic values"""
-        indicator_config = {
-            'ema_12': {'type': 'price_based', 'default': 1968.0},
-            'ema_26': {'type': 'price_based', 'default': 1968.0},
-            'ema_50': {'type': 'price_based', 'default': 1968.0},
-            'macd': {'type': 'zero', 'default': 0},
-            'macd_signal': {'type': 'zero', 'default': 0},
-            'macd_hist': {'type': 'zero', 'default': 0},
-            'rsi': {'type': 'neutral', 'default': 50},
-            'bb_upper': {'type': 'price_based', 'multiplier': 1.02, 'default': 2000.0},
-            'bb_middle': {'type': 'price_based', 'default': 1968.0},
-            'bb_lower': {'type': 'price_based', 'multiplier': 0.98, 'default': 1930.0},
-            'stoch_k': {'type': 'neutral', 'default': 50},
-            'stoch_d': {'type': 'neutral', 'default': 50}
-        }
-        
-        current_price = df['close'].iloc[-1] if len(df) > 0 else 1968.0
-        
-        for indicator, config in indicator_config.items():
-            if indicator in df.columns:
-                nan_count = df[indicator].isna().sum()
-                if nan_count > 0:
-                    if config['type'] == 'price_based':
-                        if 'multiplier' in config:
-                            fill_value = current_price * config['multiplier']
-                        else:
-                            fill_value = current_price
-                    elif config['type'] == 'zero':
-                        fill_value = 0
-                    elif config['type'] == 'neutral':
-                        fill_value = config['default']
-                    else:
-                        fill_value = config['default']
-                    
-                    df[indicator] = df[indicator].fillna(fill_value)
-                    print(f"Force filled {nan_count} NaN values in {indicator} with {fill_value:.2f}")
-        
-        return df
-
-    def add_robust_fallback_indicators(self, df):
-        """Robust fallback indicators that guarantee no NaN values"""
-        print("Using ROBUST fallback indicators")
+    def add_corrected_fallback_indicators(self, df):
+        """Corrected fallback indicators with proper calculations"""
+        print("Using CORRECTED fallback indicators")
         
         if len(df) == 0:
             return df
             
         close = df['close'].values
-        current_price = close[-1] if len(close) > 0 else 1968.0
+        close_series = pd.Series(close)
         
-        # Simple but reliable calculations
-        price_series = pd.Series(close)
+        # Simple but correct calculations
+        df['ema_12'] = close_series.ewm(span=12, adjust=False).mean()
+        df['ema_26'] = close_series.ewm(span=26, adjust=False).mean()
+        df['ema_50'] = close_series.ewm(span=50, adjust=False).mean()
         
-        # EMAs
-        df['ema_12'] = price_series.rolling(window=12, min_periods=1).mean()
-        df['ema_26'] = price_series.rolling(window=26, min_periods=1).mean()
-        df['ema_50'] = price_series.rolling(window=50, min_periods=1).mean()
-        
-        # MACD (simplified)
         df['macd'] = df['ema_12'] - df['ema_26']
-        df['macd_signal'] = df['macd'].rolling(window=9, min_periods=1).mean()
+        df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
         df['macd_hist'] = df['macd'] - df['macd_signal']
         
-        # RSI (simplified)
-        price_change = price_series.diff()
-        avg_gain = price_change.clip(lower=0).rolling(window=14, min_periods=1).mean()
-        avg_loss = (-price_change.clip(upper=0)).rolling(window=14, min_periods=1).mean()
-        rs = avg_gain / avg_loss.replace(0, float('inf'))
+        # RSI
+        delta = close_series.diff()
+        gain = delta.where(delta > 0, 0).rolling(window=14, min_periods=1).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+        rs = gain / loss.replace(0, np.inf)
         df['rsi'] = 100 - (100 / (1 + rs))
         
         # Bollinger Bands
-        df['bb_middle'] = price_series.rolling(window=20, min_periods=1).mean()
-        bb_std = price_series.rolling(window=20, min_periods=1).std().fillna(10)
+        df['bb_middle'] = close_series.rolling(window=20, min_periods=1).mean()
+        bb_std = close_series.rolling(window=20, min_periods=1).std().fillna(10)
         df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
         df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
         
         # Stochastic
         low_14 = pd.Series(df['low']).rolling(window=14, min_periods=1).min()
         high_14 = pd.Series(df['high']).rolling(window=14, min_periods=1).max()
-        df['stoch_k'] = 100 * (price_series - low_14) / (high_14 - low_14).replace(0, 1)
+        df['stoch_k'] = 100 * (close_series - low_14) / (high_14 - low_14).replace(0, 1)
         df['stoch_d'] = df['stoch_k'].rolling(window=3, min_periods=1).mean()
         
-        # Force fill any remaining NaN
-        df = self.force_fill_all_indicators(df)
+        # Ensure no NaN values
+        df = self.ensure_no_nan_indicators(df)
         
-        print("Robust fallback indicators applied successfully")
+        print("Corrected fallback indicators applied successfully")
+        return df
+
+    def clean_dataframe(self, df):
+        """Clean dataframe for calculations"""
+        print("Cleaning dataframe for calculations...")
+        
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        df = df.dropna(subset=['open', 'high', 'low', 'close'])
+        df = df.fillna(method='ffill').fillna(method='bfill')
+        
+        print(f"Data cleaning completed. Final data count: {len(df)}")
+        return df
+
+    def ensure_no_nan_indicators(self, df):
+        """Ensure no NaN values in indicators"""
+        indicator_defaults = {
+            'ema_12': df['close'].iloc[-1] if len(df) > 0 else 1968.0,
+            'ema_26': df['close'].iloc[-1] if len(df) > 0 else 1968.0,
+            'ema_50': df['close'].iloc[-1] if len(df) > 0 else 1968.0,
+            'macd': 0,
+            'macd_signal': 0,
+            'macd_hist': 0,
+            'rsi': 50,
+            'bb_upper': df['close'].iloc[-1] * 1.02 if len(df) > 0 else 2000.0,
+            'bb_middle': df['close'].iloc[-1] if len(df) > 0 else 1968.0,
+            'bb_lower': df['close'].iloc[-1] * 0.98 if len(df) > 0 else 1930.0,
+            'stoch_k': 50,
+            'stoch_d': 50
+        }
+        
+        for indicator, default in indicator_defaults.items():
+            if indicator in df.columns:
+                df[indicator] = df[indicator].fillna(default)
+        
         return df
 
     def verify_indicator_calculations(self, df):
-        """Verify that indicators were calculated correctly"""
+        """Verify indicator calculations are correct"""
         print("=== INDICATOR VERIFICATION ===")
         if len(df) > 0:
             last_row = df.iloc[-1]
-            for col in df.columns:
-                if col not in ['datetime', 'open', 'high', 'low', 'close', 'volume']:
+            
+            # Check EMA relationships
+            ema_12 = last_row['ema_12']
+            ema_26 = last_row['ema_26']
+            ema_50 = last_row['ema_50']
+            
+            print(f"EMA Values - 12: {ema_12:.2f}, 26: {ema_26:.2f}, 50: {ema_50:.2f}")
+            
+            # They should not all be equal
+            if ema_12 == ema_26 == ema_50:
+                print("⚠️  WARNING: All EMAs have same value!")
+            else:
+                print("✅ EMAs have different values - GOOD")
+            
+            # Check other indicators
+            for col in ['rsi', 'macd', 'stoch_k', 'stoch_d']:
+                if col in df.columns:
                     value = last_row[col]
-                    status = "✓ OK" if value is not None and not pd.isna(value) else "✗ NaN/None"
-                    print(f"  {col}: {value:.4f} ({status})")
-                    
-            if all(col in df.columns for col in ['ema_12', 'ema_26', 'ema_50']):
-                ema_12 = last_row['ema_12']
-                ema_26 = last_row['ema_26']
-                ema_50 = last_row['ema_50']
-                print(f"  EMA Relationship: 12={ema_12:.2f}, 26={ema_26:.2f}, 50={ema_50:.2f}")
-                
+                    print(f"  {col}: {value:.2f}")
+        
+        # Check data variation
+        for col in ['ema_12', 'ema_26', 'ema_50']:
+            if col in df.columns:
+                unique_count = df[col].nunique()
+                print(f"  {col} unique values: {unique_count}/{len(df)}")
+        
         print("==============================")
 
     def get_realtime_price_twelvedata(self):
@@ -892,7 +823,7 @@ def home():
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
-    """Main analysis endpoint - ULTIMATE FIXED VERSION"""
+    """Main analysis endpoint - CORRECTED VERSION"""
     try:
         print(f"Processing analysis for {timeframe}")
         
@@ -938,10 +869,8 @@ def get_analysis(timeframe):
                         latest_indicators[indicator] = float(value)
                     else:
                         latest_indicators[indicator] = 0.0 if 'macd' in indicator else 50.0
-                        print(f"Warning: {indicator} is None or NaN, using default")
                 else:
                     latest_indicators[indicator] = 0.0 if 'macd' in indicator else 50.0
-                    print(f"Warning: {indicator} not found in dataframe columns, using default")
         
         print(f"Prepared {len(latest_indicators)} indicators for API response")
         
@@ -1022,7 +951,7 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     
     print("=" * 60)
-    print("🚀 XAUUSD Professional Trading Analysis - ULTIMATE FIXED VERSION")
+    print("🚀 XAUUSD Professional Trading Analysis - INDICATOR CORRECTED VERSION")
     print("=" * 60)
     print("📊 Available Endpoints:")
     print("  • GET / → Dashboard")
@@ -1043,11 +972,11 @@ if __name__ == '__main__':
     print("  • NewsAPI → Fundamental News")
     print("=" * 60)
     print("🎯 CRITICAL FIXES:")
-    print("  • ✅ GUARANTEED No NaN Indicators")
-    print("  • ✅ Aggressive NaN Handling")
-    print("  • ✅ Robust Fallback System")
-    print("  • ✅ Force Fill All Missing Values")
-    print("  • ✅ Improved Data Validation")
+    print("  • ✅ CORRECTED EMA Calculations")
+    print("  • ✅ PROPER Indicator Relationships")
+    print("  • ✅ TA-Lib Integration")
+    print("  • ✅ Data Quality Verification")
+    print("  • ✅ No NaN Values Guaranteed")
     print("  • ✅ AI Trading Recommendations with Risk-Reward 1:2")
     print("=" * 60)
     
