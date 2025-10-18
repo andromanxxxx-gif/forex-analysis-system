@@ -66,6 +66,25 @@
             margin-top: 5px;
         }
         
+        .data-source-info {
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        .data-source-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            margin: 0 5px;
+            font-size: 0.8em;
+        }
+        .source-csv { background: #00ff88; color: black; }
+        .source-api { background: #0088ff; color: white; }
+        .source-generated { background: #ff8800; color: black; }
+        
         .dashboard {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -180,6 +199,17 @@
             font-size: 0.8em; 
         }
         
+        .data-health {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .health-item {
+            margin: 5px 0;
+        }
+        
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -204,16 +234,28 @@
             <span class="status-item" id="newsapiStatus">NewsAPI: Checking...</span>
         </div>
 
+        <div class="data-health" id="dataHealth" style="display: none;">
+            <strong>Data Health:</strong>
+            <div class="health-item" id="dataSourceInfo">Checking data source...</div>
+            <div class="health-item" id="dataQualityInfo">Checking data quality...</div>
+        </div>
+
         <div class="controls">
             <button class="btn active" onclick="loadData('1H')">1H</button>
             <button class="btn" onclick="loadData('4H')">4H</button>
             <button class="btn" onclick="loadData('1D')">1D</button>
             <button class="btn" onclick="checkDebug()">Debug</button>
+            <button class="btn" onclick="checkDataHealth()">Data Health</button>
         </div>
 
         <div class="price-container">
             <div class="price" id="currentPrice">Loading...</div>
             <div class="price-source" id="priceSource">Connecting to Twelve Data API...</div>
+            <div class="data-source-info" id="dataSourceDisplay" style="display: none;">
+                Data Source: <span id="dataSourceBadge" class="data-source-badge source-generated">Checking...</span>
+                • Records: <span id="dataRecords">0</span>
+                • Timeframe: <span id="dataTimeframe">-</span>
+            </div>
         </div>
 
         <div id="debugInfo" class="debug" style="display: none;"></div>
@@ -250,6 +292,7 @@
     <script>
         let currentChart = null;
         let currentTimeframe = '1H';
+        let currentDataSource = 'unknown';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -313,6 +356,7 @@
                     console.log('Data received:', data);
                     if (data.status === 'success') {
                         updateDashboard(data);
+                        updateDataSourceInfo(data);
                     } else {
                         throw new Error(data.error || 'Unknown error');
                     }
@@ -320,6 +364,8 @@
                 .catch(error => {
                     console.error('Error:', error);
                     showError(error.message);
+                    // Show data source as error
+                    updateDataSourceInfo({data_points: 0, timeframe: timeframe}, true);
                 });
         }
 
@@ -365,11 +411,101 @@
             }
         }
 
+        function updateDataSourceInfo(data, isError = false) {
+            const sourceDisplay = document.getElementById('dataSourceDisplay');
+            const sourceBadge = document.getElementById('dataSourceBadge');
+            const dataRecords = document.getElementById('dataRecords');
+            const dataTimeframe = document.getElementById('dataTimeframe');
+            
+            if (isError) {
+                sourceDisplay.style.display = 'block';
+                sourceBadge.textContent = 'ERROR';
+                sourceBadge.className = 'data-source-badge bearish';
+                dataRecords.textContent = '0';
+                dataTimeframe.textContent = currentTimeframe;
+                currentDataSource = 'error';
+                return;
+            }
+            
+            const records = data.data_points || 0;
+            const timeframe = data.timeframe || currentTimeframe;
+            
+            // Determine data source based on records and API status
+            let sourceType = 'generated';
+            let sourceText = 'Generated Data';
+            let badgeClass = 'source-generated';
+            
+            if (records > 100) {
+                // Assume good quality historical data
+                sourceType = 'csv';
+                sourceText = 'Historical CSV';
+                badgeClass = 'source-csv';
+            } else if (records > 50 && data.api_sources && data.api_sources.twelve_data) {
+                sourceType = 'api';
+                sourceText = 'API Data';
+                badgeClass = 'source-api';
+            }
+            
+            sourceDisplay.style.display = 'block';
+            sourceBadge.textContent = sourceText;
+            sourceBadge.className = `data-source-badge ${badgeClass}`;
+            dataRecords.textContent = records;
+            dataTimeframe.textContent = timeframe;
+            currentDataSource = sourceType;
+        }
+
+        function checkDataHealth() {
+            const healthPanel = document.getElementById('dataHealth');
+            const sourceInfo = document.getElementById('dataSourceInfo');
+            const qualityInfo = document.getElementById('dataQualityInfo');
+            
+            if (healthPanel.style.display === 'none') {
+                healthPanel.style.display = 'block';
+                
+                // Check data quality
+                fetch(`/api/debug/data/${currentTimeframe}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let qualityMessage = '';
+                        let sourceMessage = '';
+                        
+                        if (data.error) {
+                            sourceMessage = `Error: ${data.error}`;
+                            qualityMessage = 'Unable to assess data quality';
+                        } else {
+                            sourceMessage = `Data Source: ${currentDataSource.toUpperCase()} | Records: ${data.rows} | Columns: ${data.columns ? data.columns.length : 0}`;
+                            
+                            // Quality assessment
+                            if (data.rows >= 100) {
+                                qualityMessage = '✅ Good: Sufficient historical data';
+                            } else if (data.rows >= 50) {
+                                qualityMessage = '⚠️ Fair: Limited historical data';
+                            } else {
+                                qualityMessage = '❌ Poor: Insufficient data, using generated data';
+                            }
+                            
+                            if (data.date_range && data.date_range.start !== 'N/A') {
+                                qualityMessage += ` | Date range: ${data.date_range.start} to ${data.date_range.end}`;
+                            }
+                        }
+                        
+                        sourceInfo.textContent = sourceMessage;
+                        qualityInfo.textContent = qualityMessage;
+                    })
+                    .catch(error => {
+                        sourceInfo.textContent = 'Error checking data health';
+                        qualityInfo.textContent = error.message;
+                    });
+            } else {
+                healthPanel.style.display = 'none';
+            }
+        }
+
         function updateIndicators(indicators) {
             const grid = document.getElementById('indicatorsGrid');
             
             if (!indicators || Object.keys(indicators).length === 0) {
-                grid.innerHTML = '<div class="error">No indicators</div>';
+                grid.innerHTML = '<div class="error">No indicators available</div>';
                 return;
             }
 
@@ -380,19 +516,24 @@
                 'ema_50': { name: 'EMA 50', format: '0.2f' },
                 'rsi': { name: 'RSI', format: '0.1f' },
                 'macd': { name: 'MACD', format: '0.4f' },
+                'macd_signal': { name: 'MACD Signal', format: '0.4f' },
+                'macd_hist': { name: 'MACD Hist', format: '0.4f' },
                 'stoch_k': { name: 'Stoch K', format: '0.1f' },
+                'stoch_d': { name: 'Stoch D', format: '0.1f' },
                 'bb_upper': { name: 'BB Upper', format: '0.2f' },
                 'bb_lower': { name: 'BB Lower', format: '0.2f' }
             };
 
             for (const [key, conf] of Object.entries(config)) {
-                if (indicators[key] !== undefined) {
+                if (indicators[key] !== undefined && indicators[key] !== null) {
                     const value = indicators[key];
                     let trend = 'neutral';
                     
                     if (key === 'rsi') {
                         trend = value > 70 ? 'bearish' : value < 30 ? 'bullish' : 'neutral';
                     } else if (key === 'macd') {
+                        trend = value > 0 ? 'bullish' : 'bearish';
+                    } else if (key === 'macd_hist') {
                         trend = value > 0 ? 'bullish' : 'bearish';
                     } else if (key === 'stoch_k') {
                         trend = value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral';
@@ -413,20 +554,20 @@
                 }
             }
 
-            grid.innerHTML = html || '<div class="error">No indicators</div>';
+            grid.innerHTML = html || '<div class="error">No indicator data available</div>';
         }
 
         function updateNews(newsData) {
             const container = document.getElementById('newsContainer');
             
-            if (newsData.articles && newsData.articles.length > 0) {
+            if (newsData && newsData.articles && newsData.articles.length > 0) {
                 let html = '';
                 newsData.articles.forEach(article => {
                     const date = new Date(article.publishedAt).toLocaleDateString();
                     html += `
                         <div class="news-item">
                             <div class="news-title">${article.title}</div>
-                            <div>${article.description}</div>
+                            <div>${article.description || 'No description available'}</div>
                             <div style="font-size: 0.8em; color: #888; margin-top: 5px;">
                                 ${article.source.name} • ${date}
                             </div>
@@ -435,7 +576,7 @@
                 });
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<div class="error">No news available</div>';
+                container.innerHTML = '<div class="error">No news available. Check NewsAPI configuration.</div>';
             }
         }
 
@@ -447,16 +588,17 @@
             }
 
             if (!chartData || chartData.length === 0) {
-                console.error('No chart data');
+                console.error('No chart data available');
+                document.getElementById('priceChart').innerHTML = '<div class="error">No chart data available</div>';
                 return;
             }
 
             // Format dates for better display
             const labels = chartData.map(d => new Date(d.datetime));
             const prices = chartData.map(d => d.close);
-            const ema12 = chartData.map(d => d.ema_12).filter(v => v !== null);
-            const ema26 = chartData.map(d => d.ema_26).filter(v => v !== null);
-            const ema50 = chartData.map(d => d.ema_50).filter(v => v !== null);
+            const ema12 = chartData.map(d => d.ema_12).filter(v => v !== null && v !== undefined);
+            const ema26 = chartData.map(d => d.ema_26).filter(v => v !== null && v !== undefined);
+            const ema50 = chartData.map(d => d.ema_50).filter(v => v !== null && v !== undefined);
 
             currentChart = new Chart(ctx, {
                 type: 'line',
@@ -504,7 +646,7 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: `XAUUSD ${currentTimeframe} Chart`,
+                            text: `XAUUSD ${currentTimeframe} Chart (${prices.length} data points)`,
                             color: 'white',
                             font: { size: 16 }
                         },
