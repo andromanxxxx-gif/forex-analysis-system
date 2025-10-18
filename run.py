@@ -42,11 +42,82 @@ class XAUUSDAnalyzer:
               f"NewsAPI: {'Yes' if self.news_api_key else 'No'}")
         
     def is_price_realistic(self, price):
-        """Check if price is within realistic range for gold"""
-        return 1000 <= price <= 2500
+        """Check if price is within realistic range for XAUUSD"""
+        # XAUUSD can range from ~$1000 to $5000 in extreme conditions
+        # Relaxed validation to accept various historical data
+        return 800 <= price <= 6000
+
+    def validate_dataframe(self, df):
+        """Validate if dataframe contains realistic XAUUSD data"""
+        if df is None or len(df) == 0:
+            return False
+            
+        try:
+            # Check if essential columns exist
+            required_cols = ['open', 'high', 'low', 'close']
+            if not all(col in df.columns for col in required_cols):
+                print("Missing required columns")
+                return False
+            
+            # Check if prices are numeric
+            for col in required_cols:
+                if not pd.api.types.is_numeric_dtype(df[col]):
+                    print(f"Column {col} is not numeric")
+                    return False
+            
+            # Check if prices are realistic
+            avg_price = df['close'].mean()
+            if not self.is_price_realistic(avg_price):
+                print(f"Average price ${avg_price:.2f} outside expected range, but will use with adjustment")
+                # Don't reject immediately, we'll handle this in processing
+                
+            # Check for significant NaN values
+            if df[required_cols].isna().sum().sum() > len(df) * 0.1:  # More than 10% NaN
+                print("Too many NaN values in price data")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            print(f"Error validating dataframe: {e}")
+            return False
+
+    def normalize_price_data(self, df, target_price=None):
+        """Normalize price data to realistic range if needed"""
+        if df is None or len(df) == 0:
+            return df
+            
+        try:
+            current_avg = df['close'].mean()
+            
+            # If prices are unrealistic but we want to use the data pattern
+            if not self.is_price_realistic(current_avg):
+                print(f"Normalizing price data from ${current_avg:.2f} to realistic range")
+                
+                # Use target price if provided, otherwise use typical gold price
+                if target_price and self.is_price_realistic(target_price):
+                    base_price = target_price
+                else:
+                    base_price = 1968.0  # Typical gold price
+                
+                # Calculate scaling factor while preserving price relationships
+                scaling_factor = base_price / current_avg
+                
+                # Scale all price columns
+                price_cols = ['open', 'high', 'low', 'close']
+                for col in price_cols:
+                    df[col] = df[col] * scaling_factor
+                    
+                print(f"Price data normalized by factor {scaling_factor:.4f}, new average: ${df['close'].mean():.2f}")
+            
+            return df
+            
+        except Exception as e:
+            print(f"Error normalizing price data: {e}")
+            return df
 
     def load_from_local_csv(self, timeframe, limit=500):
-        """Load data dari file CSV lokal"""
+        """Load data dari file CSV lokal dengan validasi improved"""
         possible_paths = [
             f"data/XAUUSD_{timeframe}.csv",
             f"../data/XAUUSD_{timeframe}.csv",
@@ -130,8 +201,22 @@ class XAUUSDAnalyzer:
                                 df[col] = df[col].fillna(np.random.uniform(1800, 2000))
                     
                     df = df.sort_values('datetime')
-                    print(f"Successfully loaded {len(df)} records from {filename}")
-                    return df.tail(limit)
+                    
+                    # Validate data quality
+                    if self.validate_dataframe(df):
+                        print(f"Successfully loaded {len(df)} records from {filename}")
+                        return df.tail(limit)
+                    else:
+                        print(f"Data validation failed for {filename}, but will attempt to normalize")
+                        # Try to normalize the data instead of rejecting completely
+                        normalized_df = self.normalize_price_data(df)
+                        if self.validate_dataframe(normalized_df):
+                            print(f"Successfully normalized and loaded {len(normalized_df)} records from {filename}")
+                            return normalized_df.tail(limit)
+                        else:
+                            print(f"Failed to normalize data from {filename}")
+                            continue
+                        
                 except Exception as e:
                     print(f"Error processing {filename}: {e}")
                     traceback.print_exc()
@@ -183,6 +268,9 @@ class XAUUSDAnalyzer:
                     
                     df = df.sort_values('datetime')
                     
+                    # Normalize if needed
+                    df = self.normalize_price_data(df)
+                    
                     # Save to CSV untuk penggunaan berikutnya
                     filename = f"data/XAUUSD_{timeframe}.csv"
                     df.to_csv(filename, index=False)
@@ -201,45 +289,44 @@ class XAUUSDAnalyzer:
             return None
 
     def load_historical_data(self, timeframe, limit=500):
-        """Load data historis dengan fallback ke download dan generated data"""
+        """Load data historis dengan improved validation"""
         try:
             # Coba load dari file lokal dulu
             df = self.load_from_local_csv(timeframe, limit)
             if df is not None:
-                # Check if the last price is realistic
-                if len(df) > 0:
-                    last_price = df.iloc[-1]['close']
-                    if not self.is_price_realistic(last_price):
-                        print(f"Unrealistic price in local data: ${last_price:.2f}, using generated data")
-                        return self.generate_sample_data(timeframe, limit)
+                print(f"Using local historical data for {timeframe}")
                 return df
                 
             # Jika tidak ada file lokal, coba download dari API
-            print(f"Trying to download historical data for {timeframe}...")
+            print(f"No valid local data, trying to download historical data for {timeframe}...")
             df = self.download_historical_data(timeframe)
             if df is not None:
-                # Check if the last price is realistic
-                if len(df) > 0:
-                    last_price = df.iloc[-1]['close']
-                    if not self.is_price_realistic(last_price):
-                        print(f"Unrealistic price in downloaded data: ${last_price:.2f}, using generated data")
-                        return self.generate_sample_data(timeframe, limit)
+                print(f"Using downloaded data for {timeframe}")
                 return df.tail(limit)
                 
-            # Jika semua gagal, gunakan generated data
+            # Jika semua gagal, gunakan generated data dengan harga real-time
             print(f"All methods failed, using generated data for {timeframe}")
-            return self.generate_sample_data(timeframe, limit)
+            current_price = self.get_realtime_price()
+            if self.is_price_realistic(current_price):
+                base_price = current_price
+            else:
+                base_price = 1968.0
+            return self.generate_sample_data(timeframe, limit, base_price)
             
         except Exception as e:
             print(f"Error in load_historical_data: {e}")
-            return self.generate_sample_data(timeframe, limit)
+            current_price = self.get_realtime_price()
+            if self.is_price_realistic(current_price):
+                base_price = current_price
+            else:
+                base_price = 1968.0
+            return self.generate_sample_data(timeframe, limit, base_price)
 
-    def generate_sample_data(self, timeframe, limit=500):
-        """Generate sample data tanpa save ke file"""
-        print(f"Generating sample data for {timeframe} (in memory only)")
+    def generate_sample_data(self, timeframe, limit=500, base_price=1968.0):
+        """Generate sample data dengan base price yang bisa disesuaikan"""
+        print(f"Generating sample data for {timeframe} with base price ${base_price:.2f}")
         
         periods = limit
-        base_price = 1968.0
         
         # Create dates
         if timeframe == '1H':
@@ -251,7 +338,7 @@ class XAUUSDAnalyzer:
             
         dates = pd.date_range(end=datetime.now(), periods=periods, freq=freq)
         
-        # Generate realistic price movement
+        # Generate realistic price movement based on base price
         np.random.seed(42)
         returns = np.random.normal(0, 0.005, periods)
         prices = base_price * (1 + returns).cumprod()
@@ -270,16 +357,23 @@ class XAUUSDAnalyzer:
                 'high': high_price,
                 'low': low_price,
                 'close': close_price,
-                'volume': np.random.randint(5000, 50000)  # Pastikan volume ada
+                'volume': np.random.randint(5000, 50000)
             })
         
         df = pd.DataFrame(data)
         
         # Simpan di cache memory
         self.data_cache[timeframe] = df
-        print(f"Generated {len(df)} records for {timeframe} (cached in memory)")
+        print(f"Generated {len(df)} records for {timeframe} with average price ${df['close'].mean():.2f}")
         return df
 
+    # [Fungsi-fungsi lainnya tetap sama: clean_dataframe, calculate_indicators, ema_robust, macd_robust, rsi_robust, 
+    # bollinger_bands_robust, stochastic_robust, are_indicators_invalid, add_improved_fallback_indicators, 
+    # fill_missing_indicators, verify_indicator_calculations, get_realtime_price_twelvedata, get_simulated_price,
+    # get_realtime_price, get_fundamental_news, get_sample_news, analyze_with_deepseek, comprehensive_fallback_analysis,
+    # analyze_market_conditions]
+
+    # Tetap sertakan semua fungsi technical indicator yang sudah diperbaiki dari versi sebelumnya
     def clean_dataframe(self, df):
         """Clean and prepare dataframe for indicator calculations"""
         print("Cleaning dataframe for indicator calculations...")
@@ -324,12 +418,6 @@ class XAUUSDAnalyzer:
             # Ensure data is clean and numeric
             df = self.clean_dataframe(df)
             
-            # Check if data looks realistic
-            current_price = df['close'].iloc[-1]
-            if not self.is_price_realistic(current_price):
-                print(f"Warning: Unrealistic price detected: ${current_price:.2f}")
-                return self.add_improved_fallback_indicators(df)
-                
             close = df['close'].values
             high = df['high'].values
             low = df['low'].values
@@ -540,9 +628,6 @@ class XAUUSDAnalyzer:
         df['stoch_k'] = df['stoch_k'].clip(0, 100)
         df['stoch_d'] = df['stoch_d'].clip(0, 100)
         df['rsi'] = df['rsi'].clip(0, 100)
-        
-        # Fill any remaining NaN with realistic values
-        df = self.fill_missing_indicators(df)
         
         print("Improved fallback indicators applied successfully")
         return df
@@ -770,17 +855,12 @@ Pastikan risk-reward ratio minimal 1:2 untuk setiap rekomendasi trading.
             }
             
             self.last_api_call = current_time
-            # Try with a longer timeout and retry mechanism
-            try:
-                response = requests.post(
-                    'https://api.deepseek.com/chat/completions',
-                    headers=headers,
-                    json=data,
-                    timeout=60  # Increase timeout to 60 seconds
-                )
-            except requests.exceptions.Timeout:
-                print("DeepSeek API timeout after 60 seconds, using fallback analysis")
-                return self.comprehensive_fallback_analysis(technical_data, news_data)
+            response = requests.post(
+                'https://api.deepseek.com/chat/completions',
+                headers=headers,
+                json=data,
+                timeout=45
+            )
             
             if response.status_code == 200:
                 result = response.json()
@@ -791,6 +871,9 @@ Pastikan risk-reward ratio minimal 1:2 untuk setiap rekomendasi trading.
                 print(f"DeepSeek API error: {response.status_code} - {response.text}")
                 return self.comprehensive_fallback_analysis(technical_data, news_data)
                 
+        except requests.exceptions.Timeout:
+            print("DeepSeek API timeout, using fallback analysis")
+            return self.comprehensive_fallback_analysis(technical_data, news_data)
         except Exception as e:
             print(f"Error getting DeepSeek analysis: {e}")
             return self.comprehensive_fallback_analysis(technical_data, news_data)
@@ -1088,7 +1171,7 @@ def get_analysis(timeframe):
         
         # Prepare chart data - FIXED: Ensure indicators are properly included
         chart_data = []
-        display_data = df_with_indicators.tail(50)  # Limit to 50 points for better chart performance
+        display_data = df_with_indicators.tail(100)  # Limit to 100 points
         
         for _, row in display_data.iterrows():
             chart_point = {
@@ -1296,7 +1379,7 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     
     print("=" * 60)
-    print("🚀 XAUUSD Professional Trading Analysis - ULTIMATE VERSION")
+    print("🚀 XAUUSD Professional Trading Analysis - DATA FIXED VERSION")
     print("=" * 60)
     print("📊 Available Endpoints:")
     print("  • GET / → Dashboard")
@@ -1317,16 +1400,12 @@ if __name__ == '__main__':
     print("  • NewsAPI → Fundamental News")
     print("=" * 60)
     print("🎯 ENHANCED FEATURES:")
+    print("  • ✅ Improved Data Validation & Normalization")
+    print("  • ✅ Better Historical Data Handling")
+    print("  • ✅ Price Range Flexibility")
+    print("  • ✅ Consistent Data Sources")
     print("  • ✅ AI Trading Recommendations with Risk-Reward 1:2")
-    print("  • ✅ Specific Entry, SL, TP1, TP2 levels")
-    print("  • ✅ Professional Trading Plan")
-    print("  • ✅ Enhanced Risk Management")
-    print("  • ✅ Multi-timeframe Analysis Support")
-    print("  • ✅ ROBUST Indicator Calculations")
-    print("  • ✅ Improved Data Validation")
-    print("  • ✅ Realistic Fallback Indicators")
-    print("  • ✅ Realistic Price Validation")
-    print("  • ✅ Reduced Chart Data Points for Better Performance")
+    print("  • ✅ Robust Indicator Calculations")
     print("=" * 60)
     
     print("Starting server...")
