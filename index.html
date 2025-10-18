@@ -23,6 +23,9 @@
             --text-primary: #ffffff;
             --text-secondary: #a0a0a0;
             --border-color: #2d3e50;
+            --ema-12-color: #ff6b6b;
+            --ema-26-color: #3366ff;
+            --ema-50-color: #ffd93d;
         }
         
         * {
@@ -161,6 +164,24 @@
             animation: pulse 2s infinite;
         }
 
+        .indicator-legend {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.4; }
@@ -168,7 +189,7 @@
         }
 
         .chart-container {
-            height: 600px;
+            height: 700px;
             padding: 20px;
             position: relative;
         }
@@ -416,7 +437,7 @@
             }
             
             .chart-container {
-                height: 400px;
+                height: 500px;
                 padding: 10px;
             }
             
@@ -426,6 +447,11 @@
             
             .key-levels {
                 grid-template-columns: 1fr;
+            }
+            
+            .indicator-legend {
+                flex-wrap: wrap;
+                gap: 8px;
             }
         }
     </style>
@@ -467,13 +493,28 @@
         <!-- Chart Section -->
         <div class="chart-section">
             <div class="chart-header">
-                <h3><i class="fas fa-candlestick-chart"></i> XAU/USD Price Chart</h3>
+                <h3><i class="fas fa-candlestick-chart"></i> XAU/USD Price Chart with Indicators</h3>
                 <div class="chart-controls">
+                    <div class="indicator-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: var(--ema-12-color);"></div>
+                            <span>EMA 12</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: var(--ema-26-color);"></div>
+                            <span>EMA 26</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: var(--ema-50-color);"></div>
+                            <span>EMA 50</span>
+                        </div>
+                    </div>
                     <div id="chartInfo">Loading market data...</div>
                 </div>
             </div>
             <div class="chart-container">
                 <canvas id="priceChart"></canvas>
+                <canvas id="macdChart"></canvas>
             </div>
         </div>
 
@@ -533,7 +574,8 @@
     </div>
 
     <script>
-        let currentChart = null;
+        let currentPriceChart = null;
+        let currentMacdChart = null;
         let currentTimeframe = '1D';
         let realtimeInterval = null;
         let currentPrice = 1950.0;
@@ -579,7 +621,7 @@
                 updateAIAnalysis(data.ai_analysis);
                 updateTechnicalIndicators(data.technical_indicators);
                 updateNewsFeed(data.news);
-                renderCandlestickChart(data.chart_data, timeframe);
+                renderCharts(data.chart_data, timeframe, data.technical_indicators);
                 
                 updateStatus(`${timeframe} analysis loaded successfully`, 'connected');
                 updateLastUpdateTime();
@@ -603,7 +645,7 @@
                     updatePriceDisplay(currentPrice);
                     
                     // Update the last candle if chart exists
-                    if (currentChart) {
+                    if (currentPriceChart) {
                         updateLastCandle(currentPrice);
                     }
                     
@@ -745,7 +787,7 @@
 
             try {
                 const indicatorGroups = {
-                    'Trend Indicators': ['sma_20', 'sma_50', 'sma_200', 'ema_12', 'ema_26'],
+                    'Trend Indicators': ['ema_12', 'ema_26', 'ema_50', 'sma_20'],
                     'Momentum Indicators': ['rsi', 'macd', 'macd_signal', 'stoch_k', 'stoch_d'],
                     'Volatility Indicators': ['bb_upper', 'bb_middle', 'bb_lower', 'atr']
                 };
@@ -798,11 +840,10 @@
         // Format indicator names
         function formatIndicatorName(key) {
             const names = {
-                'sma_20': 'SMA 20',
-                'sma_50': 'SMA 50',
-                'sma_200': 'SMA 200',
                 'ema_12': 'EMA 12',
                 'ema_26': 'EMA 26',
+                'ema_50': 'EMA 50',
+                'sma_20': 'SMA 20',
                 'rsi': 'RSI (14)',
                 'macd': 'MACD',
                 'macd_signal': 'MACD Signal',
@@ -850,20 +891,19 @@
             }
         }
 
-        // Render Candlestick Chart
-        function renderCandlestickChart(data, timeframe) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            
-            // Destroy existing chart
-            if (currentChart) {
-                currentChart.destroy();
+        // Render Charts with EMA and MACD
+        function renderCharts(data, timeframe, indicators) {
+            // Destroy existing charts
+            if (currentPriceChart) {
+                currentPriceChart.destroy();
+                currentPriceChart = null;
+            }
+            if (currentMacdChart) {
+                currentMacdChart.destroy();
+                currentMacdChart = null;
             }
 
             if (!data || data.length === 0) {
-                ctx.font = '16px Arial';
-                ctx.fillStyle = '#888';
-                ctx.textAlign = 'center';
-                ctx.fillText('No chart data available', ctx.canvas.width / 2, ctx.canvas.height / 2);
                 return;
             }
 
@@ -877,28 +917,202 @@
                     c: parseFloat(d.close)
                 }));
 
+                // Prepare EMA data
+                const ema12Data = data.map((d, index) => ({
+                    x: new Date(d.datetime).getTime(),
+                    y: indicators.ema_12 ? indicators.ema_12[index] : null
+                })).filter(point => point.y !== null && !isNaN(point.y));
+
+                const ema26Data = data.map((d, index) => ({
+                    x: new Date(d.datetime).getTime(),
+                    y: indicators.ema_26 ? indicators.ema_26[index] : null
+                })).filter(point => point.y !== null && !isNaN(point.y));
+
+                const ema50Data = data.map((d, index) => ({
+                    x: new Date(d.datetime).getTime(),
+                    y: indicators.ema_50 ? indicators.ema_50[index] : null
+                })).filter(point => point.y !== null && !isNaN(point.y));
+
+                // Prepare MACD data
+                const macdData = data.map((d, index) => ({
+                    x: new Date(d.datetime).getTime(),
+                    y: indicators.macd ? indicators.macd[index] : null
+                })).filter(point => point.y !== null && !isNaN(point.y));
+
+                const macdSignalData = data.map((d, index) => ({
+                    x: new Date(d.datetime).getTime(),
+                    y: indicators.macd_signal ? indicators.macd_signal[index] : null
+                })).filter(point => point.y !== null && !isNaN(point.y));
+
+                const macdHistogramData = data.map((d, index) => ({
+                    x: new Date(d.datetime).getTime(),
+                    y: indicators.macd_hist ? indicators.macd_hist[index] : null
+                })).filter(point => point.y !== null && !isNaN(point.y));
+
                 // Update chart info
                 document.getElementById('chartInfo').textContent = 
-                    `${candlestickData.length} candles • ${timeframe} • Live Market`;
+                    `${data.length} candles • ${timeframe} • Live Market`;
 
-                currentChart = new Chart(ctx, {
+                // Create price chart with EMA
+                const priceCtx = document.getElementById('priceChart').getContext('2d');
+                currentPriceChart = new Chart(priceCtx, {
                     type: 'candlestick',
                     data: {
-                        datasets: [{
-                            label: `XAU/USD ${timeframe}`,
-                            data: candlestickData,
-                            color: {
-                                up: '#00d4aa',
-                                down: '#ff6b6b',
-                                unchanged: '#cccccc',
+                        datasets: [
+                            {
+                                label: 'XAU/USD',
+                                data: candlestickData,
+                                color: {
+                                    up: '#00d4aa',
+                                    down: '#ff6b6b',
+                                    unchanged: '#cccccc',
+                                },
+                                borderColor: {
+                                    up: '#00d4aa',
+                                    down: '#ff6b6b',
+                                    unchanged: '#cccccc'
+                                },
+                                borderWidth: 1
                             },
-                            borderColor: {
-                                up: '#00d4aa',
-                                down: '#ff6b6b',
-                                unchanged: '#cccccc'
+                            {
+                                label: 'EMA 12',
+                                data: ema12Data,
+                                type: 'line',
+                                borderColor: '#ff6b6b',
+                                backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
                             },
-                            borderWidth: 1
-                        }]
+                            {
+                                label: 'EMA 26',
+                                data: ema26Data,
+                                type: 'line',
+                                borderColor: '#3366ff',
+                                backgroundColor: 'rgba(51, 102, 255, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'EMA 50',
+                                data: ema50Data,
+                                type: 'line',
+                                borderColor: '#ffd93d',
+                                backgroundColor: 'rgba(255, 217, 61, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: getTimeUnit(timeframe),
+                                    tooltipFormat: 'yyyy-MM-dd HH:mm'
+                                },
+                                grid: {
+                                    color: 'rgba(45, 62, 80, 0.5)'
+                                },
+                                ticks: {
+                                    color: '#a0a0a0'
+                                }
+                            },
+                            y: {
+                                position: 'right',
+                                grid: {
+                                    color: 'rgba(45, 62, 80, 0.5)'
+                                },
+                                ticks: {
+                                    color: '#a0a0a0',
+                                    callback: function(value) {
+                                        return '$' + value.toFixed(2);
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: 'rgba(30, 43, 58, 0.95)',
+                                titleColor: '#00d4aa',
+                                bodyColor: '#e0e0e0',
+                                borderColor: '#00d4aa',
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        const point = context.raw;
+                                        if (context.datasetIndex === 0) {
+                                            return [
+                                                `Open: $${point.o.toFixed(2)}`,
+                                                `High: $${point.h.toFixed(2)}`,
+                                                `Low: $${point.l.toFixed(2)}`,
+                                                `Close: $${point.c.toFixed(2)}`
+                                            ];
+                                        } else {
+                                            return `${context.dataset.label}: $${point.y.toFixed(2)}`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Create MACD chart
+                const macdCtx = document.getElementById('macdChart').getContext('2d');
+                currentMacdChart = new Chart(macdCtx, {
+                    type: 'bar',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'MACD Histogram',
+                                data: macdHistogramData,
+                                backgroundColor: function(context) {
+                                    const value = context.raw.y;
+                                    return value >= 0 ? 'rgba(0, 212, 170, 0.7)' : 'rgba(255, 107, 107, 0.7)';
+                                },
+                                borderColor: function(context) {
+                                    const value = context.raw.y;
+                                    return value >= 0 ? 'rgba(0, 212, 170, 1)' : 'rgba(255, 107, 107, 1)';
+                                },
+                                borderWidth: 1,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.9
+                            },
+                            {
+                                label: 'MACD Line',
+                                data: macdData,
+                                type: 'line',
+                                borderColor: '#3366ff',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Signal Line',
+                                data: macdSignalData,
+                                type: 'line',
+                                borderColor: '#ff6b6b',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -924,7 +1138,7 @@
                                 ticks: {
                                     color: '#a0a0a0',
                                     callback: function(value) {
-                                        return '$' + value.toFixed(2);
+                                        return value.toFixed(4);
                                     }
                                 }
                             }
@@ -932,36 +1146,30 @@
                         plugins: {
                             legend: {
                                 labels: {
-                                    color: '#e0e0e0'
+                                    color: '#e0e0e0',
+                                    font: {
+                                        size: 11
+                                    }
                                 }
                             },
                             tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const point = context.raw;
-                                        return [
-                                            `Open: $${point.o.toFixed(2)}`,
-                                            `High: $${point.h.toFixed(2)}`,
-                                            `Low: $${point.l.toFixed(2)}`,
-                                            `Close: $${point.c.toFixed(2)}`
-                                        ];
-                                    }
-                                }
+                                mode: 'index',
+                                intersect: false
                             }
                         }
                     }
                 });
                 
             } catch (error) {
-                console.error('Error rendering chart:', error);
+                console.error('Error rendering charts:', error);
             }
         }
 
         // Update last candle with real-time price
         function updateLastCandle(realtimePrice) {
-            if (!currentChart || !currentChart.data.datasets[0].data.length) return;
+            if (!currentPriceChart || !currentPriceChart.data.datasets[0].data.length) return;
             
-            const data = currentChart.data.datasets[0].data;
+            const data = currentPriceChart.data.datasets[0].data;
             const lastCandle = data[data.length - 1];
             
             // Update candle with real-time price
@@ -971,11 +1179,11 @@
             
             // Update candle color
             lastCandle.color = realtimePrice >= lastCandle.o ? 
-                currentChart.data.datasets[0].color.up : 
-                currentChart.data.datasets[0].color.down;
+                currentPriceChart.data.datasets[0].color.up : 
+                currentPriceChart.data.datasets[0].color.down;
             
             // Refresh chart
-            currentChart.update('none');
+            currentPriceChart.update('none');
         }
 
         // Helper functions
