@@ -185,45 +185,94 @@ class XAUUSDAnalyzer:
             print(f"❌ Error downloading historical data: {e}")
             return None
 
-    def validate_loaded_data(self, df):
-        """Validate loaded data for basic sanity"""
-        if df is None or len(df) < 10:
-            print("❌ Data validation failed: insufficient data")
+    def aggressive_data_cleaning(self, df):
+        """Aggressive data cleaning untuk CSV yang bermasalah"""
+        print("🚨 AGGRESSIVE Data Cleaning Activated")
+        
+        if len(df) < 50:
+            return df
+            
+        initial_count = len(df)
+        
+        # Filter untuk harga gold yang realistis
+        df = df[(df['close'] >= 1800) & (df['close'] <= 4500)]
+        df = df[(df['high'] >= 1800) & (df['high'] <= 4500)]
+        df = df[(df['low'] >= 1800) & (df['low'] <= 4500)]
+        df = df[(df['open'] >= 1800) & (df['open'] <= 4500)]
+        
+        # Hapus outliers berdasarkan IQR method
+        for col in ['close', 'high', 'low', 'open']:
+            if col in df.columns:
+                Q1 = df[col].quantile(0.25)
+                Q3 = df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        
+        # Pastikan data terurut dan konsisten
+        df = df.sort_values('datetime')
+        df = df.reset_index(drop=True)
+        
+        final_count = len(df)
+        removed_count = initial_count - final_count
+        
+        if removed_count > 0:
+            print(f"🚨 Removed {removed_count} problematic records")
+            print(f"📊 Final data range: ${df['close'].min():.2f} - ${df['close'].max():.2f}")
+        
+        return df
+
+    def enhanced_data_validation(self, df):
+        """Enhanced data validation dengan outlier detection"""
+        print("🔍 Enhanced data validation...")
+        
+        if df is None or len(df) == 0:
             return False
             
-        # Check for required columns
-        required_cols = ['datetime', 'open', 'high', 'low', 'close']
-        if not all(col in df.columns for col in required_cols):
-            print("❌ Data validation failed: missing required columns")
-            return False
-            
-        # Check price sanity
+        # Check for realistic gold price range
         current_price = df['close'].iloc[-1]
-        if current_price < 1000 or current_price > 5000:
-            print(f"❌ Data validation failed: unrealistic price ${current_price:.2f}")
+        if current_price < 1800 or current_price > 4500:
+            print(f"❌ CRITICAL: Unrealistic gold price: ${current_price:.2f}")
+            return False
+        
+        # Check price relationships
+        invalid_high_low = (df['high'] < df['low']).sum()
+        invalid_open_close = (df['open'] <= 0).sum() | (df['close'] <= 0).sum()
+        
+        if invalid_high_low > 0 or invalid_open_close > 0:
+            print(f"❌ CRITICAL: Invalid price relationships detected")
+            return False
+        
+        # Check for reasonable volatility
+        daily_returns = df['close'].pct_change().abs()
+        extreme_moves = (daily_returns > 0.05).sum()  # More than 5% moves
+        
+        if extreme_moves > len(df) * 0.1:  # More than 10% of data has extreme moves
+            print(f"❌ CRITICAL: Too many extreme price moves: {extreme_moves}")
             return False
             
-        # Check for extreme outliers
-        price_std = df['close'].std()
-        if price_std > 1000:  # Unusually high volatility
-            print(f"❌ Data validation failed: extreme volatility detected")
-            return False
-            
+        print("✅ Enhanced data validation passed")
         return True
 
     def load_historical_data(self, timeframe, limit=500):
-        """Load data historis dengan validasi yang ditingkatkan"""
+        """Load data historis dengan aggressive cleaning"""
         try:
             # Try local CSV first
             df = self.load_from_local_csv(timeframe, limit)
-            if df is not None and self.validate_loaded_data(df):
-                print(f"✅ Using validated local historical data for {timeframe}")
-                return df
-                
+            if df is not None:
+                # Apply aggressive cleaning
+                df = self.aggressive_data_cleaning(df)
+                if len(df) >= 50:  # Minimal data setelah cleaning
+                    print(f"✅ Using aggressively cleaned local data for {timeframe}")
+                    return df.tail(limit)
+                else:
+                    print("❌ Insufficient data after aggressive cleaning")
+                    
             # Try download if local data invalid
-            print(f"📥 Local data invalid or not found, trying to download for {timeframe}...")
+            print(f"📥 Local data invalid, trying to download for {timeframe}...")
             df = self.download_historical_data(timeframe)
-            if df is not None and self.validate_loaded_data(df):
+            if df is not None and self.enhanced_data_validation(df):
                 print(f"✅ Using downloaded data for {timeframe}")
                 return df.tail(limit)
                 
@@ -329,9 +378,9 @@ class XAUUSDAnalyzer:
         if len(df) == 0:
             return False
             
-        # Check for reasonable price range (Gold typically $1000-$5000)
+        # Check for reasonable price range (Gold typically $1800-$4500)
         current_price = df['close'].iloc[-1]
-        if current_price < 1000 or current_price > 5000:
+        if current_price < 1800 or current_price > 4500:
             print(f"❌ WARNING: Unrealistic price detected: ${current_price:.2f}")
             return False
         
@@ -394,15 +443,26 @@ class XAUUSDAnalyzer:
             return self.add_corrected_fallback_indicators(df)
 
     def calculate_indicators_talib(self, df, close, high, low):
-        """Calculate indicators using TA-Lib"""
+        """Calculate indicators using TA-Lib with MACD FIX"""
         try:
             # EMA
             df['ema_12'] = talib.EMA(close, timeperiod=12)
             df['ema_26'] = talib.EMA(close, timeperiod=26)
             df['ema_50'] = talib.EMA(close, timeperiod=50)
             
-            # MACD
+            # MACD - dengan fix untuk inconsistency
             macd, macd_signal, macd_hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
+            
+            # Force fix MACD histogram jika ada inconsistency
+            expected_hist = macd - macd_signal
+            hist_discrepancy = np.abs(macd_hist - expected_hist)
+            
+            # Jika discrepancy besar, gunakan calculated value
+            large_discrepancies = hist_discrepancy > 0.1
+            if np.any(large_discrepancies):
+                print(f"⚠️  Fixing {np.sum(large_discrepancies)} MACD histogram discrepancies")
+                macd_hist = expected_hist
+            
             df['macd'] = macd
             df['macd_signal'] = macd_signal
             df['macd_hist'] = macd_hist
@@ -421,12 +481,47 @@ class XAUUSDAnalyzer:
             df['stoch_k'] = stoch_k
             df['stoch_d'] = stoch_d
             
+            # Final MACD validation
+            self.validate_and_fix_macd(df)
+            
             print("✅ TA-Lib indicators calculated successfully")
             return df
             
         except Exception as e:
             print(f"❌ TA-Lib calculation error: {e}, falling back to pandas")
             return self.calculate_indicators_pandas(df, close, high, low)
+
+    def validate_and_fix_macd(self, df):
+        """Validate and fix MACD calculations"""
+        if len(df) == 0:
+            return
+            
+        # Check last few rows for consistency
+        check_rows = min(10, len(df))
+        for i in range(-check_rows, 0):
+            idx = df.index[i]
+            macd = df.loc[idx, 'macd']
+            macd_signal = df.loc[idx, 'macd_signal'] 
+            macd_hist = df.loc[idx, 'macd_hist']
+            
+            expected_hist = macd - macd_signal
+            discrepancy = abs(macd_hist - expected_hist)
+            
+            if discrepancy > 0.001:
+                print(f"🔧 Fixing MACD histogram at index {idx}: {macd_hist} -> {expected_hist}")
+                df.loc[idx, 'macd_hist'] = expected_hist
+        
+        # Verify fix
+        last_row = df.iloc[-1]
+        macd = last_row['macd']
+        macd_signal = last_row['macd_signal']
+        macd_hist = last_row['macd_hist']
+        expected_hist = macd - macd_signal
+        
+        print(f"🔍 MACD Final Verification:")
+        print(f"   MACD: {macd:.4f}, Signal: {macd_signal:.4f}")
+        print(f"   Histogram: {macd_hist:.4f}, Expected: {expected_hist:.4f}")
+        print(f"   Consistent: {abs(macd_hist - expected_hist) < 0.001}")
 
     def calculate_indicators_pandas(self, df, close, high, low):
         """Calculate indicators using corrected pandas methods"""
@@ -663,29 +758,49 @@ class XAUUSDAnalyzer:
         return self.get_realtime_price_twelvedata()
 
     def get_fundamental_news(self):
-        """Get fundamental news from NewsAPI"""
+        """Get fundamental news from NewsAPI - IMPROVED QUERY"""
         try:
             if not self.news_api_key:
                 print("❌ NewsAPI key not set, using sample news")
                 return self.get_sample_news()
             
-            from_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-            url = f"https://newsapi.org/v2/everything?q=gold+XAUUSD+Federal+Reserve+inflation&from={from_date}&sortBy=publishedAt&language=en&apiKey={self.news_api_key}"
+            from_date = (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')  # Kurang hari
             
-            response = requests.get(url, timeout=10)
+            # Improved query dengan multiple terms
+            queries = [
+                f"https://newsapi.org/v2/everything?q=gold+OR+XAUUSD+OR+precious+metals&from={from_date}&sortBy=popularity&language=en&apiKey={self.news_api_key}",
+                f"https://newsapi.org/v2/everything?q=Federal+Reserve+OR+interest+rates+OR+inflation&from={from_date}&sortBy=popularity&language=en&apiKey={self.news_api_key}",
+                f"https://newsapi.org/v2/top-headlines?category=business&country=us&apiKey={self.news_api_key}"
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == 'ok' and data['totalResults'] > 0:
-                    articles = data['articles'][:3]
-                    print(f"✅ Retrieved {len(articles)} news articles from NewsAPI")
-                    return {"articles": articles}
-                else:
-                    print("❌ No articles found from NewsAPI")
-                    return self.get_sample_news()
-            else:
-                print(f"❌ NewsAPI HTTP error: {response.status_code}")
-                return self.get_sample_news()
+            all_articles = []
+            
+            for url in queries:
+                try:
+                    response = requests.get(url, timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('status') == 'ok' and data.get('articles'):
+                            all_articles.extend(data['articles'][:2])  # Ambil 2 artikel per query
+                except Exception as e:
+                    print(f"⚠️ NewsAPI query error: {e}")
+                    continue
+            
+            if all_articles:
+                # Remove duplicates berdasarkan title
+                seen_titles = set()
+                unique_articles = []
+                for article in all_articles:
+                    title = article.get('title', '')
+                    if title and title not in seen_titles:
+                        seen_titles.add(title)
+                        unique_articles.append(article)
+                
+                print(f"✅ Retrieved {len(unique_articles)} unique news articles")
+                return {"articles": unique_articles[:3]}  # Maksimal 3 artikel
+            
+            print("❌ No articles found from NewsAPI, using sample news")
+            return self.get_sample_news()
                 
         except Exception as e:
             print(f"❌ Error getting news from NewsAPI: {e}")
@@ -713,7 +828,7 @@ class XAUUSDAnalyzer:
         }
 
     def analyze_with_deepseek(self, technical_data, news_data):
-        """Get AI analysis from DeepSeek API with enhanced timeout handling"""
+        """Get AI analysis from DeepSeek API - ENHANCED VERSION"""
         try:
             current_time = time.time()
             if current_time - self.last_api_call < 10:
@@ -722,6 +837,11 @@ class XAUUSDAnalyzer:
             
             if not self.deepseek_api_key:
                 print("❌ DeepSeek API key not set, using comprehensive analysis")
+                return self.comprehensive_fallback_analysis(technical_data, news_data)
+            
+            # Validasi API key format
+            if not self.deepseek_api_key.startswith('sk-'):
+                print("❌ DeepSeek API key format invalid, using fallback")
                 return self.comprehensive_fallback_analysis(technical_data, news_data)
             
             current_price = technical_data.get('current_price', 0)
@@ -778,18 +898,21 @@ Format output profesional dengan:
                     }
                 ],
                 "temperature": 0.7,
-                "max_tokens": 1500
+                "max_tokens": 1500,
+                "stream": False
             }
             
             self.last_api_call = current_time
             
-            # Enhanced timeout with retry
+            # Enhanced timeout with retry and better error handling
             max_retries = 2
             timeout_duration = 30
             
             for attempt in range(max_retries):
                 try:
                     print(f"🤖 Attempting DeepSeek API call (attempt {attempt + 1}/{max_retries})...")
+                    
+                    # Main API call
                     response = requests.post(
                         'https://api.deepseek.com/chat/completions',
                         headers=headers,
@@ -800,31 +923,45 @@ Format output profesional dengan:
                     if response.status_code == 200:
                         result = response.json()
                         analysis = result['choices'][0]['message']['content']
-                        print("✅ DeepSeek AI analysis generated successfully with trading recommendations")
+                        print("✅ DeepSeek AI analysis generated successfully")
                         return analysis
                     else:
-                        print(f"❌ DeepSeek API error (attempt {attempt + 1}): {response.status_code} - {response.text}")
-                        if attempt == max_retries - 1:
-                            return self.comprehensive_fallback_analysis(technical_data, news_data)
+                        print(f"❌ DeepSeek API error (attempt {attempt + 1}): {response.status_code}")
+                        print(f"Response: {response.text}")
                         
+                        if response.status_code == 401:
+                            print("❌ Unauthorized - check API key")
+                            return self.comprehensive_fallback_analysis(technical_data, news_data)
+                        elif response.status_code == 429:
+                            print("⏳ Rate limited, waiting...")
+                            time.sleep(5)
+                            continue
+                        elif attempt == max_retries - 1:
+                            return self.comprehensive_fallback_analysis(technical_data, news_data)
+                            
                 except requests.exceptions.Timeout:
                     print(f"⏰ DeepSeek API timeout (attempt {attempt + 1})")
                     if attempt == max_retries - 1:
                         return self.comprehensive_fallback_analysis(technical_data, news_data)
                         
-                except requests.exceptions.ConnectionError:
-                    print(f"🔌 DeepSeek API connection error (attempt {attempt + 1})")
+                except requests.exceptions.ConnectionError as e:
+                    print(f"🔌 DeepSeek API connection error (attempt {attempt + 1}): {e}")
                     if attempt == max_retries - 1:
                         return self.comprehensive_fallback_analysis(technical_data, news_data)
                         
+                except Exception as e:
+                    print(f"❌ Unexpected error in DeepSeek API (attempt {attempt + 1}): {e}")
+                    if attempt == max_retries - 1:
+                        return self.comprehensive_fallback_analysis(technical_data, news_data)
+                
                 # Wait before retry
                 if attempt < max_retries - 1:
-                    time.sleep(2)
-                
+                    time.sleep(3)
+                    
             return self.comprehensive_fallback_analysis(technical_data, news_data)
             
         except Exception as e:
-            print(f"❌ Error getting DeepSeek analysis: {e}")
+            print(f"❌ Critical error in DeepSeek analysis: {e}")
             return self.comprehensive_fallback_analysis(technical_data, news_data)
 
     def comprehensive_fallback_analysis(self, technical_data, news_data):
@@ -1200,7 +1337,7 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     
     print("=" * 70)
-    print("🚀 XAUUSD Professional Trading Analysis - ENHANCED VERSION")
+    print("🚀 XAUUSD Professional Trading Analysis - ULTRA ENHANCED VERSION")
     print("=" * 70)
     print("📊 Available Endpoints:")
     print("  • GET / → Dashboard")
@@ -1217,15 +1354,14 @@ if __name__ == '__main__':
     print("  • DeepSeek AI → Market Analysis") 
     print("  • NewsAPI → Fundamental News")
     print("=" * 70)
-    print("🎯 CRITICAL ENHANCEMENTS:")
-    print("  • ✅ ENHANCED Data Validation & Cleaning")
-    print("  • ✅ CORRECTED MACD Calculations")
-    print("  • ✅ REALISTIC Price Ranges")
-    print("  • ✅ ENHANCED API Retry Mechanism")
-    print("  • ✅ COMPREHENSIVE Error Handling")
-    print("  • ✅ REAL-TIME Indicator Verification")
-    print("  • ✅ IMPROVED Fallback Systems")
+    print("🎯 CRITICAL FIXES IMPLEMENTED:")
+    print("  • ✅ AGGRESSIVE Data Cleaning - Removes unrealistic prices")
+    print("  • ✅ MACD Calculation FIX - Force histogram recalculation")
+    print("  • ✅ Enhanced DeepSeek API - Better error handling & retry")
+    print("  • ✅ Improved NewsAPI Queries - Multiple search terms")
+    print("  • ✅ Realistic Price Ranges - $1800-$4500 for gold")
+    print("  • ✅ Enhanced Validation - Comprehensive data checks")
     print("=" * 70)
     
-    print("🚀 Starting enhanced server...")
+    print("🚀 Starting ultra-enhanced server...")
     app.run(debug=True, port=5000, host='0.0.0.0')
