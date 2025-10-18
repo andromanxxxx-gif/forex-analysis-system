@@ -629,32 +629,46 @@ class XAUUSDAnalyzer:
             
             news_context = "\n".join(news_headlines) if news_headlines else "No significant news"
             
+            # Enhanced prompt with specific trading recommendation requirements
             prompt = f"""
-Sebagai analis pasar keuangan profesional, berikan analisis komprehensif untuk XAUUSD (Gold/USD) berdasarkan data berikut:
+Sebagai analis pasar keuangan profesional dengan pengalaman 10+ tahun dalam trading XAUUSD (Gold/USD), berikan analisis komprehensif berdasarkan data berikut:
 
-DATA TEKNIKAL:
+**DATA TEKNIKAL:**
 - Harga Saat Ini: ${current_price:.2f}
-- RSI: {indicators.get('rsi', 'N/A')}
-- MACD: {indicators.get('macd', 'N/A')}
+- RSI (14): {indicators.get('rsi', 'N/A')}
+- MACD: {indicators.get('macd', 'N/A')} | Signal: {indicators.get('macd_signal', 'N/A')}
 - EMA 12: {indicators.get('ema_12', 'N/A')}
 - EMA 26: {indicators.get('ema_26', 'N/A')}
 - EMA 50: {indicators.get('ema_50', 'N/A')}
-- Stochastic K: {indicators.get('stoch_k', 'N/A')}
-- Stochastic D: {indicators.get('stoch_d', 'N/A')}
-- Bollinger Band Upper: {indicators.get('bb_upper', 'N/A')}
-- Bollinger Band Lower: {indicators.get('bb_lower', 'N/A')}
+- Stochastic: K={indicators.get('stoch_k', 'N/A')}, D={indicators.get('stoch_d', 'N/A')}
+- Bollinger Bands: Upper={indicators.get('bb_upper', 'N/A')}, Lower={indicators.get('bb_lower', 'N/A')}
 
-BERITA TERKINI:
+**BERITA TERKINI:**
 {news_context}
 
-Tolong berikan analisis yang mencakup:
-1. Kondisi trend saat ini (bullish/bearish/neutral)
-2. Sinyal trading dengan level entry, stop loss, dan take profit
-3. Analisis momentum dan kekuatan trend
-4. Faktor fundamental yang perlu diperhatikan
-5. Rekomendasi risk management
+**INSTRUKSI KHUSUS:**
+1. Berikan rekomendasi trading yang JELAS: BUY, SELL, atau HOLD
+2. Setiap rekomendasi HARUS dilengkapi dengan:
+   - Entry Price yang spesifik
+   - Stop Loss (SL) yang realistis
+   - Minimal 2 level Take Profit (TP1, TP2) dengan risk-reward ratio minimal 1:2
+   - Risk-reward ratio harus dihitung dan disebutkan secara eksplisit
+3. Analisis harus mencakup:
+   - Kondisi trend saat ini (bullish/bearish/neutral) dengan timeframe multiple
+   - Momentum dan kekuatan trend
+   - Key support dan resistance levels
+   - Faktor fundamental yang mempengaruhi
+   - Risk management recommendations
 
-Format respons dalam bahasa Indonesia yang profesional.
+**FORMAT OUTPUT:**
+Gunakan format profesional dengan bagian-bagian berikut:
+1. EXECUTIVE SUMMARY (termasuk rekomendasi utama)
+2. TECHNICAL ANALYSIS DETAILED
+3. TRADING RECOMMENDATION dengan ENTRY, SL, TP1, TP2
+4. RISK MANAGEMENT
+5. FUNDAMENTAL CONTEXT
+
+Pastikan risk-reward ratio minimal 1:2 untuk setiap rekomendasi trading.
 """
             
             headers = {
@@ -671,7 +685,7 @@ Format respons dalam bahasa Indonesia yang profesional.
                     }
                 ],
                 "temperature": 0.7,
-                "max_tokens": 1000
+                "max_tokens": 1500
             }
             
             self.last_api_call = current_time
@@ -679,13 +693,13 @@ Format respons dalam bahasa Indonesia yang profesional.
                 'https://api.deepseek.com/chat/completions',
                 headers=headers,
                 json=data,
-                timeout=45  # Increased timeout
+                timeout=45
             )
             
             if response.status_code == 200:
                 result = response.json()
                 analysis = result['choices'][0]['message']['content']
-                print("DeepSeek AI analysis generated successfully")
+                print("DeepSeek AI analysis generated successfully with trading recommendations")
                 return analysis
             else:
                 print(f"DeepSeek API error: {response.status_code} - {response.text}")
@@ -782,82 +796,109 @@ Format respons dalam bahasa Indonesia yang profesional.
         # Determine overall trend and signal
         if bullish_signals - bearish_signals >= 3:
             trend = "STRONG BULLISH"
-            signal = "STRONG BUY"
-            risk = "LOW"
+            signal = "BUY"
+            risk = "MEDIUM"
+            risk_reward = "1:3"
         elif bullish_signals - bearish_signals >= 1:
             trend = "BULLISH"
             signal = "BUY"
             risk = "MEDIUM"
+            risk_reward = "1:2"
         elif bearish_signals - bullish_signals >= 3:
             trend = "STRONG BEARISH"
-            signal = "STRONG SELL"
+            signal = "SELL"
             risk = "HIGH"
+            risk_reward = "1:3"
         elif bearish_signals - bullish_signals >= 1:
             trend = "BEARISH"
             signal = "SELL"
             risk = "MEDIUM"
+            risk_reward = "1:2"
         else:
             trend = "NEUTRAL"
-            signal = "HOLD"
+            signal = "HOLD/WAIT"
             risk = "LOW"
+            risk_reward = "N/A"
         
-        # Calculate trading levels
-        if signal in ["STRONG BUY", "BUY"]:
-            stop_loss = current_price * 0.99  # 1% below current price
-            take_profit_1 = current_price * 1.01  # 1% above
-            take_profit_2 = current_price * 1.02  # 2% above
-        elif signal in ["STRONG SELL", "SELL"]:
-            stop_loss = current_price * 1.01  # 1% above current price
-            take_profit_1 = current_price * 0.99  # 1% below
-            take_profit_2 = current_price * 0.98  # 2% below
+        # Calculate trading levels with proper risk-reward
+        if signal == "BUY":
+            entry = current_price
+            stop_loss = entry * 0.99  # 1% risk
+            take_profit_1 = entry * 1.02  # 2% reward -> 1:2 risk-reward
+            take_profit_2 = entry * 1.03  # 3% reward -> 1:3 risk-reward
+            position_size = "Standard (1-2% risk per trade)"
+        elif signal == "SELL":
+            entry = current_price
+            stop_loss = entry * 1.01  # 1% risk
+            take_profit_1 = entry * 0.98  # 2% reward -> 1:2 risk-reward
+            take_profit_2 = entry * 0.97  # 3% reward -> 1:3 risk-reward
+            position_size = "Standard (1-2% risk per trade)"
         else:
-            stop_loss = current_price * 0.995
-            take_profit_1 = current_price * 1.005
-            take_profit_2 = current_price * 1.01
+            entry = current_price
+            stop_loss = entry * 0.995
+            take_profit_1 = entry * 1.01
+            take_profit_2 = entry * 1.02
+            position_size = "Wait for clearer signal"
         
         analysis = f"""
-** ANALISIS XAUUSD KOMPREHENSIF **
+**ANALISIS XAUUSD KOMPREHENSIF - TRADING RECOMMENDATION**
 *Dibuat: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
 
-** RINGKASAN EKSEKUTIF **
+**EXECUTIVE SUMMARY:**
 - Harga Saat Ini: ${current_price:.2f}
 - Trend Pasar: {trend}
-- Sinyal Trading: {signal}
-- Level Risiko: {risk}
+- **REKOMENDASI UTAMA: {signal}**
+- Risk Level: {risk}
+- Risk-Reward Ratio: {risk_reward}
 
-** ANALISIS TEKNIKAL **
+**TECHNICAL ANALYSIS:**
 
-** Analisis Trend: **
-- Alignment EMA: {ema_signal}
-- Harga vs EMA 12: {'Diatas' if current_price > ema_12 else 'Dibawah'} (${ema_12:.2f})
-- Harga vs EMA 26: {'Diatas' if current_price > ema_26 else 'Dibawah'} (${ema_26:.2f})
+**Trend Analysis:**
+- EMA Alignment: {ema_signal}
+- Harga vs EMA 12: {'DIATAS' if current_price > ema_12 else 'DIBAWAH'} (${ema_12:.2f})
+- Harga vs EMA 26: {'DIATAS' if current_price > ema_26 else 'DIBAWAH'} (${ema_26:.2f})
+- Harga vs EMA 50: {'DIATAS' if current_price > ema_50 else 'DIBAWAH'} (${ema_50:.2f})
 
-** Indikator Momentum: **
+**Momentum Indicators:**
 - RSI (14): {rsi:.1f} - {rsi_signal}
-- MACD: {macd:.4f} - {macd_signal_text}
+- MACD: {macd:.4f} vs Signal: {macd_signal:.4f} - {macd_signal_text}
 - Stochastic: K={stoch_k:.1f}, D={stoch_d:.1f} - {stoch_signal}
 - Bollinger Bands: {bb_signal}
 
-** Kekuatan Sinyal: **
-- Sinyal Bullish: {bullish_signals}
-- Sinyal Bearish: {bearish_signals}
+**Signal Strength:**
+- Bullish Signals: {bullish_signals}/8
+- Bearish Signals: {bearish_signals}/8
 
-** REKOMENDASI TRADING **
+**TRADING RECOMMENDATION:**
 
-** Strategi Utama: **
-{signal} XAUUSD dengan pendekatan risiko {risk.lower()}.
+**Action: {signal} XAUUSD**
 
-** Level Kunci: **
-- Support Kuat: ${bb_lower:.2f}
-- Resistance Kuat: ${bb_upper:.2f}
+**Entry Levels:**
+- Ideal Entry: ${entry:.2f}
+- Aggressive Entry: ${entry * 0.998:.2f}
+- Conservative Entry: ${entry * 1.002:.2f}
 
-** Manajemen Risiko: **
+**Risk Management:**
 - Stop Loss: ${stop_loss:.2f}
-- Take Profit 1: ${take_profit_1:.2f}
-- Take Profit 2: ${take_profit_2:.2f}
+- Take Profit 1: ${take_profit_1:.2f} (Risk-Reward 1:2)
+- Take Profit 2: ${take_profit_2:.2f} (Risk-Reward 1:3)
+- Position Size: {position_size}
 
-** CATATAN: **
-Analisis ini menggunakan fallback system. Pastikan koneksi internet stabil untuk analisis AI DeepSeek.
+**Key Levels:**
+- Strong Support: ${bb_lower:.2f}
+- Strong Resistance: ${bb_upper:.2f}
+- Immediate Support: ${min(bb_lower, current_price * 0.995):.2f}
+- Immediate Resistance: ${max(bb_upper, current_price * 1.005):.2f}
+
+**TRADING PLAN:**
+1. Entry pada ${entry:.2f} atau level yang disebutkan
+2. Set Stop Loss ketat di ${stop_loss:.2f}
+3. Take Profit pertama di ${take_profit_1:.2f} (50% position)
+4. Take Profit kedua di ${take_profit_2:.2f} (50% position)
+5. Risk maksimal 2% dari equity per trade
+
+**CATATAN PENTING:**
+Analisis ini menggunakan fallback system. Untuk analisis yang lebih akurat dengan AI DeepSeek, pastikan koneksi internet stabil dan API key terkonfigurasi dengan benar.
 """
         return analysis
 
@@ -895,7 +936,7 @@ def home():
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
-    """Main analysis endpoint - FIXED VERSION"""
+    """Main analysis endpoint - ENHANCED VERSION"""
     try:
         print(f"Processing analysis for {timeframe}")
         
@@ -1172,7 +1213,7 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     
     print("=" * 60)
-    print("🚀 XAUUSD Professional Trading Analysis - FIXED VERSION")
+    print("🚀 XAUUSD Professional Trading Analysis - ENHANCED VERSION")
     print("=" * 60)
     print("📊 Available Endpoints:")
     print("  • GET / → Dashboard")
@@ -1192,11 +1233,12 @@ if __name__ == '__main__':
     print("  • DeepSeek AI → Market Analysis") 
     print("  • NewsAPI → Fundamental News")
     print("=" * 60)
-    print("🛠️ IMPROVEMENTS:")
-    print("  • Fixed NaN indicator calculations")
-    print("  • Enhanced data cleaning and validation")
-    print("  • Better error handling and fallbacks")
-    print("  • Improved indicator verification")
+    print("🎯 ENHANCED FEATURES:")
+    print("  • AI Trading Recommendations with Risk-Reward 1:2")
+    print("  • Specific Entry, SL, TP1, TP2 levels")
+    print("  • Professional Trading Plan")
+    print("  • Enhanced Risk Management")
+    print("  • Multi-timeframe Analysis Support")
     print("=" * 60)
     
     print("Starting server...")
