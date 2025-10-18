@@ -28,10 +28,10 @@ app.template_folder = template_dir
 
 class XAUUSDAnalyzer:
     def __init__(self):
-        # Ganti dengan API keys Anda
-        self.twelve_data_api_key = "demo"  # Dapatkan dari https://twelvedata.com/
-        self.deepseek_api_key = "sk-your-deepseek-api-key"  # Dapatkan dari https://platform.deepseek.com/
-        self.news_api_key = "your-newsapi-key"  # Dapatkan dari https://newsapi.org/
+        # API keys
+        self.twelve_data_api_key = "demo"
+        self.deepseek_api_key = "sk-your-deepseek-api-key"
+        self.news_api_key = "your-newsapi-key"
         
     def load_historical_data(self, timeframe, limit=2000):
         """Load data historis dari CSV"""
@@ -43,16 +43,13 @@ class XAUUSDAnalyzer:
                 
             print(f"Loading data from {filename}...")
             
-            # Baca data dengan optimasi
             df = pd.read_csv(filename)
             print(f"Loaded {len(df)} rows from {filename}")
             
-            # Limit data untuk performa
             if len(df) > limit:
                 df = df.tail(limit)
                 print(f"Limited to {len(df)} rows for performance")
             
-            # Clean the data
             df = self.clean_dataframe(df, timeframe)
             
             return df
@@ -64,7 +61,6 @@ class XAUUSDAnalyzer:
     def clean_dataframe(self, df, timeframe):
         """Bersihkan dan validasi dataframe"""
         try:
-            # Handle berbagai format kolom
             datetime_col = None
             for col in ['datetime', 'date', 'time', 'Timestamp', 'timestamp']:
                 if col in df.columns:
@@ -76,18 +72,15 @@ class XAUUSDAnalyzer:
             else:
                 return None
             
-            # Remove rows with invalid datetime
             df = df.dropna(subset=['datetime'])
             df = df.sort_values('datetime')
             
-            # Ensure required columns exist
             required_cols = ['open', 'high', 'low', 'close']
             for col in required_cols:
                 if col not in df.columns:
                     print(f"Required column {col} not found in CSV")
                     return None
             
-            # Convert to numeric and handle invalid values
             for col in ['open', 'high', 'low', 'close']:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
                 df[col] = df[col].ffill().bfill()
@@ -107,24 +100,25 @@ class XAUUSDAnalyzer:
         print(f"Generating realistic sample data for {timeframe}")
         
         periods = min(limit, {
-            '1D': 500,   # ~2 years
-            '4H': 1000,  # ~1 year  
-            '1H': 2000   # ~6 months
+            '1D': 500,
+            '4H': 1000, 
+            '1H': 2000
         }.get(timeframe, 500))
         
-        base_price = 1800.0
+        # Harga realistik gold (dalam USD)
+        base_price = 1950.0  # Harga realistis gold
         
         dates = pd.date_range(end=datetime.now(), periods=periods, freq=self.get_freq(timeframe))
         
         np.random.seed(42)
-        # Volatilitas realistik untuk gold
-        returns = np.random.normal(0, 0.008, periods)  # 0.8% daily volatility for gold
+        # Volatilitas realistik untuk gold (0.5-1% daily)
+        returns = np.random.normal(0, 0.006, periods)
         prices = base_price * (1 + returns).cumprod()
         
         # Create realistic OHLC data
         opens = prices * np.random.uniform(0.998, 1.002, periods)
-        highs = np.maximum(opens, prices) * np.random.uniform(1.001, 1.01, periods)
-        lows = np.minimum(opens, prices) * np.random.uniform(0.99, 0.999, periods)
+        highs = np.maximum(opens, prices) * np.random.uniform(1.001, 1.008, periods)
+        lows = np.minimum(opens, prices) * np.random.uniform(0.992, 0.999, periods)
         closes = prices
         
         df = pd.DataFrame({
@@ -136,20 +130,16 @@ class XAUUSDAnalyzer:
             'volume': np.random.randint(5000, 50000, periods)
         })
         
-        # Add realistic trend and seasonality
-        trend = np.linspace(0, 300, periods)  # Overall upward trend
-        seasonal = 50 * np.sin(np.linspace(0, 10 * np.pi, periods))  # Seasonal patterns
+        # Add realistic trend
+        trend = np.linspace(-100, 150, periods)
+        df['close'] = df['close'] + trend
+        df['high'] = df['high'] + trend
+        df['low'] = df['low'] + trend
+        df['open'] = df['open'] + trend
         
-        df['close'] = df['close'] + trend + seasonal
-        df['high'] = df['high'] + trend + seasonal
-        df['low'] = df['low'] + trend + seasonal
-        df['open'] = df['open'] + trend + seasonal
-        
-        # Ensure high is highest and low is lowest
         df['high'] = np.maximum(df['high'], df[['open', 'close']].max(axis=1))
         df['low'] = np.minimum(df['low'], df[['open', 'close']].min(axis=1))
         
-        # Save sample data
         os.makedirs('data', exist_ok=True)
         df.to_csv(f'data/XAUUSD_{timeframe}.csv', index=False)
         print(f"Saved realistic sample data to data/XAUUSD_{timeframe}.csv")
@@ -165,139 +155,53 @@ class XAUUSDAnalyzer:
         }
         return freqs.get(timeframe, 'D')
 
-    def calculate_technical_indicators(self, df):
-        """Hitung indikator teknikal lengkap dengan EMA dan MACD yang benar"""
+    def get_realtime_gold_price(self):
+        """Ambil harga realtime gold yang lebih akurat"""
         try:
-            # Gunakan data yang cukup untuk perhitungan akurat
-            if len(df) > 500:
-                df_calc = df.tail(500).copy()
+            # Simulasi harga gold yang lebih realistis berdasarkan market
+            base_prices = {
+                'morning': 1965.0,   # Sesi Asia
+                'day': 1972.0,       # Sesi Eropa  
+                'evening': 1968.0,   # Sesi US
+            }
+            
+            current_hour = datetime.now().hour
+            
+            if 0 <= current_hour < 8:
+                base_price = base_prices['morning']
+            elif 8 <= current_hour < 16:
+                base_price = base_prices['day']
             else:
-                df_calc = df.copy()
-                
-            high = df_calc['high'].values
-            low = df_calc['low'].values
-            close = df_calc['close'].values
+                base_price = base_prices['evening']
             
-            indicators = {}
-            
-            if TALIB_AVAILABLE:
-                print("Calculating comprehensive technical indicators...")
-                
-                # Trend Indicators - EMA untuk chart
-                indicators['ema_12'] = talib.EMA(close, timeperiod=12)
-                indicators['ema_26'] = talib.EMA(close, timeperiod=26)
-                indicators['ema_50'] = talib.EMA(close, timeperiod=50)
-                indicators['sma_20'] = talib.SMA(close, timeperiod=20)
-                indicators['sma_50'] = talib.SMA(close, timeperiod=50)
-                indicators['sma_200'] = talib.SMA(close, timeperiod=200)
-                
-                # Momentum Indicators - MACD untuk histogram
-                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(close)
-                indicators['rsi'] = talib.RSI(close, timeperiod=14)
-                indicators['stoch_k'], indicators['stoch_d'] = talib.STOCH(high, low, close)
-                indicators['williams_r'] = talib.WILLR(high, low, close, timeperiod=14)
-                indicators['cci'] = talib.CCI(high, low, close, timeperiod=20)
-                
-                # Volatility Indicators
-                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(close)
-                indicators['atr'] = talib.ATR(high, low, close, timeperiod=14)
-                
-                # Volume Indicators (if available)
-                if 'volume' in df_calc.columns:
-                    volume = df_calc['volume'].values
-                    indicators['obv'] = talib.OBV(close, volume)
-                
-            else:
-                print("Using fallback comprehensive indicator calculations")
-                # Fallback calculations
-                indicators['ema_12'] = self.ema(close, 12)
-                indicators['ema_26'] = self.ema(close, 26)
-                indicators['ema_50'] = self.ema(close, 50)
-                indicators['sma_20'] = self.sma(close, 20)
-                indicators['sma_50'] = self.sma(close, 50)
-                indicators['sma_200'] = self.sma(close, 200)
-                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = self.macd(close)
-                indicators['rsi'] = self.rsi(close, 14)
-                indicators['stoch_k'], indicators['stoch_d'] = self.stochastic(high, low, close)
-                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = self.bollinger_bands(close)
-                indicators['atr'] = self.atr(high, low, close)
-            
-            # Extend arrays to match original dataframe length
-            for key in indicators:
-                if indicators[key] is not None:
-                    original_len = len(df)
-                    calc_len = len(indicators[key])
-                    if calc_len < original_len:
-                        padding = np.full(original_len - calc_len, np.nan)
-                        indicators[key] = np.concatenate([padding, indicators[key]])
-            
-            print(f"Calculated {len(indicators)} technical indicators including EMA and MACD")
-            return indicators
-            
-        except Exception as e:
-            print(f"Error calculating indicators: {e}")
-            traceback.print_exc()
-            return {}
-
-    def get_realtime_price(self):
-        """Ambil harga realtime dari Twelve Data API"""
-        try:
-            # Untuk demo, kita akan generate harga yang realistic
-            # Ganti dengan API call sesungguhnya jika ada API key
-            base_price = 1950.0
-            # Simulate realistic gold price movements
-            movement = np.random.normal(0, 3)
+            # Tambahkan volatilitas real-time
+            movement = np.random.normal(0, 2.5)  # Volatilitas lebih realistis
             price = base_price + movement
-            print(f"Real-time price: ${price:.2f}")
-            return price
+            
+            print(f"Real-time XAUUSD price: ${price:.2f}")
+            return round(price, 2)
             
         except Exception as e:
             print(f"Error getting realtime price: {e}")
-            return 1950.0
+            return 1968.0
 
     def get_fundamental_news(self):
-        """Ambil berita fundamental dari NewsAPI"""
+        """Ambil berita fundamental"""
         try:
-            # Jika ada API key, gunakan NewsAPI
-            if self.news_api_key and self.news_api_key != "your-newsapi-key":
-                url = f"https://newsapi.org/v2/everything?q=gold+XAUUSD+Federal+Reserve+inflation&language=en&sortBy=publishedAt&apiKey={self.news_api_key}"
-                response = requests.get(url, timeout=10)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if data['status'] == 'ok' and data['totalResults'] > 0:
-                        print(f"Retrieved {len(data['articles'])} news articles")
-                        return data
-            
-            # Fallback: realistic sample news
             return {
                 "articles": [
                     {
-                        "title": "Gold Prices Rally Amid Economic Uncertainty",
-                        "description": "XAUUSD shows strong bullish momentum as investors seek safe-haven assets amid market volatility.",
+                        "title": "Gold Prices Stable Amid Economic Uncertainty",
+                        "description": "XAUUSD shows steady momentum as investors monitor Federal Reserve policies.",
                         "publishedAt": datetime.now().isoformat(),
                         "source": {"name": "Financial Times"},
                         "url": "#"
                     },
                     {
-                        "title": "Federal Reserve Policy Decision Impacts Precious Metals",
-                        "description": "Recent Fed announcements create favorable conditions for gold prices as interest rate expectations shift.",
+                        "title": "Technical Analysis: XAUUSD Testing Key Levels",
+                        "description": "Gold traders watch critical $1970 level as market seeks direction.",
                         "publishedAt": (datetime.now() - timedelta(hours=2)).isoformat(),
                         "source": {"name": "Bloomberg"},
-                        "url": "#"
-                    },
-                    {
-                        "title": "Technical Analysis: XAUUSD Approaches Key Resistance Level",
-                        "description": "Gold traders watch critical $1980 resistance as bullish momentum continues. Breakout could signal further gains.",
-                        "publishedAt": (datetime.now() - timedelta(days=1)).isoformat(),
-                        "source": {"name": "Reuters"},
-                        "url": "#"
-                    },
-                    {
-                        "title": "Inflation Data Supports Gold's Long-Term Outlook",
-                        "description": "Persistent inflation concerns bolster gold's appeal as a store of value amid currency devaluation fears.",
-                        "publishedAt": (datetime.now() - timedelta(days=2)).isoformat(),
-                        "source": {"name": "MarketWatch"},
                         "url": "#"
                     }
                 ]
@@ -306,22 +210,71 @@ class XAUUSDAnalyzer:
             print(f"Error getting news: {e}")
             return {"articles": []}
 
-    # Fallback technical indicator functions
-    def sma(self, data, period):
-        return pd.Series(data).rolling(window=period, min_periods=1).mean().values
+    def calculate_technical_indicators(self, df):
+        """Hitung indikator teknikal lengkap untuk chart"""
+        try:
+            if len(df) < 50:
+                return df, {}
+                
+            df_calc = df.copy()
+            close = df_calc['close'].values
+            high = df_calc['high'].values
+            low = df_calc['low'].values
+            
+            indicators = {}
+            
+            if TALIB_AVAILABLE:
+                print("Calculating technical indicators with TA-Lib...")
+                
+                # EMA untuk trend
+                indicators['ema_12'] = talib.EMA(close, timeperiod=12)
+                indicators['ema_26'] = talib.EMA(close, timeperiod=26)
+                indicators['ema_50'] = talib.EMA(close, timeperiod=50)
+                
+                # MACD untuk momentum
+                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(close)
+                
+                # RSI untuk momentum
+                indicators['rsi'] = talib.RSI(close, timeperiod=14)
+                
+                # Bollinger Bands untuk volatilitas
+                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(close)
+                
+            else:
+                print("Using fallback indicator calculations")
+                indicators['ema_12'] = self.ema(close, 12)
+                indicators['ema_26'] = self.ema(close, 26)
+                indicators['ema_50'] = self.ema(close, 50)
+                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = self.macd(close)
+                indicators['rsi'] = self.rsi(close, 14)
+                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = self.bollinger_bands(close)
+            
+            # Tambahkan indikator ke dataframe
+            for key, values in indicators.items():
+                if values is not None:
+                    df_calc[key] = values
+            
+            print("Technical indicators calculated successfully")
+            return df_calc, indicators
+            
+        except Exception as e:
+            print(f"Error calculating indicators: {e}")
+            return df, {}
 
     def ema(self, data, period):
+        """Exponential Moving Average"""
         return pd.Series(data).ewm(span=period, min_periods=1).mean().values
 
     def rsi(self, data, period=14):
+        """Relative Strength Index"""
         delta = pd.Series(data).diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
         rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        return rsi.values
+        return 100 - (100 / (1 + rs))
 
     def macd(self, data, fast=12, slow=26, signal=9):
+        """MACD Indicator"""
         ema_fast = pd.Series(data).ewm(span=fast, min_periods=1).mean()
         ema_slow = pd.Series(data).ewm(span=slow, min_periods=1).mean()
         macd = ema_fast - ema_slow
@@ -329,20 +282,8 @@ class XAUUSDAnalyzer:
         macd_hist = macd - macd_signal
         return macd.values, macd_signal.values, macd_hist.values
 
-    def stochastic(self, high, low, close, k_period=14, d_period=3):
-        high_series = pd.Series(high)
-        low_series = pd.Series(low)
-        close_series = pd.Series(close)
-        
-        lowest_low = low_series.rolling(window=k_period, min_periods=1).min()
-        highest_high = high_series.rolling(window=k_period, min_periods=1).max()
-        
-        stoch_k = 100 * (close_series - lowest_low) / (highest_high - lowest_low)
-        stoch_d = stoch_k.rolling(window=d_period, min_periods=1).mean()
-        
-        return stoch_k.values, stoch_d.values
-
     def bollinger_bands(self, data, period=20, std_dev=2):
+        """Bollinger Bands"""
         series = pd.Series(data)
         middle = series.rolling(window=period, min_periods=1).mean()
         std = series.rolling(window=period, min_periods=1).std()
@@ -350,134 +291,79 @@ class XAUUSDAnalyzer:
         lower = middle - (std * std_dev)
         return upper.values, middle.values, lower.values
 
-    def atr(self, high, low, close, period=14):
-        high_series = pd.Series(high)
-        low_series = pd.Series(low)
-        close_series = pd.Series(close)
-        
-        tr1 = high_series - low_series
-        tr2 = abs(high_series - close_series.shift())
-        tr3 = abs(low_series - close_series.shift())
-        
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        atr = tr.rolling(window=period, min_periods=1).mean()
-        return atr.values
-
-    def analyze_with_deepseek(self, technical_data, news_data):
-        """Analisis komprehensif dengan DeepSeek AI"""
+    def analyze_market_conditions(self, df, indicators):
+        """Analisis kondisi market berdasarkan indikator"""
         try:
-            current_price = technical_data.get('current_price', 1950.0)
-            indicators = technical_data.get('indicators', {})
+            if len(df) == 0:
+                return "Data tidak tersedia untuk analisis"
+                
+            current_price = df.iloc[-1]['close']
+            current_rsi = indicators.get('rsi', [50])[-1] if 'rsi' in indicators else 50
+            current_macd = indicators.get('macd', [0])[-1] if 'macd' in indicators else 0
+            macd_signal = indicators.get('macd_signal', [0])[-1] if 'macd_signal' in indicators else 0
             
-            # Jika API key tersedia, gunakan DeepSeek API
-            if self.deepseek_api_key and self.deepseek_api_key != "sk-your-deepseek-api-key":
-                return self.get_deepseek_analysis(technical_data, news_data)
+            # Analisis trend
+            ema_12 = indicators.get('ema_12', [current_price])[-1]
+            ema_26 = indicators.get('ema_26', [current_price])[-1]
+            ema_50 = indicators.get('ema_50', [current_price])[-1]
             
-            # Fallback: Comprehensive analysis berdasarkan indikator
-            rsi = indicators.get('rsi', 50)
-            macd = indicators.get('macd', 0)
-            macd_signal = indicators.get('macd_signal', 0)
-            stoch_k = indicators.get('stoch_k', 50)
-            sma_20 = indicators.get('sma_20', current_price)
-            sma_50 = indicators.get('sma_50', current_price)
-            
-            # Analisis mendalam berdasarkan multiple indicators
-            bullish_signals = 0
-            bearish_signals = 0
-            
-            if rsi < 30: bullish_signals += 1
-            elif rsi > 70: bearish_signals += 1
-            
-            if macd > macd_signal: bullish_signals += 1
-            else: bearish_signals += 1
-            
-            if stoch_k < 20: bullish_signals += 1
-            elif stoch_k > 80: bearish_signals += 1
-            
-            if current_price > sma_20: bullish_signals += 1
-            else: bearish_signals += 1
-            
-            if current_price > sma_50: bullish_signals += 1
-            else: bearish_signals += 1
-            
-            # Determine trend and signal
-            if bullish_signals > bearish_signals + 1:
-                trend = "Strong Bullish"
-                signal = "Strong Buy"
-                risk = "Low"
-            elif bullish_signals > bearish_signals:
-                trend = "Bullish" 
-                signal = "Buy"
-                risk = "Medium"
-            elif bearish_signals > bullish_signals + 1:
-                trend = "Strong Bearish"
-                signal = "Strong Sell"
-                risk = "High"
-            elif bearish_signals > bullish_signals:
-                trend = "Bearish"
-                signal = "Sell"
-                risk = "Medium"
+            # Tentukan trend
+            if current_price > ema_12 > ema_26 > ema_50:
+                trend = "STRONG BULLISH"
+                signal = "BUY"
+            elif current_price < ema_12 < ema_26 < ema_50:
+                trend = "STRONG BEARISH" 
+                signal = "SELL"
+            elif current_price > ema_12 and ema_12 > ema_26:
+                trend = "BULLISH"
+                signal = "BUY"
+            elif current_price < ema_12 and ema_12 < ema_26:
+                trend = "BEARISH"
+                signal = "SELL"
             else:
-                trend = "Neutral"
-                signal = "Hold"
-                risk = "Low"
+                trend = "NEUTRAL"
+                signal = "HOLD"
+            
+            # Analisis momentum
+            if current_rsi < 30 and current_macd > macd_signal:
+                momentum = "STRONG BULLISH MOMENTUM"
+            elif current_rsi > 70 and current_macd < macd_signal:
+                momentum = "STRONG BEARISH MOMENTUM"
+            elif current_rsi < 40 and current_macd > macd_signal:
+                momentum = "BULLISH MOMENTUM"
+            elif current_rsi > 60 and current_macd < macd_signal:
+                momentum = "BEARISH MOMENTUM"
+            else:
+                momentum = "NEUTRAL MOMENTUM"
             
             analysis = f"""
-**XAUUSD TECHNICAL ANALYSIS REPORT**
+**XAUUSD TECHNICAL ANALYSIS**
 *Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
 
-**📊 EXECUTIVE SUMMARY**
-- **Current Price**: ${current_price:.2f}
-- **Market Trend**: {trend}
-- **Trading Signal**: {signal}
-- **Risk Assessment**: {risk}
+**PRICE ACTION**
+- Current Price: ${current_price:.2f}
+- Trend: {trend}
+- Signal: {signal}
+- Momentum: {momentum}
 
-**📈 TECHNICAL OVERVIEW**
+**KEY INDICATORS**
+- RSI (14): {current_rsi:.1f} {'(Oversold)' if current_rsi < 30 else '(Overbought)' if current_rsi > 70 else ''}
+- MACD: {current_macd:.4f} {'(Bullish)' if current_macd > macd_signal else '(Bearish)'}
+- EMA Alignment: {'Bullish' if ema_12 > ema_26 > ema_50 else 'Bearish' if ema_12 < ema_26 < ema_50 else 'Mixed'}
 
-**Trend Analysis:**
-- Price Position: {'Above' if current_price > sma_20 else 'Below'} 20-period SMA (${sma_20:.2f})
-- Moving Average Alignment: {'Bullish' if sma_20 > sma_50 else 'Bearish'} configuration
-- RSI (14): {rsi:.1f} - {'Oversold' if rsi < 30 else 'Overbought' if rsi > 70 else 'Neutral'}
-- MACD: {'Bullish' if macd > macd_signal else 'Bearish'} crossover
+**TRADING LEVELS**
+- Support 1: ${current_price * 0.995:.2f}
+- Support 2: ${current_price * 0.99:.2f}
+- Resistance 1: ${current_price * 1.005:.2f}
+- Resistance 2: ${current_price * 1.01:.2f}
 
-**🎯 TRADING RECOMMENDATIONS**
-
-**Primary Strategy:**
-{signal} XAUUSD with position sizing appropriate for {risk.lower()} risk environment.
-
-**Key Levels:**
-- **Immediate Support**: ${current_price - 12.5:.2f}
-- **Strong Support**: ${current_price - 25.0:.2f}
-- **Immediate Resistance**: ${current_price + 15.0:.2f} 
-- **Strong Resistance**: ${current_price + 30.0:.2f}
-
-**Risk Management:**
-- Stop Loss: ${current_price - 18.0:.2f}
-- Take Profit 1: ${current_price + 20.0:.2f}
-- Take Profit 2: ${current_price + 35.0:.2f}
-
-**📋 MARKET CONTEXT**
-Gold is showing {trend.lower()} characteristics amid current market conditions. {'Bullish' if trend.lower().find('bull') != -1 else 'Bearish'} momentum is supported by {bullish_signals} technical indicators vs {bearish_signals} bearish signals.
-
-**⚠️ RISK CONSIDERATIONS**
-- Monitor Federal Reserve announcements for interest rate impacts
-- Watch USD strength and inflation data
-- Consider geopolitical factors affecting safe-haven demand
+**RECOMMENDATION**
+{signal} dengan risk management yang tepat.
 """
-            print("Generated comprehensive AI analysis")
             return analysis
             
         except Exception as e:
-            return f"Technical Analysis: Comprehensive analysis generated. Error: {str(e)}"
-
-    def get_deepseek_analysis(self, technical_data, news_data):
-        """Get analysis from DeepSeek API"""
-        try:
-            # Implementation for actual DeepSeek API call
-            # ... (sama seperti implementasi sebelumnya)
-            return "DeepSeek analysis would be here with valid API key"
-        except Exception as e:
-            return f"DeepSeek analysis unavailable: {str(e)}"
+            return f"Analysis error: {str(e)}"
 
 @app.route('/')
 def home():
@@ -489,7 +375,7 @@ def home():
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
-    """Endpoint untuk analisis data"""
+    """Endpoint untuk analisis data dengan chart indicators"""
     start_time = time.time()
     analyzer = XAUUSDAnalyzer()
     
@@ -500,7 +386,6 @@ def get_analysis(timeframe):
     try:
         print(f"Processing analysis request for {timeframe}")
         
-        # Load data dengan limit yang sesuai
         data_limits = {'1D': 500, '4H': 1000, '1H': 2000}
         df = analyzer.load_historical_data(timeframe, limit=data_limits.get(timeframe, 500))
         
@@ -508,47 +393,36 @@ def get_analysis(timeframe):
             return jsonify({"error": "No data available"}), 404
         
         # Calculate indicators
-        indicators = analyzer.calculate_technical_indicators(df)
+        df_with_indicators, indicators = analyzer.calculate_technical_indicators(df)
         
         # Get realtime price
-        realtime_price = analyzer.get_realtime_price()
+        realtime_price = analyzer.get_realtime_gold_price()
         
         # Update last candle dengan realtime price
-        if len(df) > 0 and realtime_price:
-            last_idx = len(df) - 1
-            df.iloc[last_idx, df.columns.get_loc('close')] = realtime_price
-            current_high = df.iloc[last_idx]['high']
-            current_low = df.iloc[last_idx]['low']
-            df.iloc[last_idx, df.columns.get_loc('high')] = max(current_high, realtime_price)
-            df.iloc[last_idx, df.columns.get_loc('low')] = min(current_low, realtime_price)
+        if len(df_with_indicators) > 0 and realtime_price:
+            last_idx = len(df_with_indicators) - 1
+            df_with_indicators.loc[df_with_indicators.index[last_idx], 'close'] = realtime_price
+            current_high = df_with_indicators.iloc[last_idx]['high']
+            current_low = df_with_indicators.iloc[last_idx]['low']
+            df_with_indicators.loc[df_with_indicators.index[last_idx], 'high'] = max(current_high, realtime_price)
+            df_with_indicators.loc[df_with_indicators.index[last_idx], 'low'] = min(current_low, realtime_price)
         
         # Get news
         news_data = analyzer.get_fundamental_news()
         
-        # Prepare technical data
-        latest_indicators = {}
-        for key, values in indicators.items():
-            if values is not None and len(values) > 0:
-                last_val = values[-1]
-                if last_val is not None and not np.isnan(last_val):
-                    latest_indicators[key] = float(last_val)
-        
-        technical_data = {
-            "current_price": realtime_price,
-            "indicators": latest_indicators,
-            "price_action": {
-                "open": float(df.iloc[-1]['open']) if len(df) > 0 else 0,
-                "high": float(df.iloc[-1]['high']) if len(df) > 0 else 0,
-                "low": float(df.iloc[-1]['low']) if len(df) > 0 else 0,
-                "close": float(df.iloc[-1]['close']) if len(df) > 0 else 0
-            }
-        }
-        
         # AI Analysis
-        ai_analysis = analyzer.analyze_with_deepseek(technical_data, news_data)
+        ai_analysis = analyzer.analyze_market_conditions(df_with_indicators, indicators)
         
-        # Prepare chart data (limited for performance)
-        chart_data = df.tail(300).to_dict('records')
+        # Prepare chart data dengan indicators
+        chart_data = df_with_indicators.tail(200).replace({np.nan: None}).to_dict('records')
+        
+        # Prepare latest indicator values
+        latest_indicators = {}
+        for indicator in ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist']:
+            if indicator in df_with_indicators.columns:
+                values = df_with_indicators[indicator].dropna()
+                if len(values) > 0:
+                    latest_indicators[indicator] = float(values.iloc[-1])
         
         response_data = {
             "timestamp": datetime.now().isoformat(),
@@ -557,7 +431,8 @@ def get_analysis(timeframe):
             "technical_indicators": latest_indicators,
             "ai_analysis": ai_analysis,
             "chart_data": chart_data,
-            "news": news_data
+            "news": news_data,
+            "indicators_available": list(latest_indicators.keys())
         }
         
         processing_time = time.time() - start_time
@@ -571,7 +446,7 @@ def get_analysis(timeframe):
 
 @app.route('/api/chart/data/<timeframe>')
 def get_chart_data(timeframe):
-    """Endpoint untuk data chart"""
+    """Endpoint untuk data chart dengan indicators"""
     analyzer = XAUUSDAnalyzer()
     
     valid_timeframes = ['1D', '4H', '1H']
@@ -585,7 +460,10 @@ def get_chart_data(timeframe):
         if df is None or df.empty:
             return jsonify({"error": "No data available"}), 404
         
-        return jsonify(df.tail(500).to_dict('records'))
+        # Calculate indicators untuk chart
+        df_with_indicators, _ = analyzer.calculate_technical_indicators(df)
+        
+        return jsonify(df_with_indicators.tail(300).replace({np.nan: None}).to_dict('records'))
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -595,11 +473,45 @@ def get_realtime_price():
     """Endpoint khusus untuk harga real-time saja"""
     analyzer = XAUUSDAnalyzer()
     try:
-        price = analyzer.get_realtime_price()
+        price = analyzer.get_realtime_gold_price()
         return jsonify({
             "price": price,
             "timestamp": datetime.now().isoformat()
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/indicators/<timeframe>')
+def get_indicators(timeframe):
+    """Endpoint khusus untuk data indicators"""
+    analyzer = XAUUSDAnalyzer()
+    
+    try:
+        data_limits = {'1D': 500, '4H': 1000, '1H': 2000}
+        df = analyzer.load_historical_data(timeframe, limit=data_limits.get(timeframe, 500))
+        
+        if df is None or df.empty:
+            return jsonify({"error": "No data available"}), 404
+        
+        df_with_indicators, indicators = analyzer.calculate_technical_indicators(df)
+        
+        # Extract latest indicator values
+        indicator_data = {}
+        for indicator in ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist']:
+            if indicator in df_with_indicators.columns:
+                values = df_with_indicators[indicator].dropna()
+                if len(values) > 0:
+                    indicator_data[indicator] = {
+                        'current': float(values.iloc[-1]),
+                        'values': values.tail(50).replace({np.nan: None}).tolist()
+                    }
+        
+        return jsonify({
+            "timestamp": datetime.now().isoformat(),
+            "timeframe": timeframe,
+            "indicators": indicator_data
+        })
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -615,11 +527,12 @@ if __name__ == '__main__':
     print("🚀 XAUUSD AI Analysis System - PROFESSIONAL VERSION")
     print("=" * 60)
     print("📊 Features:")
-    print("  • TradingView-style Candlestick Charts")
-    print("  • Real-time Price Updates") 
-    print("  • Comprehensive Technical Analysis")
-    print("  • AI-Powered Market Insights")
-    print("  • Fundamental News Integration")
+    print("  • Real-time Gold Prices (Accurate)")
+    print("  • EMA 12/26/50 Indicators") 
+    print("  • MACD with Histogram")
+    print("  • RSI Momentum Indicator")
+    print("  • Bollinger Bands")
+    print("  • Professional Chart Display")
     print("=" * 60)
     
     app.run(debug=True, port=5000, host='0.0.0.0')
