@@ -27,11 +27,60 @@ app.template_folder = template_dir
 
 class XAUUSDAnalyzer:
     def __init__(self):
-        pass
+        self.data_cache = {}  # Cache untuk menyimpan data di memory
         
+    def load_historical_data(self, timeframe, limit=500):
+        """Load data historis dari CSV file yang sudah ada"""
+        try:
+            filename = f"data/XAUUSD_{timeframe}.csv"
+            if os.path.exists(filename):
+                print(f"Loading historical data from {filename}")
+                df = pd.read_csv(filename)
+                
+                # Pastikan kolom datetime ada dan format benar
+                if 'datetime' in df.columns:
+                    df['datetime'] = pd.to_datetime(df['datetime'])
+                elif 'date' in df.columns:
+                    df['datetime'] = pd.to_datetime(df['date'])
+                    df = df.rename(columns={'date': 'datetime'})
+                elif 'time' in df.columns:
+                    df['datetime'] = pd.to_datetime(df['time'])
+                    df = df.rename(columns={'time': 'datetime'})
+                else:
+                    # Jika tidak ada kolom datetime, buat berdasarkan index
+                    df['datetime'] = pd.date_range(end=datetime.now(), periods=len(df), freq='H')
+                
+                # Pastikan kolom OHLC ada
+                required_cols = ['open', 'high', 'low', 'close']
+                for col in required_cols:
+                    if col not in df.columns:
+                        print(f"Warning: Column {col} not found in CSV")
+                        # Buat data dummy jika kolom tidak ada
+                        df[col] = np.random.uniform(1800, 2000, len(df))
+                
+                # Konversi ke numeric
+                for col in required_cols:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    df[col] = df[col].fillna(method='ffill').fillna(method='bfill')
+                
+                if 'volume' not in df.columns:
+                    df['volume'] = np.random.randint(1000, 10000, len(df))
+                
+                df = df.sort_values('datetime')
+                print(f"Successfully loaded {len(df)} records from {filename}")
+                return df.tail(limit)
+            else:
+                print(f"File {filename} not found, using generated data")
+                return self.generate_sample_data(timeframe, limit)
+                
+        except Exception as e:
+            print(f"Error loading historical data: {e}")
+            traceback.print_exc()
+            return self.generate_sample_data(timeframe, limit)
+
     def generate_sample_data(self, timeframe, limit=500):
-        """Generate sample data for XAUUSD"""
-        print(f"Generating sample data for {timeframe}")
+        """Generate sample data tanpa save ke file"""
+        print(f"Generating sample data for {timeframe} (in memory only)")
         
         periods = limit
         base_price = 1968.0
@@ -70,31 +119,16 @@ class XAUUSDAnalyzer:
         
         df = pd.DataFrame(data)
         
-        # Save to CSV
-        os.makedirs('data', exist_ok=True)
-        df.to_csv(f'data/XAUUSD_{timeframe}.csv', index=False)
-        print(f"Generated {len(df)} records for {timeframe}")
+        # Simpan di cache memory
+        self.data_cache[timeframe] = df
+        print(f"Generated {len(df)} records for {timeframe} (cached in memory)")
         return df
-
-    def load_data(self, timeframe, limit=500):
-        """Load data from CSV or generate sample data"""
-        try:
-            filename = f"data/XAUUSD_{timeframe}.csv"
-            if os.path.exists(filename):
-                df = pd.read_csv(filename)
-                df['datetime'] = pd.to_datetime(df['datetime'])
-                print(f"Loaded {len(df)} records from {filename}")
-                return df.tail(limit)
-            else:
-                return self.generate_sample_data(timeframe, limit)
-        except Exception as e:
-            print(f"Error loading data: {e}")
-            return self.generate_sample_data(timeframe, limit)
 
     def calculate_indicators(self, df):
         """Calculate technical indicators"""
         try:
-            if len(df) < 50:
+            if len(df) < 20:
+                print("Not enough data for indicators")
                 return df
                 
             close = df['close'].values
@@ -118,11 +152,13 @@ class XAUUSDAnalyzer:
             
         except Exception as e:
             print(f"Error calculating indicators: {e}")
+            traceback.print_exc()
             return df
 
     def ema(self, data, period):
         """Exponential Moving Average"""
-        return pd.Series(data).ewm(span=period, adjust=False).mean()
+        series = pd.Series(data)
+        return series.ewm(span=period, adjust=False).mean()
 
     def macd(self, data, fast=12, slow=26, signal=9):
         """MACD Indicator"""
@@ -137,10 +173,11 @@ class XAUUSDAnalyzer:
         """RSI Indicator"""
         series = pd.Series(data)
         delta = series.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
         rs = gain / loss
-        return 100 - (100 / (1 + rs))
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.fillna(50)  # Default to 50 if cannot calculate
 
     def get_realtime_price(self):
         """Get real-time gold price"""
@@ -158,8 +195,8 @@ class XAUUSDAnalyzer:
                 return "No data available for analysis"
                 
             current_price = df.iloc[-1]['close']
-            current_rsi = df.iloc[-1]['rsi'] if 'rsi' in df.columns else 50
-            current_macd = df.iloc[-1]['macd'] if 'macd' in df.columns else 0
+            current_rsi = df.iloc[-1]['rsi'] if 'rsi' in df.columns and not pd.isna(df.iloc[-1]['rsi']) else 50
+            current_macd = df.iloc[-1]['macd'] if 'macd' in df.columns and not pd.isna(df.iloc[-1]['macd']) else 0
             
             # Simple analysis
             if current_rsi < 30 and current_macd > 0:
@@ -200,7 +237,7 @@ RECOMMENDATION:
             return analysis
             
         except Exception as e:
-            return f"Analysis completed. Market data processed."
+            return f"Analysis completed. Error: {str(e)}"
 
 # Create analyzer instance
 analyzer = XAUUSDAnalyzer()
@@ -211,7 +248,7 @@ def home():
     try:
         return render_template('index.html')
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error loading template: {str(e)}"
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
@@ -223,8 +260,8 @@ def get_analysis(timeframe):
         if timeframe not in ['1H', '4H', '1D']:
             return jsonify({"error": "Invalid timeframe"}), 400
         
-        # Load and prepare data
-        df = analyzer.load_data(timeframe, 200)
+        # Load and prepare data - GUNAKAN DATA HISTORIS
+        df = analyzer.load_historical_data(timeframe, 200)
         df_with_indicators = analyzer.calculate_indicators(df)
         
         # Get current price
@@ -241,7 +278,7 @@ def get_analysis(timeframe):
         chart_data = []
         for _, row in df_with_indicators.tail(100).iterrows():
             chart_data.append({
-                'datetime': row['datetime'].isoformat(),
+                'datetime': row['datetime'].isoformat() if hasattr(row['datetime'], 'isoformat') else str(row['datetime']),
                 'open': float(row['open']),
                 'high': float(row['high']),
                 'low': float(row['low']),
@@ -272,23 +309,25 @@ def get_analysis(timeframe):
             "technical_indicators": latest_indicators,
             "ai_analysis": analysis,
             "chart_data": chart_data,
+            "data_points": len(chart_data),
             "news": {
                 "articles": [
                     {
-                        "title": "Gold Market Update",
-                        "description": "XAUUSD showing active trading session with technical indicators providing clear signals.",
-                        "source": {"name": "Market Analysis"},
+                        "title": "Gold Market Analysis",
+                        "description": "Technical indicators showing market trends for XAUUSD.",
+                        "source": {"name": "Market Data"},
                         "publishedAt": datetime.now().isoformat()
                     }
                 ]
             }
         }
         
-        print(f"Analysis completed for {timeframe}")
+        print(f"Analysis completed for {timeframe}. Sent {len(chart_data)} data points.")
         return jsonify(response)
         
     except Exception as e:
         print(f"Error in analysis: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e), "status": "error"}), 500
 
 @app.route('/api/health')
@@ -307,13 +346,41 @@ def realtime_price():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/debug')
+def debug():
+    """Debug endpoint to check data files"""
+    try:
+        files = {}
+        for timeframe in ['1H', '4H', '1D']:
+            filename = f"data/XAUUSD_{timeframe}.csv"
+            if os.path.exists(filename):
+                df = pd.read_csv(filename)
+                files[timeframe] = {
+                    "exists": True,
+                    "rows": len(df),
+                    "columns": list(df.columns),
+                    "first_date": df.iloc[0]['datetime'] if 'datetime' in df.columns else "N/A",
+                    "last_date": df.iloc[-1]['datetime'] if 'datetime' in df.columns else "N/A"
+                }
+            else:
+                files[timeframe] = {"exists": False}
+        
+        return jsonify({
+            "status": "debug",
+            "data_files": files,
+            "current_dir": os.getcwd(),
+            "data_dir": os.path.join(os.getcwd(), 'data')
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('data', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
     
     print("=" * 60)
-    print("🚀 XAUUSD Analysis Dashboard - SIMPLIFIED VERSION")
+    print("🚀 XAUUSD Analysis Dashboard - FIXED VERSION")
     print("=" * 60)
     print("📊 Available Endpoints:")
     print("  • GET / → Dashboard")
@@ -322,13 +389,8 @@ if __name__ == '__main__':
     print("  • GET /api/analysis/1D → Daily Analysis")
     print("  • GET /api/realtime/price → Current Price")
     print("  • GET /api/health → Health Check")
+    print("  • GET /api/debug → Debug Info")
     print("=" * 60)
-    
-    # Generate sample data first
-    print("Generating sample data...")
-    analyzer.generate_sample_data('1H', 200)
-    analyzer.generate_sample_data('4H', 200)
-    analyzer.generate_sample_data('1D', 200)
     
     print("Starting server...")
     app.run(debug=True, port=5000, host='0.0.0.0')
