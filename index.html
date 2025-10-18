@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XAUUSD Trading Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -47,12 +48,22 @@
             color: black; 
         }
         
+        .price-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 10px;
+        }
         .price { 
             font-size: 2.5em; 
-            text-align: center; 
             color: #ffd700; 
-            margin: 20px 0; 
             font-weight: bold;
+        }
+        .price-source {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
         }
         
         .dashboard {
@@ -146,13 +157,22 @@
             margin: 10px 0; 
             font-size: 0.8em; 
         }
+        
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            color: #666;
+            font-size: 0.9em;
+            border-top: 1px solid #333;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>XAUUSD Trading Analysis</h1>
-            <p>Real-time Gold Market Analysis</p>
+            <p>Real-time Gold Market Analysis with Twelve Data API</p>
         </div>
 
         <div class="controls">
@@ -162,7 +182,10 @@
             <button class="btn" onclick="checkDebug()">Debug</button>
         </div>
 
-        <div class="price" id="currentPrice">Loading...</div>
+        <div class="price-container">
+            <div class="price" id="currentPrice">Loading...</div>
+            <div class="price-source" id="priceSource">Connecting to Twelve Data API...</div>
+        </div>
 
         <div id="debugInfo" class="debug" style="display: none;"></div>
 
@@ -188,6 +211,10 @@
             <div id="newsContainer">
                 <div class="loading">Loading news...</div>
             </div>
+        </div>
+
+        <div class="footer">
+            <p>Last updated: <span id="lastUpdate">-</span> | XAUUSD Gold Analysis</p>
         </div>
     </div>
 
@@ -241,6 +268,7 @@
 
         function showLoading() {
             document.getElementById('currentPrice').textContent = 'Loading...';
+            document.getElementById('priceSource').textContent = 'Fetching data...';
             document.getElementById('aiAnalysis').textContent = 'Loading analysis...';
             document.getElementById('indicatorsGrid').innerHTML = '<div class="loading">Loading indicators...</div>';
             document.getElementById('newsContainer').innerHTML = '<div class="loading">Loading news...</div>';
@@ -248,6 +276,7 @@
 
         function showError(message) {
             document.getElementById('currentPrice').textContent = 'Error';
+            document.getElementById('priceSource').textContent = 'Connection failed';
             document.getElementById('aiAnalysis').textContent = message;
             document.getElementById('indicatorsGrid').innerHTML = `<div class="error">${message}</div>`;
             document.getElementById('newsContainer').innerHTML = `<div class="error">${message}</div>`;
@@ -257,6 +286,8 @@
             try {
                 // Update price
                 document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
+                document.getElementById('priceSource').textContent = 'Live from Twelve Data API';
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
                 
                 // Update analysis
                 document.getElementById('aiAnalysis').textContent = data.ai_analysis;
@@ -291,7 +322,9 @@
                 'ema_50': { name: 'EMA 50', format: '0.2f' },
                 'rsi': { name: 'RSI', format: '0.1f' },
                 'macd': { name: 'MACD', format: '0.4f' },
-                'stoch_k': { name: 'Stoch K', format: '0.1f' }
+                'stoch_k': { name: 'Stoch K', format: '0.1f' },
+                'bb_upper': { name: 'BB Upper', format: '0.2f' },
+                'bb_lower': { name: 'BB Lower', format: '0.2f' }
             };
 
             for (const [key, conf] of Object.entries(config)) {
@@ -305,6 +338,10 @@
                         trend = value > 0 ? 'bullish' : 'bearish';
                     } else if (key === 'stoch_k') {
                         trend = value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral';
+                    } else if (key === 'bb_upper') {
+                        trend = 'bearish';
+                    } else if (key === 'bb_lower') {
+                        trend = 'bullish';
                     }
                     
                     html += `
@@ -327,19 +364,20 @@
             if (newsData.articles && newsData.articles.length > 0) {
                 let html = '';
                 newsData.articles.forEach(article => {
+                    const date = new Date(article.publishedAt).toLocaleDateString();
                     html += `
                         <div class="news-item">
                             <div class="news-title">${article.title}</div>
                             <div>${article.description}</div>
                             <div style="font-size: 0.8em; color: #888; margin-top: 5px;">
-                                ${article.source.name}
+                                ${article.source.name} • ${date}
                             </div>
                         </div>
                     `;
                 });
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<div class="error">No news</div>';
+                container.innerHTML = '<div class="error">No news available</div>';
             }
         }
 
@@ -355,10 +393,12 @@
                 return;
             }
 
+            // Format dates for better display
             const labels = chartData.map(d => new Date(d.datetime));
             const prices = chartData.map(d => d.close);
             const ema12 = chartData.map(d => d.ema_12).filter(v => v !== null);
             const ema26 = chartData.map(d => d.ema_26).filter(v => v !== null);
+            const ema50 = chartData.map(d => d.ema_50).filter(v => v !== null);
 
             currentChart = new Chart(ctx, {
                 type: 'line',
@@ -366,26 +406,37 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Price',
+                            label: 'XAUUSD Price',
                             data: prices,
                             borderColor: '#ffd700',
                             backgroundColor: 'rgba(255, 215, 0, 0.1)',
                             borderWidth: 2,
-                            fill: true
+                            fill: true,
+                            tension: 0.1
                         },
                         {
                             label: 'EMA 12',
                             data: ema12,
                             borderColor: '#00ff88',
                             borderWidth: 1,
-                            pointRadius: 0
+                            pointRadius: 0,
+                            tension: 0.1
                         },
                         {
                             label: 'EMA 26',
                             data: ema26,
                             borderColor: '#0088ff',
                             borderWidth: 1,
-                            pointRadius: 0
+                            pointRadius: 0,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'EMA 50',
+                            data: ema50,
+                            borderColor: '#ff4444',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0.1
                         }
                     ]
                 },
@@ -395,27 +446,57 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: `XAUUSD ${currentTimeframe}`,
-                            color: 'white'
+                            text: `XAUUSD ${currentTimeframe} Chart`,
+                            color: 'white',
+                            font: { size: 16 }
                         },
                         legend: {
-                            labels: { color: 'white' }
+                            labels: { 
+                                color: 'white',
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)'
                         }
                     },
                     scales: {
                         x: {
-                            ticks: { color: 'white', maxTicksLimit: 8 },
-                            grid: { color: '#444' }
+                            type: 'time',
+                            time: {
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'MMM dd HH:mm'
+                                }
+                            },
+                            ticks: { 
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                maxTicksLimit: 8,
+                                font: { size: 10 }
+                            },
+                            grid: { 
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
                         },
                         y: {
                             ticks: { 
-                                color: 'white',
+                                color: 'rgba(255, 255, 255, 0.7)',
                                 callback: function(value) {
                                     return '$' + value.toFixed(2);
-                                }
+                                },
+                                font: { size: 10 }
                             },
-                            grid: { color: '#444' }
+                            grid: { 
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
                         }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
                     }
                 }
             });
@@ -426,12 +507,16 @@
                 .then(response => response.json())
                 .then(data => {
                     const debugDiv = document.getElementById('debugInfo');
-                    debugDiv.style.display = 'block';
-                    debugDiv.innerHTML = `
-                        <h3>Debug Info</h3>
-                        <pre>${JSON.stringify(data, null, 2)}</pre>
-                        <button class="btn" onclick="document.getElementById('debugInfo').style.display='none'">Hide</button>
-                    `;
+                    if (debugDiv.style.display === 'none') {
+                        debugDiv.style.display = 'block';
+                        debugDiv.innerHTML = `
+                            <h3>Debug Information</h3>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                            <button class="btn" onclick="document.getElementById('debugInfo').style.display='none'" style="margin-top: 10px;">Hide Debug</button>
+                        `;
+                    } else {
+                        debugDiv.style.display = 'none';
+                    }
                 })
                 .catch(error => {
                     console.error('Debug error:', error);
