@@ -28,6 +28,7 @@ app.template_folder = template_dir
 class XAUUSDAnalyzer:
     def __init__(self):
         self.data_cache = {}
+        self.twelve_data_api_key = "YOUR_TWELVE_DATA_API_KEY"  # Ganti dengan API key Anda
         
     def load_historical_data(self, timeframe, limit=500):
         """Load data historis dari CSV file yang sudah ada"""
@@ -215,14 +216,44 @@ class XAUUSDAnalyzer:
         
         return stoch_k, stoch_d
 
-    def get_realtime_price(self):
-        """Get real-time gold price"""
-        # Simulate realistic gold price
+    def get_realtime_price_twelvedata(self):
+        """Get real-time gold price from Twelve Data API"""
+        try:
+            if self.twelve_data_api_key == "YOUR_TWELVE_DATA_API_KEY":
+                print("Using simulated price (set your Twelve Data API key)")
+                return self.get_simulated_price()
+            
+            url = f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={self.twelve_data_api_key}"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'price' in data:
+                    price = float(data['price'])
+                    print(f"Real-time XAUUSD price from Twelve Data: ${price:.2f}")
+                    return price
+                else:
+                    print(f"Twelve Data API error: {data.get('message', 'Unknown error')}")
+                    return self.get_simulated_price()
+            else:
+                print(f"Twelve Data API HTTP error: {response.status_code}")
+                return self.get_simulated_price()
+                
+        except Exception as e:
+            print(f"Error getting price from Twelve Data: {e}")
+            return self.get_simulated_price()
+
+    def get_simulated_price(self):
+        """Fallback simulated price"""
         base_price = 1968.0
         movement = np.random.normal(0, 1.5)
         price = base_price + movement
-        print(f"Real-time XAUUSD price: ${price:.2f}")
+        print(f"Simulated XAUUSD price: ${price:.2f}")
         return round(price, 2)
+
+    def get_realtime_price(self):
+        """Main function to get real-time price"""
+        return self.get_realtime_price_twelvedata()
 
     def get_fundamental_news(self):
         """Get fundamental news about gold market"""
@@ -589,6 +620,8 @@ if __name__ == '__main__':
     print("  • GET /api/realtime/price → Current Price")
     print("  • GET /api/health → Health Check")
     print("  • GET /api/debug → Debug Info")
+    print("=" * 60)
+    print("💡 Don't forget to set your Twelve Data API key!")
     print("=" * 60)
     
     print("Starting server...")
