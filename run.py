@@ -265,7 +265,7 @@ class XAUUSDAnalyzer:
         return df
 
     def calculate_indicators(self, df):
-        """Calculate technical indicators"""
+        """Calculate technical indicators - FIXED VERSION"""
         try:
             if len(df) < 20:
                 print("Not enough data for indicators")
@@ -275,32 +275,48 @@ class XAUUSDAnalyzer:
             high = df['high'].values
             low = df['low'].values
             
+            print(f"Calculating indicators for {len(df)} records...")
+            
             # Calculate EMAs
             df['ema_12'] = self.ema(close, 12)
             df['ema_26'] = self.ema(close, 26)
             df['ema_50'] = self.ema(close, 50)
+            print("EMAs calculated")
             
             # Calculate MACD
             macd, signal, hist = self.macd(close)
             df['macd'] = macd
             df['macd_signal'] = signal
             df['macd_hist'] = hist
+            print("MACD calculated")
             
             # Calculate RSI
             df['rsi'] = self.rsi(close, 14)
+            print("RSI calculated")
             
             # Calculate Bollinger Bands
             bb_upper, bb_middle, bb_lower = self.bollinger_bands(close)
             df['bb_upper'] = bb_upper
             df['bb_middle'] = bb_middle
             df['bb_lower'] = bb_lower
+            print("Bollinger Bands calculated")
             
             # Calculate Stochastic
             stoch_k, stoch_d = self.stochastic(high, low, close)
             df['stoch_k'] = stoch_k
             df['stoch_d'] = stoch_d
+            print("Stochastic calculated")
             
-            print("All technical indicators calculated successfully")
+            # Verify all indicators were added
+            expected_indicators = ['ema_12', 'ema_26', 'ema_50', 'macd', 'macd_signal', 'macd_hist', 
+                                  'rsi', 'bb_upper', 'bb_middle', 'bb_lower', 'stoch_k', 'stoch_d']
+            
+            missing = [ind for ind in expected_indicators if ind not in df.columns]
+            if missing:
+                print(f"WARNING: Missing indicators: {missing}")
+            else:
+                print("All technical indicators calculated successfully")
+                
             return df
             
         except Exception as e:
@@ -736,7 +752,7 @@ def home():
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
-    """Main analysis endpoint"""
+    """Main analysis endpoint - FIXED VERSION"""
     try:
         print(f"Processing analysis for {timeframe}")
         
@@ -746,53 +762,99 @@ def get_analysis(timeframe):
         
         # Load and prepare data
         df = analyzer.load_historical_data(timeframe, 200)
+        print(f"Loaded {len(df)} records for {timeframe}")
+        
+        # Calculate indicators FIRST
         df_with_indicators = analyzer.calculate_indicators(df)
+        print("Indicators calculated")
         
         # Get current price from Twelve Data
         current_price = analyzer.get_realtime_price()
+        print(f"Current price: ${current_price:.2f}")
         
-        # Update last price
+        # Update last price in the dataframe
         if len(df_with_indicators) > 0:
             df_with_indicators.iloc[-1, df_with_indicators.columns.get_loc('close')] = current_price
+            # Also update high/low if current price exceeds them
+            if current_price > df_with_indicators.iloc[-1]['high']:
+                df_with_indicators.iloc[-1, df_with_indicators.columns.get_loc('high')] = current_price
+            if current_price < df_with_indicators.iloc[-1]['low']:
+                df_with_indicators.iloc[-1, df_with_indicators.columns.get_loc('low')] = current_price
         
         # Get news from NewsAPI
         news_data = analyzer.get_fundamental_news()
         
-        # Prepare indicators for analysis
+        # DEBUG: Check what indicators are available
+        print("Available columns in df_with_indicators:", df_with_indicators.columns.tolist())
+        if len(df_with_indicators) > 0:
+            last_row = df_with_indicators.iloc[-1]
+            print("Last row data sample:")
+            for col in ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 'bb_upper', 'bb_lower']:
+                if col in df_with_indicators.columns:
+                    print(f"  {col}: {last_row[col]} (type: {type(last_row[col])})")
+        
+        # Prepare indicators for analysis - FIXED: Ensure all indicators are included
         latest_indicators = {}
         if len(df_with_indicators) > 0:
             last_row = df_with_indicators.iloc[-1]
-            for indicator in ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist', 
-                             'stoch_k', 'stoch_d', 'bb_upper', 'bb_lower']:
-                if indicator in df_with_indicators.columns and not pd.isna(last_row[indicator]):
-                    latest_indicators[indicator] = float(last_row[indicator])
+            indicator_list = ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist', 
+                             'stoch_k', 'stoch_d', 'bb_upper', 'bb_lower', 'bb_middle']
+            
+            for indicator in indicator_list:
+                if indicator in df_with_indicators.columns:
+                    value = last_row[indicator]
+                    # Convert to float, handle NaN/None
+                    if value is not None and not pd.isna(value):
+                        latest_indicators[indicator] = float(value)
+                    else:
+                        latest_indicators[indicator] = None
+                        print(f"Warning: {indicator} is None or NaN")
+                else:
+                    print(f"Warning: {indicator} not found in dataframe columns")
+        
+        print(f"Prepared {len(latest_indicators)} indicators for API response")
+        print("Indicators data:", latest_indicators)
         
         # Generate comprehensive AI analysis
         analysis = analyzer.analyze_market_conditions(df_with_indicators, latest_indicators, news_data)
         
-        # Prepare chart data (limit to 100 points for better performance)
+        # Prepare chart data - FIXED: Ensure indicators are properly included
         chart_data = []
-        for _, row in df_with_indicators.tail(100).iterrows():
+        display_data = df_with_indicators.tail(100)  # Limit to 100 points
+        
+        for _, row in display_data.iterrows():
             chart_point = {
                 'datetime': row['datetime'].isoformat() if hasattr(row['datetime'], 'isoformat') else str(row['datetime']),
                 'open': float(row['open']),
                 'high': float(row['high']),
                 'low': float(row['low']),
                 'close': float(row['close']),
-                'volume': float(row.get('volume', 0)),  # Safe access dengan default value
+                'volume': float(row.get('volume', 0)),
             }
             
-            # Add indicators if available
-            indicators_to_add = ['ema_12', 'ema_26', 'ema_50', 'macd', 'macd_signal', 'macd_hist', 
-                               'rsi', 'bb_upper', 'bb_lower']
+            # Add ALL indicators to chart data
+            indicator_columns = ['ema_12', 'ema_26', 'ema_50', 'macd', 'macd_signal', 'macd_hist', 
+                               'rsi', 'bb_upper', 'bb_lower', 'bb_middle', 'stoch_k', 'stoch_d']
             
-            for indicator in indicators_to_add:
-                if indicator in df_with_indicators.columns and not pd.isna(row[indicator]):
-                    chart_point[indicator] = float(row[indicator])
+            for indicator in indicator_columns:
+                if indicator in df_with_indicators.columns:
+                    value = row[indicator]
+                    if value is not None and not pd.isna(value):
+                        chart_point[indicator] = float(value)
+                    else:
+                        chart_point[indicator] = None
                 else:
                     chart_point[indicator] = None
             
             chart_data.append(chart_point)
+        
+        # Final debug check
+        if chart_data:
+            last_chart_point = chart_data[-1]
+            print("Last chart point indicators:")
+            for key, value in last_chart_point.items():
+                if key not in ['datetime', 'open', 'high', 'low', 'close', 'volume']:
+                    print(f"  {key}: {value}")
         
         response = {
             "status": "success",
@@ -811,7 +873,7 @@ def get_analysis(timeframe):
             }
         }
         
-        print(f"Analysis completed for {timeframe}. Sent {len(chart_data)} data points.")
+        print(f"Analysis completed for {timeframe}. Sent {len(chart_data)} data points with {len(latest_indicators)} indicators.")
         return jsonify(response)
         
     except Exception as e:
@@ -908,6 +970,49 @@ def debug_data(timeframe):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/clear_cache')
+def clear_cache():
+    """Clear data cache endpoint"""
+    try:
+        analyzer.data_cache = {}
+        # Also try to clear pandas cache if any
+        import gc
+        gc.collect()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Data cache cleared successfully",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/force_download/<timeframe>')
+def force_download(timeframe):
+    """Force download historical data"""
+    try:
+        if timeframe not in ['1H', '4H', '1D']:
+            return jsonify({"error": "Invalid timeframe"}), 400
+            
+        print(f"Force downloading data for {timeframe}...")
+        df = analyzer.download_historical_data(timeframe)
+        
+        if df is not None:
+            return jsonify({
+                "status": "success",
+                "message": f"Downloaded {len(df)} records for {timeframe}",
+                "records": len(df),
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to download data for {timeframe}"
+            }), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     # Install required packages if not already installed
     try:
@@ -935,6 +1040,8 @@ if __name__ == '__main__':
     print("  • GET /api/health → Health Check")
     print("  • GET /api/debug → Debug Info")
     print("  • GET /api/debug/data/<timeframe> → Data Debug")
+    print("  • GET /api/clear_cache → Clear Data Cache")
+    print("  • GET /api/force_download/<timeframe> → Force Download Data")
     print("=" * 60)
     print("🔧 Integrated APIs:")
     print("  • Twelve Data → Real-time Prices")
