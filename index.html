@@ -210,6 +210,14 @@
             margin: 5px 0;
         }
         
+        .data-fix-panel {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -234,6 +242,13 @@
             <span class="status-item" id="newsapiStatus">NewsAPI: Checking...</span>
         </div>
 
+        <div class="data-fix-panel" id="dataFixPanel" style="display: none;">
+            <strong>⚠️ Data Issues Detected</strong>
+            <div class="health-item" id="dataFixInfo">Checking data issues...</div>
+            <button class="btn" onclick="forceDownloadData()" style="margin-top: 10px;">Force Download Historical Data</button>
+            <button class="btn" onclick="clearDataCache()" style="margin-top: 5px;">Clear Data Cache</button>
+        </div>
+
         <div class="data-health" id="dataHealth" style="display: none;">
             <strong>Data Health:</strong>
             <div class="health-item" id="dataSourceInfo">Checking data source...</div>
@@ -246,6 +261,7 @@
             <button class="btn" onclick="loadData('1D')">1D</button>
             <button class="btn" onclick="checkDebug()">Debug</button>
             <button class="btn" onclick="checkDataHealth()">Data Health</button>
+            <button class="btn" onclick="forceReloadBackend()">Reload Backend</button>
         </div>
 
         <div class="price-container">
@@ -293,10 +309,12 @@
         let currentChart = null;
         let currentTimeframe = '1H';
         let currentDataSource = 'unknown';
+        let backendDataStatus = {};
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Dashboard started');
+            checkBackendDataStatus();
             checkAPIStatus();
             loadData('1H');
             
@@ -307,6 +325,89 @@
                 }
             }, 30000);
         });
+
+        function checkBackendDataStatus() {
+            fetch('/api/debug')
+                .then(response => response.json())
+                .then(data => {
+                    backendDataStatus = data;
+                    console.log('Backend data status:', data);
+                    updateDataFixPanel(data);
+                })
+                .catch(error => {
+                    console.error('Error checking backend data status:', error);
+                });
+        }
+
+        function updateDataFixPanel(debugData) {
+            const fixPanel = document.getElementById('dataFixPanel');
+            const fixInfo = document.getElementById('dataFixInfo');
+            
+            let issues = [];
+            
+            // Check for data file issues
+            if (debugData.data_files) {
+                if (!debugData.data_files['1H'] || !debugData.data_files['1H'].exists) {
+                    issues.push('1H data file missing');
+                }
+                if (!debugData.data_files['4H'] || !debugData.data_files['4H'].exists) {
+                    issues.push('4H data file missing');
+                }
+                if (!debugData.data_files['1D'] || !debugData.data_files['1D'].exists) {
+                    issues.push('1D data file missing');
+                }
+            }
+            
+            if (issues.length > 0) {
+                fixPanel.style.display = 'block';
+                fixInfo.textContent = `Issues: ${issues.join(', ')}`;
+            } else {
+                fixPanel.style.display = 'none';
+            }
+        }
+
+        function forceDownloadData() {
+            const timeframes = ['1H', '4H', '1D'];
+            let completed = 0;
+            
+            timeframes.forEach(timeframe => {
+                fetch(`/api/analysis/${timeframe}?force_download=true`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(`Downloaded data for ${timeframe}:`, data);
+                        completed++;
+                        if (completed === timeframes.length) {
+                            alert('Data download completed! Refreshing...');
+                            checkBackendDataStatus();
+                            loadData(currentTimeframe);
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error downloading ${timeframe} data:`, error);
+                        completed++;
+                    });
+            });
+        }
+
+        function clearDataCache() {
+            fetch('/api/clear_cache')
+                .then(response => response.json())
+                .then(data => {
+                    alert('Cache cleared! Refreshing...');
+                    checkBackendDataStatus();
+                    loadData(currentTimeframe);
+                })
+                .catch(error => {
+                    console.error('Error clearing cache:', error);
+                    // Fallback: reload page
+                    location.reload();
+                });
+        }
+
+        function forceReloadBackend() {
+            alert('Forcing backend reload...');
+            location.reload();
+        }
 
         function checkAPIStatus() {
             fetch('/api/debug')
@@ -347,7 +448,9 @@
             
             showLoading();
             
-            fetch(`/api/analysis/${timeframe}`)
+            // Add cache busting parameter
+            const cacheBuster = new Date().getTime();
+            fetch(`/api/analysis/${timeframe}?t=${cacheBuster}`)
                 .then(response => {
                     if (!response.ok) throw new Error('Network error');
                     return response.json();
@@ -390,7 +493,11 @@
                     current_price: data.current_price,
                     indicators_count: data.technical_indicators ? Object.keys(data.technical_indicators).length : 0,
                     indicators: data.technical_indicators,
-                    chart_data_length: data.chart_data ? data.chart_data.length : 0
+                    chart_data_length: data.chart_data ? data.chart_data.length : 0,
+                    chart_data_indicators: data.chart_data && data.chart_data.length > 0 ? 
+                        Object.keys(data.chart_data[data.chart_data.length - 1]).filter(k => 
+                            ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 'bb_upper', 'bb_lower'].includes(k)
+                        ) : []
                 });
 
                 // Update price
@@ -402,7 +509,7 @@
                 // Update analysis
                 document.getElementById('aiAnalysis').textContent = data.ai_analysis;
                 
-                // Update indicators - tambahkan fallback ke chart data
+                // Update indicators with enhanced extraction
                 updateIndicators(data.technical_indicators, data.current_price, data.chart_data);
                 
                 // Update news
@@ -510,49 +617,89 @@
             console.log('Raw indicators data:', indicators);
             console.log('Current price:', currentPrice);
             
-            // FALLBACK: Jika indicators kosong, coba ambil dari chart data terakhir
+            // ENHANCED FALLBACK: Extract from chart data if technical_indicators is empty
             if (!indicators || Object.keys(indicators).length === 0) {
-                console.log('No indicators in technical_indicators, trying to extract from chart data...');
+                console.log('No indicators in technical_indicators, trying advanced extraction from chart data...');
+                indicators = {};
+                
                 if (chartData && chartData.length > 0) {
-                    const lastDataPoint = chartData[chartData.length - 1];
-                    indicators = {};
-                    
-                    // Extract indicator values from the last chart data point
-                    const possibleIndicators = [
-                        'ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 
-                        'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 
-                        'bb_upper', 'bb_lower'
+                    // Try multiple strategies to extract indicators
+                    const strategies = [
+                        // Strategy 1: Last data point
+                        () => chartData[chartData.length - 1],
+                        // Strategy 2: Find first data point with indicators
+                        () => chartData.find(point => 
+                            point.ema_12 !== undefined || point.rsi !== undefined || point.macd !== undefined
+                        ),
+                        // Strategy 3: Average of last 5 points (for stability)
+                        () => {
+                            const lastPoints = chartData.slice(-5);
+                            const avgPoint = {};
+                            const indicatorKeys = ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 'bb_upper', 'bb_lower'];
+                            
+                            indicatorKeys.forEach(key => {
+                                const values = lastPoints.map(p => p[key]).filter(v => v !== undefined && v !== null);
+                                if (values.length > 0) {
+                                    avgPoint[key] = values.reduce((a, b) => a + b, 0) / values.length;
+                                }
+                            });
+                            return avgPoint;
+                        }
                     ];
                     
-                    possibleIndicators.forEach(indicator => {
-                        if (lastDataPoint[indicator] !== undefined && lastDataPoint[indicator] !== null) {
-                            indicators[indicator] = lastDataPoint[indicator];
+                    for (const strategy of strategies) {
+                        try {
+                            const dataPoint = strategy();
+                            if (dataPoint) {
+                                const indicatorKeys = ['ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 'bb_upper', 'bb_lower'];
+                                indicatorKeys.forEach(key => {
+                                    if (dataPoint[key] !== undefined && dataPoint[key] !== null && !indicators[key]) {
+                                        indicators[key] = dataPoint[key];
+                                    }
+                                });
+                            }
+                        } catch (e) {
+                            console.warn('Strategy failed:', e);
                         }
-                    });
+                    }
                     
-                    console.log('Extracted indicators from chart data:', indicators);
+                    console.log('Enhanced extraction from chart data:', indicators);
                 }
             }
             
+            // If still no indicators, show comprehensive error message
             if (!indicators || Object.keys(indicators).length === 0) {
                 const debugInfo = `
                     <div class="error" style="grid-column: 1 / -1;">
-                        <strong>No technical indicators available.</strong>
+                        <strong>🚨 CRITICAL: No technical indicators available</strong>
                         <div style="text-align: left; margin: 10px 0;">
-                            <strong>Possible causes:</strong>
+                            <strong>Root Cause Analysis:</strong>
                             <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
-                                <li>Backend calculated indicators but didn't include in response</li>
-                                <li>Data format issues in backend processing</li>
-                                <li>Insufficient historical data for calculations</li>
+                                <li>Backend calculated indicators but didn't include in API response</li>
+                                <li>Data loading issues - using generated data instead of CSV files</li>
+                                <li>Indicator calculation errors in backend</li>
+                                <li>API response format mismatch</li>
                             </ul>
-                            <strong>Debug Information:</strong><br>
-                            - Indicators object: ${JSON.stringify(indicators)}<br>
-                            - Current price: ${currentPrice}<br>
+                            <strong>Immediate Actions:</strong>
+                            <ol style="text-align: left; margin: 10px 0; padding-left: 20px;">
+                                <li>Click "Force Download Historical Data" to rebuild data files</li>
+                                <li>Click "Clear Data Cache" to reset backend cache</li>
+                                <li>Check backend logs for calculation errors</li>
+                                <li>Verify CSV files exist in data/ folder</li>
+                            </ol>
+                            <strong>Technical Details:</strong><br>
                             - Timeframe: ${currentTimeframe}<br>
-                            - Chart data points: ${chartData ? chartData.length : 0}
+                            - Current Price: ${currentPrice}<br>
+                            - Backend Data Files: ${JSON.stringify(backendDataStatus.data_files || {})}<br>
+                            - Chart Data Points: ${chartData ? chartData.length : 0}<br>
+                            - Last Chart Point: ${chartData && chartData.length > 0 ? JSON.stringify(chartData[chartData.length - 1]) : 'N/A'}
                         </div>
-                        <button class="btn" onclick="checkDataHealth()" style="margin-top: 10px;">Check Data Health</button>
-                        <button class="btn" onclick="checkDebug()" style="margin-top: 5px;">Show Debug Info</button>
+                        <div style="margin-top: 15px;">
+                            <button class="btn" onclick="forceDownloadData()" style="margin: 5px;">Force Download Data</button>
+                            <button class="btn" onclick="clearDataCache()" style="margin: 5px;">Clear Cache</button>
+                            <button class="btn" onclick="checkDataHealth()" style="margin: 5px;">Data Health</button>
+                            <button class="btn" onclick="checkDebug()" style="margin: 5px;">Debug Info</button>
+                        </div>
                     </div>
                 `;
                 grid.innerHTML = debugInfo;
