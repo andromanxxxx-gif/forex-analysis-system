@@ -6,271 +6,451 @@
     <title>XAUUSD Trading Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: Arial, sans-serif; 
-            background: #1a1a1a; 
-            color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+            color: #e0e0e0; 
             padding: 20px; 
+            min-height: 100vh;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
         
         .header { 
             text-align: center; 
-            margin-bottom: 20px; 
-            padding: 20px;
-            background: #2a2a2a;
-            border-radius: 10px;
+            margin-bottom: 25px; 
+            padding: 25px;
+            background: rgba(42, 42, 58, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 215, 0, 0.2);
         }
         .header h1 { 
             color: #ffd700; 
             margin-bottom: 10px; 
+            font-size: 2.5rem;
+            text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+        }
+        .header p {
+            color: #b0b0b0;
+            font-size: 1.1rem;
+        }
+        
+        .api-status-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .api-status-card { 
+            background: rgba(42, 42, 58, 0.8);
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border-left: 4px solid;
+            display: flex;
+            align-items: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .api-status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .api-status-card.twelve-data { border-left-color: #00ff88; }
+        .api-status-card.deepseek { border-left-color: #0088ff; }
+        .api-status-card.newsapi { border-left-color: #ff8800; }
+        
+        .status-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+            width: 50px;
+            text-align: center;
+        }
+        .status-details {
+            flex: 1;
+        }
+        .status-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        .status-value {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .status-active {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+        .status-inactive {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+        }
+        .status-checking {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
         }
         
         .controls { 
             display: flex; 
             justify-content: center; 
-            gap: 10px; 
-            margin: 20px 0;
+            gap: 12px; 
+            margin: 25px 0;
             flex-wrap: wrap;
         }
         .btn { 
-            padding: 10px 20px; 
-            background: #333; 
-            color: white; 
-            border: 1px solid #ffd700; 
-            border-radius: 5px; 
+            padding: 12px 24px; 
+            background: rgba(51, 51, 68, 0.8); 
+            color: #e0e0e0; 
+            border: 1px solid rgba(255, 215, 0, 0.3); 
+            border-radius: 8px; 
             cursor: pointer; 
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:hover { 
+            background: rgba(255, 215, 0, 0.1); 
+            border-color: rgba(255, 215, 0, 0.6);
+            transform: translateY(-2px);
         }
         .btn.active { 
-            background: #ffd700; 
-            color: black; 
+            background: rgba(255, 215, 0, 0.9); 
+            color: #1a1a2e; 
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
         }
         
         .price-container {
             text-align: center;
-            margin: 20px 0;
-            padding: 15px;
-            background: #2a2a2a;
-            border-radius: 10px;
+            margin: 25px 0;
+            padding: 20px;
+            background: rgba(42, 42, 58, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .price-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
         }
         .price { 
-            font-size: 2.5em; 
+            font-size: 3.5rem; 
             color: #ffd700; 
             font-weight: bold;
+            text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+            margin: 10px 0;
         }
         .price-source {
-            color: #888;
-            font-size: 0.9em;
+            color: #b0b0b0;
+            font-size: 1rem;
             margin-top: 5px;
         }
         
         .data-source-info {
-            background: #333;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
+            background: rgba(51, 51, 68, 0.6);
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
             font-size: 0.85em;
             text-align: center;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
         }
         .data-source-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 20px;
             margin: 0 5px;
             font-size: 0.8em;
+            font-weight: bold;
+            gap: 5px;
         }
-        .source-csv { background: #00ff88; color: black; }
-        .source-api { background: #0088ff; color: white; }
-        .source-generated { background: #ff8800; color: black; }
+        .source-csv { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .source-api { background: rgba(0, 136, 255, 0.2); color: #0088ff; }
+        .source-generated { background: rgba(255, 136, 0, 0.2); color: #ff8800; }
         
         .dashboard {
             display: grid;
             grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 25px;
+            margin-bottom: 25px;
         }
         
         @media (max-width: 768px) {
             .dashboard {
                 grid-template-columns: 1fr;
             }
+            .api-status-container {
+                grid-template-columns: 1fr;
+            }
         }
         
         .chart-container { 
-            background: #2a2a2a; 
-            padding: 20px; 
-            border-radius: 10px; 
-            height: 400px;
+            background: rgba(42, 42, 58, 0.8); 
+            padding: 25px; 
+            border-radius: 15px; 
+            height: 450px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
         
         .analysis-panel { 
-            background: #2a2a2a; 
-            padding: 20px; 
-            border-radius: 10px; 
-            max-height: 400px;
+            background: rgba(42, 42, 58, 0.8); 
+            padding: 25px; 
+            border-radius: 15px; 
+            max-height: 450px;
             overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        .analysis-panel::before {
+            content: '🤖';
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 1.5rem;
+            opacity: 0.7;
         }
         .analysis-content { 
             white-space: pre-wrap; 
-            font-family: monospace;
-            line-height: 1.4;
-            font-size: 0.9em;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            font-size: 0.95em;
         }
         
         .indicators-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
-            gap: 10px; 
-            margin: 20px 0; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 15px; 
+            margin: 25px 0; 
         }
         .indicator-card { 
-            background: #2a2a2a; 
-            padding: 15px; 
-            border-radius: 8px; 
+            background: rgba(42, 42, 58, 0.8); 
+            padding: 20px; 
+            border-radius: 12px; 
             text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-top: 3px solid transparent;
+        }
+        .indicator-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .indicator-card.bullish { border-top-color: #00ff88; }
+        .indicator-card.bearish { border-top-color: #ff4444; }
+        .indicator-card.neutral { border-top-color: #ffd700; }
+        .indicator-name {
+            font-size: 0.9em;
+            color: #b0b0b0;
+            margin-bottom: 10px;
         }
         .indicator-value { 
-            font-size: 1.3em; 
+            font-size: 1.5em; 
             font-weight: bold; 
-            margin: 5px 0; 
+            margin: 10px 0; 
         }
         .bullish { color: #00ff88; }
         .bearish { color: #ff4444; }
         .neutral { color: #ffd700; }
         
         .news-panel {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
+            background: rgba(42, 42, 58, 0.8);
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
         .news-item {
-            background: #333;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border-left: 3px solid #ffd700;
+            background: rgba(51, 51, 68, 0.6);
+            padding: 18px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border-left: 4px solid #ffd700;
+            transition: transform 0.2s ease;
+        }
+        .news-item:hover {
+            transform: translateX(5px);
         }
         .news-title {
             font-weight: bold;
             color: #ffd700;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 1.05rem;
         }
         
-        .api-status {
-            background: #2a2a2a;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
+        .data-health {
+            background: rgba(42, 42, 58, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 15px 0;
             font-size: 0.9em;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
-        .status-item {
-            display: inline-block;
-            margin: 0 10px;
-            padding: 5px 10px;
-            border-radius: 5px;
+        .health-item {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        .status-active {
-            background: #00ff88;
-            color: black;
-        }
-        .status-inactive {
-            background: #ff4444;
-            color: white;
+        
+        .data-fix-panel {
+            background: rgba(42, 42, 58, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 15px 0;
+            font-size: 0.9em;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border-left: 4px solid #ff4444;
         }
         
         .loading { 
             text-align: center; 
             padding: 40px; 
             color: #ffd700; 
+            font-size: 1.1rem;
         }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffd700;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         .error { 
             color: #ff4444; 
             text-align: center; 
             padding: 20px; 
+            background: rgba(255, 68, 68, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #ff4444;
         }
         .debug { 
-            background: #333; 
-            padding: 10px; 
-            border-radius: 5px; 
-            margin: 10px 0; 
-            font-size: 0.8em; 
-        }
-        
-        .data-health {
-            background: #2a2a2a;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            font-size: 0.9em;
-        }
-        .health-item {
-            margin: 5px 0;
-        }
-        
-        .data-fix-panel {
-            background: #2a2a2a;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            font-size: 0.9em;
+            background: rgba(51, 51, 68, 0.8); 
+            padding: 15px; 
+            border-radius: 10px; 
+            margin: 15px 0; 
+            font-size: 0.85em; 
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
         
         .footer {
             text-align: center;
-            margin-top: 20px;
-            padding: 15px;
+            margin-top: 30px;
+            padding: 20px;
             color: #666;
             font-size: 0.9em;
-            border-top: 1px solid #333;
+            border-top: 1px solid rgba(51, 51, 68, 0.6);
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>XAUUSD AI Trading Analysis</h1>
+            <h1><i class="fas fa-chart-line"></i> XAUUSD AI Trading Analysis</h1>
             <p>Real-time Gold Market Analysis with AI & Live Data</p>
         </div>
 
-        <div class="api-status" id="apiStatus">
-            <strong>API Status:</strong>
-            <span class="status-item" id="twelveDataStatus">Twelve Data: Checking...</span>
-            <span class="status-item" id="deepseekStatus">DeepSeek AI: Checking...</span>
-            <span class="status-item" id="newsapiStatus">NewsAPI: Checking...</span>
+        <div class="api-status-container">
+            <div class="api-status-card twelve-data">
+                <div class="status-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="status-details">
+                    <div class="status-name">Twelve Data</div>
+                    <div class="status-value status-checking pulse" id="twelveDataStatus">Checking...</div>
+                </div>
+            </div>
+            
+            <div class="api-status-card deepseek">
+                <div class="status-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="status-details">
+                    <div class="status-name">DeepSeek AI</div>
+                    <div class="status-value status-checking pulse" id="deepseekStatus">Checking...</div>
+                </div>
+            </div>
+            
+            <div class="api-status-card newsapi">
+                <div class="status-icon">
+                    <i class="fas fa-newspaper"></i>
+                </div>
+                <div class="status-details">
+                    <div class="status-name">NewsAPI</div>
+                    <div class="status-value status-checking pulse" id="newsapiStatus">Checking...</div>
+                </div>
+            </div>
         </div>
 
         <div class="data-fix-panel" id="dataFixPanel" style="display: none;">
-            <strong>⚠️ Data Issues Detected</strong>
+            <strong><i class="fas fa-exclamation-triangle"></i> Data Issues Detected</strong>
             <div class="health-item" id="dataFixInfo">Checking data issues...</div>
-            <button class="btn" onclick="forceDownloadData()" style="margin-top: 10px;">Force Download Historical Data</button>
-            <button class="btn" onclick="clearDataCache()" style="margin-top: 5px;">Clear Data Cache</button>
+            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn" onclick="forceDownloadData()"><i class="fas fa-download"></i> Force Download Historical Data</button>
+                <button class="btn" onclick="clearDataCache()"><i class="fas fa-broom"></i> Clear Data Cache</button>
+            </div>
         </div>
 
         <div class="data-health" id="dataHealth" style="display: none;">
-            <strong>Data Health:</strong>
-            <div class="health-item" id="dataSourceInfo">Checking data source...</div>
-            <div class="health-item" id="dataQualityInfo">Checking data quality...</div>
+            <strong><i class="fas fa-heartbeat"></i> Data Health</strong>
+            <div class="health-item" id="dataSourceInfo"><i class="fas fa-database"></i> Checking data source...</div>
+            <div class="health-item" id="dataQualityInfo"><i class="fas fa-chart-bar"></i> Checking data quality...</div>
         </div>
 
         <div class="controls">
-            <button class="btn active" onclick="loadData('1H')">1H</button>
-            <button class="btn" onclick="loadData('4H')">4H</button>
-            <button class="btn" onclick="loadData('1D')">1D</button>
-            <button class="btn" onclick="checkDebug()">Debug</button>
-            <button class="btn" onclick="checkDataHealth()">Data Health</button>
-            <button class="btn" onclick="forceReloadBackend()">Reload Backend</button>
+            <button class="btn active" onclick="loadData('1H')"><i class="fas fa-clock"></i> 1H</button>
+            <button class="btn" onclick="loadData('4H')"><i class="fas fa-clock"></i> 4H</button>
+            <button class="btn" onclick="loadData('1D')"><i class="fas fa-calendar-day"></i> 1D</button>
+            <button class="btn" onclick="checkDebug()"><i class="fas fa-bug"></i> Debug</button>
+            <button class="btn" onclick="checkDataHealth()"><i class="fas fa-stethoscope"></i> Data Health</button>
+            <button class="btn" onclick="forceReloadBackend()"><i class="fas fa-sync-alt"></i> Reload Backend</button>
         </div>
 
         <div class="price-container">
             <div class="price" id="currentPrice">Loading...</div>
             <div class="price-source" id="priceSource">Connecting to Twelve Data API...</div>
             <div class="data-source-info" id="dataSourceDisplay" style="display: none;">
-                Data Source: <span id="dataSourceBadge" class="data-source-badge source-generated">Checking...</span>
-                • Records: <span id="dataRecords">0</span>
-                • Timeframe: <span id="dataTimeframe">-</span>
+                <span><i class="fas fa-info-circle"></i> Data Source: <span id="dataSourceBadge" class="data-source-badge source-generated">Checking...</span></span>
+                <span><i class="fas fa-list"></i> Records: <span id="dataRecords">0</span></span>
+                <span><i class="fas fa-clock"></i> Timeframe: <span id="dataTimeframe">-</span></span>
             </div>
         </div>
 
@@ -282,7 +462,7 @@
             </div>
 
             <div class="analysis-panel">
-                <h3>🤖 AI Market Analysis</h3>
+                <h3><i class="fas fa-robot"></i> AI Market Analysis</h3>
                 <div class="analysis-content" id="aiAnalysis">
                     Loading AI analysis...
                 </div>
@@ -290,18 +470,18 @@
         </div>
 
         <div class="indicators-grid" id="indicatorsGrid">
-            <div class="loading">Loading indicators...</div>
+            <div class="loading">Loading indicators</div>
         </div>
 
         <div class="news-panel">
-            <h3>📰 Market News</h3>
+            <h3><i class="fas fa-newspaper"></i> Market News</h3>
             <div id="newsContainer">
-                <div class="loading">Loading news from NewsAPI...</div>
+                <div class="loading">Loading news from NewsAPI</div>
             </div>
         </div>
 
         <div class="footer">
-            <p>Last updated: <span id="lastUpdate">-</span> | Powered by Twelve Data, DeepSeek AI & NewsAPI</p>
+            <p><i class="fas fa-clock"></i> Last updated: <span id="lastUpdate">-</span> | Powered by Twelve Data, DeepSeek AI & NewsAPI</p>
         </div>
     </div>
 
@@ -426,14 +606,20 @@
             const deepseekElem = document.getElementById('deepseekStatus');
             const newsapiElem = document.getElementById('newsapiStatus');
 
-            twelveDataElem.textContent = `Twelve Data: ${apiStatus.twelve_data ? 'Connected' : 'Disabled'}`;
-            twelveDataElem.className = `status-item ${apiStatus.twelve_data ? 'status-active' : 'status-inactive'}`;
+            // Remove pulse animation
+            twelveDataElem.classList.remove('pulse');
+            deepseekElem.classList.remove('pulse');
+            newsapiElem.classList.remove('pulse');
 
-            deepseekElem.textContent = `DeepSeek AI: ${apiStatus.deepseek ? 'Connected' : 'Disabled'}`;
-            deepseekElem.className = `status-item ${apiStatus.deepseek ? 'status-active' : 'status-inactive'}`;
+            // Update status
+            twelveDataElem.textContent = apiStatus.twelve_data ? 'Connected' : 'Disabled';
+            twelveDataElem.className = `status-value ${apiStatus.twelve_data ? 'status-active' : 'status-inactive'}`;
 
-            newsapiElem.textContent = `NewsAPI: ${apiStatus.newsapi ? 'Connected' : 'Disabled'}`;
-            newsapiElem.className = `status-item ${apiStatus.newsapi ? 'status-active' : 'status-inactive'}`;
+            deepseekElem.textContent = apiStatus.deepseek ? 'Connected' : 'Disabled';
+            deepseekElem.className = `status-value ${apiStatus.deepseek ? 'status-active' : 'status-inactive'}`;
+
+            newsapiElem.textContent = apiStatus.newsapi ? 'Connected' : 'Disabled';
+            newsapiElem.className = `status-value ${apiStatus.newsapi ? 'status-active' : 'status-inactive'}`;
         }
 
         function loadData(timeframe) {
@@ -475,8 +661,8 @@
             document.getElementById('currentPrice').textContent = 'Loading...';
             document.getElementById('priceSource').textContent = 'Fetching data...';
             document.getElementById('aiAnalysis').textContent = 'Loading AI analysis...';
-            document.getElementById('indicatorsGrid').innerHTML = '<div class="loading">Loading indicators...</div>';
-            document.getElementById('newsContainer').innerHTML = '<div class="loading">Loading news...</div>';
+            document.getElementById('indicatorsGrid').innerHTML = '<div class="loading">Loading indicators</div>';
+            document.getElementById('newsContainer').innerHTML = '<div class="loading">Loading news</div>';
         }
 
         function showError(message) {
@@ -671,7 +857,7 @@
             if (!indicators || Object.keys(indicators).length === 0) {
                 const debugInfo = `
                     <div class="error" style="grid-column: 1 / -1;">
-                        <strong>🚨 CRITICAL: No technical indicators available</strong>
+                        <strong><i class="fas fa-exclamation-triangle"></i> CRITICAL: No technical indicators available</strong>
                         <div style="text-align: left; margin: 10px 0;">
                             <strong>Root Cause Analysis:</strong>
                             <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
@@ -694,11 +880,11 @@
                             - Chart Data Points: ${chartData ? chartData.length : 0}<br>
                             - Last Chart Point: ${chartData && chartData.length > 0 ? JSON.stringify(chartData[chartData.length - 1]) : 'N/A'}
                         </div>
-                        <div style="margin-top: 15px;">
-                            <button class="btn" onclick="forceDownloadData()" style="margin: 5px;">Force Download Data</button>
-                            <button class="btn" onclick="clearDataCache()" style="margin: 5px;">Clear Cache</button>
-                            <button class="btn" onclick="checkDataHealth()" style="margin: 5px;">Data Health</button>
-                            <button class="btn" onclick="checkDebug()" style="margin: 5px;">Debug Info</button>
+                        <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn" onclick="forceDownloadData()"><i class="fas fa-download"></i> Force Download Data</button>
+                            <button class="btn" onclick="clearDataCache()"><i class="fas fa-broom"></i> Clear Cache</button>
+                            <button class="btn" onclick="checkDataHealth()"><i class="fas fa-stethoscope"></i> Data Health</button>
+                            <button class="btn" onclick="checkDebug()"><i class="fas fa-bug"></i> Debug Info</button>
                         </div>
                     </div>
                 `;
@@ -805,9 +991,9 @@
                     let levelInfo = '';
                     if (config.levels) {
                         if (value > config.levels.overbought) {
-                            levelInfo = '<div style="font-size: 0.7em; color: #ff4444;">OVERBOUGHT</div>';
+                            levelInfo = '<div style="font-size: 0.7em; color: #ff4444; margin-top: 5px;"><i class="fas fa-arrow-up"></i> OVERBOUGHT</div>';
                         } else if (value < config.levels.oversold) {
-                            levelInfo = '<div style="font-size: 0.7em; color: #00ff88;">OVERSOLD</div>';
+                            levelInfo = '<div style="font-size: 0.7em; color: #00ff88; margin-top: 5px;"><i class="fas fa-arrow-down"></i> OVERSOLD</div>';
                         }
                     }
                     
@@ -816,8 +1002,8 @@
                         'N/A';
                     
                     html += `
-                        <div class="indicator-card">
-                            <div style="font-size: 0.9em; margin-bottom: 5px;">${config.name}</div>
+                        <div class="indicator-card ${trend}">
+                            <div class="indicator-name">${config.name}</div>
                             <div class="indicator-value ${trend}">
                                 ${displayValue}
                             </div>
@@ -835,7 +1021,7 @@
                         <strong>No standard indicators available</strong>
                         <div style="text-align: left; margin-top: 10px;">
                             <strong>Available raw data:</strong>
-                            <pre style="background: #333; padding: 10px; border-radius: 5px; font-size: 0.8em; overflow-x: auto;">${JSON.stringify(indicators, null, 2)}</pre>
+                            <pre style="background: rgba(51, 51, 68, 0.6); padding: 10px; border-radius: 5px; font-size: 0.8em; overflow-x: auto;">${JSON.stringify(indicators, null, 2)}</pre>
                         </div>
                     </div>
                 `;
@@ -855,8 +1041,9 @@
                         <div class="news-item">
                             <div class="news-title">${article.title}</div>
                             <div>${article.description || 'No description available'}</div>
-                            <div style="font-size: 0.8em; color: #888; margin-top: 5px;">
-                                ${article.source.name} • ${date}
+                            <div style="font-size: 0.8em; color: #888; margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                                <span><i class="fas fa-newspaper"></i> ${article.source.name}</span>
+                                <span><i class="fas fa-calendar"></i> ${date}</span>
                             </div>
                         </div>
                     `;
@@ -1020,9 +1207,9 @@
                     if (debugDiv.style.display === 'none') {
                         debugDiv.style.display = 'block';
                         debugDiv.innerHTML = `
-                            <h3>Debug Information</h3>
+                            <h3><i class="fas fa-bug"></i> Debug Information</h3>
                             <pre>${JSON.stringify(data, null, 2)}</pre>
-                            <button class="btn" onclick="document.getElementById('debugInfo').style.display='none'" style="margin-top: 10px;">Hide Debug</button>
+                            <button class="btn" onclick="document.getElementById('debugInfo').style.display='none'" style="margin-top: 10px;"><i class="fas fa-times"></i> Hide Debug</button>
                         `;
                     } else {
                         debugDiv.style.display = 'none';
