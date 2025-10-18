@@ -41,53 +41,172 @@ class XAUUSDAnalyzer:
               f"DeepSeek: {'Yes' if self.deepseek_api_key else 'No'}, "
               f"NewsAPI: {'Yes' if self.news_api_key else 'No'}")
         
-    def load_historical_data(self, timeframe, limit=500):
-        """Load data historis dari CSV file yang sudah ada"""
-        try:
-            filename = f"data/XAUUSD_{timeframe}.csv"
+    def load_from_local_csv(self, timeframe, limit=500):
+        """Load data dari file CSV lokal"""
+        possible_paths = [
+            f"data/XAUUSD_{timeframe}.csv",
+            f"../data/XAUUSD_{timeframe}.csv",
+            f"./data/XAUUSD_{timeframe}.csv",
+            f"XAUUSD_{timeframe}.csv"
+        ]
+        
+        for filename in possible_paths:
             if os.path.exists(filename):
-                print(f"Loading historical data from {filename}")
-                df = pd.read_csv(filename)
+                try:
+                    print(f"Loading from {filename}")
+                    df = pd.read_csv(filename)
+                    
+                    # Debug: print kolom yang tersedia
+                    print(f"Columns in CSV: {df.columns.tolist()}")
+                    print(f"First few rows: {df.head(2)}")
+                    
+                    # Pastikan kolom datetime ada dan format benar
+                    datetime_col = None
+                    for col in ['datetime', 'date', 'time', 'timestamp']:
+                        if col in df.columns:
+                            datetime_col = col
+                            break
+                    
+                    if datetime_col:
+                        df['datetime'] = pd.to_datetime(df[datetime_col])
+                        if datetime_col != 'datetime':
+                            df = df.drop(columns=[datetime_col])
+                    else:
+                        # Jika tidak ada kolom datetime, buat berdasarkan index
+                        print("No datetime column found, creating based on index")
+                        if timeframe == '1H':
+                            freq = 'H'
+                        elif timeframe == '4H':
+                            freq = '4H'
+                        else:  # 1D
+                            freq = 'D'
+                        df['datetime'] = pd.date_range(end=datetime.now(), periods=len(df), freq=freq)
+                    
+                    # Pastikan kolom OHLC ada dengan berbagai kemungkinan nama
+                    ohlc_mapping = {
+                        'open': ['open', 'Open', 'OPEN'],
+                        'high': ['high', 'High', 'HIGH'], 
+                        'low': ['low', 'Low', 'LOW'],
+                        'close': ['close', 'Close', 'CLOSE']
+                    }
+                    
+                    for standard_name, possible_names in ohlc_mapping.items():
+                        if standard_name not in df.columns:
+                            for name in possible_names:
+                                if name in df.columns:
+                                    df[standard_name] = df[name]
+                                    print(f"Mapped column {name} to {standard_name}")
+                                    break
+                            else:
+                                # Jika kolom tidak ditemukan, buat data dummy
+                                print(f"Warning: Column {standard_name} not found in CSV, creating dummy data")
+                                if standard_name == 'open':
+                                    df[standard_name] = np.random.uniform(1800, 2000, len(df))
+                                elif standard_name == 'high':
+                                    df[standard_name] = df['open'] * np.random.uniform(1.001, 1.01, len(df))
+                                elif standard_name == 'low':
+                                    df[standard_name] = df['open'] * np.random.uniform(0.99, 0.999, len(df))
+                                elif standard_name == 'close':
+                                    df[standard_name] = df['open'] * np.random.uniform(0.995, 1.005, len(df))
+                    
+                    # Konversi ke numeric dan handle missing values
+                    for col in ['open', 'high', 'low', 'close']:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                        # Fill NaN values dengan forward fill lalu backward fill
+                        df[col] = df[col].fillna(method='ffill').fillna(method='bfill')
+                        # Jika masih ada NaN, isi dengan nilai acak
+                        if df[col].isna().any():
+                            df[col] = df[col].fillna(np.random.uniform(1800, 2000))
+                    
+                    if 'volume' not in df.columns:
+                        df['volume'] = np.random.randint(1000, 10000, len(df))
+                    
+                    df = df.sort_values('datetime')
+                    print(f"Successfully loaded {len(df)} records from {filename}")
+                    return df.tail(limit)
+                except Exception as e:
+                    print(f"Error processing {filename}: {e}")
+                    continue
+        return None
+
+    def download_historical_data(self, timeframe, days=30):
+        """Download data historis dari Twelve Data API"""
+        try:
+            if not self.twelve_data_api_key:
+                print("Twelve Data API key not available for historical data download")
+                return None
                 
-                # Pastikan kolom datetime ada dan format benar
-                if 'datetime' in df.columns:
+            # Map timeframe ke interval Twelve Data
+            interval_map = {
+                '1H': '1h',
+                '4H': '4h', 
+                '1D': '1day'
+            }
+            
+            interval = interval_map.get(timeframe, '1h')
+            url = f"https://api.twelvedata.com/time_series?symbol=XAU/USD&interval={interval}&outputsize=1000&apikey={self.twelve_data_api_key}"
+            
+            response = requests.get(url, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'ok' and 'values' in data:
+                    values = data['values']
+                    df = pd.DataFrame(values)
+                    
+                    # Convert dan rename columns
+                    df = df.rename(columns={
+                        'datetime': 'datetime',
+                        'open': 'open',
+                        'high': 'high', 
+                        'low': 'low',
+                        'close': 'close'
+                    })
+                    
+                    # Convert types
                     df['datetime'] = pd.to_datetime(df['datetime'])
-                elif 'date' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['date'])
-                    df = df.rename(columns={'date': 'datetime'})
-                elif 'time' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['time'])
-                    df = df.rename(columns={'time': 'datetime'})
+                    for col in ['open', 'high', 'low', 'close']:
+                        df[col] = pd.to_numeric(df[col])
+                    
+                    df = df.sort_values('datetime')
+                    
+                    # Save to CSV untuk penggunaan berikutnya
+                    filename = f"data/XAUUSD_{timeframe}.csv"
+                    df.to_csv(filename, index=False)
+                    print(f"Downloaded and saved {len(df)} records to {filename}")
+                    
+                    return df
                 else:
-                    # Jika tidak ada kolom datetime, buat berdasarkan index
-                    df['datetime'] = pd.date_range(end=datetime.now(), periods=len(df), freq='H')
-                
-                # Pastikan kolom OHLC ada
-                required_cols = ['open', 'high', 'low', 'close']
-                for col in required_cols:
-                    if col not in df.columns:
-                        print(f"Warning: Column {col} not found in CSV")
-                        # Buat data dummy jika kolom tidak ada
-                        df[col] = np.random.uniform(1800, 2000, len(df))
-                
-                # Konversi ke numeric
-                for col in required_cols:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                    df[col] = df[col].fillna(method='ffill').fillna(method='bfill')
-                
-                if 'volume' not in df.columns:
-                    df['volume'] = np.random.randint(1000, 10000, len(df))
-                
-                df = df.sort_values('datetime')
-                print(f"Successfully loaded {len(df)} records from {filename}")
-                return df.tail(limit)
+                    print(f"Twelve Data API error: {data.get('message', 'Unknown error')}")
+                    return None
             else:
-                print(f"File {filename} not found, using generated data")
-                return self.generate_sample_data(timeframe, limit)
+                print(f"Twelve Data API HTTP error: {response.status_code}")
+                return None
                 
         except Exception as e:
-            print(f"Error loading historical data: {e}")
-            traceback.print_exc()
+            print(f"Error downloading historical data: {e}")
+            return None
+
+    def load_historical_data(self, timeframe, limit=500):
+        """Load data historis dengan fallback ke download dan generated data"""
+        try:
+            # Coba load dari file lokal dulu
+            df = self.load_from_local_csv(timeframe, limit)
+            if df is not None:
+                return df
+                
+            # Jika tidak ada file lokal, coba download dari API
+            print(f"Trying to download historical data for {timeframe}...")
+            df = self.download_historical_data(timeframe)
+            if df is not None:
+                return df.tail(limit)
+                
+            # Jika semua gagal, gunakan generated data
+            print(f"All methods failed, using generated data for {timeframe}")
+            return self.generate_sample_data(timeframe, limit)
+            
+        except Exception as e:
+            print(f"Error in load_historical_data: {e}")
             return self.generate_sample_data(timeframe, limit)
 
     def generate_sample_data(self, timeframe, limit=500):
@@ -757,6 +876,26 @@ def debug():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/debug/data/<timeframe>')
+def debug_data(timeframe):
+    """Debug endpoint untuk memeriksa data"""
+    try:
+        df = analyzer.load_historical_data(timeframe, 10)
+        data_info = {
+            "timeframe": timeframe,
+            "rows": len(df),
+            "columns": df.columns.tolist(),
+            "data_types": {col: str(df[col].dtype) for col in df.columns},
+            "sample_data": df.head(3).to_dict('records'),
+            "date_range": {
+                "start": str(df['datetime'].min()) if 'datetime' in df.columns else "N/A",
+                "end": str(df['datetime'].max()) if 'datetime' in df.columns else "N/A"
+            }
+        }
+        return jsonify(data_info)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     # Install required packages if not already installed
     try:
@@ -783,6 +922,7 @@ if __name__ == '__main__':
     print("  • GET /api/realtime/price → Current Price")
     print("  • GET /api/health → Health Check")
     print("  • GET /api/debug → Debug Info")
+    print("  • GET /api/debug/data/<timeframe> → Data Debug")
     print("=" * 60)
     print("🔧 Integrated APIs:")
     print("  • Twelve Data → Real-time Prices")
