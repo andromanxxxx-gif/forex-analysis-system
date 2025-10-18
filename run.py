@@ -35,6 +35,7 @@ class XAUUSDAnalyzer:
         self.twelve_data_api_key = os.getenv('TWELVE_DATA_API_KEY')
         self.deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
         self.news_api_key = os.getenv('NEWS_API_KEY')
+        self.last_api_call = 0  # Rate limiting
         
         print(f"API Keys loaded: TwelveData: {'Yes' if self.twelve_data_api_key else 'No'}, "
               f"DeepSeek: {'Yes' if self.deepseek_api_key else 'No'}, "
@@ -281,7 +282,7 @@ class XAUUSDAnalyzer:
             if response.status_code == 200:
                 data = response.json()
                 if data['status'] == 'ok' and data['totalResults'] > 0:
-                    articles = data['articles'][:5]  # Get top 5 articles
+                    articles = data['articles'][:3]  # Get top 3 articles
                     print(f"Retrieved {len(articles)} news articles from NewsAPI")
                     return {"articles": articles}
                 else:
@@ -317,11 +318,17 @@ class XAUUSDAnalyzer:
         }
 
     def analyze_with_deepseek(self, technical_data, news_data):
-        """Get AI analysis from DeepSeek API"""
+        """Get AI analysis from DeepSeek API with improved error handling"""
         try:
+            # Rate limiting - minimum 10 seconds between API calls
+            current_time = time.time()
+            if current_time - self.last_api_call < 10:
+                print("Skipping DeepSeek API call (rate limiting)")
+                return self.comprehensive_fallback_analysis(technical_data, news_data)
+            
             if not self.deepseek_api_key:
-                print("DeepSeek API key not set, using basic analysis")
-                return self.basic_analysis(technical_data, news_data)
+                print("DeepSeek API key not set, using comprehensive analysis")
+                return self.comprehensive_fallback_analysis(technical_data, news_data)
             
             # Prepare context for AI
             current_price = technical_data.get('current_price', 0)
@@ -380,11 +387,12 @@ Format respons dalam bahasa Indonesia yang profesional.
                 "max_tokens": 1000
             }
             
+            self.last_api_call = current_time
             response = requests.post(
                 'https://api.deepseek.com/chat/completions',
                 headers=headers,
                 json=data,
-                timeout=30
+                timeout=45  # Increased timeout
             )
             
             if response.status_code == 200:
@@ -393,53 +401,178 @@ Format respons dalam bahasa Indonesia yang profesional.
                 print("DeepSeek AI analysis generated successfully")
                 return analysis
             else:
-                print(f"DeepSeek API error: {response.status_code}")
-                return self.basic_analysis(technical_data, news_data)
+                print(f"DeepSeek API error: {response.status_code} - {response.text}")
+                return self.comprehensive_fallback_analysis(technical_data, news_data)
                 
+        except requests.exceptions.Timeout:
+            print("DeepSeek API timeout, using fallback analysis")
+            return self.comprehensive_fallback_analysis(technical_data, news_data)
         except Exception as e:
             print(f"Error getting DeepSeek analysis: {e}")
-            return self.basic_analysis(technical_data, news_data)
+            return self.comprehensive_fallback_analysis(technical_data, news_data)
 
-    def basic_analysis(self, technical_data, news_data):
-        """Basic analysis fallback"""
+    def comprehensive_fallback_analysis(self, technical_data, news_data):
+        """Comprehensive fallback analysis when AI fails"""
         current_price = technical_data.get('current_price', 0)
         indicators = technical_data.get('indicators', {})
         
+        # Extract values with defaults
         rsi = indicators.get('rsi', 50)
         macd = indicators.get('macd', 0)
+        macd_signal = indicators.get('macd_signal', 0)
+        ema_12 = indicators.get('ema_12', current_price)
+        ema_26 = indicators.get('ema_26', current_price)
+        ema_50 = indicators.get('ema_50', current_price)
+        stoch_k = indicators.get('stoch_k', 50)
+        stoch_d = indicators.get('stoch_d', 50)
+        bb_upper = indicators.get('bb_upper', current_price * 1.02)
+        bb_lower = indicators.get('bb_lower', current_price * 0.98)
         
-        if rsi < 30 and macd > 0:
-            signal = "STRONG BUY"
-            trend = "BULLISH"
-        elif rsi > 70 and macd < 0:
-            signal = "STRONG SELL"
-            trend = "BEARISH"
+        # Calculate signals
+        bullish_signals = 0
+        bearish_signals = 0
+        
+        # RSI Analysis
+        if rsi < 30:
+            bullish_signals += 2
+            rsi_signal = "OVERSOLD - STRONG BUY"
         elif rsi < 40:
-            signal = "BUY"
-            trend = "BULLISH"
+            bullish_signals += 1
+            rsi_signal = "NEARLY OVERSOLD - BUY"
+        elif rsi > 70:
+            bearish_signals += 2
+            rsi_signal = "OVERBOUGHT - STRONG SELL"
         elif rsi > 60:
-            signal = "SELL"
-            trend = "BEARISH"
+            bearish_signals += 1
+            rsi_signal = "NEARLY OVERBOUGHT - SELL"
         else:
-            signal = "HOLD"
-            trend = "NEUTRAL"
+            rsi_signal = "NEUTRAL"
         
-        return f"""
-Analisis XAUUSD - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        # MACD Analysis
+        if macd > macd_signal:
+            bullish_signals += 1
+            macd_signal_text = "BULLISH CROSSOVER"
+        else:
+            bearish_signals += 1
+            macd_signal_text = "BEARISH CROSSOVER"
+        
+        # EMA Analysis
+        if current_price > ema_12 > ema_26 > ema_50:
+            bullish_signals += 2
+            ema_signal = "STRONG BULLISH TREND"
+        elif current_price < ema_12 < ema_26 < ema_50:
+            bearish_signals += 2
+            ema_signal = "STRONG BEARISH TREND"
+        elif current_price > ema_12 and ema_12 > ema_26:
+            bullish_signals += 1
+            ema_signal = "BULLISH TREND"
+        elif current_price < ema_12 and ema_12 < ema_26:
+            bearish_signals += 1
+            ema_signal = "BEARISH TREND"
+        else:
+            ema_signal = "MIXED TREND"
+        
+        # Stochastic Analysis
+        if stoch_k < 20 and stoch_d < 20:
+            bullish_signals += 1
+            stoch_signal = "OVERSOLD - BUY"
+        elif stoch_k > 80 and stoch_d > 80:
+            bearish_signals += 1
+            stoch_signal = "OVERBOUGHT - SELL"
+        else:
+            stoch_signal = "NEUTRAL"
+        
+        # Bollinger Bands Analysis
+        if current_price < bb_lower:
+            bullish_signals += 1
+            bb_signal = "PRICE BELOW LOWER BAND - POTENTIAL BUY"
+        elif current_price > bb_upper:
+            bearish_signals += 1
+            bb_signal = "PRICE ABOVE UPPER BAND - POTENTIAL SELL"
+        else:
+            bb_signal = "PRICE WITHIN BANDS - NEUTRAL"
+        
+        # Determine overall trend and signal
+        if bullish_signals - bearish_signals >= 3:
+            trend = "STRONG BULLISH"
+            signal = "STRONG BUY"
+            risk = "LOW"
+        elif bullish_signals - bearish_signals >= 1:
+            trend = "BULLISH"
+            signal = "BUY"
+            risk = "MEDIUM"
+        elif bearish_signals - bullish_signals >= 3:
+            trend = "STRONG BEARISH"
+            signal = "STRONG SELL"
+            risk = "HIGH"
+        elif bearish_signals - bullish_signals >= 1:
+            trend = "BEARISH"
+            signal = "SELL"
+            risk = "MEDIUM"
+        else:
+            trend = "NEUTRAL"
+            signal = "HOLD"
+            risk = "LOW"
+        
+        # Calculate trading levels
+        if signal in ["STRONG BUY", "BUY"]:
+            stop_loss = current_price * 0.99  # 1% below current price
+            take_profit_1 = current_price * 1.01  # 1% above
+            take_profit_2 = current_price * 1.02  # 2% above
+        elif signal in ["STRONG SELL", "SELL"]:
+            stop_loss = current_price * 1.01  # 1% above current price
+            take_profit_1 = current_price * 0.99  # 1% below
+            take_profit_2 = current_price * 0.98  # 2% below
+        else:
+            stop_loss = current_price * 0.995
+            take_profit_1 = current_price * 1.005
+            take_profit_2 = current_price * 1.01
+        
+        analysis = f"""
+** ANALISIS XAUUSD KOMPREHENSIF **
+*Dibuat: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
 
-Harga Saat Ini: ${current_price:.2f}
-Trend: {trend}
-Sinyal: {signal}
+** RINGKASAN EKSEKUTIF **
+- Harga Saat Ini: ${current_price:.2f}
+- Trend Pasar: {trend}
+- Sinyal Trading: {signal}
+- Level Risiko: {risk}
 
-TEKNIKAL:
-- RSI: {rsi:.1f} ({'Oversold' if rsi < 30 else 'Overbought' if rsi > 70 else 'Neutral'})
-- MACD: {macd:.4f} ({'Bullish' if macd > 0 else 'Bearish'})
+** ANALISIS TEKNIKAL **
 
-REKOMENDASI:
-{signal} dengan risk management yang tepat.
+** Analisis Trend: **
+- Alignment EMA: {ema_signal}
+- Harga vs EMA 12: {'Diatas' if current_price > ema_12 else 'Dibawah'} (${ema_12:.2f})
+- Harga vs EMA 26: {'Diatas' if current_price > ema_26 else 'Dibawah'} (${ema_26:.2f})
 
-PERHATIAN: Analisis dasar digunakan. Pastikan API DeepSeek terkonfigurasi untuk analisis AI yang lebih mendalam.
+** Indikator Momentum: **
+- RSI (14): {rsi:.1f} - {rsi_signal}
+- MACD: {macd:.4f} - {macd_signal_text}
+- Stochastic: K={stoch_k:.1f}, D={stoch_d:.1f} - {stoch_signal}
+- Bollinger Bands: {bb_signal}
+
+** Kekuatan Sinyal: **
+- Sinyal Bullish: {bullish_signals}
+- Sinyal Bearish: {bearish_signals}
+
+** REKOMENDASI TRADING **
+
+** Strategi Utama: **
+{signal} XAUUSD dengan pendekatan risiko {risk.lower()}.
+
+** Level Kunci: **
+- Support Kuat: ${bb_lower:.2f}
+- Resistance Kuat: ${bb_upper:.2f}
+
+** Manajemen Risiko: **
+- Stop Loss: ${stop_loss:.2f}
+- Take Profit 1: ${take_profit_1:.2f}
+- Take Profit 2: ${take_profit_2:.2f}
+
+** CATATAN: **
+Analisis ini menggunakan fallback system. Pastikan koneksi internet stabil untuk analisis AI DeepSeek.
 """
+        return analysis
 
     def analyze_market_conditions(self, df, indicators, news_data):
         """Comprehensive market analysis using AI"""
@@ -555,6 +688,21 @@ def get_analysis(timeframe):
         traceback.print_exc()
         return jsonify({"error": str(e), "status": "error"}), 500
 
+@app.route('/api/analyze')
+def legacy_analyze():
+    """Legacy endpoint for compatibility - redirects to XAUUSD analysis"""
+    pair = request.args.get('pair', 'XAUUSD')
+    timeframe = request.args.get('timeframe', '4H')
+    
+    if pair.upper() != 'XAUUSD':
+        return jsonify({
+            "error": f"Pair {pair} not supported. Only XAUUSD is supported.",
+            "supported_pairs": ["XAUUSD"]
+        }), 400
+    
+    # Redirect to the main analysis endpoint
+    return get_analysis(timeframe)
+
 @app.route('/api/health')
 def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
@@ -631,6 +779,7 @@ if __name__ == '__main__':
     print("  • GET /api/analysis/1H → 1Hour Analysis") 
     print("  • GET /api/analysis/4H → 4Hour Analysis")
     print("  • GET /api/analysis/1D → Daily Analysis")
+    print("  • GET /api/analyze?pair=XAUUSD&timeframe=4H → Legacy Support")
     print("  • GET /api/realtime/price → Current Price")
     print("  • GET /api/health → Health Check")
     print("  • GET /api/debug → Debug Info")
