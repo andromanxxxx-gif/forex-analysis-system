@@ -41,6 +41,10 @@ class XAUUSDAnalyzer:
               f"DeepSeek: {'Yes' if self.deepseek_api_key else 'No'}, "
               f"NewsAPI: {'Yes' if self.news_api_key else 'No'}")
         
+    def is_price_realistic(self, price):
+        """Check if price is within realistic range for gold"""
+        return 1000 <= price <= 2500
+
     def load_from_local_csv(self, timeframe, limit=500):
         """Load data dari file CSV lokal"""
         possible_paths = [
@@ -202,12 +206,24 @@ class XAUUSDAnalyzer:
             # Coba load dari file lokal dulu
             df = self.load_from_local_csv(timeframe, limit)
             if df is not None:
+                # Check if the last price is realistic
+                if len(df) > 0:
+                    last_price = df.iloc[-1]['close']
+                    if not self.is_price_realistic(last_price):
+                        print(f"Unrealistic price in local data: ${last_price:.2f}, using generated data")
+                        return self.generate_sample_data(timeframe, limit)
                 return df
                 
             # Jika tidak ada file lokal, coba download dari API
             print(f"Trying to download historical data for {timeframe}...")
             df = self.download_historical_data(timeframe)
             if df is not None:
+                # Check if the last price is realistic
+                if len(df) > 0:
+                    last_price = df.iloc[-1]['close']
+                    if not self.is_price_realistic(last_price):
+                        print(f"Unrealistic price in downloaded data: ${last_price:.2f}, using generated data")
+                        return self.generate_sample_data(timeframe, limit)
                 return df.tail(limit)
                 
             # Jika semua gagal, gunakan generated data
@@ -310,7 +326,7 @@ class XAUUSDAnalyzer:
             
             # Check if data looks realistic
             current_price = df['close'].iloc[-1]
-            if current_price > 2500 or current_price < 1000:  # Reasonable gold price range
+            if not self.is_price_realistic(current_price):
                 print(f"Warning: Unrealistic price detected: ${current_price:.2f}")
                 return self.add_improved_fallback_indicators(df)
                 
@@ -524,6 +540,9 @@ class XAUUSDAnalyzer:
         df['stoch_k'] = df['stoch_k'].clip(0, 100)
         df['stoch_d'] = df['stoch_d'].clip(0, 100)
         df['rsi'] = df['rsi'].clip(0, 100)
+        
+        # Fill any remaining NaN with realistic values
+        df = self.fill_missing_indicators(df)
         
         print("Improved fallback indicators applied successfully")
         return df
@@ -751,12 +770,17 @@ Pastikan risk-reward ratio minimal 1:2 untuk setiap rekomendasi trading.
             }
             
             self.last_api_call = current_time
-            response = requests.post(
-                'https://api.deepseek.com/chat/completions',
-                headers=headers,
-                json=data,
-                timeout=45
-            )
+            # Try with a longer timeout and retry mechanism
+            try:
+                response = requests.post(
+                    'https://api.deepseek.com/chat/completions',
+                    headers=headers,
+                    json=data,
+                    timeout=60  # Increase timeout to 60 seconds
+                )
+            except requests.exceptions.Timeout:
+                print("DeepSeek API timeout after 60 seconds, using fallback analysis")
+                return self.comprehensive_fallback_analysis(technical_data, news_data)
             
             if response.status_code == 200:
                 result = response.json()
@@ -767,9 +791,6 @@ Pastikan risk-reward ratio minimal 1:2 untuk setiap rekomendasi trading.
                 print(f"DeepSeek API error: {response.status_code} - {response.text}")
                 return self.comprehensive_fallback_analysis(technical_data, news_data)
                 
-        except requests.exceptions.Timeout:
-            print("DeepSeek API timeout, using fallback analysis")
-            return self.comprehensive_fallback_analysis(technical_data, news_data)
         except Exception as e:
             print(f"Error getting DeepSeek analysis: {e}")
             return self.comprehensive_fallback_analysis(technical_data, news_data)
@@ -1067,7 +1088,7 @@ def get_analysis(timeframe):
         
         # Prepare chart data - FIXED: Ensure indicators are properly included
         chart_data = []
-        display_data = df_with_indicators.tail(100)  # Limit to 100 points
+        display_data = df_with_indicators.tail(50)  # Limit to 50 points for better chart performance
         
         for _, row in display_data.iterrows():
             chart_point = {
@@ -1304,6 +1325,8 @@ if __name__ == '__main__':
     print("  • ✅ ROBUST Indicator Calculations")
     print("  • ✅ Improved Data Validation")
     print("  • ✅ Realistic Fallback Indicators")
+    print("  • ✅ Realistic Price Validation")
+    print("  • ✅ Reduced Chart Data Points for Better Performance")
     print("=" * 60)
     
     print("Starting server...")
