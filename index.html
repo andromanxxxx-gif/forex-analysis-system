@@ -397,7 +397,7 @@
                 document.getElementById('aiAnalysis').textContent = data.ai_analysis;
                 
                 // Update indicators
-                updateIndicators(data.technical_indicators);
+                updateIndicators(data.technical_indicators, data.current_price);
                 
                 // Update news
                 updateNews(data.news);
@@ -501,60 +501,143 @@
             }
         }
 
-        function updateIndicators(indicators) {
+        function updateIndicators(indicators, currentPrice) {
             const grid = document.getElementById('indicatorsGrid');
             
             if (!indicators || Object.keys(indicators).length === 0) {
-                grid.innerHTML = '<div class="error">No indicators available</div>';
+                grid.innerHTML = `
+                    <div class="error" style="grid-column: 1 / -1;">
+                        No technical indicators available. Possible reasons:
+                        <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
+                            <li>Insufficient historical data for calculations</li>
+                            <li>Data format issues in CSV files</li>
+                            <li>Indicator calculation errors</li>
+                        </ul>
+                        <button class="btn" onclick="checkDataHealth()" style="margin-top: 10px;">Check Data Health</button>
+                    </div>
+                `;
                 return;
             }
 
+            console.log('Indicators data:', indicators); // Debug log
+
             let html = '';
-            const config = {
-                'ema_12': { name: 'EMA 12', format: '0.2f' },
-                'ema_26': { name: 'EMA 26', format: '0.2f' },
-                'ema_50': { name: 'EMA 50', format: '0.2f' },
-                'rsi': { name: 'RSI', format: '0.1f' },
-                'macd': { name: 'MACD', format: '0.4f' },
-                'macd_signal': { name: 'MACD Signal', format: '0.4f' },
-                'macd_hist': { name: 'MACD Hist', format: '0.4f' },
-                'stoch_k': { name: 'Stoch K', format: '0.1f' },
-                'stoch_d': { name: 'Stoch D', format: '0.1f' },
-                'bb_upper': { name: 'BB Upper', format: '0.2f' },
-                'bb_lower': { name: 'BB Lower', format: '0.2f' }
+            const indicatorConfig = {
+                'rsi': { 
+                    name: 'RSI (14)', 
+                    format: '0.1f',
+                    levels: { overbought: 70, oversold: 30 },
+                    getTrend: (value) => value > 70 ? 'bearish' : value < 30 ? 'bullish' : 'neutral'
+                },
+                'macd': { 
+                    name: 'MACD', 
+                    format: '0.4f',
+                    getTrend: (value) => value > 0 ? 'bullish' : 'bearish'
+                },
+                'macd_signal': { 
+                    name: 'MACD Signal', 
+                    format: '0.4f',
+                    getTrend: (value, indicators) => indicators.macd > value ? 'bullish' : 'bearish'
+                },
+                'macd_hist': { 
+                    name: 'MACD Histogram', 
+                    format: '0.4f',
+                    getTrend: (value) => value > 0 ? 'bullish' : 'bearish'
+                },
+                'ema_12': { 
+                    name: 'EMA 12', 
+                    format: '0.2f',
+                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bullish' : 'bearish'
+                },
+                'ema_26': { 
+                    name: 'EMA 26', 
+                    format: '0.2f',
+                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bullish' : 'bearish'
+                },
+                'ema_50': { 
+                    name: 'EMA 50', 
+                    format: '0.2f',
+                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bullish' : 'bearish'
+                },
+                'stoch_k': { 
+                    name: 'Stoch %K', 
+                    format: '0.1f',
+                    levels: { overbought: 80, oversold: 20 },
+                    getTrend: (value) => value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral'
+                },
+                'stoch_d': { 
+                    name: 'Stoch %D', 
+                    format: '0.1f',
+                    levels: { overbought: 80, oversold: 20 },
+                    getTrend: (value) => value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral'
+                },
+                'bb_upper': { 
+                    name: 'BB Upper', 
+                    format: '0.2f',
+                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bearish' : 'neutral'
+                },
+                'bb_lower': { 
+                    name: 'BB Lower', 
+                    format: '0.2f',
+                    getTrend: (value, indicators, currentPrice) => currentPrice < value ? 'bullish' : 'neutral'
+                }
             };
 
-            for (const [key, conf] of Object.entries(config)) {
+            // Count available indicators
+            let availableCount = 0;
+            
+            for (const [key, config] of Object.entries(indicatorConfig)) {
                 if (indicators[key] !== undefined && indicators[key] !== null) {
+                    availableCount++;
                     const value = indicators[key];
                     let trend = 'neutral';
                     
-                    if (key === 'rsi') {
-                        trend = value > 70 ? 'bearish' : value < 30 ? 'bullish' : 'neutral';
-                    } else if (key === 'macd') {
-                        trend = value > 0 ? 'bullish' : 'bearish';
-                    } else if (key === 'macd_hist') {
-                        trend = value > 0 ? 'bullish' : 'bearish';
-                    } else if (key === 'stoch_k') {
-                        trend = value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral';
-                    } else if (key === 'bb_upper') {
-                        trend = 'bearish';
-                    } else if (key === 'bb_lower') {
-                        trend = 'bullish';
+                    try {
+                        // Calculate trend based on configuration
+                        if (config.getTrend) {
+                            trend = config.getTrend(value, indicators, currentPrice);
+                        }
+                    } catch (error) {
+                        console.warn(`Error calculating trend for ${key}:`, error);
+                        trend = 'neutral';
+                    }
+                    
+                    // Add level information for RSI and Stochastic
+                    let levelInfo = '';
+                    if (config.levels) {
+                        if (value > config.levels.overbought) {
+                            levelInfo = '<div style="font-size: 0.7em; color: #ff4444;">OVERBOUGHT</div>';
+                        } else if (value < config.levels.oversold) {
+                            levelInfo = '<div style="font-size: 0.7em; color: #00ff88;">OVERSOLD</div>';
+                        }
                     }
                     
                     html += `
                         <div class="indicator-card">
-                            <div>${conf.name}</div>
+                            <div style="font-size: 0.9em; margin-bottom: 5px;">${config.name}</div>
                             <div class="indicator-value ${trend}">
-                                ${value.toFixed(conf.format.includes('4') ? 4 : 2)}
+                                ${value.toFixed(config.format === '0.4f' ? 4 : config.format === '0.1f' ? 1 : 2)}
                             </div>
+                            ${levelInfo}
                         </div>
                     `;
                 }
             }
 
-            grid.innerHTML = html || '<div class="error">No indicator data available</div>';
+            // If no standard indicators found, show what's available
+            if (availableCount === 0) {
+                html = '<div class="error" style="grid-column: 1 / -1;">No standard indicators available</div>';
+                
+                // Show raw available indicators for debugging
+                let rawIndicators = '<div style="text-align: left; margin-top: 10px;">Available data: ';
+                for (const [key, value] of Object.entries(indicators)) {
+                    rawIndicators += `<br>${key}: ${value}`;
+                }
+                rawIndicators += '</div>';
+                html += rawIndicators;
+            }
+
+            grid.innerHTML = html;
         }
 
         function updateNews(newsData) {
@@ -596,49 +679,63 @@
             // Format dates for better display
             const labels = chartData.map(d => new Date(d.datetime));
             const prices = chartData.map(d => d.close);
-            const ema12 = chartData.map(d => d.ema_12).filter(v => v !== null && v !== undefined);
-            const ema26 = chartData.map(d => d.ema_26).filter(v => v !== null && v !== undefined);
-            const ema50 = chartData.map(d => d.ema_50).filter(v => v !== null && v !== undefined);
+            
+            // Prepare indicator data with null checks
+            const ema12 = chartData.map(d => (d.ema_12 !== null && d.ema_12 !== undefined) ? d.ema_12 : null);
+            const ema26 = chartData.map(d => (d.ema_26 !== null && d.ema_26 !== undefined) ? d.ema_26 : null);
+            const ema50 = chartData.map(d => (d.ema_50 !== null && d.ema_50 !== undefined) ? d.ema_50 : null);
+
+            const datasets = [
+                {
+                    label: 'XAUUSD Price',
+                    data: prices,
+                    borderColor: '#ffd700',
+                    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }
+            ];
+
+            // Only add EMA datasets if they have valid data
+            if (ema12.some(v => v !== null)) {
+                datasets.push({
+                    label: 'EMA 12',
+                    data: ema12,
+                    borderColor: '#00ff88',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    tension: 0.1
+                });
+            }
+
+            if (ema26.some(v => v !== null)) {
+                datasets.push({
+                    label: 'EMA 26',
+                    data: ema26,
+                    borderColor: '#0088ff',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    tension: 0.1
+                });
+            }
+
+            if (ema50.some(v => v !== null)) {
+                datasets.push({
+                    label: 'EMA 50',
+                    data: ema50,
+                    borderColor: '#ff4444',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    tension: 0.1
+                });
+            }
 
             currentChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [
-                        {
-                            label: 'XAUUSD Price',
-                            data: prices,
-                            borderColor: '#ffd700',
-                            backgroundColor: 'rgba(255, 215, 0, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'EMA 12',
-                            data: ema12,
-                            borderColor: '#00ff88',
-                            borderWidth: 1,
-                            pointRadius: 0,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'EMA 26',
-                            data: ema26,
-                            borderColor: '#0088ff',
-                            borderWidth: 1,
-                            pointRadius: 0,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'EMA 50',
-                            data: ema50,
-                            borderColor: '#ff4444',
-                            borderWidth: 1,
-                            pointRadius: 0,
-                            tension: 0.1
-                        }
-                    ]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -659,7 +756,19 @@
                         tooltip: {
                             mode: 'index',
                             intersect: false,
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)'
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
                         }
                     },
                     scales: {
