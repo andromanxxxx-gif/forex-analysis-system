@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 import os
 import traceback
 import time
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Try to import talib
 try:
@@ -28,7 +32,13 @@ app.template_folder = template_dir
 class XAUUSDAnalyzer:
     def __init__(self):
         self.data_cache = {}
-        self.twelve_data_api_key = "YOUR_TWELVE_DATA_API_KEY"  # Ganti dengan API key Anda
+        self.twelve_data_api_key = os.getenv('TWELVE_DATA_API_KEY')
+        self.deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
+        self.news_api_key = os.getenv('NEWS_API_KEY')
+        
+        print(f"API Keys loaded: TwelveData: {'Yes' if self.twelve_data_api_key else 'No'}, "
+              f"DeepSeek: {'Yes' if self.deepseek_api_key else 'No'}, "
+              f"NewsAPI: {'Yes' if self.news_api_key else 'No'}")
         
     def load_historical_data(self, timeframe, limit=500):
         """Load data historis dari CSV file yang sudah ada"""
@@ -219,8 +229,8 @@ class XAUUSDAnalyzer:
     def get_realtime_price_twelvedata(self):
         """Get real-time gold price from Twelve Data API"""
         try:
-            if self.twelve_data_api_key == "YOUR_TWELVE_DATA_API_KEY":
-                print("Using simulated price (set your Twelve Data API key)")
+            if not self.twelve_data_api_key:
+                print("Twelve Data API key not set")
                 return self.get_simulated_price()
             
             url = f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={self.twelve_data_api_key}"
@@ -228,12 +238,12 @@ class XAUUSDAnalyzer:
             
             if response.status_code == 200:
                 data = response.json()
-                if 'price' in data:
+                if 'price' in data and data['price'] != '':
                     price = float(data['price'])
                     print(f"Real-time XAUUSD price from Twelve Data: ${price:.2f}")
                     return price
                 else:
-                    print(f"Twelve Data API error: {data.get('message', 'Unknown error')}")
+                    print(f"Twelve Data API error: {data.get('message', 'No price data')}")
                     return self.get_simulated_price()
             else:
                 print(f"Twelve Data API HTTP error: {response.status_code}")
@@ -256,221 +266,201 @@ class XAUUSDAnalyzer:
         return self.get_realtime_price_twelvedata()
 
     def get_fundamental_news(self):
-        """Get fundamental news about gold market"""
+        """Get fundamental news from NewsAPI"""
         try:
-            return {
-                "articles": [
-                    {
-                        "title": "Gold Prices Hold Steady Amid Economic Uncertainty",
-                        "description": "XAUUSD maintains strong support levels as investors seek safe-haven assets.",
-                        "publishedAt": datetime.now().isoformat(),
-                        "source": {"name": "Financial Times"},
-                        "url": "#"
-                    },
-                    {
-                        "title": "Federal Reserve Policy Impacts Precious Metals",
-                        "description": "Recent Fed announcements create favorable conditions for gold prices.",
-                        "publishedAt": (datetime.now() - timedelta(hours=2)).isoformat(),
-                        "source": {"name": "Bloomberg"},
-                        "url": "#"
-                    },
-                    {
-                        "title": "Technical Analysis: XAUUSD Shows Bullish Momentum",
-                        "description": "Gold approaches key resistance level as bullish pattern forms.",
-                        "publishedAt": (datetime.now() - timedelta(days=1)).isoformat(),
-                        "source": {"name": "Reuters"},
-                        "url": "#"
-                    }
-                ]
-            }
+            if not self.news_api_key:
+                print("NewsAPI key not set, using sample news")
+                return self.get_sample_news()
+            
+            # Get news from last 7 days about gold and economy
+            from_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            url = f"https://newsapi.org/v2/everything?q=gold+XAUUSD+Federal+Reserve+inflation&from={from_date}&sortBy=publishedAt&language=en&apiKey={self.news_api_key}"
+            
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data['status'] == 'ok' and data['totalResults'] > 0:
+                    articles = data['articles'][:5]  # Get top 5 articles
+                    print(f"Retrieved {len(articles)} news articles from NewsAPI")
+                    return {"articles": articles}
+                else:
+                    print("No articles found from NewsAPI")
+                    return self.get_sample_news()
+            else:
+                print(f"NewsAPI HTTP error: {response.status_code}")
+                return self.get_sample_news()
+                
         except Exception as e:
-            print(f"Error getting news: {e}")
-            return {"articles": []}
+            print(f"Error getting news from NewsAPI: {e}")
+            return self.get_sample_news()
 
-    def analyze_market_conditions(self, df, indicators):
-        """Comprehensive market analysis with trading signals"""
+    def get_sample_news(self):
+        """Sample news data as fallback"""
+        return {
+            "articles": [
+                {
+                    "title": "Gold Prices Hold Steady Amid Economic Uncertainty",
+                    "description": "XAUUSD maintains strong support levels as investors seek safe-haven assets.",
+                    "publishedAt": datetime.now().isoformat(),
+                    "source": {"name": "Financial Times"},
+                    "url": "#"
+                },
+                {
+                    "title": "Federal Reserve Policy Impacts Precious Metals",
+                    "description": "Recent Fed announcements create favorable conditions for gold prices.",
+                    "publishedAt": (datetime.now() - timedelta(hours=2)).isoformat(),
+                    "source": {"name": "Bloomberg"},
+                    "url": "#"
+                }
+            ]
+        }
+
+    def analyze_with_deepseek(self, technical_data, news_data):
+        """Get AI analysis from DeepSeek API"""
+        try:
+            if not self.deepseek_api_key:
+                print("DeepSeek API key not set, using basic analysis")
+                return self.basic_analysis(technical_data, news_data)
+            
+            # Prepare context for AI
+            current_price = technical_data.get('current_price', 0)
+            indicators = technical_data.get('indicators', {})
+            
+            # Extract news headlines
+            news_headlines = []
+            if news_data and 'articles' in news_data:
+                for article in news_data['articles'][:3]:  # Top 3 articles
+                    news_headlines.append(f"- {article['title']} ({article['source']['name']})")
+            
+            news_context = "\n".join(news_headlines) if news_headlines else "No significant news"
+            
+            prompt = f"""
+Sebagai analis pasar keuangan profesional, berikan analisis komprehensif untuk XAUUSD (Gold/USD) berdasarkan data berikut:
+
+DATA TEKNIKAL:
+- Harga Saat Ini: ${current_price:.2f}
+- RSI: {indicators.get('rsi', 'N/A')}
+- MACD: {indicators.get('macd', 'N/A')}
+- EMA 12: {indicators.get('ema_12', 'N/A')}
+- EMA 26: {indicators.get('ema_26', 'N/A')}
+- EMA 50: {indicators.get('ema_50', 'N/A')}
+- Stochastic K: {indicators.get('stoch_k', 'N/A')}
+- Stochastic D: {indicators.get('stoch_d', 'N/A')}
+- Bollinger Band Upper: {indicators.get('bb_upper', 'N/A')}
+- Bollinger Band Lower: {indicators.get('bb_lower', 'N/A')}
+
+BERITA TERKINI:
+{news_context}
+
+Tolong berikan analisis yang mencakup:
+1. Kondisi trend saat ini (bullish/bearish/neutral)
+2. Sinyal trading dengan level entry, stop loss, dan take profit
+3. Analisis momentum dan kekuatan trend
+4. Faktor fundamental yang perlu diperhatikan
+5. Rekomendasi risk management
+
+Format respons dalam bahasa Indonesia yang profesional.
+"""
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {self.deepseek_api_key}'
+            }
+            
+            data = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.7,
+                "max_tokens": 1000
+            }
+            
+            response = requests.post(
+                'https://api.deepseek.com/chat/completions',
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                analysis = result['choices'][0]['message']['content']
+                print("DeepSeek AI analysis generated successfully")
+                return analysis
+            else:
+                print(f"DeepSeek API error: {response.status_code}")
+                return self.basic_analysis(technical_data, news_data)
+                
+        except Exception as e:
+            print(f"Error getting DeepSeek analysis: {e}")
+            return self.basic_analysis(technical_data, news_data)
+
+    def basic_analysis(self, technical_data, news_data):
+        """Basic analysis fallback"""
+        current_price = technical_data.get('current_price', 0)
+        indicators = technical_data.get('indicators', {})
+        
+        rsi = indicators.get('rsi', 50)
+        macd = indicators.get('macd', 0)
+        
+        if rsi < 30 and macd > 0:
+            signal = "STRONG BUY"
+            trend = "BULLISH"
+        elif rsi > 70 and macd < 0:
+            signal = "STRONG SELL"
+            trend = "BEARISH"
+        elif rsi < 40:
+            signal = "BUY"
+            trend = "BULLISH"
+        elif rsi > 60:
+            signal = "SELL"
+            trend = "BEARISH"
+        else:
+            signal = "HOLD"
+            trend = "NEUTRAL"
+        
+        return f"""
+Analisis XAUUSD - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+Harga Saat Ini: ${current_price:.2f}
+Trend: {trend}
+Sinyal: {signal}
+
+TEKNIKAL:
+- RSI: {rsi:.1f} ({'Oversold' if rsi < 30 else 'Overbought' if rsi > 70 else 'Neutral'})
+- MACD: {macd:.4f} ({'Bullish' if macd > 0 else 'Bearish'})
+
+REKOMENDASI:
+{signal} dengan risk management yang tepat.
+
+PERHATIAN: Analisis dasar digunakan. Pastikan API DeepSeek terkonfigurasi untuk analisis AI yang lebih mendalam.
+"""
+
+    def analyze_market_conditions(self, df, indicators, news_data):
+        """Comprehensive market analysis using AI"""
         try:
             if len(df) == 0:
                 return "No data available for analysis"
                 
             current_price = df.iloc[-1]['close']
             
-            # Get latest indicator values
-            current_rsi = indicators.get('rsi', 50)
-            current_macd = indicators.get('macd', 0)
-            macd_signal = indicators.get('macd_signal', 0)
-            stoch_k = indicators.get('stoch_k', 50)
-            stoch_d = indicators.get('stoch_d', 50)
-            ema_12 = indicators.get('ema_12', current_price)
-            ema_26 = indicators.get('ema_26', current_price)
-            ema_50 = indicators.get('ema_50', current_price)
-            bb_upper = indicators.get('bb_upper', current_price * 1.02)
-            bb_lower = indicators.get('bb_lower', current_price * 0.98)
+            # Prepare technical data for AI analysis
+            technical_data = {
+                'current_price': current_price,
+                'indicators': indicators
+            }
             
-            # Calculate trading signals
-            bullish_signals = 0
-            bearish_signals = 0
-            
-            # RSI Analysis
-            if current_rsi < 30:
-                bullish_signals += 2
-                rsi_signal = "OVERSOLD - STRONG BUY"
-            elif current_rsi < 40:
-                bullish_signals += 1
-                rsi_signal = "NEARLY OVERSOLD - BUY"
-            elif current_rsi > 70:
-                bearish_signals += 2
-                rsi_signal = "OVERBOUGHT - STRONG SELL"
-            elif current_rsi > 60:
-                bearish_signals += 1
-                rsi_signal = "NEARLY OVERBOUGHT - SELL"
-            else:
-                rsi_signal = "NEUTRAL"
-            
-            # MACD Analysis
-            if current_macd > macd_signal:
-                bullish_signals += 1
-                macd_signal_text = "BULLISH CROSSOVER"
-            else:
-                bearish_signals += 1
-                macd_signal_text = "BEARISH CROSSOVER"
-            
-            # EMA Analysis
-            if current_price > ema_12 > ema_26 > ema_50:
-                bullish_signals += 2
-                ema_signal = "STRONG BULLISH TREND"
-            elif current_price < ema_12 < ema_26 < ema_50:
-                bearish_signals += 2
-                ema_signal = "STRONG BEARISH TREND"
-            elif current_price > ema_12 and ema_12 > ema_26:
-                bullish_signals += 1
-                ema_signal = "BULLISH TREND"
-            elif current_price < ema_12 and ema_12 < ema_26:
-                bearish_signals += 1
-                ema_signal = "BEARISH TREND"
-            else:
-                ema_signal = "MIXED TREND"
-            
-            # Stochastic Analysis
-            if stoch_k < 20 and stoch_d < 20:
-                bullish_signals += 1
-                stoch_signal = "OVERSOLD - BUY"
-            elif stoch_k > 80 and stoch_d > 80:
-                bearish_signals += 1
-                stoch_signal = "OVERBOUGHT - SELL"
-            else:
-                stoch_signal = "NEUTRAL"
-            
-            # Bollinger Bands Analysis
-            if current_price < bb_lower:
-                bullish_signals += 1
-                bb_signal = "PRICE BELOW LOWER BAND - POTENTIAL BUY"
-            elif current_price > bb_upper:
-                bearish_signals += 1
-                bb_signal = "PRICE ABOVE UPPER BAND - POTENTIAL SELL"
-            else:
-                bb_signal = "PRICE WITHIN BANDS - NEUTRAL"
-            
-            # Determine overall trend and signal
-            if bullish_signals - bearish_signals >= 3:
-                trend = "STRONG BULLISH"
-                signal = "STRONG BUY"
-                risk = "LOW"
-            elif bullish_signals - bearish_signals >= 1:
-                trend = "BULLISH"
-                signal = "BUY"
-                risk = "MEDIUM"
-            elif bearish_signals - bullish_signals >= 3:
-                trend = "STRONG BEARISH"
-                signal = "STRONG SELL"
-                risk = "HIGH"
-            elif bearish_signals - bullish_signals >= 1:
-                trend = "BEARISH"
-                signal = "SELL"
-                risk = "MEDIUM"
-            else:
-                trend = "NEUTRAL"
-                signal = "HOLD"
-                risk = "LOW"
-            
-            # Calculate trading levels
-            if signal in ["STRONG BUY", "BUY"]:
-                stop_loss = current_price * 0.99  # 1% below current price
-                take_profit_1 = current_price * 1.01  # 1% above
-                take_profit_2 = current_price * 1.02  # 2% above
-            elif signal in ["STRONG SELL", "SELL"]:
-                stop_loss = current_price * 1.01  # 1% above current price
-                take_profit_1 = current_price * 0.99  # 1% below
-                take_profit_2 = current_price * 0.98  # 2% below
-            else:
-                stop_loss = current_price * 0.995
-                take_profit_1 = current_price * 1.005
-                take_profit_2 = current_price * 1.01
-            
-            analysis = f"""
-** XAUUSD TRADING ANALYSIS **
-Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-** EXECUTIVE SUMMARY **
-- Current Price: ${current_price:.2f}
-- Market Trend: {trend}
-- Trading Signal: {signal}
-- Risk Level: {risk}
-
-** TECHNICAL OVERVIEW **
-
-** Trend Analysis: **
-- EMA Alignment: {ema_signal}
-- Price vs EMA 12: {'Above' if current_price > ema_12 else 'Below'} (${ema_12:.2f})
-- Price vs EMA 26: {'Above' if current_price > ema_26 else 'Below'} (${ema_26:.2f})
-
-** Momentum Indicators: **
-- RSI (14): {current_rsi:.1f} - {rsi_signal}
-- MACD: {current_macd:.4f} - {macd_signal_text}
-- Stochastic: K={stoch_k:.1f}, D={stoch_d:.1f} - {stoch_signal}
-- Bollinger Bands: {bb_signal}
-
-** Signal Strength: **
-- Bullish Signals: {bullish_signals}
-- Bearish Signals: {bearish_signals}
-
-** TRADING RECOMMENDATIONS **
-
-** Primary Strategy: **
-{signal} XAUUSD with {risk.lower()} risk approach.
-
-** Key Levels: **
-- Strong Support: ${bb_lower:.2f}
-- Strong Resistance: ${bb_upper:.2f}
-
-** Risk Management: **
-- Stop Loss: ${stop_loss:.2f}
-- Take Profit 1: ${take_profit_1:.2f}
-- Take Profit 2: ${take_profit_2:.2f}
-
-** TRADING PLAN **
-
-** Entry: **
-- Ideal Entry: ${current_price:.2f}
-- Alternative Entry: ${current_price * 0.998:.2f} (for BUY) / ${current_price * 1.002:.2f} (for SELL)
-
-** Position Sizing: **
-- Risk per trade: 1-2% of account
-- Leverage: Maximum 1:10 for this setup
-
-** RISK CONSIDERATIONS **
-- Monitor Federal Reserve announcements
-- Watch USD strength and inflation data
-- Consider geopolitical factors
-- Always use proper risk management
-
-** MARKET CONTEXT **
-Gold is showing {trend.lower()} characteristics with {bullish_signals} bullish indicators vs {bearish_signals} bearish indicators. {'Consider long positions' if 'BUY' in signal else 'Consider short positions' if 'SELL' in signal else 'Wait for clearer signals'}.
-"""
+            # Get AI analysis
+            analysis = self.analyze_with_deepseek(technical_data, news_data)
             return analysis
             
         except Exception as e:
-            return f"Comprehensive analysis completed. Technical indicators processed."
+            return f"Market analysis completed. Error in processing: {str(e)}"
 
 # Create analyzer instance
 analyzer = XAUUSDAnalyzer()
@@ -497,12 +487,15 @@ def get_analysis(timeframe):
         df = analyzer.load_historical_data(timeframe, 200)
         df_with_indicators = analyzer.calculate_indicators(df)
         
-        # Get current price
+        # Get current price from Twelve Data
         current_price = analyzer.get_realtime_price()
         
         # Update last price
         if len(df_with_indicators) > 0:
             df_with_indicators.iloc[-1, df_with_indicators.columns.get_loc('close')] = current_price
+        
+        # Get news from NewsAPI
+        news_data = analyzer.get_fundamental_news()
         
         # Prepare indicators for analysis
         latest_indicators = {}
@@ -513,11 +506,8 @@ def get_analysis(timeframe):
                 if indicator in df_with_indicators.columns and not pd.isna(last_row[indicator]):
                     latest_indicators[indicator] = float(last_row[indicator])
         
-        # Generate comprehensive analysis
-        analysis = analyzer.analyze_market_conditions(df_with_indicators, latest_indicators)
-        
-        # Get fundamental news
-        news_data = analyzer.get_fundamental_news()
+        # Generate comprehensive AI analysis
+        analysis = analyzer.analyze_market_conditions(df_with_indicators, latest_indicators, news_data)
         
         # Prepare chart data (limit to 100 points for better performance)
         chart_data = []
@@ -549,7 +539,12 @@ def get_analysis(timeframe):
             "ai_analysis": analysis,
             "chart_data": chart_data,
             "data_points": len(chart_data),
-            "news": news_data
+            "news": news_data,
+            "api_sources": {
+                "twelve_data": bool(analyzer.twelve_data_api_key),
+                "deepseek": bool(analyzer.deepseek_api_key),
+                "newsapi": bool(analyzer.news_api_key)
+            }
         }
         
         print(f"Analysis completed for {timeframe}. Sent {len(chart_data)} data points.")
@@ -569,8 +564,10 @@ def realtime_price():
     """Realtime price endpoint"""
     try:
         price = analyzer.get_realtime_price()
+        source = "Twelve Data API" if analyzer.twelve_data_api_key else "Simulated"
         return jsonify({
             "price": price,
+            "source": source,
             "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
@@ -578,7 +575,7 @@ def realtime_price():
 
 @app.route('/api/debug')
 def debug():
-    """Debug endpoint to check data files"""
+    """Debug endpoint to check data files and API status"""
     try:
         files = {}
         for timeframe in ['1H', '4H', '1D']:
@@ -595,9 +592,17 @@ def debug():
             else:
                 files[timeframe] = {"exists": False}
         
+        # Test API connections
+        api_status = {
+            "twelve_data": bool(analyzer.twelve_data_api_key),
+            "deepseek": bool(analyzer.deepseek_api_key),
+            "newsapi": bool(analyzer.news_api_key)
+        }
+        
         return jsonify({
             "status": "debug",
             "data_files": files,
+            "api_status": api_status,
             "current_dir": os.getcwd(),
             "data_dir": os.path.join(os.getcwd(), 'data')
         })
@@ -605,6 +610,15 @@ def debug():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Install required packages if not already installed
+    try:
+        import dotenv
+    except ImportError:
+        print("Installing python-dotenv...")
+        os.system("pip install python-dotenv")
+        from dotenv import load_dotenv
+        load_dotenv()
+    
     # Create necessary directories
     os.makedirs('data', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
@@ -621,7 +635,10 @@ if __name__ == '__main__':
     print("  • GET /api/health → Health Check")
     print("  • GET /api/debug → Debug Info")
     print("=" * 60)
-    print("💡 Don't forget to set your Twelve Data API key!")
+    print("🔧 Integrated APIs:")
+    print("  • Twelve Data → Real-time Prices")
+    print("  • DeepSeek AI → Market Analysis") 
+    print("  • NewsAPI → Fundamental News")
     print("=" * 60)
     
     print("Starting server...")
