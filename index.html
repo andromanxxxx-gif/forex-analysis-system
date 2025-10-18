@@ -3,386 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XAUUSD Professional Trading Analysis</title>
+    <title>XAUUSD Trading Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: linear-gradient(135deg, #0c0c0c, #1a1a2e, #16213e);
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
             color: white; 
             padding: 20px; 
-            min-height: 100vh;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         
-        /* Header Styles */
         .header { 
             text-align: center; 
-            margin-bottom: 30px; 
-            padding: 25px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 215, 0, 0.2);
+            margin-bottom: 20px; 
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 10px;
         }
         .header h1 { 
-            font-size: 2.8em; 
+            color: #ffd700; 
             margin-bottom: 10px; 
-            background: linear-gradient(45deg, #ffd700, #ffed4e, #ffd700);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
-        }
-        .header p { 
-            color: #cccccc; 
-            font-size: 1.1em;
         }
         
-        /* Controls */
         .controls { 
             display: flex; 
             justify-content: center; 
-            gap: 15px; 
-            margin: 25px 0;
+            gap: 10px; 
+            margin: 20px 0;
             flex-wrap: wrap;
         }
         .btn { 
-            padding: 12px 25px; 
-            background: rgba(255, 215, 0, 0.15); 
-            color: #ffd700; 
-            border: 2px solid #ffd700; 
-            border-radius: 8px; 
+            padding: 10px 20px; 
+            background: #333; 
+            color: white; 
+            border: 1px solid #ffd700; 
+            border-radius: 5px; 
             cursor: pointer; 
-            font-weight: 600;
-            transition: all 0.3s ease;
-            font-size: 1em;
-        }
-        .btn:hover { 
-            background: #ffd700; 
-            color: #0c0c0c;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
         }
         .btn.active { 
             background: #ffd700; 
-            color: #0c0c0c;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            color: black; 
         }
         
-        /* Price Display */
-        .price-container {
-            text-align: center;
-            margin: 30px 0;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 215, 0, 0.2);
-        }
         .price { 
-            font-size: 3em; 
+            font-size: 2.5em; 
+            text-align: center; 
+            color: #ffd700; 
+            margin: 20px 0; 
             font-weight: bold;
-            background: linear-gradient(45deg, #00ff88, #00ccff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-        }
-        .price-change {
-            font-size: 1.1em;
-            color: #cccccc;
         }
         
-        /* Main Dashboard Grid */
         .dashboard {
             display: grid;
             grid-template-columns: 2fr 1fr;
-            gap: 25px;
-            margin-bottom: 25px;
+            gap: 20px;
+            margin-bottom: 20px;
         }
         
-        @media (max-width: 1024px) {
+        @media (max-width: 768px) {
             .dashboard {
                 grid-template-columns: 1fr;
             }
         }
         
-        /* Chart Container */
         .chart-container { 
-            background: rgba(255, 255, 255, 0.05); 
-            padding: 25px; 
-            border-radius: 15px; 
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #2a2a2a; 
+            padding: 20px; 
+            border-radius: 10px; 
+            height: 400px;
         }
         
-        /* Analysis Panel */
         .analysis-panel { 
-            background: rgba(255, 255, 255, 0.05); 
-            padding: 25px; 
-            border-radius: 15px; 
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-height: 600px;
+            background: #2a2a2a; 
+            padding: 20px; 
+            border-radius: 10px; 
+            max-height: 400px;
             overflow-y: auto;
-        }
-        .analysis-panel h3 {
-            color: #ffd700;
-            margin-bottom: 15px;
-            font-size: 1.4em;
-            border-bottom: 2px solid #ffd700;
-            padding-bottom: 8px;
         }
         .analysis-content { 
             white-space: pre-wrap; 
-            font-family: 'Courier New', monospace;
-            line-height: 1.5;
-            font-size: 0.95em;
+            font-family: monospace;
+            line-height: 1.4;
+            font-size: 0.9em;
         }
         
-        /* Indicators Grid */
         .indicators-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-            gap: 15px; 
-            margin: 25px 0; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 10px; 
+            margin: 20px 0; 
         }
         .indicator-card { 
-            background: rgba(255, 255, 255, 0.05); 
-            padding: 20px; 
-            border-radius: 10px; 
+            background: #2a2a2a; 
+            padding: 15px; 
+            border-radius: 8px; 
             text-align: center;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: transform 0.3s ease;
-        }
-        .indicator-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255, 215, 0, 0.3);
-        }
-        .indicator-name {
-            font-size: 0.9em;
-            color: #cccccc;
-            margin-bottom: 8px;
         }
         .indicator-value { 
-            font-size: 1.4em; 
+            font-size: 1.3em; 
             font-weight: bold; 
             margin: 5px 0; 
         }
-        .bullish { 
-            color: #00ff88; 
-            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
-        }
-        .bearish { 
-            color: #ff4444; 
-            text-shadow: 0 0 10px rgba(255, 68, 68, 0.3);
-        }
-        .neutral { 
-            color: #ffd700; 
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-        }
+        .bullish { color: #00ff88; }
+        .bearish { color: #ff4444; }
+        .neutral { color: #ffd700; }
         
-        /* News Panel */
         .news-panel {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 25px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            grid-column: 1 / -1;
-        }
-        .news-panel h3 {
-            color: #ffd700;
-            margin-bottom: 20px;
-            font-size: 1.4em;
-            border-bottom: 2px solid #ffd700;
-            padding-bottom: 8px;
-        }
-        .news-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 20px;
-        }
-        .news-item {
-            background: rgba(255, 255, 255, 0.03);
+            background: #2a2a2a;
             padding: 20px;
             border-radius: 10px;
-            border-left: 4px solid #ffd700;
-            transition: all 0.3s ease;
+            margin-top: 20px;
         }
-        .news-item:hover {
-            background: rgba(255, 255, 255, 0.07);
-            transform: translateX(5px);
+        .news-item {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 3px solid #ffd700;
         }
         .news-title {
             font-weight: bold;
-            margin-bottom: 10px;
             color: #ffd700;
-            font-size: 1.1em;
-        }
-        .news-description {
-            color: #cccccc;
-            margin-bottom: 10px;
-            line-height: 1.4;
-        }
-        .news-source {
-            font-size: 0.85em;
-            color: #888888;
+            margin-bottom: 5px;
         }
         
-        /* Trading Signals */
-        .signals-panel {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 25px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            margin: 25px 0;
-        }
-        .signals-panel h3 {
-            color: #ffd700;
-            margin-bottom: 20px;
-            font-size: 1.4em;
-            border-bottom: 2px solid #ffd700;
-            padding-bottom: 8px;
-        }
-        .signal-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-        }
-        .signal-item {
-            background: rgba(255, 255, 255, 0.03);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .signal-value {
-            font-size: 1.8em;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        
-        /* Status and Loading */
         .loading { 
             text-align: center; 
             padding: 40px; 
             color: #ffd700; 
-            font-size: 1.2em;
         }
         .error { 
             color: #ff4444; 
             text-align: center; 
             padding: 20px; 
-            background: rgba(255, 68, 68, 0.1);
-            border-radius: 10px;
-            border: 1px solid #ff4444;
         }
         .debug { 
-            background: rgba(255, 0, 0, 0.1); 
-            padding: 15px; 
-            border-radius: 10px; 
+            background: #333; 
+            padding: 10px; 
+            border-radius: 5px; 
             margin: 10px 0; 
-            font-size: 0.9em; 
-            border: 1px solid #ff4444;
-        }
-        
-        /* Footer */
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding: 20px;
-            color: #666666;
-            font-size: 0.9em;
-            border-top: 1px solid #333333;
+            font-size: 0.8em; 
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
-            <h1>🧠 XAUUSD Professional Trading Analysis</h1>
-            <p>Advanced AI-Powered Gold Market Analysis with Real-time Signals</p>
+            <h1>XAUUSD Trading Analysis</h1>
+            <p>Real-time Gold Market Analysis</p>
         </div>
 
-        <!-- Controls -->
         <div class="controls">
-            <button class="btn active" onclick="loadData('1H')">1 Hour</button>
-            <button class="btn" onclick="loadData('4H')">4 Hours</button>
-            <button class="btn" onclick="loadData('1D')">1 Day</button>
-            <button class="btn" onclick="checkDebug()">Debug Info</button>
+            <button class="btn active" onclick="loadData('1H')">1H</button>
+            <button class="btn" onclick="loadData('4H')">4H</button>
+            <button class="btn" onclick="loadData('1D')">1D</button>
+            <button class="btn" onclick="checkDebug()">Debug</button>
         </div>
 
-        <!-- Price Display -->
-        <div class="price-container">
-            <div class="price" id="currentPrice">Loading...</div>
-            <div class="price-change" id="priceChange">Real-time XAUUSD Gold Price</div>
-        </div>
+        <div class="price" id="currentPrice">Loading...</div>
 
-        <!-- Debug Info -->
         <div id="debugInfo" class="debug" style="display: none;"></div>
 
-        <!-- Main Dashboard -->
         <div class="dashboard">
-            <!-- Chart -->
             <div class="chart-container">
                 <canvas id="priceChart"></canvas>
             </div>
 
-            <!-- Analysis Panel -->
             <div class="analysis-panel">
-                <h3>📊 AI Trading Analysis</h3>
+                <h3>Market Analysis</h3>
                 <div class="analysis-content" id="aiAnalysis">
-                    Loading comprehensive market analysis...
+                    Loading analysis...
                 </div>
             </div>
         </div>
 
-        <!-- Trading Signals -->
-        <div class="signals-panel" id="signalsPanel" style="display: none;">
-            <h3>🎯 Trading Signals</h3>
-            <div class="signal-grid" id="signalGrid">
-                <!-- Signals will be populated here -->
-            </div>
-        </div>
-
-        <!-- Technical Indicators -->
         <div class="indicators-grid" id="indicatorsGrid">
-            <div class="loading">Loading technical indicators...</div>
+            <div class="loading">Loading indicators...</div>
         </div>
 
-        <!-- News Panel -->
         <div class="news-panel">
-            <h3>📰 Market News & Analysis</h3>
-            <div class="news-grid" id="newsContainer">
-                <div class="loading">Loading market news...</div>
+            <h3>Market News</h3>
+            <div id="newsContainer">
+                <div class="loading">Loading news...</div>
             </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p>XAUUSD Professional Trading Analysis System | Real-time Market Data | AI-Powered Signals</p>
-            <p>Last updated: <span id="lastUpdate">-</span></p>
         </div>
     </div>
 
     <script>
         let currentChart = null;
         let currentTimeframe = '1H';
-        let currentData = null;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Professional Trading Dashboard Started');
+            console.log('Dashboard started');
             loadData('1H');
             
             // Auto-refresh every 30 seconds
             setInterval(() => {
                 if (currentTimeframe) {
-                    console.log('Auto-refreshing data...');
                     loadData(currentTimeframe);
                 }
             }, 30000);
@@ -390,41 +210,40 @@
 
         function loadData(timeframe) {
             currentTimeframe = timeframe;
-            console.log('Loading professional analysis for:', timeframe);
+            console.log('Loading:', timeframe);
             
             // Update buttons
-            document.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
             event.target.classList.add('active');
             
             showLoading();
             
             fetch(`/api/analysis/${timeframe}`)
                 .then(response => {
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    if (!response.ok) throw new Error('Network error');
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Professional data received:', data);
-                    currentData = data;
-                    
+                    console.log('Data received:', data);
                     if (data.status === 'success') {
                         updateDashboard(data);
                     } else {
-                        throw new Error(data.error || 'Server returned an error');
+                        throw new Error(data.error || 'Unknown error');
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading professional data:', error);
-                    showError('Failed to load market data: ' + error.message);
+                    console.error('Error:', error);
+                    showError(error.message);
                 });
         }
 
         function showLoading() {
             document.getElementById('currentPrice').textContent = 'Loading...';
-            document.getElementById('aiAnalysis').textContent = 'Loading comprehensive market analysis...';
-            document.getElementById('indicatorsGrid').innerHTML = '<div class="loading">Loading technical indicators...</div>';
-            document.getElementById('newsContainer').innerHTML = '<div class="loading">Loading market news...</div>';
-            document.getElementById('signalsPanel').style.display = 'none';
+            document.getElementById('aiAnalysis').textContent = 'Loading analysis...';
+            document.getElementById('indicatorsGrid').innerHTML = '<div class="loading">Loading indicators...</div>';
+            document.getElementById('newsContainer').innerHTML = '<div class="loading">Loading news...</div>';
         }
 
         function showError(message) {
@@ -438,35 +257,30 @@
             try {
                 // Update price
                 document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
-                document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
                 
                 // Update analysis
                 document.getElementById('aiAnalysis').textContent = data.ai_analysis;
                 
                 // Update indicators
-                updateIndicatorsGrid(data.technical_indicators);
+                updateIndicators(data.technical_indicators);
                 
                 // Update news
                 updateNews(data.news);
                 
-                // Update trading signals
-                updateTradingSignals(data);
-                
                 // Update chart
                 updateChart(data.chart_data);
                 
-                console.log('Professional dashboard updated successfully');
             } catch (error) {
-                console.error('Error updating professional dashboard:', error);
-                showError('Error displaying professional data: ' + error.message);
+                console.error('Error updating dashboard:', error);
+                showError('Error displaying data');
             }
         }
 
-        function updateIndicatorsGrid(indicators) {
+        function updateIndicators(indicators) {
             const grid = document.getElementById('indicatorsGrid');
             
             if (!indicators || Object.keys(indicators).length === 0) {
-                grid.innerHTML = '<div class="error">No indicator data available</div>';
+                grid.innerHTML = '<div class="error">No indicators</div>';
                 return;
             }
 
@@ -477,44 +291,34 @@
                 'ema_50': { name: 'EMA 50', format: '0.2f' },
                 'rsi': { name: 'RSI', format: '0.1f' },
                 'macd': { name: 'MACD', format: '0.4f' },
-                'macd_signal': { name: 'MACD Signal', format: '0.4f' },
-                'macd_hist': { name: 'MACD Histogram', format: '0.4f' },
-                'stoch_k': { name: 'Stoch %K', format: '0.1f' },
-                'stoch_d': { name: 'Stoch %D', format: '0.1f' },
-                'bb_upper': { name: 'BB Upper', format: '0.2f' },
-                'bb_lower': { name: 'BB Lower', format: '0.2f' }
+                'stoch_k': { name: 'Stoch K', format: '0.1f' }
             };
 
             for (const [key, conf] of Object.entries(config)) {
-                if (indicators[key] !== undefined && indicators[key] !== null) {
+                if (indicators[key] !== undefined) {
                     const value = indicators[key];
                     let trend = 'neutral';
                     
                     if (key === 'rsi') {
                         trend = value > 70 ? 'bearish' : value < 30 ? 'bullish' : 'neutral';
-                    } else if (key.includes('macd')) {
+                    } else if (key === 'macd') {
                         trend = value > 0 ? 'bullish' : 'bearish';
-                    } else if (key.includes('stoch')) {
+                    } else if (key === 'stoch_k') {
                         trend = value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral';
-                    } else if (key.includes('bb_upper')) {
-                        trend = 'bearish';
-                    } else if (key.includes('bb_lower')) {
-                        trend = 'bullish';
                     }
                     
                     html += `
                         <div class="indicator-card">
-                            <div class="indicator-name">${conf.name}</div>
+                            <div>${conf.name}</div>
                             <div class="indicator-value ${trend}">
                                 ${value.toFixed(conf.format.includes('4') ? 4 : 2)}
                             </div>
-                            <div class="indicator-trend">${trend.toUpperCase()}</div>
                         </div>
                     `;
                 }
             }
 
-            grid.innerHTML = html || '<div class="error">No professional indicator data available</div>';
+            grid.innerHTML = html || '<div class="error">No indicators</div>';
         }
 
         function updateNews(newsData) {
@@ -523,63 +327,20 @@
             if (newsData.articles && newsData.articles.length > 0) {
                 let html = '';
                 newsData.articles.forEach(article => {
-                    const publishDate = new Date(article.publishedAt).toLocaleDateString();
                     html += `
                         <div class="news-item">
                             <div class="news-title">${article.title}</div>
-                            <div class="news-description">${article.description}</div>
-                            <div class="news-source">${article.source.name} • ${publishDate}</div>
+                            <div>${article.description}</div>
+                            <div style="font-size: 0.8em; color: #888; margin-top: 5px;">
+                                ${article.source.name}
+                            </div>
                         </div>
                     `;
                 });
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<div class="error">No market news available</div>';
+                container.innerHTML = '<div class="error">No news</div>';
             }
-        }
-
-        function updateTradingSignals(data) {
-            const panel = document.getElementById('signalsPanel');
-            const grid = document.getElementById('signalGrid');
-            
-            // Extract trading signals from analysis text
-            const analysis = data.ai_analysis;
-            const signals = {
-                trend: extractValue(analysis, 'Market Trend:'),
-                signal: extractValue(analysis, 'Trading Signal:'),
-                risk: extractValue(analysis, 'Risk Level:')
-            };
-            
-            if (signals.trend && signals.signal) {
-                panel.style.display = 'block';
-                
-                let signalColor = 'neutral';
-                if (signals.signal.includes('BUY')) signalColor = 'bullish';
-                else if (signals.signal.includes('SELL')) signalColor = 'bearish';
-                
-                grid.innerHTML = `
-                    <div class="signal-item">
-                        <div>Market Trend</div>
-                        <div class="signal-value ${signalColor}">${signals.trend}</div>
-                    </div>
-                    <div class="signal-item">
-                        <div>Trading Signal</div>
-                        <div class="signal-value ${signalColor}">${signals.signal}</div>
-                    </div>
-                    <div class="signal-item">
-                        <div>Risk Level</div>
-                        <div class="signal-value">${signals.risk || 'MEDIUM'}</div>
-                    </div>
-                `;
-            } else {
-                panel.style.display = 'none';
-            }
-        }
-
-        function extractValue(text, key) {
-            const regex = new RegExp(key + '\\s*([^\\n]+)');
-            const match = text.match(regex);
-            return match ? match[1].trim() : null;
         }
 
         function updateChart(chartData) {
@@ -590,7 +351,7 @@
             }
 
             if (!chartData || chartData.length === 0) {
-                console.error('No professional chart data available');
+                console.error('No chart data');
                 return;
             }
 
@@ -598,9 +359,6 @@
             const prices = chartData.map(d => d.close);
             const ema12 = chartData.map(d => d.ema_12).filter(v => v !== null);
             const ema26 = chartData.map(d => d.ema_26).filter(v => v !== null);
-            const ema50 = chartData.map(d => d.ema_50).filter(v => v !== null);
-            const bbUpper = chartData.map(d => d.bb_upper).filter(v => v !== null);
-            const bbLower = chartData.map(d => d.bb_lower).filter(v => v !== null);
 
             currentChart = new Chart(ctx, {
                 type: 'line',
@@ -608,55 +366,26 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'XAUUSD Price',
+                            label: 'Price',
                             data: prices,
                             borderColor: '#ffd700',
                             backgroundColor: 'rgba(255, 215, 0, 0.1)',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.1
+                            borderWidth: 2,
+                            fill: true
                         },
                         {
                             label: 'EMA 12',
                             data: ema12,
                             borderColor: '#00ff88',
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            tension: 0.1
+                            borderWidth: 1,
+                            pointRadius: 0
                         },
                         {
                             label: 'EMA 26',
                             data: ema26,
                             borderColor: '#0088ff',
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'EMA 50',
-                            data: ema50,
-                            borderColor: '#ff4444',
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            tension: 0.1
-                        },
-                        {
-                            label: 'BB Upper',
-                            data: bbUpper,
-                            borderColor: 'rgba(255, 255, 255, 0.3)',
                             borderWidth: 1,
-                            pointRadius: 0,
-                            borderDash: [5, 5],
-                            tension: 0.1
-                        },
-                        {
-                            label: 'BB Lower',
-                            data: bbLower,
-                            borderColor: 'rgba(255, 255, 255, 0.3)',
-                            borderWidth: 1,
-                            pointRadius: 0,
-                            borderDash: [5, 5],
-                            tension: 0.1
+                            pointRadius: 0
                         }
                     ]
                 },
@@ -666,68 +395,26 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: `XAUUSD ${currentTimeframe} Professional Chart`,
-                            color: 'white',
-                            font: { size: 16, weight: 'bold' }
+                            text: `XAUUSD ${currentTimeframe}`,
+                            color: 'white'
                         },
                         legend: {
-                            labels: { 
-                                color: 'white',
-                                font: { size: 12 }
-                            }
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            titleColor: '#ffd700',
-                            bodyColor: 'white',
-                            borderColor: '#ffd700',
-                            borderWidth: 1
+                            labels: { color: 'white' }
                         }
                     },
                     scales: {
                         x: {
-                            type: 'time',
-                            time: {
-                                unit: 'hour',
-                                displayFormats: {
-                                    hour: 'MMM dd HH:mm'
-                                }
-                            },
-                            ticks: { 
-                                color: 'rgba(255, 255, 255, 0.7)',
-                                maxTicksLimit: 8,
-                                font: { size: 11 }
-                            },
-                            grid: { 
-                                color: 'rgba(255, 255, 255, 0.1)',
-                                drawBorder: false
-                            }
+                            ticks: { color: 'white', maxTicksLimit: 8 },
+                            grid: { color: '#444' }
                         },
                         y: {
                             ticks: { 
-                                color: 'rgba(255, 255, 255, 0.7)',
+                                color: 'white',
                                 callback: function(value) {
                                     return '$' + value.toFixed(2);
-                                },
-                                font: { size: 11 }
+                                }
                             },
-                            grid: { 
-                                color: 'rgba(255, 255, 255, 0.1)',
-                                drawBorder: false
-                            }
-                        }
-                    },
-                    interaction: {
-                        mode: 'nearest',
-                        axis: 'x',
-                        intersect: false
-                    },
-                    elements: {
-                        point: {
-                            radius: 0,
-                            hoverRadius: 4
+                            grid: { color: '#444' }
                         }
                     }
                 }
@@ -739,16 +426,12 @@
                 .then(response => response.json())
                 .then(data => {
                     const debugDiv = document.getElementById('debugInfo');
-                    if (debugDiv.style.display === 'none') {
-                        debugDiv.style.display = 'block';
-                        debugDiv.innerHTML = `
-                            <h3>🔧 Debug Information</h3>
-                            <pre>${JSON.stringify(data, null, 2)}</pre>
-                            <button class="btn" onclick="document.getElementById('debugInfo').style.display='none'" style="margin-top: 10px;">Hide Debug</button>
-                        `;
-                    } else {
-                        debugDiv.style.display = 'none';
-                    }
+                    debugDiv.style.display = 'block';
+                    debugDiv.innerHTML = `
+                        <h3>Debug Info</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <button class="btn" onclick="document.getElementById('debugInfo').style.display='none'">Hide</button>
+                    `;
                 })
                 .catch(error => {
                     console.error('Debug error:', error);
