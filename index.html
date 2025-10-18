@@ -3,15 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XAUUSD AI Analysis System</title>
-    
-    <!-- Load Chart.js dan plugin financial -->
+    <title>XAUUSD AI Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
-    
     <style>
-        /* Reset CSS */
         * {
             margin: 0;
             padding: 0;
@@ -21,126 +15,69 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #0f1b2b;
-            color: #e0e0e0;
+            color: #ffffff;
             line-height: 1.6;
-            min-height: 100vh;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
         }
 
         .header {
-            background: linear-gradient(135deg, #1e2b3a 0%, #2d3e50 100%);
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            border: 1px solid #2d3e50;
+            background: #1e2b3a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
             text-align: center;
         }
 
-        .header h1 {
-            color: #00d4aa;
-            font-size: 2.5em;
-            margin-bottom: 15px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
         .price-display {
-            font-size: 3em;
+            font-size: 2em;
             font-weight: bold;
             color: #00d4aa;
-            margin: 20px 0;
-            text-shadow: 0 2px 8px rgba(0, 212, 170, 0.3);
+            margin: 10px 0;
         }
 
         .timeframe-selector {
             display: flex;
-            gap: 15px;
-            margin: 25px 0;
+            gap: 10px;
+            margin: 15px 0;
             justify-content: center;
             flex-wrap: wrap;
         }
 
         .timeframe-btn {
-            padding: 12px 25px;
+            padding: 8px 16px;
             background: #2d3e50;
-            border: 2px solid #3d4e60;
-            border-radius: 8px;
+            border: none;
+            border-radius: 5px;
             color: white;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            font-size: 1em;
-        }
-
-        .timeframe-btn:hover {
-            background: #3d4e60;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
 
         .timeframe-btn.active {
             background: #00d4aa;
             color: #0f1b2b;
-            border-color: #00d4aa;
-            box-shadow: 0 4px 15px rgba(0, 212, 170, 0.3);
         }
 
         .chart-container {
             background: #1e2b3a;
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            height: 600px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            border: 1px solid #2d3e50;
-            position: relative;
-        }
-
-        .chart-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding: 10px;
-            background: rgba(45, 62, 80, 0.5);
-            border-radius: 8px;
-        }
-
-        .realtime-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #00d4aa;
-            font-weight: 600;
-        }
-
-        .realtime-dot {
-            width: 8px;
-            height: 8px;
-            background: #00d4aa;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            height: 400px;
         }
 
         .analysis-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 25px;
-            margin-bottom: 25px;
+            gap: 15px;
+            margin-bottom: 15px;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 768px) {
             .analysis-grid {
                 grid-template-columns: 1fr;
             }
@@ -148,803 +85,179 @@
 
         .analysis-card {
             background: #1e2b3a;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            border: 1px solid #2d3e50;
-            min-height: 400px;
-            display: flex;
-            flex-direction: column;
+            padding: 15px;
+            border-radius: 10px;
+            min-height: 200px;
         }
 
         .analysis-card h3 {
             color: #00d4aa;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #2d3e50;
-            padding-bottom: 15px;
-            font-size: 1.5em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .analysis-content {
-            flex: 1;
-            overflow-y: auto;
-            padding-right: 10px;
-            max-height: 300px;
-        }
-
-        .analysis-content::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .analysis-content::-webkit-scrollbar-track {
-            background: #2d3e50;
-            border-radius: 3px;
-        }
-
-        .analysis-content::-webkit-scrollbar-thumb {
-            background: #00d4aa;
-            border-radius: 3px;
-        }
-
-        .indicator-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-            margin-top: 15px;
-        }
-
-        .indicator-item {
-            background: #2d3e50;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            border: 1px solid #3d4e60;
-            transition: transform 0.2s ease;
-        }
-
-        .indicator-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        .indicator-name {
-            font-size: 0.9em;
-            color: #a0a0a0;
-            margin-bottom: 8px;
-        }
-
-        .indicator-value {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #00d4aa;
-        }
-
-        .news-item {
-            background: #2d3e50;
-            padding: 20px;
-            margin: 15px 0;
-            border-radius: 10px;
-            border-left: 4px solid #00d4aa;
-            border: 1px solid #3d4e60;
-        }
-
-        .news-item strong {
-            color: #ffffff;
-            font-size: 1.1em;
-            display: block;
             margin-bottom: 10px;
-        }
-
-        .news-item p {
-            color: #b0b0b0;
-            margin-bottom: 10px;
-            line-height: 1.5;
-        }
-
-        .news-item small {
-            color: #888;
-            font-size: 0.85em;
-        }
-
-        .signal-buy { 
-            color: #00d4aa !important; 
-            font-weight: bold;
-        }
-        .signal-sell { 
-            color: #ff6b6b !important; 
-            font-weight: bold;
-        }
-        .signal-hold { 
-            color: #ffd93d !important; 
-            font-weight: bold;
         }
 
         .loading {
             text-align: center;
-            padding: 40px 20px;
+            padding: 20px;
             color: #00d4aa;
-            font-size: 1.1em;
-        }
-
-        .loading:after {
-            content: '...';
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
         }
 
         .error {
             color: #ff6b6b;
-            padding: 15px;
-            background: rgba(255, 107, 107, 0.1);
-            border-radius: 8px;
-            margin: 10px 0;
-            border: 1px solid rgba(255, 107, 107, 0.3);
-        }
-
-        .success {
-            color: #00d4aa;
-            padding: 15px;
-            background: rgba(0, 212, 170, 0.1);
-            border-radius: 8px;
-            margin: 10px 0;
-            border: 1px solid rgba(0, 212, 170, 0.3);
-        }
-
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 20px;
-            padding: 15px;
-            background: #1e2b3a;
-            border-radius: 10px;
-            font-size: 0.9em;
-            border: 1px solid #2d3e50;
-        }
-
-        .trend-indicator {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-
-        .analysis-section {
-            margin: 15px 0;
-            padding: 15px;
-            background: rgba(45, 62, 80, 0.5);
-            border-radius: 8px;
-            border-left: 3px solid #00d4aa;
-        }
-
-        .analysis-section h4 {
-            color: #00d4aa;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-
-        .key-levels {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .level-item {
             padding: 10px;
-            background: rgba(45, 62, 80, 0.7);
-            border-radius: 6px;
-            text-align: center;
-            font-size: 0.9em;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .header h1 {
-                font-size: 2em;
-            }
-            
-            .price-display {
-                font-size: 2.2em;
-            }
-            
-            .timeframe-btn {
-                padding: 10px 15px;
-                font-size: 0.9em;
-            }
-            
-            .chart-container {
-                height: 500px;
-                padding: 15px;
-            }
-            
-            .analysis-card {
-                padding: 15px;
-                min-height: 300px;
-            }
-            
-            .indicator-grid {
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            }
-            
-            .key-levels {
-                grid-template-columns: 1fr;
-            }
+            background: #2d1e1e;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header Section -->
         <div class="header">
-            <h1>🚀 XAUUSD AI Analysis System</h1>
-            <div class="price-display" id="currentPrice">Loading XAU/USD...</div>
+            <h1>XAUUSD AI Analysis</h1>
+            <div class="price-display" id="currentPrice">Loading...</div>
             <div class="timeframe-selector">
-                <button class="timeframe-btn active" onclick="changeTimeframe('1D')">📅 1D (2 Years)</button>
-                <button class="timeframe-btn" onclick="changeTimeframe('4H')">⏰ 4H (1 Year)</button>
-                <button class="timeframe-btn" onclick="changeTimeframe('1H')">⚡ 1H (6 Months)</button>
+                <button class="timeframe-btn active" onclick="changeTimeframe('1D')">1D</button>
+                <button class="timeframe-btn" onclick="changeTimeframe('4H')">4H</button>
+                <button class="timeframe-btn" onclick="changeTimeframe('1H')">1H</button>
             </div>
         </div>
 
-        <!-- Chart Section -->
         <div class="chart-container">
-            <div class="chart-controls">
-                <div class="realtime-indicator">
-                    <div class="realtime-dot"></div>
-                    <span>Live Market Data</span>
-                </div>
-                <div id="chartInfo">Loading chart data...</div>
-            </div>
             <canvas id="priceChart"></canvas>
         </div>
 
-        <!-- Analysis Grid -->
         <div class="analysis-grid">
-            <!-- AI Analysis Card -->
             <div class="analysis-card">
-                <h3>🤖 AI Analysis</h3>
-                <div class="analysis-content" id="aiAnalysis">
-                    <div class="loading">Loading AI analysis</div>
+                <h3>AI Analysis</h3>
+                <div id="aiAnalysis">
+                    <div class="loading">Loading analysis...</div>
                 </div>
             </div>
             
-            <!-- Technical Indicators Card -->
             <div class="analysis-card">
-                <h3>📊 Technical Indicators</h3>
-                <div class="analysis-content" id="technicalIndicators">
-                    <div class="loading">Loading technical indicators</div>
+                <h3>Technical Indicators</h3>
+                <div id="technicalIndicators">
+                    <div class="loading">Loading indicators...</div>
                 </div>
             </div>
         </div>
 
-        <!-- News Card -->
         <div class="analysis-card">
-            <h3>📰 Fundamental News</h3>
-            <div class="analysis-content" id="newsFeed">
-                <div class="loading">Loading market news</div>
+            <h3>Market News</h3>
+            <div id="newsFeed">
+                <div class="loading">Loading news...</div>
             </div>
-        </div>
-        
-        <!-- Status Bar -->
-        <div class="status-bar">
-            <div id="status">🟢 System Ready - Select a timeframe to start</div>
-            <div id="lastUpdate">Last update: Never</div>
         </div>
     </div>
 
     <script>
         let currentChart = null;
         let currentTimeframe = '1D';
-        let realtimeUpdateInterval = null;
 
-        // Initialize when page loads
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 XAUUSD Dashboard Initialized');
-            updateStatus('System ready - Loading initial data...', 'info');
+            console.log("Initializing XAUUSD Analysis System...");
             loadAnalysis(currentTimeframe);
-            
-            // Auto-refresh every 30 seconds for real-time updates
-            realtimeUpdateInterval = setInterval(() => {
-                if (currentTimeframe) {
-                    updateRealtimePrice();
-                }
-            }, 30000);
         });
 
-        // Change timeframe function
         function changeTimeframe(timeframe) {
             currentTimeframe = timeframe;
-            
-            // Update active button
             document.querySelectorAll('.timeframe-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
-            
-            updateStatus(`Loading ${timeframe} data...`, 'info');
             loadAnalysis(timeframe);
         }
 
-        // Main analysis loading function
         async function loadAnalysis(timeframe) {
             try {
-                showLoadingStates();
+                showLoading();
+                console.log(`Loading ${timeframe} analysis...`);
                 
-                console.log(`📊 Loading analysis for: ${timeframe}`);
+                const response = await fetch(`/api/analysis/${timeframe}`);
+                if (!response.ok) throw new Error('API error');
                 
-                // Load analysis data from API
-                const analysisResponse = await fetch(`/api/analysis/${timeframe}`);
-                if (!analysisResponse.ok) {
-                    throw new Error(`API Error: ${analysisResponse.status}`);
-                }
-                const analysisData = await analysisResponse.json();
+                const data = await response.json();
                 
-                console.log('✅ Analysis data loaded:', analysisData);
+                // Update UI
+                document.getElementById('currentPrice').textContent = 
+                    `XAU/USD $${data.current_price?.toFixed(2) || 'N/A'}`;
                 
-                // Update all UI components
-                updatePriceDisplay(analysisData.current_price);
-                updateAIAnalysis(analysisData.ai_analysis);
-                updateTechnicalIndicators(analysisData.technical_indicators);
-                updateNewsFeed(analysisData.news);
+                document.getElementById('aiAnalysis').innerHTML = 
+                    formatAnalysis(data.ai_analysis);
                 
-                // Load and render candlestick chart
-                await loadAndRenderCandlestickChart(timeframe);
+                document.getElementById('technicalIndicators').innerHTML = 
+                    formatIndicators(data.technical_indicators);
                 
-                updateStatus(`✅ ${timeframe} analysis loaded successfully`, 'success');
-                updateLastUpdateTime();
+                document.getElementById('newsFeed').innerHTML = 
+                    formatNews(data.news);
+                
+                renderChart(data.chart_data, timeframe);
                 
             } catch (error) {
-                console.error('❌ Error loading analysis:', error);
-                handleLoadingError(error);
+                console.error('Error:', error);
+                document.getElementById('aiAnalysis').innerHTML = 
+                    '<div class="error">Failed to load data</div>';
             }
         }
 
-        // Update real-time price only (without reloading entire analysis)
-        async function updateRealtimePrice() {
-            try {
-                const analysisResponse = await fetch(`/api/analysis/${currentTimeframe}`);
-                if (!analysisResponse.ok) return;
-                
-                const analysisData = await analysisResponse.json();
-                updatePriceDisplay(analysisData.current_price);
-                
-                // Update the last candle with real-time price
-                if (currentChart && analysisData.current_price) {
-                    updateLastCandle(analysisData.current_price);
-                }
-                
-                updateLastUpdateTime();
-                
-            } catch (error) {
-                console.log('Realtime price update failed:', error);
-            }
+        function showLoading() {
+            document.getElementById('aiAnalysis').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('technicalIndicators').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('newsFeed').innerHTML = '<div class="loading">Loading...</div>';
         }
 
-        // Show loading states
-        function showLoadingStates() {
-            document.getElementById('aiAnalysis').innerHTML = '<div class="loading">Analyzing market data</div>';
-            document.getElementById('technicalIndicators').innerHTML = '<div class="loading">Calculating indicators</div>';
-            document.getElementById('newsFeed').innerHTML = '<div class="loading">Fetching news</div>';
-            document.getElementById('currentPrice').textContent = 'Loading XAU/USD...';
-            document.getElementById('chartInfo').textContent = 'Loading chart data...';
+        function formatAnalysis(analysis) {
+            if (!analysis) return '<div class="error">No analysis</div>';
+            return '<div style="white-space: pre-line;">' + analysis + '</div>';
         }
 
-        // Update price display
-        function updatePriceDisplay(price) {
-            if (price && !isNaN(price)) {
-                const formattedPrice = `$${price.toFixed(2)}`;
-                document.getElementById('currentPrice').textContent = `XAU/USD ${formattedPrice}`;
-                document.getElementById('currentPrice').style.color = '#00d4aa';
-            } else {
-                document.getElementById('currentPrice').textContent = 'XAU/USD Price Unavailable';
-                document.getElementById('currentPrice').style.color = '#ff6b6b';
-            }
-        }
-
-        // Update AI Analysis section
-        function updateAIAnalysis(analysis) {
-            const container = document.getElementById('aiAnalysis');
+        function formatIndicators(indicators) {
+            if (!indicators) return '<div class="error">No indicators</div>';
             
-            if (!analysis || analysis.includes('Error') || analysis.includes('unavailable')) {
-                container.innerHTML = '<div class="error">AI analysis temporarily unavailable</div>';
-                return;
+            let html = '';
+            for (const [key, value] of Object.entries(indicators)) {
+                html += `<div>${key}: ${value?.toFixed(4)}</div>`;
             }
-
-            try {
-                let html = '';
-                const lines = analysis.split('\n').filter(line => line.trim());
-                
-                lines.forEach(line => {
-                    const trimmed = line.trim();
-                    
-                    if (trimmed.includes('TREND:')) {
-                        const trend = trimmed.split(':')[1]?.trim() || 'Unknown';
-                        const trendClass = getTrendClass(trend);
-                        html += `<div class="analysis-section">
-                            <strong>Trend Analysis:</strong> 
-                            <span class="${trendClass}">${trend}</span>
-                        </div>`;
-                    }
-                    else if (trimmed.includes('SIGNAL:')) {
-                        const signal = trimmed.split(':')[1]?.trim() || 'Hold';
-                        const signalClass = `signal-${signal.toLowerCase()}`;
-                        html += `<div class="analysis-section">
-                            <strong>Trading Signal:</strong> 
-                            <span class="${signalClass}">${signal}</span>
-                        </div>`;
-                    }
-                    else if (trimmed.includes('RISK LEVEL:')) {
-                        const risk = trimmed.split(':')[1]?.trim() || 'Medium';
-                        html += `<div class="analysis-section">
-                            <strong>Risk Level:</strong> ${risk}
-                        </div>`;
-                    }
-                    else if (trimmed.includes('SUPPORT:') || trimmed.includes('RESISTANCE:')) {
-                        const [label, value] = trimmed.split(':');
-                        if (value) {
-                            html += `<div class="level-item">
-                                <strong>${label.trim()}:</strong> ${value.trim()}
-                            </div>`;
-                        }
-                    }
-                    else if (trimmed.includes('ANALYSIS:') || trimmed.includes('TECHNICAL OBSERVATIONS:') || trimmed.includes('TRADING RECOMMENDATION:')) {
-                        html += `<div class="analysis-section">
-                            <h4>${trimmed.replace(':', '')}</h4>`;
-                    }
-                    else if (trimmed && !trimmed.includes('---') && !trimmed.match(/^\d+\.$/)) {
-                        if (trimmed.match(/^[A-Z\s]+:$/)) {
-                            html += `</div><div class="analysis-section"><h4>${trimmed.replace(':', '')}</h4>`;
-                        } else {
-                            html += `<p>${trimmed}</p>`;
-                        }
-                    }
-                });
-
-                container.innerHTML = html;
-            } catch (e) {
-                console.error('Error formatting AI analysis:', e);
-                container.innerHTML = '<div class="error">Error displaying analysis</div>';
-            }
+            return html;
         }
 
-        // Update technical indicators
-        function updateTechnicalIndicators(indicators) {
-            const container = document.getElementById('technicalIndicators');
+        function formatNews(news) {
+            if (!news?.articles) return '<div class="error">No news</div>';
             
-            if (!indicators || Object.keys(indicators).length === 0) {
-                container.innerHTML = '<div class="error">Technical indicators unavailable</div>';
-                return;
-            }
-
-            try {
-                const importantIndicators = {
-                    'RSI (14)': indicators.rsi,
-                    'MACD': indicators.macd,
-                    'MACD Signal': indicators.macd_signal,
-                    'Stoch K': indicators.stoch_k,
-                    'Stoch D': indicators.stoch_d,
-                    'SMA 20': indicators.sma_20,
-                    'SMA 50': indicators.sma_50,
-                    'SMA 200': indicators.sma_200,
-                    'BB Upper': indicators.bb_upper,
-                    'BB Lower': indicators.bb_lower,
-                    'ATR (14)': indicators.atr
-                };
-
-                let html = '<div class="indicator-grid">';
-                let hasData = false;
-
-                Object.entries(importantIndicators).forEach(([name, value]) => {
-                    if (value !== undefined && value !== null && !isNaN(value)) {
-                        hasData = true;
-                        let valueClass = '';
-                        let displayValue = value?.toFixed(4);
-                        
-                        // Color coding for specific indicators
-                        if (name === 'RSI (14)') {
-                            if (value > 70) valueClass = 'signal-sell';
-                            else if (value < 30) valueClass = 'signal-buy';
-                        } else if (name === 'MACD' && indicators.macd_signal !== undefined) {
-                            if (value > indicators.macd_signal) valueClass = 'signal-buy';
-                            else valueClass = 'signal-sell';
-                        }
-                        
-                        html += `
-                            <div class="indicator-item">
-                                <div class="indicator-name">${name}</div>
-                                <div class="indicator-value ${valueClass}">${displayValue}</div>
-                            </div>
-                        `;
-                    }
-                });
-
-                html += '</div>';
-                
-                if (!hasData) {
-                    container.innerHTML = '<div class="error">No indicator data available</div>';
-                } else {
-                    container.innerHTML = html;
-                }
-            } catch (e) {
-                console.error('Error formatting indicators:', e);
-                container.innerHTML = '<div class="error">Error displaying indicators</div>';
-            }
+            return news.articles.map(article => 
+                `<div style="margin: 10px 0;"><strong>${article.title}</strong><br>${article.description}</div>`
+            ).join('');
         }
 
-        // Update news feed
-        function updateNewsFeed(newsData) {
-            const container = document.getElementById('newsFeed');
-            
-            if (!newsData || !newsData.articles || newsData.articles.length === 0) {
-                container.innerHTML = '<div class="error">Market news temporarily unavailable</div>';
-                return;
-            }
-
-            try {
-                let html = '';
-                newsData.articles.slice(0, 5).forEach((article, index) => {
-                    const date = new Date(article.publishedAt);
-                    html += `
-                        <div class="news-item">
-                            <strong>${article.title || 'Market Update'}</strong>
-                            <p>${article.description || 'No description available.'}</p>
-                            <small>${date.toLocaleDateString()} • ${date.toLocaleTimeString()}</small>
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-            } catch (e) {
-                console.error('Error formatting news:', e);
-                container.innerHTML = '<div class="error'>Error loading news feed</div>';
-            }
-        }
-
-        // Load and render candlestick chart
-        async function loadAndRenderCandlestickChart(timeframe) {
-            try {
-                const chartResponse = await fetch(`/api/chart/data/${timeframe}`);
-                if (!chartResponse.ok) {
-                    throw new Error(`Chart data error: ${chartResponse.status}`);
-                }
-                const chartData = await chartResponse.json();
-                
-                console.log(`📈 Loaded ${chartData.length} candlestick data points`);
-                renderCandlestickChart(chartData, timeframe);
-                
-            } catch (error) {
-                console.error('Error loading chart data:', error);
-                updateStatus('Warning: Chart data unavailable', 'error');
-            }
-        }
-
-        // Render candlestick chart function
-        function renderCandlestickChart(data, timeframe) {
+        function renderChart(data, timeframe) {
             const ctx = document.getElementById('priceChart').getContext('2d');
             
-            // Destroy existing chart
             if (currentChart) {
                 currentChart.destroy();
             }
-
-            if (!data || data.length === 0) {
-                ctx.font = '16px Arial';
-                ctx.fillStyle = '#888';
-                ctx.textAlign = 'center';
-                ctx.fillText('No chart data available', ctx.canvas.width / 2, ctx.canvas.height / 2);
-                return;
-            }
-
-            try {
-                // Prepare candlestick data
-                const candlestickData = data.map(d => ({
-                    x: new Date(d.datetime).getTime(),
-                    o: parseFloat(d.open),
-                    h: parseFloat(d.high),
-                    l: parseFloat(d.low),
-                    c: parseFloat(d.close)
-                }));
-
-                // Update chart info
-                document.getElementById('chartInfo').textContent = 
-                    `${candlestickData.length} candles • ${timeframe} timeframe`;
-
-                currentChart = new Chart(ctx, {
-                    type: 'candlestick',
-                    data: {
-                        datasets: [{
-                            label: `XAU/USD ${timeframe}`,
-                            data: candlestickData,
-                            color: {
-                                up: '#00d4aa',
-                                down: '#ff6b6b',
-                                unchanged: '#cccccc',
-                            },
-                            borderColor: {
-                                up: '#00d4aa',
-                                down: '#ff6b6b',
-                                unchanged: '#cccccc'
-                            },
-                            borderWidth: 1,
-                            backgroundColors: {
-                                up: 'rgba(0, 212, 170, 0.1)',
-                                down: 'rgba(255, 107, 107, 0.1)'
-                            }
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: {
-                                    unit: getTimeUnit(timeframe),
-                                    tooltipFormat: 'yyyy-MM-dd HH:mm',
-                                    displayFormats: {
-                                        hour: 'HH:mm',
-                                        day: 'MMM dd',
-                                        week: 'MMM dd',
-                                        month: 'MMM yyyy'
-                                    }
-                                },
-                                grid: {
-                                    color: 'rgba(45, 62, 80, 0.5)'
-                                },
-                                ticks: {
-                                    color: '#a0a0a0',
-                                    maxRotation: 0
-                                }
-                            },
-                            y: {
-                                grid: {
-                                    color: 'rgba(45, 62, 80, 0.5)'
-                                },
-                                ticks: {
-                                    color: '#a0a0a0',
-                                    callback: function(value) {
-                                        return '$' + value.toFixed(2);
-                                    }
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    color: '#e0e0e0',
-                                    font: {
-                                        size: 12
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false,
-                                backgroundColor: 'rgba(30, 43, 58, 0.95)',
-                                titleColor: '#00d4aa',
-                                bodyColor: '#e0e0e0',
-                                borderColor: '#00d4aa',
-                                borderWidth: 1,
-                                callbacks: {
-                                    label: function(context) {
-                                        const point = context.raw;
-                                        return [
-                                            `Open: $${point.o.toFixed(2)}`,
-                                            `High: $${point.h.toFixed(2)}`,
-                                            `Low: $${point.l.toFixed(2)}`,
-                                            `Close: $${point.c.toFixed(2)}`
-                                        ];
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Error rendering candlestick chart:', error);
-                ctx.font = '16px Arial';
-                ctx.fillStyle = '#ff6b6b';
-                ctx.textAlign = 'center';
-                ctx.fillText('Error rendering chart', ctx.canvas.width / 2, ctx.canvas.height / 2);
-            }
-        }
-
-        // Update the last candle with real-time price
-        function updateLastCandle(realtimePrice) {
-            if (!currentChart || !currentChart.data.datasets[0].data.length) return;
             
-            const lastCandle = currentChart.data.datasets[0].data[currentChart.data.datasets[0].data.length - 1];
+            const prices = data.map(d => d.close);
+            const labels = data.map((d, i) => i);
             
-            // Update the last candle with real-time price
-            lastCandle.c = realtimePrice;
-            lastCandle.h = Math.max(lastCandle.h, realtimePrice);
-            lastCandle.l = Math.min(lastCandle.l, realtimePrice);
-            
-            // Update the color based on new close price
-            lastCandle.color = realtimePrice >= lastCandle.o ? 
-                currentChart.data.datasets[0].color.up : 
-                currentChart.data.datasets[0].color.down;
-            
-            // Refresh the chart
-            currentChart.update('none');
-            
-            console.log('🔄 Updated last candle with real-time price:', realtimePrice);
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `XAU/USD ${timeframe}`,
+                        data: prices,
+                        borderColor: '#00d4aa',
+                        backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
         }
-
-        // Helper functions
-        function getTrendClass(trend) {
-            if (!trend) return 'signal-hold';
-            const trendLower = trend.toLowerCase();
-            if (trendLower.includes('bull')) return 'signal-buy';
-            if (trendLower.includes('bear')) return 'signal-sell';
-            return 'signal-hold';
-        }
-
-        function getTimeUnit(timeframe) {
-            switch(timeframe) {
-                case '1D': return 'month';
-                case '4H': return 'day';
-                case '1H': return 'hour';
-                default: return 'day';
-            }
-        }
-
-        function updateStatus(message, type) {
-            const statusElement = document.getElementById('status');
-            statusElement.textContent = message;
-            
-            // Remove existing classes
-            statusElement.className = '';
-            
-            // Add appropriate class
-            if (type === 'error') {
-                statusElement.style.color = '#ff6b6b';
-            } else if (type === 'success') {
-                statusElement.style.color = '#00d4aa';
-            } else {
-                statusElement.style.color = '#ffd93d';
-            }
-        }
-
-        function updateLastUpdateTime() {
-            const now = new Date();
-            document.getElementById('lastUpdate').textContent = 
-                `Last update: ${now.toLocaleTimeString()}`;
-        }
-
-        function handleLoadingError(error) {
-            updateStatus(`Error: ${error.message}`, 'error');
-            document.getElementById('aiAnalysis').innerHTML = 
-                '<div class="error">Failed to load analysis data</div>';
-        }
-
-        // Global error handler
-        window.addEventListener('error', function(e) {
-            console.error('Global error:', e.error);
-            updateStatus('Application error occurred', 'error');
-        });
-
-        // Clean up interval when page unloads
-        window.addEventListener('beforeunload', function() {
-            if (realtimeUpdateInterval) {
-                clearInterval(realtimeUpdateInterval);
-            }
-        });
     </script>
 </body>
 </html>
