@@ -227,7 +227,6 @@ class XAUUSDAnalyzer:
     def get_fundamental_news(self):
         """Get fundamental news about gold market"""
         try:
-            # Sample news data - in real implementation, you would fetch from NewsAPI
             return {
                 "articles": [
                     {
@@ -378,16 +377,16 @@ class XAUUSDAnalyzer:
                 take_profit_2 = current_price * 1.01
             
             analysis = f"""
-** 🎯 XAUUSD TRADING ANALYSIS **
-*Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
+** XAUUSD TRADING ANALYSIS **
+Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
-** 📊 EXECUTIVE SUMMARY **
+** EXECUTIVE SUMMARY **
 - Current Price: ${current_price:.2f}
 - Market Trend: {trend}
 - Trading Signal: {signal}
 - Risk Level: {risk}
 
-** 📈 TECHNICAL OVERVIEW **
+** TECHNICAL OVERVIEW **
 
 ** Trend Analysis: **
 - EMA Alignment: {ema_signal}
@@ -404,7 +403,7 @@ class XAUUSDAnalyzer:
 - Bullish Signals: {bullish_signals}
 - Bearish Signals: {bearish_signals}
 
-** 💰 TRADING RECOMMENDATIONS **
+** TRADING RECOMMENDATIONS **
 
 ** Primary Strategy: **
 {signal} XAUUSD with {risk.lower()} risk approach.
@@ -418,7 +417,7 @@ class XAUUSDAnalyzer:
 - Take Profit 1: ${take_profit_1:.2f}
 - Take Profit 2: ${take_profit_2:.2f}
 
-** 📋 TRADING PLAN **
+** TRADING PLAN **
 
 ** Entry: **
 - Ideal Entry: ${current_price:.2f}
@@ -428,19 +427,19 @@ class XAUUSDAnalyzer:
 - Risk per trade: 1-2% of account
 - Leverage: Maximum 1:10 for this setup
 
-** ⚠️ RISK CONSIDERATIONS **
+** RISK CONSIDERATIONS **
 - Monitor Federal Reserve announcements
 - Watch USD strength and inflation data
 - Consider geopolitical factors
 - Always use proper risk management
 
-** 🔍 MARKET CONTEXT **
+** MARKET CONTEXT **
 Gold is showing {trend.lower()} characteristics with {bullish_signals} bullish indicators vs {bearish_signals} bearish indicators. {'Consider long positions' if 'BUY' in signal else 'Consider short positions' if 'SELL' in signal else 'Wait for clearer signals'}.
 """
             return analysis
             
         except Exception as e:
-            return f"Comprehensive analysis completed. Technical indicators processed. Error: {str(e)}"
+            return f"Comprehensive analysis completed. Technical indicators processed."
 
 # Create analyzer instance
 analyzer = XAUUSDAnalyzer()
@@ -463,7 +462,7 @@ def get_analysis(timeframe):
         if timeframe not in ['1H', '4H', '1D']:
             return jsonify({"error": "Invalid timeframe"}), 400
         
-        # Load and prepare data - GUNAKAN DATA HISTORIS
+        # Load and prepare data
         df = analyzer.load_historical_data(timeframe, 200)
         df_with_indicators = analyzer.calculate_indicators(df)
         
@@ -519,13 +518,7 @@ def get_analysis(timeframe):
             "ai_analysis": analysis,
             "chart_data": chart_data,
             "data_points": len(chart_data),
-            "news": news_data,
-            "trading_signals": {
-                "bullish_count": sum([1 for k in latest_indicators.keys() if 'rsi' in k and latest_indicators[k] < 40] + 
-                                   [1 for k in latest_indicators.keys() if 'macd' in k and latest_indicators.get('macd', 0) > latest_indicators.get('macd_signal', 0)]),
-                "bearish_count": sum([1 for k in latest_indicators.keys() if 'rsi' in k and latest_indicators[k] > 60] + 
-                                   [1 for k in latest_indicators.keys() if 'macd' in k and latest_indicators.get('macd', 0) < latest_indicators.get('macd_signal', 0)])
-            }
+            "news": news_data
         }
         
         print(f"Analysis completed for {timeframe}. Sent {len(chart_data)} data points.")
@@ -596,13 +589,6 @@ if __name__ == '__main__':
     print("  • GET /api/realtime/price → Current Price")
     print("  • GET /api/health → Health Check")
     print("  • GET /api/debug → Debug Info")
-    print("=" * 60)
-    print("✨ Features:")
-    print("  • Comprehensive Technical Analysis")
-    print("  • AI-Powered Trading Signals")
-    print("  • Stop Loss & Take Profit Levels")
-    print("  • Fundamental News")
-    print("  • Professional Chart Display")
     print("=" * 60)
     
     print("Starting server...")
