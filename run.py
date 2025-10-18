@@ -165,71 +165,80 @@ class XAUUSDAnalyzer:
         }
         return freqs.get(timeframe, 'D')
 
-    # run.py - Tambahkan method ini di class XAUUSDAnalyzer
-
     def calculate_technical_indicators(self, df):
-    """Hitung indikator teknikal dengan EMA dan MACD yang benar"""
-    try:
-        # Gunakan data yang cukup untuk perhitungan akurat
-        if len(df) > 500:
-            df_calc = df.tail(500).copy()
-        else:
-            df_calc = df.copy()
+        """Hitung indikator teknikal lengkap dengan EMA dan MACD yang benar"""
+        try:
+            # Gunakan data yang cukup untuk perhitungan akurat
+            if len(df) > 500:
+                df_calc = df.tail(500).copy()
+            else:
+                df_calc = df.copy()
+                
+            high = df_calc['high'].values
+            low = df_calc['low'].values
+            close = df_calc['close'].values
             
-        high = df_calc['high'].values
-        low = df_calc['low'].values
-        close = df_calc['close'].values
-        open_prices = df_calc['open'].values
-        
-        indicators = {}
-        
-        if TALIB_AVAILABLE:
-            print("Calculating comprehensive technical indicators with TA-Lib...")
+            indicators = {}
             
-            # Trend Indicators - EMA untuk chart
-            indicators['ema_12'] = talib.EMA(close, timeperiod=12)
-            indicators['ema_26'] = talib.EMA(close, timeperiod=26)
-            indicators['ema_50'] = talib.EMA(close, timeperiod=50)
-            indicators['sma_20'] = talib.SMA(close, timeperiod=20)
+            if TALIB_AVAILABLE:
+                print("Calculating comprehensive technical indicators...")
+                
+                # Trend Indicators - EMA untuk chart
+                indicators['ema_12'] = talib.EMA(close, timeperiod=12)
+                indicators['ema_26'] = talib.EMA(close, timeperiod=26)
+                indicators['ema_50'] = talib.EMA(close, timeperiod=50)
+                indicators['sma_20'] = talib.SMA(close, timeperiod=20)
+                indicators['sma_50'] = talib.SMA(close, timeperiod=50)
+                indicators['sma_200'] = talib.SMA(close, timeperiod=200)
+                
+                # Momentum Indicators - MACD untuk histogram
+                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(close)
+                indicators['rsi'] = talib.RSI(close, timeperiod=14)
+                indicators['stoch_k'], indicators['stoch_d'] = talib.STOCH(high, low, close)
+                indicators['williams_r'] = talib.WILLR(high, low, close, timeperiod=14)
+                indicators['cci'] = talib.CCI(high, low, close, timeperiod=20)
+                
+                # Volatility Indicators
+                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(close)
+                indicators['atr'] = talib.ATR(high, low, close, timeperiod=14)
+                
+                # Volume Indicators (if available)
+                if 'volume' in df_calc.columns:
+                    volume = df_calc['volume'].values
+                    indicators['obv'] = talib.OBV(close, volume)
+                
+            else:
+                print("Using fallback comprehensive indicator calculations")
+                # Fallback calculations
+                indicators['ema_12'] = self.ema(close, 12)
+                indicators['ema_26'] = self.ema(close, 26)
+                indicators['ema_50'] = self.ema(close, 50)
+                indicators['sma_20'] = self.sma(close, 20)
+                indicators['sma_50'] = self.sma(close, 50)
+                indicators['sma_200'] = self.sma(close, 200)
+                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = self.macd(close)
+                indicators['rsi'] = self.rsi(close, 14)
+                indicators['stoch_k'], indicators['stoch_d'] = self.stochastic(high, low, close)
+                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = self.bollinger_bands(close)
+                indicators['atr'] = self.atr(high, low, close)
             
-            # Momentum Indicators - MACD untuk histogram
-            indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(close)
-            indicators['rsi'] = talib.RSI(close, timeperiod=14)
-            indicators['stoch_k'], indicators['stoch_d'] = talib.STOCH(high, low, close)
+            # Extend arrays to match original dataframe length
+            for key in indicators:
+                if indicators[key] is not None:
+                    original_len = len(df)
+                    calc_len = len(indicators[key])
+                    if calc_len < original_len:
+                        padding = np.full(original_len - calc_len, np.nan)
+                        indicators[key] = np.concatenate([padding, indicators[key]])
             
-            # Volatility Indicators
-            indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(close)
-            indicators['atr'] = talib.ATR(high, low, close, timeperiod=14)
+            print(f"Calculated {len(indicators)} technical indicators including EMA and MACD")
+            return indicators
             
-        else:
-            print("Using fallback comprehensive indicator calculations")
-            # Fallback calculations
-            indicators['ema_12'] = self.ema(close, 12)
-            indicators['ema_26'] = self.ema(close, 26)
-            indicators['ema_50'] = self.ema(close, 50)
-            indicators['sma_20'] = self.sma(close, 20)
-            indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = self.macd(close)
-            indicators['rsi'] = self.rsi(close, 14)
-            indicators['stoch_k'], indicators['stoch_d'] = self.stochastic(high, low, close)
-            indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = self.bollinger_bands(close)
-            indicators['atr'] = self.atr(high, low, close)
-        
-        # Extend arrays to match original dataframe length
-        for key in indicators:
-            if indicators[key] is not None:
-                original_len = len(df)
-                calc_len = len(indicators[key])
-                if calc_len < original_len:
-                    padding = np.full(original_len - calc_len, np.nan)
-                    indicators[key] = np.concatenate([padding, indicators[key]])
-        
-        print(f"Calculated {len(indicators)} technical indicators including EMA and MACD")
-        return indicators
-        
-    except Exception as e:
-        print(f"Error calculating indicators: {e}")
-        traceback.print_exc()
-        return {}
+        except Exception as e:
+            print(f"Error calculating indicators: {e}")
+            traceback.print_exc()
+            return {}
+
     def get_realtime_price(self):
         """Ambil harga realtime dari Twelve Data API"""
         try:
@@ -296,77 +305,6 @@ class XAUUSDAnalyzer:
         except Exception as e:
             print(f"Error getting news: {e}")
             return {"articles": []}
-
-    def calculate_technical_indicators(self, df):
-        """Hitung indikator teknikal lengkap"""
-        try:
-            # Gunakan data yang cukup untuk perhitungan akurat
-            if len(df) > 500:
-                df_calc = df.tail(500).copy()
-            else:
-                df_calc = df.copy()
-                
-            high = df_calc['high'].values
-            low = df_calc['low'].values
-            close = df_calc['close'].values
-            
-            indicators = {}
-            
-            if TALIB_AVAILABLE:
-                print("Calculating comprehensive technical indicators...")
-                
-                # Trend Indicators
-                indicators['sma_20'] = talib.SMA(close, timeperiod=20)
-                indicators['sma_50'] = talib.SMA(close, timeperiod=50)
-                indicators['sma_200'] = talib.SMA(close, timeperiod=200)
-                indicators['ema_12'] = talib.EMA(close, timeperiod=12)
-                indicators['ema_26'] = talib.EMA(close, timeperiod=26)
-                
-                # Momentum Indicators
-                indicators['rsi'] = talib.RSI(close, timeperiod=14)
-                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = talib.MACD(close)
-                indicators['stoch_k'], indicators['stoch_d'] = talib.STOCH(high, low, close)
-                indicators['williams_r'] = talib.WILLR(high, low, close, timeperiod=14)
-                indicators['cci'] = talib.CCI(high, low, close, timeperiod=20)
-                
-                # Volatility Indicators
-                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = talib.BBANDS(close)
-                indicators['atr'] = talib.ATR(high, low, close, timeperiod=14)
-                
-                # Volume Indicators (if available)
-                if 'volume' in df_calc.columns:
-                    volume = df_calc['volume'].values
-                    indicators['obv'] = talib.OBV(close, volume)
-                
-            else:
-                print("Using fallback comprehensive indicator calculations")
-                # Fallback calculations
-                indicators['sma_20'] = self.sma(close, 20)
-                indicators['sma_50'] = self.sma(close, 50)
-                indicators['sma_200'] = self.sma(close, 200)
-                indicators['ema_12'] = self.ema(close, 12)
-                indicators['ema_26'] = self.ema(close, 26)
-                indicators['rsi'] = self.rsi(close, 14)
-                indicators['macd'], indicators['macd_signal'], indicators['macd_hist'] = self.macd(close)
-                indicators['stoch_k'], indicators['stoch_d'] = self.stochastic(high, low, close)
-                indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'] = self.bollinger_bands(close)
-                indicators['atr'] = self.atr(high, low, close)
-            
-            # Extend arrays to match original dataframe length
-            for key in indicators:
-                if indicators[key] is not None:
-                    original_len = len(df)
-                    calc_len = len(indicators[key])
-                    if calc_len < original_len:
-                        padding = np.full(original_len - calc_len, np.nan)
-                        indicators[key] = np.concatenate([padding, indicators[key]])
-            
-            print(f"Calculated {len(indicators)} technical indicators")
-            return indicators
-            
-        except Exception as e:
-            print(f"Error calculating indicators: {e}")
-            return {}
 
     # Fallback technical indicator functions
     def sma(self, data, period):
