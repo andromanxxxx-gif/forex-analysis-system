@@ -35,6 +35,7 @@
             background: #2d2d2d; padding: 20px; 
             border-radius: 10px; margin: 20px 0; 
             white-space: pre-wrap; font-family: monospace; 
+            line-height: 1.4;
         }
         .indicators { 
             display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
@@ -50,22 +51,26 @@
         .neutral { color: #ffd700; }
         .loading { text-align: center; padding: 40px; color: #ffd700; }
         .error { color: #ff4444; text-align: center; padding: 20px; }
+        .debug { background: #333; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9em; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🧠 XAUUSD Gold Analysis</h1>
-            <p>Real-time Technical Analysis</p>
+            <p>Real-time Technical Analysis with Historical Data</p>
         </div>
 
         <div class="controls">
             <button class="btn active" onclick="loadData('1H')">1 Hour</button>
             <button class="btn" onclick="loadData('4H')">4 Hours</button>
             <button class="btn" onclick="loadData('1D')">1 Day</button>
+            <button class="btn" onclick="checkDebug()">Debug</button>
         </div>
 
         <div class="price" id="currentPrice">Loading...</div>
+
+        <div id="debugInfo" class="debug" style="display: none;"></div>
 
         <div class="chart-container">
             <canvas id="priceChart"></canvas>
@@ -92,7 +97,7 @@
 
         function loadData(timeframe) {
             currentTimeframe = timeframe;
-            console.log('Loading:', timeframe);
+            console.log('Loading data for:', timeframe);
             
             // Update buttons
             document.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
@@ -102,7 +107,7 @@
             
             fetch(`/api/analysis/${timeframe}`)
                 .then(response => {
-                    if (!response.ok) throw new Error('Network error');
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return response.json();
                 })
                 .then(data => {
@@ -110,12 +115,12 @@
                     if (data.status === 'success') {
                         updateDashboard(data);
                     } else {
-                        throw new Error(data.error || 'Unknown error');
+                        throw new Error(data.error || 'Unknown error from server');
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    showError(error.message);
+                    console.error('Error loading data:', error);
+                    showError('Failed to load data: ' + error.message);
                 });
         }
 
@@ -127,29 +132,36 @@
 
         function showError(message) {
             document.getElementById('currentPrice').textContent = 'Error';
-            document.getElementById('aiAnalysis').textContent = `Error: ${message}`;
+            document.getElementById('aiAnalysis').textContent = message;
             document.getElementById('indicatorsGrid').innerHTML = `<div class="error">${message}</div>`;
         }
 
         function updateDashboard(data) {
-            // Update price
-            document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
-            
-            // Update analysis
-            document.getElementById('aiAnalysis').textContent = data.ai_analysis;
-            
-            // Update indicators
-            updateIndicators(data.technical_indicators);
-            
-            // Update chart
-            updateChart(data.chart_data);
+            try {
+                // Update price
+                document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
+                
+                // Update analysis
+                document.getElementById('aiAnalysis').textContent = data.ai_analysis;
+                
+                // Update indicators
+                updateIndicators(data.technical_indicators);
+                
+                // Update chart
+                updateChart(data.chart_data);
+                
+                console.log('Dashboard updated successfully with', data.data_points, 'data points');
+            } catch (error) {
+                console.error('Error updating dashboard:', error);
+                showError('Error displaying data: ' + error.message);
+            }
         }
 
         function updateIndicators(indicators) {
             const grid = document.getElementById('indicatorsGrid');
             
             if (!indicators || Object.keys(indicators).length === 0) {
-                grid.innerHTML = '<div class="error">No indicator data</div>';
+                grid.innerHTML = '<div class="error">No indicator data available</div>';
                 return;
             }
 
@@ -159,17 +171,19 @@
                 'ema_26': { name: 'EMA 26', format: '0.2f' },
                 'ema_50': { name: 'EMA 50', format: '0.2f' },
                 'rsi': { name: 'RSI', format: '0.1f' },
-                'macd': { name: 'MACD', format: '0.4f' }
+                'macd': { name: 'MACD', format: '0.4f' },
+                'macd_signal': { name: 'MACD Signal', format: '0.4f' },
+                'macd_hist': { name: 'MACD Hist', format: '0.4f' }
             };
 
             for (const [key, conf] of Object.entries(config)) {
-                if (indicators[key] !== undefined) {
+                if (indicators[key] !== undefined && indicators[key] !== null) {
                     const value = indicators[key];
                     let trend = 'neutral';
                     
                     if (key === 'rsi') {
                         trend = value > 70 ? 'bearish' : value < 30 ? 'bullish' : 'neutral';
-                    } else if (key === 'macd') {
+                    } else if (key.includes('macd')) {
                         trend = value > 0 ? 'bullish' : 'bearish';
                     }
                     
@@ -184,7 +198,7 @@
                 }
             }
 
-            grid.innerHTML = html || '<div class="error">No indicators</div>';
+            grid.innerHTML = html || '<div class="error">No indicator data available</div>';
         }
 
         function updateChart(chartData) {
@@ -195,9 +209,12 @@
             }
 
             if (!chartData || chartData.length === 0) {
-                console.error('No chart data');
+                console.error('No chart data available');
+                document.getElementById('priceChart').style.display = 'none';
                 return;
             }
+
+            document.getElementById('priceChart').style.display = 'block';
 
             const labels = chartData.map(d => new Date(d.datetime));
             const prices = chartData.map(d => d.close);
@@ -215,21 +232,24 @@
                             borderColor: '#ffd700',
                             backgroundColor: 'rgba(255, 215, 0, 0.1)',
                             borderWidth: 2,
-                            fill: true
+                            fill: true,
+                            tension: 0.1
                         },
                         {
                             label: 'EMA 12',
                             data: ema12,
                             borderColor: '#00ff00',
                             borderWidth: 1,
-                            pointRadius: 0
+                            pointRadius: 0,
+                            tension: 0.1
                         },
                         {
                             label: 'EMA 26',
                             data: ema26,
                             borderColor: '#0088ff',
                             borderWidth: 1,
-                            pointRadius: 0
+                            pointRadius: 0,
+                            tension: 0.1
                         }
                     ]
                 },
@@ -239,7 +259,8 @@
                         title: {
                             display: true,
                             text: `XAUUSD ${currentTimeframe} Chart`,
-                            color: 'white'
+                            color: 'white',
+                            font: { size: 16 }
                         },
                         legend: {
                             labels: { color: 'white' }
@@ -264,9 +285,27 @@
             });
         }
 
+        function checkDebug() {
+            fetch('/api/debug')
+                .then(response => response.json())
+                .then(data => {
+                    const debugDiv = document.getElementById('debugInfo');
+                    debugDiv.style.display = 'block';
+                    debugDiv.innerHTML = `
+                        <h3>Debug Information</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <button onclick="document.getElementById('debugInfo').style.display='none'">Hide</button>
+                    `;
+                })
+                .catch(error => {
+                    console.error('Debug error:', error);
+                });
+        }
+
         // Auto-refresh every 30 seconds
         setInterval(() => {
             if (currentTimeframe) {
+                console.log('Auto-refreshing data...');
                 loadData(currentTimeframe);
             }
         }, 30000);
