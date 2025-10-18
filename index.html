@@ -353,7 +353,7 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Data received:', data);
+                    console.log('Full API response:', data); // Debug full response
                     if (data.status === 'success') {
                         updateDashboard(data);
                         updateDataSourceInfo(data);
@@ -387,6 +387,13 @@
 
         function updateDashboard(data) {
             try {
+                console.log('Updating dashboard with data:', {
+                    current_price: data.current_price,
+                    indicators_count: data.technical_indicators ? Object.keys(data.technical_indicators).length : 0,
+                    indicators: data.technical_indicators,
+                    chart_data_length: data.chart_data ? data.chart_data.length : 0
+                });
+
                 // Update price
                 document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
                 document.getElementById('priceSource').textContent = data.api_sources.twelve_data ? 
@@ -407,7 +414,7 @@
                 
             } catch (error) {
                 console.error('Error updating dashboard:', error);
-                showError('Error displaying data');
+                showError('Error displaying data: ' + error.message);
             }
         }
 
@@ -504,22 +511,26 @@
         function updateIndicators(indicators, currentPrice) {
             const grid = document.getElementById('indicatorsGrid');
             
+            console.log('Raw indicators data:', indicators);
+            console.log('Current price:', currentPrice);
+            
             if (!indicators || Object.keys(indicators).length === 0) {
-                grid.innerHTML = `
+                const debugInfo = `
                     <div class="error" style="grid-column: 1 / -1;">
-                        No technical indicators available. Possible reasons:
-                        <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
-                            <li>Insufficient historical data for calculations</li>
-                            <li>Data format issues in CSV files</li>
-                            <li>Indicator calculation errors</li>
-                        </ul>
+                        <strong>No technical indicators available.</strong>
+                        <div style="text-align: left; margin: 10px 0;">
+                            <strong>Debug Information:</strong><br>
+                            - Indicators object: ${JSON.stringify(indicators)}<br>
+                            - Current price: ${currentPrice}<br>
+                            - Timeframe: ${currentTimeframe}
+                        </div>
                         <button class="btn" onclick="checkDataHealth()" style="margin-top: 10px;">Check Data Health</button>
+                        <button class="btn" onclick="checkDebug()" style="margin-top: 5px;">Show Debug Info</button>
                     </div>
                 `;
+                grid.innerHTML = debugInfo;
                 return;
             }
-
-            console.log('Indicators data:', indicators); // Debug log
 
             let html = '';
             const indicatorConfig = {
@@ -527,7 +538,11 @@
                     name: 'RSI (14)', 
                     format: '0.1f',
                     levels: { overbought: 70, oversold: 30 },
-                    getTrend: (value) => value > 70 ? 'bearish' : value < 30 ? 'bullish' : 'neutral'
+                    getTrend: (value) => {
+                        if (value > 70) return 'bearish';
+                        if (value < 30) return 'bullish';
+                        return 'neutral';
+                    }
                 },
                 'macd': { 
                     name: 'MACD', 
@@ -537,7 +552,10 @@
                 'macd_signal': { 
                     name: 'MACD Signal', 
                     format: '0.4f',
-                    getTrend: (value, indicators) => indicators.macd > value ? 'bullish' : 'bearish'
+                    getTrend: (value, allIndicators) => {
+                        const macd = allIndicators.macd || 0;
+                        return macd > value ? 'bullish' : 'bearish';
+                    }
                 },
                 'macd_hist': { 
                     name: 'MACD Histogram', 
@@ -547,48 +565,58 @@
                 'ema_12': { 
                     name: 'EMA 12', 
                     format: '0.2f',
-                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bullish' : 'bearish'
+                    getTrend: (value, allIndicators, price) => price > value ? 'bullish' : 'bearish'
                 },
                 'ema_26': { 
                     name: 'EMA 26', 
                     format: '0.2f',
-                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bullish' : 'bearish'
+                    getTrend: (value, allIndicators, price) => price > value ? 'bullish' : 'bearish'
                 },
                 'ema_50': { 
                     name: 'EMA 50', 
                     format: '0.2f',
-                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bullish' : 'bearish'
+                    getTrend: (value, allIndicators, price) => price > value ? 'bullish' : 'bearish'
                 },
                 'stoch_k': { 
                     name: 'Stoch %K', 
                     format: '0.1f',
                     levels: { overbought: 80, oversold: 20 },
-                    getTrend: (value) => value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral'
+                    getTrend: (value) => {
+                        if (value > 80) return 'bearish';
+                        if (value < 20) return 'bullish';
+                        return 'neutral';
+                    }
                 },
                 'stoch_d': { 
                     name: 'Stoch %D', 
                     format: '0.1f',
                     levels: { overbought: 80, oversold: 20 },
-                    getTrend: (value) => value > 80 ? 'bearish' : value < 20 ? 'bullish' : 'neutral'
+                    getTrend: (value) => {
+                        if (value > 80) return 'bearish';
+                        if (value < 20) return 'bullish';
+                        return 'neutral';
+                    }
                 },
                 'bb_upper': { 
                     name: 'BB Upper', 
                     format: '0.2f',
-                    getTrend: (value, indicators, currentPrice) => currentPrice > value ? 'bearish' : 'neutral'
+                    getTrend: (value, allIndicators, price) => price > value ? 'bearish' : 'neutral'
                 },
                 'bb_lower': { 
                     name: 'BB Lower', 
                     format: '0.2f',
-                    getTrend: (value, indicators, currentPrice) => currentPrice < value ? 'bullish' : 'neutral'
+                    getTrend: (value, allIndicators, price) => price < value ? 'bullish' : 'neutral'
                 }
             };
 
             // Count available indicators
             let availableCount = 0;
+            const availableIndicators = [];
             
             for (const [key, config] of Object.entries(indicatorConfig)) {
                 if (indicators[key] !== undefined && indicators[key] !== null) {
                     availableCount++;
+                    availableIndicators.push(key);
                     const value = indicators[key];
                     let trend = 'neutral';
                     
@@ -612,11 +640,15 @@
                         }
                     }
                     
+                    const displayValue = typeof value === 'number' ? 
+                        value.toFixed(config.format === '0.4f' ? 4 : config.format === '0.1f' ? 1 : 2) : 
+                        'N/A';
+                    
                     html += `
                         <div class="indicator-card">
                             <div style="font-size: 0.9em; margin-bottom: 5px;">${config.name}</div>
                             <div class="indicator-value ${trend}">
-                                ${value.toFixed(config.format === '0.4f' ? 4 : config.format === '0.1f' ? 1 : 2)}
+                                ${displayValue}
                             </div>
                             ${levelInfo}
                         </div>
@@ -624,17 +656,19 @@
                 }
             }
 
+            console.log(`Found ${availableCount} indicators:`, availableIndicators);
+
             // If no standard indicators found, show what's available
             if (availableCount === 0) {
-                html = '<div class="error" style="grid-column: 1 / -1;">No standard indicators available</div>';
-                
-                // Show raw available indicators for debugging
-                let rawIndicators = '<div style="text-align: left; margin-top: 10px;">Available data: ';
-                for (const [key, value] of Object.entries(indicators)) {
-                    rawIndicators += `<br>${key}: ${value}`;
-                }
-                rawIndicators += '</div>';
-                html += rawIndicators;
+                html = `
+                    <div class="error" style="grid-column: 1 / -1;">
+                        <strong>No standard indicators available</strong>
+                        <div style="text-align: left; margin-top: 10px;">
+                            <strong>Available raw data:</strong>
+                            <pre style="background: #333; padding: 10px; border-radius: 5px; font-size: 0.8em; overflow-x: auto;">${JSON.stringify(indicators, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
             }
 
             grid.innerHTML = html;
