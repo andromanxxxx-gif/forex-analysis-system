@@ -190,6 +190,15 @@
             border-radius: 5px;
             font-size: 0.9em;
         }
+        
+        #chartPlaceholder {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #888;
+            font-size: 1.2em;
+        }
     </style>
 </head>
 <body>
@@ -205,7 +214,8 @@
         </div>
 
         <div class="chart-container">
-            <canvas id="priceChart"></canvas>
+            <div id="chartPlaceholder">Loading chart...</div>
+            <canvas id="priceChart" style="display: none;"></canvas>
         </div>
 
         <div class="analysis-grid">
@@ -300,6 +310,8 @@
                 const chartData = await chartResponse.json();
                 
                 console.log(`Loaded ${chartData.length} chart data points`);
+                console.log("First few data points:", chartData.slice(0, 3));
+                
                 renderChart(chartData, timeframe);
                 
                 updateStatus(`Data loaded successfully for ${timeframe}`, "success");
@@ -318,6 +330,9 @@
             document.getElementById('aiAnalysis').innerHTML = '<div class="loading">Loading AI analysis...</div>';
             document.getElementById('technicalIndicators').innerHTML = '<div class="loading">Loading technical indicators...</div>';
             document.getElementById('newsFeed').innerHTML = '<div class="loading">Loading news...</div>';
+            document.getElementById('chartPlaceholder').textContent = 'Loading chart...';
+            document.getElementById('chartPlaceholder').style.display = 'flex';
+            document.getElementById('priceChart').style.display = 'none';
         }
 
         function updateStatus(message, type) {
@@ -475,26 +490,33 @@
         }
 
         function renderChart(data, timeframe) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
+            const ctx = document.getElementById('priceChart');
+            const placeholder = document.getElementById('chartPlaceholder');
             
             // Destroy existing chart
             if (currentChart) {
                 currentChart.destroy();
+                currentChart = null;
             }
             
             if (!data || data.length === 0) {
-                ctx.font = '20px Arial';
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText('No chart data available', 100, 100);
+                console.error('No data available for chart');
+                placeholder.textContent = 'No chart data available';
+                placeholder.style.display = 'flex';
+                ctx.style.display = 'none';
                 updateStatus("No chart data available", "error");
                 return;
             }
             
             try {
+                console.log("Starting chart rendering with", data.length, "data points");
+                
+                // Sort data by datetime to ensure correct order
+                data.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+                
                 // Prepare data for chart
-                const labels = data.map(d => new Date(d.datetime));
                 const chartData = {
-                    labels: labels,
+                    labels: data.map(d => new Date(d.datetime)),
                     datasets: [{
                         label: `XAU/USD ${timeframe}`,
                         data: data.map(d => ({
@@ -510,6 +532,12 @@
                         pointHoverRadius: 3
                     }]
                 };
+                
+                console.log("Chart data prepared, creating chart instance...");
+                
+                // Show canvas, hide placeholder
+                ctx.style.display = 'block';
+                placeholder.style.display = 'none';
                 
                 currentChart = new Chart(ctx, {
                     type: 'line',
@@ -539,7 +567,9 @@
                                 },
                                 ticks: {
                                     color: '#ffffff',
-                                    maxRotation: 0
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    maxTicksLimit: 12
                                 }
                             },
                             y: {
@@ -576,12 +606,15 @@
                                 callbacks: {
                                     label: function(context) {
                                         const point = data[context.dataIndex];
-                                        return [
-                                            `Open: $${parseFloat(point.open).toFixed(2)}`,
-                                            `High: $${parseFloat(point.high).toFixed(2)}`,
-                                            `Low: $${parseFloat(point.low).toFixed(2)}`,
-                                            `Close: $${parseFloat(point.close).toFixed(2)}`
-                                        ];
+                                        if (point) {
+                                            return [
+                                                `Open: $${parseFloat(point.open || point.close).toFixed(2)}`,
+                                                `High: $${parseFloat(point.high || point.close).toFixed(2)}`,
+                                                `Low: $${parseFloat(point.low || point.close).toFixed(2)}`,
+                                                `Close: $${parseFloat(point.close).toFixed(2)}`
+                                            ];
+                                        }
+                                        return `Price: $${context.parsed.y.toFixed(2)}`;
                                     }
                                 }
                             }
@@ -590,12 +623,14 @@
                 });
                 
                 console.log("Chart rendered successfully");
+                updateStatus("Chart rendered successfully", "success");
+                
             } catch (error) {
                 console.error('Error rendering chart:', error);
-                updateStatus("Error rendering chart", "error");
-                ctx.font = '16px Arial';
-                ctx.fillStyle = '#ff6b6b';
-                ctx.fillText('Error rendering chart: ' + error.message, 50, 100);
+                placeholder.textContent = 'Error rendering chart: ' + error.message;
+                placeholder.style.display = 'flex';
+                ctx.style.display = 'none';
+                updateStatus("Error rendering chart: " + error.message, "error");
             }
         }
 
