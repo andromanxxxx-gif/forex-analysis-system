@@ -363,6 +363,31 @@ def create_fallback_html():
     </body>
     </html>
     """
+def get_realtime_candlestick_data(self, timeframe):
+    """Generate real-time candlestick data with current price"""
+    try:
+        # Load historical data
+        df = self.load_historical_data(timeframe)
+        if df is None or df.empty:
+            return None
+        
+        # Get real-time price
+        realtime_price = self.get_realtime_price()
+        
+        # Update the last candle with real-time price
+        if len(df) > 0 and realtime_price:
+            last_idx = len(df) - 1
+            df.iloc[last_idx, df.columns.get_loc('close')] = realtime_price
+            current_high = df.iloc[last_idx]['high']
+            current_low = df.iloc[last_idx]['low']
+            df.iloc[last_idx, df.columns.get_loc('high')] = max(current_high, realtime_price)
+            df.iloc[last_idx, df.columns.get_loc('low')] = min(current_low, realtime_price)
+        
+        return df
+        
+    except Exception as e:
+        print(f"Error getting real-time candlestick data: {e}")
+        return None
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
