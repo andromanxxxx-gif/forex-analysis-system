@@ -353,7 +353,7 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Full API response:', data); // Debug full response
+                    console.log('Full API response:', data);
                     if (data.status === 'success') {
                         updateDashboard(data);
                         updateDataSourceInfo(data);
@@ -364,7 +364,6 @@
                 .catch(error => {
                     console.error('Error:', error);
                     showError(error.message);
-                    // Show data source as error
                     updateDataSourceInfo({data_points: 0, timeframe: timeframe}, true);
                 });
         }
@@ -387,7 +386,7 @@
 
         function updateDashboard(data) {
             try {
-                console.log('Updating dashboard with data:', {
+                console.log('Dashboard data received:', {
                     current_price: data.current_price,
                     indicators_count: data.technical_indicators ? Object.keys(data.technical_indicators).length : 0,
                     indicators: data.technical_indicators,
@@ -403,8 +402,8 @@
                 // Update analysis
                 document.getElementById('aiAnalysis').textContent = data.ai_analysis;
                 
-                // Update indicators
-                updateIndicators(data.technical_indicators, data.current_price);
+                // Update indicators - tambahkan fallback ke chart data
+                updateIndicators(data.technical_indicators, data.current_price, data.chart_data);
                 
                 // Update news
                 updateNews(data.news);
@@ -443,7 +442,6 @@
             let badgeClass = 'source-generated';
             
             if (records > 100) {
-                // Assume good quality historical data
                 sourceType = 'csv';
                 sourceText = 'Historical CSV';
                 badgeClass = 'source-csv';
@@ -469,7 +467,6 @@
             if (healthPanel.style.display === 'none') {
                 healthPanel.style.display = 'block';
                 
-                // Check data quality
                 fetch(`/api/debug/data/${currentTimeframe}`)
                     .then(response => response.json())
                     .then(data => {
@@ -482,7 +479,6 @@
                         } else {
                             sourceMessage = `Data Source: ${currentDataSource.toUpperCase()} | Records: ${data.rows} | Columns: ${data.columns ? data.columns.length : 0}`;
                             
-                            // Quality assessment
                             if (data.rows >= 100) {
                                 qualityMessage = '✅ Good: Sufficient historical data';
                             } else if (data.rows >= 50) {
@@ -508,21 +504,52 @@
             }
         }
 
-        function updateIndicators(indicators, currentPrice) {
+        function updateIndicators(indicators, currentPrice, chartData) {
             const grid = document.getElementById('indicatorsGrid');
             
             console.log('Raw indicators data:', indicators);
             console.log('Current price:', currentPrice);
+            
+            // FALLBACK: Jika indicators kosong, coba ambil dari chart data terakhir
+            if (!indicators || Object.keys(indicators).length === 0) {
+                console.log('No indicators in technical_indicators, trying to extract from chart data...');
+                if (chartData && chartData.length > 0) {
+                    const lastDataPoint = chartData[chartData.length - 1];
+                    indicators = {};
+                    
+                    // Extract indicator values from the last chart data point
+                    const possibleIndicators = [
+                        'ema_12', 'ema_26', 'ema_50', 'rsi', 'macd', 
+                        'macd_signal', 'macd_hist', 'stoch_k', 'stoch_d', 
+                        'bb_upper', 'bb_lower'
+                    ];
+                    
+                    possibleIndicators.forEach(indicator => {
+                        if (lastDataPoint[indicator] !== undefined && lastDataPoint[indicator] !== null) {
+                            indicators[indicator] = lastDataPoint[indicator];
+                        }
+                    });
+                    
+                    console.log('Extracted indicators from chart data:', indicators);
+                }
+            }
             
             if (!indicators || Object.keys(indicators).length === 0) {
                 const debugInfo = `
                     <div class="error" style="grid-column: 1 / -1;">
                         <strong>No technical indicators available.</strong>
                         <div style="text-align: left; margin: 10px 0;">
+                            <strong>Possible causes:</strong>
+                            <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
+                                <li>Backend calculated indicators but didn't include in response</li>
+                                <li>Data format issues in backend processing</li>
+                                <li>Insufficient historical data for calculations</li>
+                            </ul>
                             <strong>Debug Information:</strong><br>
                             - Indicators object: ${JSON.stringify(indicators)}<br>
                             - Current price: ${currentPrice}<br>
-                            - Timeframe: ${currentTimeframe}
+                            - Timeframe: ${currentTimeframe}<br>
+                            - Chart data points: ${chartData ? chartData.length : 0}
                         </div>
                         <button class="btn" onclick="checkDataHealth()" style="margin-top: 10px;">Check Data Health</button>
                         <button class="btn" onclick="checkDebug()" style="margin-top: 5px;">Show Debug Info</button>
@@ -609,7 +636,6 @@
                 }
             };
 
-            // Count available indicators
             let availableCount = 0;
             const availableIndicators = [];
             
@@ -621,7 +647,6 @@
                     let trend = 'neutral';
                     
                     try {
-                        // Calculate trend based on configuration
                         if (config.getTrend) {
                             trend = config.getTrend(value, indicators, currentPrice);
                         }
@@ -630,7 +655,6 @@
                         trend = 'neutral';
                     }
                     
-                    // Add level information for RSI and Stochastic
                     let levelInfo = '';
                     if (config.levels) {
                         if (value > config.levels.overbought) {
@@ -658,7 +682,6 @@
 
             console.log(`Found ${availableCount} indicators:`, availableIndicators);
 
-            // If no standard indicators found, show what's available
             if (availableCount === 0) {
                 html = `
                     <div class="error" style="grid-column: 1 / -1;">
@@ -710,11 +733,9 @@
                 return;
             }
 
-            // Format dates for better display
             const labels = chartData.map(d => new Date(d.datetime));
             const prices = chartData.map(d => d.close);
             
-            // Prepare indicator data with null checks
             const ema12 = chartData.map(d => (d.ema_12 !== null && d.ema_12 !== undefined) ? d.ema_12 : null);
             const ema26 = chartData.map(d => (d.ema_26 !== null && d.ema_26 !== undefined) ? d.ema_26 : null);
             const ema50 = chartData.map(d => (d.ema_50 !== null && d.ema_50 !== undefined) ? d.ema_50 : null);
@@ -731,7 +752,6 @@
                 }
             ];
 
-            // Only add EMA datasets if they have valid data
             if (ema12.some(v => v !== null)) {
                 datasets.push({
                     label: 'EMA 12',
