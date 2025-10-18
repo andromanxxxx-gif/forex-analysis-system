@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XAUUSD AI Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.4/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -139,13 +140,21 @@
             border-radius: 5px;
             margin: 10px 0;
         }
+        
+        .success {
+            color: #00d4aa;
+            padding: 10px;
+            background: #1e2d2a;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🚀 XAUUSD AI Analysis System</h1>
-            <div class="price-display" id="currentPrice">Loading...</div>
+            <div class="price-display" id="currentPrice">Loading XAU/USD...</div>
             <div class="timeframe-selector">
                 <button class="timeframe-btn active" onclick="changeTimeframe('1D')">1D (2 Years)</button>
                 <button class="timeframe-btn" onclick="changeTimeframe('4H')">4H (1 Year)</button>
@@ -181,6 +190,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            console.log("Initializing XAUUSD Analysis System...");
             loadAnalysis(currentTimeframe);
             setInterval(() => loadAnalysis(currentTimeframe), 60000); // Update every minute
         });
@@ -197,13 +207,17 @@
         async function loadAnalysis(timeframe) {
             try {
                 showLoading();
+                console.log(`Loading analysis for timeframe: ${timeframe}`);
                 
                 // Load analysis data
-                const analysisResponse = await fetch(`http://localhost:5000/api/analysis/${timeframe}`);
+                const analysisResponse = await fetch(`/api/analysis/${timeframe}`);
                 if (!analysisResponse.ok) {
-                    throw new Error(`HTTP error! status: ${analysisResponse.status}`);
+                    const errorData = await analysisResponse.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${analysisResponse.status}`);
                 }
                 const analysisData = await analysisResponse.json();
+                
+                console.log("Analysis data loaded:", analysisData);
                 
                 // Update price
                 document.getElementById('currentPrice').textContent = 
@@ -222,12 +236,13 @@
                     formatNews(analysisData.news);
                 
                 // Load chart data
-                const chartResponse = await fetch(`http://localhost:5000/api/chart/data/${timeframe}`);
+                const chartResponse = await fetch(`/api/chart/data/${timeframe}`);
                 if (!chartResponse.ok) {
-                    throw new Error(`HTTP error! status: ${chartResponse.status}`);
+                    throw new Error(`Chart data error! status: ${chartResponse.status}`);
                 }
                 const chartData = await chartResponse.json();
                 
+                console.log(`Loaded ${chartData.length} chart data points`);
                 renderChart(chartData, timeframe);
                 
             } catch (error) {
@@ -238,55 +253,70 @@
         }
 
         function showLoading() {
-            document.getElementById('aiAnalysis').innerHTML = '<div class="loading">Loading...</div>';
-            document.getElementById('technicalIndicators').innerHTML = '<div class="loading">Loading...</div>';
-            document.getElementById('newsFeed').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('aiAnalysis').innerHTML = '<div class="loading">Loading AI analysis...</div>';
+            document.getElementById('technicalIndicators').innerHTML = '<div class="loading">Loading technical indicators...</div>';
+            document.getElementById('newsFeed').innerHTML = '<div class="loading">Loading news...</div>';
         }
 
         function formatAIAnalysis(analysis) {
-            if (!analysis || analysis.includes('Error')) {
-                return '<div class="error">Analysis unavailable</div>';
+            if (!analysis || analysis.includes('Error') || analysis.includes('unavailable')) {
+                return '<div class="error">Analysis temporarily unavailable</div>';
             }
             
             // Parse the AI response format
             const lines = analysis.split('\n');
             let html = '';
+            let inAnalysisSection = false;
             
             lines.forEach(line => {
-                if (line.includes('TREND:')) {
-                    const trend = line.split(':')[1]?.trim();
-                    html += `<div class="trend"><strong>Trend:</strong> <span class="signal-${getTrendClass(trend)}">${trend}</span></div>`;
-                } else if (line.includes('SIGNAL:')) {
-                    const signal = line.split(':')[1]?.trim();
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return;
+                
+                if (trimmedLine.includes('TREND:')) {
+                    const trend = trimmedLine.split(':')[1]?.trim();
+                    html += `<div class="trend"><strong>Trend:</strong> <span class="signal-${getTrendClass(trend)}">${trend || 'N/A'}</span></div>`;
+                } else if (trimmedLine.includes('SIGNAL:')) {
+                    const signal = trimmedLine.split(':')[1]?.trim();
                     const signalClass = signal ? `signal-${signal.toLowerCase()}` : '';
-                    html += `<div class="signal"><strong>Signal:</strong> <span class="${signalClass}">${signal}</span></div>`;
-                } else if (line.includes('RISK LEVEL:')) {
-                    const risk = line.split(':')[1]?.trim();
-                    html += `<div class="risk"><strong>Risk Level:</strong> ${risk}</div>`;
-                } else if (line.includes('SUPPORT:') || line.includes('RESISTANCE:')) {
-                    const parts = line.split(':');
+                    html += `<div class="signal"><strong>Signal:</strong> <span class="${signalClass}">${signal || 'N/A'}</span></div>`;
+                } else if (trimmedLine.includes('RISK LEVEL:')) {
+                    const risk = trimmedLine.split(':')[1]?.trim();
+                    html += `<div class="risk"><strong>Risk Level:</strong> ${risk || 'N/A'}</div>`;
+                } else if (trimmedLine.includes('SUPPORT:') || trimmedLine.includes('RESISTANCE:')) {
+                    const parts = trimmedLine.split(':');
                     if (parts.length >= 2) {
                         html += `<div class="level"><strong>${parts[0]}:</strong> ${parts[1].trim()}</div>`;
                     }
-                } else if (line.trim() && !line.includes('---')) {
-                    html += `<p>${line.trim()}</p>`;
+                } else if (trimmedLine.includes('ANALYSIS:') || trimmedLine.includes('TECHNICAL OBSERVATIONS:') || trimmedLine.includes('TRADING RECOMMENDATION:') || trimmedLine.includes('KEY LEVELS:')) {
+                    html += `<h4>${trimmedLine.replace(':', '')}</h4>`;
+                    inAnalysisSection = true;
+                } else if (trimmedLine && !trimmedLine.includes('---')) {
+                    if (inAnalysisSection || trimmedLine.length > 50) {
+                        html += `<p>${trimmedLine}</p>`;
+                    } else if (trimmedLine.match(/^\d+\./)) {
+                        html += `<p>${trimmedLine}</p>`;
+                    }
                 }
             });
+            
+            if (!html) {
+                html = `<div class="success">${analysis}</div>`;
+            }
             
             return html;
         }
 
         function getTrendClass(trend) {
             if (!trend) return 'hold';
-            trend = trend.toLowerCase();
-            if (trend.includes('bull')) return 'buy';
-            if (trend.includes('bear')) return 'sell';
+            const trendLower = trend.toLowerCase();
+            if (trendLower.includes('bull')) return 'buy';
+            if (trendLower.includes('bear')) return 'sell';
             return 'hold';
         }
 
         function formatTechnicalIndicators(indicators) {
             if (!indicators || Object.keys(indicators).length === 0) {
-                return '<div class="error">Indicators unavailable</div>';
+                return '<div class="error">Technical indicators temporarily unavailable</div>';
             }
             
             const importantIndicators = {
@@ -304,14 +334,18 @@
             };
             
             let html = '<div class="indicator-grid">';
+            let hasData = false;
             
             Object.entries(importantIndicators).forEach(([name, value]) => {
-                if (value !== undefined && value !== null) {
+                if (value !== undefined && value !== null && !isNaN(value)) {
+                    hasData = true;
                     let valueClass = '';
+                    let displayValue = value?.toFixed(4);
+                    
                     if (name === 'RSI') {
                         if (value > 70) valueClass = 'signal-sell';
                         else if (value < 30) valueClass = 'signal-buy';
-                    } else if (name === 'MACD' && indicators.macd_signal) {
+                    } else if (name === 'MACD' && indicators.macd_signal !== undefined) {
                         if (value > indicators.macd_signal) valueClass = 'signal-buy';
                         else valueClass = 'signal-sell';
                     }
@@ -319,28 +353,34 @@
                     html += `
                         <div class="indicator-item">
                             <div>${name}</div>
-                            <div class="indicator-value ${valueClass}">${value?.toFixed(4)}</div>
+                            <div class="indicator-value ${valueClass}">${displayValue}</div>
                         </div>
                     `;
                 }
             });
             
             html += '</div>';
+            
+            if (!hasData) {
+                return '<div class="error">No indicator data available</div>';
+            }
+            
             return html;
         }
 
         function formatNews(newsData) {
             if (!newsData || !newsData.articles || newsData.articles.length === 0) {
-                return '<div class="error">News unavailable</div>';
+                return '<div class="error">News feed temporarily unavailable</div>';
             }
             
             let html = '';
             newsData.articles.slice(0, 5).forEach(article => {
+                const date = new Date(article.publishedAt);
                 html += `
                     <div class="news-item">
-                        <strong>${article.title}</strong>
-                        <p>${article.description || ''}</p>
-                        <small>${new Date(article.publishedAt).toLocaleDateString()}</small>
+                        <strong>${article.title || 'No title'}</strong>
+                        <p>${article.description || 'No description available'}</p>
+                        <small>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</small>
                     </div>
                 `;
             });
@@ -355,28 +395,40 @@
                 currentChart.destroy();
             }
             
-            // Prepare data for financial chart
-            const chartData = data.map(d => ({
-                x: new Date(d.datetime),
-                o: parseFloat(d.open),
-                h: parseFloat(d.high),
-                l: parseFloat(d.low),
-                c: parseFloat(d.close)
-            }));
+            if (!data || data.length === 0) {
+                ctx.font = '20px Arial';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('No chart data available', 100, 100);
+                return;
+            }
+            
+            // Prepare data for chart
+            const chartData = {
+                labels: data.map(d => new Date(d.datetime)),
+                datasets: [{
+                    label: `XAU/USD ${timeframe}`,
+                    data: data.map(d => ({
+                        x: new Date(d.datetime),
+                        o: parseFloat(d.open),
+                        h: parseFloat(d.high),
+                        l: parseFloat(d.low),
+                        c: parseFloat(d.close)
+                    })),
+                    backgroundColor: (ctx) => {
+                        const point = ctx.dataset.data[ctx.dataIndex];
+                        return point.c >= point.o ? 'rgba(0, 212, 170, 0.8)' : 'rgba(255, 107, 107, 0.8)';
+                    },
+                    borderColor: (ctx) => {
+                        const point = ctx.dataset.data[ctx.dataIndex];
+                        return point.c >= point.o ? '#00d4aa' : '#ff6b6b';
+                    },
+                    borderWidth: 1
+                }]
+            };
             
             currentChart = new Chart(ctx, {
-                type: 'candlestick',
-                data: {
-                    datasets: [{
-                        label: `XAU/USD ${timeframe}`,
-                        data: chartData,
-                        color: {
-                            up: '#00d4aa',
-                            down: '#ff6b6b',
-                            unchanged: '#cccccc',
-                        }
-                    }]
-                },
+                type: 'bar',
+                data: chartData,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -384,13 +436,15 @@
                         x: {
                             type: 'time',
                             time: {
-                                unit: getTimeUnit(timeframe)
+                                unit: getTimeUnit(timeframe),
+                                tooltipFormat: 'yyyy-MM-dd HH:mm'
                             },
                             grid: {
                                 color: '#2d3e50'
                             },
                             ticks: {
-                                color: '#ffffff'
+                                color: '#ffffff',
+                                maxRotation: 0
                             }
                         },
                         y: {
@@ -413,6 +467,17 @@
                         tooltip: {
                             mode: 'index',
                             intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    const point = context.raw;
+                                    return [
+                                        `Open: $${point.o.toFixed(2)}`,
+                                        `High: $${point.h.toFixed(2)}`,
+                                        `Low: $${point.l.toFixed(2)}`,
+                                        `Close: $${point.c.toFixed(2)}`
+                                    ];
+                                }
+                            },
                             backgroundColor: 'rgba(30, 43, 58, 0.9)',
                             titleColor: '#00d4aa',
                             bodyColor: '#ffffff',
@@ -427,9 +492,9 @@
         function getTimeUnit(timeframe) {
             switch(timeframe) {
                 case '1D': return 'month';
-                case '4H': return 'week';
-                case '1H': return 'day';
-                default: return 'month';
+                case '4H': return 'day';
+                case '1H': return 'hour';
+                default: return 'day';
             }
         }
     </script>
