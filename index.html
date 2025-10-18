@@ -140,6 +140,28 @@
             margin-bottom: 5px;
         }
         
+        .api-status {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .status-item {
+            display: inline-block;
+            margin: 0 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        .status-active {
+            background: #00ff88;
+            color: black;
+        }
+        .status-inactive {
+            background: #ff4444;
+            color: white;
+        }
+        
         .loading { 
             text-align: center; 
             padding: 40px; 
@@ -171,8 +193,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>XAUUSD Trading Analysis</h1>
-            <p>Real-time Gold Market Analysis with Twelve Data API</p>
+            <h1>XAUUSD AI Trading Analysis</h1>
+            <p>Real-time Gold Market Analysis with AI & Live Data</p>
+        </div>
+
+        <div class="api-status" id="apiStatus">
+            <strong>API Status:</strong>
+            <span class="status-item" id="twelveDataStatus">Twelve Data: Checking...</span>
+            <span class="status-item" id="deepseekStatus">DeepSeek AI: Checking...</span>
+            <span class="status-item" id="newsapiStatus">NewsAPI: Checking...</span>
         </div>
 
         <div class="controls">
@@ -195,9 +224,9 @@
             </div>
 
             <div class="analysis-panel">
-                <h3>Market Analysis</h3>
+                <h3>🤖 AI Market Analysis</h3>
                 <div class="analysis-content" id="aiAnalysis">
-                    Loading analysis...
+                    Loading AI analysis...
                 </div>
             </div>
         </div>
@@ -207,14 +236,14 @@
         </div>
 
         <div class="news-panel">
-            <h3>Market News</h3>
+            <h3>📰 Market News</h3>
             <div id="newsContainer">
-                <div class="loading">Loading news...</div>
+                <div class="loading">Loading news from NewsAPI...</div>
             </div>
         </div>
 
         <div class="footer">
-            <p>Last updated: <span id="lastUpdate">-</span> | XAUUSD Gold Analysis</p>
+            <p>Last updated: <span id="lastUpdate">-</span> | Powered by Twelve Data, DeepSeek AI & NewsAPI</p>
         </div>
     </div>
 
@@ -225,6 +254,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Dashboard started');
+            checkAPIStatus();
             loadData('1H');
             
             // Auto-refresh every 30 seconds
@@ -234,6 +264,33 @@
                 }
             }, 30000);
         });
+
+        function checkAPIStatus() {
+            fetch('/api/debug')
+                .then(response => response.json())
+                .then(data => {
+                    const apiStatus = data.api_status;
+                    updateAPIStatus(apiStatus);
+                })
+                .catch(error => {
+                    console.error('Error checking API status:', error);
+                });
+        }
+
+        function updateAPIStatus(apiStatus) {
+            const twelveDataElem = document.getElementById('twelveDataStatus');
+            const deepseekElem = document.getElementById('deepseekStatus');
+            const newsapiElem = document.getElementById('newsapiStatus');
+
+            twelveDataElem.textContent = `Twelve Data: ${apiStatus.twelve_data ? 'Connected' : 'Disabled'}`;
+            twelveDataElem.className = `status-item ${apiStatus.twelve_data ? 'status-active' : 'status-inactive'}`;
+
+            deepseekElem.textContent = `DeepSeek AI: ${apiStatus.deepseek ? 'Connected' : 'Disabled'}`;
+            deepseekElem.className = `status-item ${apiStatus.deepseek ? 'status-active' : 'status-inactive'}`;
+
+            newsapiElem.textContent = `NewsAPI: ${apiStatus.newsapi ? 'Connected' : 'Disabled'}`;
+            newsapiElem.className = `status-item ${apiStatus.newsapi ? 'status-active' : 'status-inactive'}`;
+        }
 
         function loadData(timeframe) {
             currentTimeframe = timeframe;
@@ -269,7 +326,7 @@
         function showLoading() {
             document.getElementById('currentPrice').textContent = 'Loading...';
             document.getElementById('priceSource').textContent = 'Fetching data...';
-            document.getElementById('aiAnalysis').textContent = 'Loading analysis...';
+            document.getElementById('aiAnalysis').textContent = 'Loading AI analysis...';
             document.getElementById('indicatorsGrid').innerHTML = '<div class="loading">Loading indicators...</div>';
             document.getElementById('newsContainer').innerHTML = '<div class="loading">Loading news...</div>';
         }
@@ -286,7 +343,8 @@
             try {
                 // Update price
                 document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
-                document.getElementById('priceSource').textContent = 'Live from Twelve Data API';
+                document.getElementById('priceSource').textContent = data.api_sources.twelve_data ? 
+                    'Live from Twelve Data API' : 'Simulated Price (API not configured)';
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
                 
                 // Update analysis
