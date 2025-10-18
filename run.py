@@ -58,7 +58,6 @@ class XAUUSDAnalyzer:
                     
                     # Debug: print kolom yang tersedia
                     print(f"Columns in CSV: {df.columns.tolist()}")
-                    print(f"First few rows: {df.head(2)}")
                     
                     # Pastikan kolom datetime ada dan format benar
                     datetime_col = None
@@ -109,23 +108,29 @@ class XAUUSDAnalyzer:
                                 elif standard_name == 'close':
                                     df[standard_name] = df['open'] * np.random.uniform(0.995, 1.005, len(df))
                     
+                    # Pastikan kolom volume ada
+                    if 'volume' not in df.columns:
+                        print("Volume column not found, setting default values")
+                        df['volume'] = np.random.randint(1000, 10000, len(df))
+                    
                     # Konversi ke numeric dan handle missing values
-                    for col in ['open', 'high', 'low', 'close']:
+                    for col in ['open', 'high', 'low', 'close', 'volume']:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
                         # Fill NaN values dengan forward fill lalu backward fill
                         df[col] = df[col].fillna(method='ffill').fillna(method='bfill')
                         # Jika masih ada NaN, isi dengan nilai acak
                         if df[col].isna().any():
-                            df[col] = df[col].fillna(np.random.uniform(1800, 2000))
-                    
-                    if 'volume' not in df.columns:
-                        df['volume'] = np.random.randint(1000, 10000, len(df))
+                            if col == 'volume':
+                                df[col] = df[col].fillna(np.random.randint(1000, 10000))
+                            else:
+                                df[col] = df[col].fillna(np.random.uniform(1800, 2000))
                     
                     df = df.sort_values('datetime')
                     print(f"Successfully loaded {len(df)} records from {filename}")
                     return df.tail(limit)
                 except Exception as e:
                     print(f"Error processing {filename}: {e}")
+                    traceback.print_exc()
                     continue
         return None
 
@@ -167,6 +172,10 @@ class XAUUSDAnalyzer:
                     df['datetime'] = pd.to_datetime(df['datetime'])
                     for col in ['open', 'high', 'low', 'close']:
                         df[col] = pd.to_numeric(df[col])
+                    
+                    # Tambahkan kolom volume dengan nilai default
+                    if 'volume' not in df.columns:
+                        df['volume'] = 0  # Default value untuk volume
                     
                     df = df.sort_values('datetime')
                     
@@ -245,7 +254,7 @@ class XAUUSDAnalyzer:
                 'high': high_price,
                 'low': low_price,
                 'close': close_price,
-                'volume': np.random.randint(5000, 50000)
+                'volume': np.random.randint(5000, 50000)  # Pastikan volume ada
             })
         
         df = pd.DataFrame(data)
@@ -764,23 +773,26 @@ def get_analysis(timeframe):
         # Prepare chart data (limit to 100 points for better performance)
         chart_data = []
         for _, row in df_with_indicators.tail(100).iterrows():
-            chart_data.append({
+            chart_point = {
                 'datetime': row['datetime'].isoformat() if hasattr(row['datetime'], 'isoformat') else str(row['datetime']),
                 'open': float(row['open']),
                 'high': float(row['high']),
                 'low': float(row['low']),
                 'close': float(row['close']),
-                'volume': float(row['volume']),
-                'ema_12': float(row['ema_12']) if 'ema_12' in df_with_indicators.columns and not pd.isna(row['ema_12']) else None,
-                'ema_26': float(row['ema_26']) if 'ema_26' in df_with_indicators.columns and not pd.isna(row['ema_26']) else None,
-                'ema_50': float(row['ema_50']) if 'ema_50' in df_with_indicators.columns and not pd.isna(row['ema_50']) else None,
-                'macd': float(row['macd']) if 'macd' in df_with_indicators.columns and not pd.isna(row['macd']) else None,
-                'macd_signal': float(row['macd_signal']) if 'macd_signal' in df_with_indicators.columns and not pd.isna(row['macd_signal']) else None,
-                'macd_hist': float(row['macd_hist']) if 'macd_hist' in df_with_indicators.columns and not pd.isna(row['macd_hist']) else None,
-                'rsi': float(row['rsi']) if 'rsi' in df_with_indicators.columns and not pd.isna(row['rsi']) else None,
-                'bb_upper': float(row['bb_upper']) if 'bb_upper' in df_with_indicators.columns and not pd.isna(row['bb_upper']) else None,
-                'bb_lower': float(row['bb_lower']) if 'bb_lower' in df_with_indicators.columns and not pd.isna(row['bb_lower']) else None
-            })
+                'volume': float(row.get('volume', 0)),  # Safe access dengan default value
+            }
+            
+            # Add indicators if available
+            indicators_to_add = ['ema_12', 'ema_26', 'ema_50', 'macd', 'macd_signal', 'macd_hist', 
+                               'rsi', 'bb_upper', 'bb_lower']
+            
+            for indicator in indicators_to_add:
+                if indicator in df_with_indicators.columns and not pd.isna(row[indicator]):
+                    chart_point[indicator] = float(row[indicator])
+                else:
+                    chart_point[indicator] = None
+            
+            chart_data.append(chart_point)
         
         response = {
             "status": "success",
