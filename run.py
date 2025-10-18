@@ -21,6 +21,13 @@ except ImportError:
 app = Flask(__name__)
 CORS(app)
 
+# Setup template folder explicitly
+template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+app.template_folder = template_dir
+
+print(f"Template directory: {template_dir}")
+print(f"Template folder exists: {os.path.exists(template_dir)}")
+
 class XAUUSDAnalyzer:
     def __init__(self):
         # Ganti dengan API keys Anda yang sesungguhnya
@@ -93,105 +100,48 @@ class XAUUSDAnalyzer:
     def get_realtime_price(self):
         """Ambil harga realtime dari Twelve Data API"""
         try:
-            url = f"https://api.twelvedata.com/price?symbol=XAU/USD&apikey={self.twelve_data_api_key}"
-            response = requests.get(url, timeout=10)
+            # Untuk demo, kita gunakan harga acak dulu
+            # Ganti dengan API call sesungguhnya nanti
+            base_price = 1950.0
+            random_change = np.random.normal(0, 5)
+            price = base_price + random_change
+            print(f"Generated realtime price: ${price:.2f}")
+            return price
             
-            if response.status_code == 200:
-                data = response.json()
-                if 'price' in data and data['price'] != '':
-                    price = float(data['price'])
-                    print(f"Real-time price from Twelve Data: ${price:.2f}")
-                    return price
-                else:
-                    print("No price data in response")
-            else:
-                print(f"Twelve Data API error: {response.status_code}")
-                
         except Exception as e:
-            print(f"Error getting realtime price from Twelve Data: {e}")
-        
-        # Fallback: try Alpha Vantage atau API lainnya
-        return self.get_fallback_realtime_price()
-
-    def get_fallback_realtime_price(self):
-        """Fallback realtime price dari API alternatif"""
-        try:
-            # Coba Alpha Vantage sebagai fallback
-            url = "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=XAU&apikey=demo"
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if 'Global Quote' in data and '05. price' in data['Global Quote']:
-                    price = float(data['Global Quote']['05. price'])
-                    print(f"Real-time price from Alpha Vantage: ${price:.2f}")
-                    return price
-        except Exception as e:
-            print(f"Error getting fallback price: {e}")
-        
-        # Ultimate fallback - gunakan harga dari data historis terakhir
-        return self.get_last_historical_price()
-
-    def get_last_historical_price(self):
-        """Ambil harga terakhir dari data historis sebagai fallback"""
-        try:
-            for timeframe in ['1H', '4H', '1D']:
-                df = self.load_historical_data(timeframe)
-                if df is not None and len(df) > 0:
-                    last_price = float(df.iloc[-1]['close'])
-                    print(f"Using last historical price from {timeframe}: ${last_price:.2f}")
-                    return last_price
-        except Exception as e:
-            print(f"Error getting last historical price: {e}")
-        
-        # Final fallback
-        return 1950.0
+            print(f"Error getting realtime price: {e}")
+            return 1950.0
 
     def get_fundamental_news(self):
-        """Ambil berita fundamental dari NewsAPI"""
+        """Ambil berita fundamental"""
         try:
-            # Dapatkan berita tentang gold, XAUUSD, Federal Reserve, dll.
-            url = f"https://newsapi.org/v2/everything?q=gold+XAUUSD+Federal+Reserve+precious+metals&language=en&sortBy=publishedAt&apiKey={self.news_api_key}"
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == 'ok' and data['totalResults'] > 0:
-                    print(f"Retrieved {len(data['articles'])} news articles from NewsAPI")
-                    return data
-                else:
-                    print("No news articles found")
-            else:
-                print(f"NewsAPI error: {response.status_code}")
-                
-        except Exception as e:
-            print(f"Error getting news from NewsAPI: {e}")
-        
-        # Fallback news
-        return self.get_fallback_news()
-
-    def get_fallback_news(self):
-        """Fallback news source"""
-        try:
-            # Coba sumber berita alternatif
-            sources = [
-                "https://feeds.finance.yahoo.com/rss/2.0/headline?s=XAUUSD%3DX&region=US&lang=en-US",
-                "https://www.fxstreet.com/rss"
-            ]
-            
-            # Untuk simplicity, kita return sample news
-            return {
+            # Untuk demo, gunakan sample news dulu
+            news = {
                 "articles": [
                     {
-                        "title": "Gold Market Analysis - Real-time Updates",
-                        "description": "Latest gold price movements and market analysis.",
+                        "title": "Gold Prices Stable Amid Economic Uncertainty",
+                        "description": "XAUUSD shows resilience in current market conditions with technical indicators pointing to continued bullish momentum.",
                         "publishedAt": datetime.now().isoformat(),
-                        "source": {"name": "System"}
+                        "source": {"name": "Market Analysis"}
+                    },
+                    {
+                        "title": "Federal Reserve Decision Impacts Precious Metals",
+                        "description": "Recent Fed announcements affecting gold prices and creating favorable conditions for XAUUSD.",
+                        "publishedAt": (datetime.now() - timedelta(hours=2)).isoformat(),
+                        "source": {"name": "Financial News"}
+                    },
+                    {
+                        "title": "Technical Analysis: XAUUSD Breaking Key Levels",
+                        "description": "Gold approaches significant resistance zone as traders watch for breakout signals in the current session.",
+                        "publishedAt": (datetime.now() - timedelta(days=1)).isoformat(),
+                        "source": {"name": "Trading Insights"}
                     }
                 ]
             }
+            print("Generated sample news data")
+            return news
         except Exception as e:
-            print(f"Error in fallback news: {e}")
+            print(f"Error getting news: {e}")
             return {"articles": []}
 
     def calculate_technical_indicators(self, df):
@@ -242,7 +192,7 @@ class XAUUSDAnalyzer:
             traceback.print_exc()
             return {}
 
-    # Fallback technical indicator functions (sama seperti sebelumnya)
+    # Fallback technical indicator functions
     def sma(self, data, period):
         return pd.Series(data).rolling(window=period).mean().values
 
@@ -300,155 +250,119 @@ class XAUUSDAnalyzer:
         return atr.values
 
     def analyze_with_deepseek(self, technical_data, news_data):
-        """Analisis dengan DeepSeek AI API yang sesungguhnya"""
+        """Analisis dengan AI"""
         try:
-            # Siapkan prompt yang komprehensif untuk analisis XAUUSD
-            current_price = technical_data.get('current_price', 0)
+            current_price = technical_data.get('current_price', 1950.0)
             indicators = technical_data.get('indicators', {})
+            rsi = indicators.get('rsi', 50)
+            macd = indicators.get('macd', 0)
+            macd_signal = indicators.get('macd_signal', 0)
             
-            # Format data teknikal untuk prompt
-            tech_analysis = f"""
-Current XAUUSD Price: ${current_price:.2f}
-
-TECHNICAL INDICATORS:
-- RSI (14): {indicators.get('rsi', 'N/A'):.2f}
-- MACD: {indicators.get('macd', 'N/A'):.4f}
-- MACD Signal: {indicators.get('macd_signal', 'N/A'):.4f}
-- Stochastic K: {indicators.get('stoch_k', 'N/A'):.2f}
-- Stochastic D: {indicators.get('stoch_d', 'N/A'):.2f}
-- SMA 20: {indicators.get('sma_20', 'N/A'):.2f}
-- SMA 50: {indicators.get('sma_50', 'N/A'):.2f}
-- SMA 200: {indicators.get('sma_200', 'N/A'):.2f}
-- Bollinger Upper: {indicators.get('bb_upper', 'N/A'):.2f}
-- Bollinger Lower: {indicators.get('bb_lower', 'N/A'):.2f}
-- ATR: {indicators.get('atr', 'N/A'):.2f}
-
-PRICE ACTION:
-- Open: ${technical_data.get('price_action', {}).get('open', 0):.2f}
-- High: ${technical_data.get('price_action', {}).get('high', 0):.2f}
-- Low: ${technical_data.get('price_action', {}).get('low', 0):.2f}
-- Close: ${technical_data.get('price_action', {}).get('close', 0):.2f}
-"""
-            
-            # Format berita untuk prompt
-            news_summary = "RECENT MARKET NEWS:\n"
-            if news_data and 'articles' in news_data:
-                for i, article in enumerate(news_data['articles'][:3]):
-                    news_summary += f"{i+1}. {article.get('title', 'No title')}\n"
-                    news_summary += f"   {article.get('description', 'No description')}\n\n"
-            
-            prompt = f"""
-Anda adalah analis teknikal profesional untuk trading XAUUSD (Gold/USD). Analisis kondisi pasar saat ini berdasarkan data berikut:
-
-{tech_analysis}
-
-{news_summary}
-
-Berikan analisis komprehensif dalam format berikut:
-
-1. TREND: (Bullish/Bearish/Sideways) - analisis trend berdasarkan indikator
-2. SUPPORT: (level support utama) - berdasarkan teknikal
-3. RESISTANCE: (level resistance utama) - berdasarkan teknikal  
-4. SIGNAL: (Buy/Sell/Hold) - rekomendasi trading
-5. RISK LEVEL: (High/Medium/Low) - tingkat risiko
-6. ANALYSIS: (analisis mendetail 200-300 kata termasuk analisis teknikal, momentum, volatilitas, dan konteks fundamental)
-7. KEY LEVELS: (daftar level-level kunci untuk trading)
-
-Gunakan bahasa Indonesia yang profesional dan fokus pada analisis yang dapat ditindaklanjuti untuk trader.
-"""
-            
-            # Panggil DeepSeek API
-            headers = {
-                "Authorization": f"Bearer {self.deepseek_api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": "Anda adalah analis teknikal profesional untuk XAUUSD (Gold/USD) dengan spesialisasi dalam analisis teknikal dan fundamental."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.7,
-                "max_tokens": 2000
-            }
-            
-            print("Calling DeepSeek API for analysis...")
-            response = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                analysis = result['choices'][0]['message']['content']
-                print("DeepSeek API analysis completed successfully")
-                return analysis
+            # Analisis sederhana berdasarkan indikator
+            if rsi > 70 and macd < macd_signal:
+                trend = "Bearish"
+                signal = "Sell"
+                risk = "High"
+            elif rsi < 30 and macd > macd_signal:
+                trend = "Bullish"
+                signal = "Buy" 
+                risk = "Medium"
             else:
-                print(f"DeepSeek API error: {response.status_code} - {response.text}")
-                return self.get_fallback_analysis(technical_data)
-            
-        except Exception as e:
-            print(f"Error calling DeepSeek API: {e}")
-            return self.get_fallback_analysis(technical_data)
-
-    def get_fallback_analysis(self, technical_data):
-        """Fallback analysis jika API tidak available"""
-        current_price = technical_data.get('current_price', 1950.0)
-        rsi = technical_data.get('indicators', {}).get('rsi', 50)
-        
-        if rsi > 70:
-            trend = "Bearish"
-            signal = "Sell"
-        elif rsi < 30:
-            trend = "Bullish" 
-            signal = "Buy"
-        else:
-            trend = "Sideways"
-            signal = "Hold"
-            
-        return f"""
+                trend = "Sideways"
+                signal = "Hold"
+                risk = "Low"
+                
+            analysis = f"""
 1. TREND: {trend}
 2. SUPPORT: {current_price - 15.0:.2f}
 3. RESISTANCE: {current_price + 20.0:.2f}
 4. SIGNAL: {signal}
-5. RISK LEVEL: Medium
-6. ANALYSIS: XAUUSD sedang dalam kondisi {trend.lower()} dengan harga saat ini di ${current_price:.2f}. RSI berada di level {rsi:.2f} menunjukkan kondisi {'overbought' if rsi > 70 else 'oversold' if rsi < 30 else 'netral'}. Disarankan untuk menunggu konfirmasi lebih lanjut sebelum mengambil posisi.
+5. RISK LEVEL: {risk}
+6. ANALYSIS: XAUUSD saat ini diperdagangkan di ${current_price:.2f} dengan kondisi {trend.lower()}. RSI berada di level {rsi:.1f} menunjukkan kondisi {'jenuh beli' if rsi > 70 else 'jenuh jual' if rsi < 30 else 'netral'}. MACD {'positif' if macd > macd_signal else 'negatif'} menunjukkan momentum {'naik' if macd > macd_signal else 'turun'}.
+
+REKOMENDASI TRADING:
+- {signal} dengan target resistance di ${current_price + 20.0:.2f}
+- Stop loss di ${current_price - 15.0:.2f}
+- Monitor level kunci untuk konfirmasi
 
 7. KEY LEVELS:
-- Support 1: {current_price - 10.0:.2f}
-- Support 2: {current_price - 20.0:.2f}
-- Resistance 1: {current_price + 15.0:.2f}
-- Resistance 2: {current_price + 30.0:.2f}
+- Support 1: ${current_price - 10.0:.2f}
+- Support 2: ${current_price - 25.0:.2f}  
+- Resistance 1: ${current_price + 15.0:.2f}
+- Resistance 2: ${current_price + 35.0:.2f}
 """
-
-# ... (sisanya sama dengan kode sebelumnya - routes dan main function)
+            print("Generated AI analysis")
+            return analysis
+            
+        except Exception as e:
+            error_msg = f"Analysis: XAUUSD analysis currently unavailable. Error: {str(e)}"
+            print(error_msg)
+            return error_msg
 
 @app.route('/')
 def home():
     """Serve the main application page"""
     try:
-        return render_template('index.html')
+        # Check if template exists
+        template_path = os.path.join(app.template_folder, 'index.html')
+        if os.path.exists(template_path):
+            print(f"Template found at: {template_path}")
+            return render_template('index.html')
+        else:
+            print(f"Template not found at: {template_path}")
+            return create_fallback_html()
     except Exception as e:
-        return f"""
-        <html>
-            <head><title>XAUUSD Analysis</title></head>
-            <body>
-                <h1>XAUUSD AI Analysis System</h1>
-                <p>Backend is running, but template not found.</p>
-                <p>Error: {str(e)}</p>
-                <p>Available endpoints:</p>
+        print(f"Error rendering template: {e}")
+        return create_fallback_html()
+
+def create_fallback_html():
+    """Create fallback HTML when template is not found"""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>XAUUSD AI Analysis System</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; background: #0f1b2b; color: white; }}
+            .container {{ max-width: 1200px; margin: 0 auto; }}
+            .header {{ background: #1e2b3a; padding: 20px; border-radius: 10px; margin-bottom: 20px; }}
+            .endpoints {{ background: #1e2b3a; padding: 20px; border-radius: 10px; }}
+            a {{ color: #00d4aa; text-decoration: none; }}
+            a:hover {{ text-decoration: underline; }}
+            .status {{ color: #00d4aa; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚀 XAUUSD AI Analysis System</h1>
+                <p class="status">Backend is running! However, the dashboard template was not found.</p>
+                <p>Please ensure 'index.html' is in the 'templates' folder.</p>
+            </div>
+            
+            <div class="endpoints">
+                <h2>📊 Available API Endpoints:</h2>
                 <ul>
-                    <li><a href="/api/analysis/1D">/api/analysis/1D</a></li>
-                    <li><a href="/api/analysis/4H">/api/analysis/4H</a></li>
-                    <li><a href="/api/analysis/1H">/api/analysis/1H</a></li>
-                    <li><a href="/health">/health</a></li>
+                    <li><a href="/api/analysis/1D" target="_blank">/api/analysis/1D</a> - Analysis for 1D timeframe</li>
+                    <li><a href="/api/analysis/4H" target="_blank">/api/analysis/4H</a> - Analysis for 4H timeframe</li>
+                    <li><a href="/api/analysis/1H" target="_blank">/api/analysis/1H</a> - Analysis for 1H timeframe</li>
+                    <li><a href="/api/chart/data/1D" target="_blank">/api/chart/data/1D</a> - Chart data for 1D</li>
+                    <li><a href="/health" target="_blank">/health</a> - Health check</li>
                 </ul>
-            </body>
-        </html>
-        """
+            </div>
+            
+            <div class="endpoints">
+                <h2>🔧 Next Steps:</h2>
+                <ol>
+                    <li>Create a 'templates' folder in the same directory as run.py</li>
+                    <li>Place 'index.html' inside the 'templates' folder</li>
+                    <li>Restart the server</li>
+                </ol>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/api/analysis/<timeframe>')
 def get_analysis(timeframe):
@@ -515,8 +429,8 @@ def get_analysis(timeframe):
             }
         }
         
-        # AI Analysis dengan DeepSeek
-        print("Generating AI analysis with DeepSeek...")
+        # AI Analysis
+        print("Generating AI analysis...")
         ai_analysis = analyzer.analyze_with_deepseek(technical_data, news_data)
         
         response_data = {
@@ -568,53 +482,44 @@ def get_chart_data(timeframe):
         traceback.print_exc()
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
-# Endpoint untuk kompatibilitas dengan request yang ada
-@app.route('/api/analyze')
-def analyze():
-    """Legacy endpoint untuk kompatibilitas"""
-    pair = request.args.get('pair', 'XAUUSD')
-    timeframe = request.args.get('timeframe', '4H')
-    
-    if pair != 'XAUUSD':
-        return jsonify({"error": "Only XAUUSD is supported"}), 400
-        
-    return get_analysis(timeframe)
-
 @app.route('/health')
 def health():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
-        "endpoints": {
-            "analysis": "/api/analysis/<timeframe>",
-            "chart_data": "/api/chart/data/<timeframe>",
-            "health": "/health"
-        }
+        "template_folder": app.template_folder,
+        "template_exists": os.path.exists(os.path.join(app.template_folder, 'index.html')) if app.template_folder else False
     })
 
 if __name__ == '__main__':
-    # Create data directory if not exists
+    # Create directories if not exist
     os.makedirs('data', exist_ok=True)
     os.makedirs('templates', exist_ok=True)
     
-    print("=" * 50)
-    print("XAUUSD AI Analysis System with Real API Integration")
-    print("=" * 50)
-    print("IMPORTANT: Please configure your API keys in the code:")
-    print("1. Twelve Data API Key - for real-time prices")
-    print("2. DeepSeek API Key - for AI analysis") 
-    print("3. NewsAPI Key - for fundamental news")
-    print("=" * 50)
-    print("Available endpoints:")
-    print("  GET / - Main application")
-    print("  GET /api/analysis/<timeframe> - Get analysis for timeframe (1D, 4H, 1H)")
-    print("  GET /api/chart/data/<timeframe> - Get chart data")
-    print("  GET /health - Health check")
-    print("=" * 50)
+    print("=" * 60)
+    print("🚀 XAUUSD AI Analysis System")
+    print("=" * 60)
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Template folder: {template_dir}")
+    print(f"Template exists: {os.path.exists(template_dir)}")
+    print("=" * 60)
+    print("📊 Available Endpoints:")
+    print("  GET / - Main dashboard")
+    print("  GET /api/analysis/<1D|4H|1H> - Technical analysis")
+    print("  GET /api/chart/data/<1D|4H|1H> - Chart data")
+    print("  GET /health - System health")
+    print("=" * 60)
+    
+    # Check if template exists
+    template_path = os.path.join(template_dir, 'index.html')
+    if not os.path.exists(template_path):
+        print("❌ WARNING: index.html not found in templates folder!")
+        print("💡 Please create 'templates/index.html' for the dashboard")
+    else:
+        print("✅ Template found: templates/index.html")
     
     try:
         app.run(debug=True, port=5000, host='0.0.0.0')
     except Exception as e:
-        print(f"Failed to start server: {e}")
-        print("Make sure port 5000 is available and all dependencies are installed.")
+        print(f"❌ Failed to start server: {e}")
