@@ -508,7 +508,12 @@
 
         function checkBackendDataStatus() {
             fetch('/api/debug')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     backendDataStatus = data;
                     console.log('Backend data status:', data);
@@ -516,6 +521,12 @@
                 })
                 .catch(error => {
                     console.error('Error checking backend data status:', error);
+                    document.getElementById('twelveDataStatus').textContent = 'Backend Error';
+                    document.getElementById('twelveDataStatus').className = 'status-value status-inactive';
+                    document.getElementById('deepseekStatus').textContent = 'Backend Error';
+                    document.getElementById('deepseekStatus').className = 'status-value status-inactive';
+                    document.getElementById('newsapiStatus').textContent = 'Backend Error';
+                    document.getElementById('newsapiStatus').className = 'status-value status-inactive';
                 });
         }
 
@@ -552,7 +563,12 @@
             
             timeframes.forEach(timeframe => {
                 fetch(`/api/analysis/${timeframe}?force_download=true`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         console.log(`Downloaded data for ${timeframe}:`, data);
                         completed++;
@@ -571,7 +587,12 @@
 
         function clearDataCache() {
             fetch('/api/clear_cache')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     alert('Cache cleared! Refreshing...');
                     checkBackendDataStatus();
@@ -585,13 +606,32 @@
         }
 
         function forceReloadBackend() {
-            alert('Forcing backend reload...');
-            location.reload();
+            showLoading();
+            fetch('/api/health')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert('Backend is healthy! Reloading data...');
+                    loadData(currentTimeframe);
+                })
+                .catch(error => {
+                    alert('Backend connection issue. Please check if server is running.');
+                    console.error('Backend health check failed:', error);
+                });
         }
 
         function checkAPIStatus() {
             fetch('/api/debug')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     const apiStatus = data.api_status;
                     updateAPIStatus(apiStatus);
@@ -638,7 +678,9 @@
             const cacheBuster = new Date().getTime();
             fetch(`/api/analysis/${timeframe}?t=${cacheBuster}`)
                 .then(response => {
-                    if (!response.ok) throw new Error('Network error');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
                     return response.json();
                 })
                 .then(data => {
@@ -647,7 +689,7 @@
                         updateDashboard(data);
                         updateDataSourceInfo(data);
                     } else {
-                        throw new Error(data.error || 'Unknown error');
+                        throw new Error(data.error || 'Unknown error from server');
                     }
                 })
                 .catch(error => {
@@ -761,7 +803,12 @@
                 healthPanel.style.display = 'block';
                 
                 fetch(`/api/debug/data/${currentTimeframe}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         let qualityMessage = '';
                         let sourceMessage = '';
@@ -1201,7 +1248,12 @@
 
         function checkDebug() {
             fetch('/api/debug')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     const debugDiv = document.getElementById('debugInfo');
                     if (debugDiv.style.display === 'none') {
