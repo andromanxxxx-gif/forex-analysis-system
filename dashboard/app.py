@@ -81,12 +81,18 @@ class SystemConfig:
     BACKTEST_MIN_CONFIDENCE: int = 40  # Lower confidence threshold for backtesting
     BACKTEST_RISK_SCORE_THRESHOLD: int = 8  # Higher risk tolerance for backtesting
     
-    # Supported Instruments
+    # Supported Instruments - SEMUA 10 PASANGAN FOREX
     FOREX_PAIRS: List[str] = field(default_factory=lambda: [
-        "EURUSD", "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", 
-        "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
+        "EURUSD", "USDJPY", "GBPUSD", "USDCHF", "AUDUSD", 
+        "USDCAD", "NZDUSD", "EURJPY", "GBPJPY", "CHFJPY"
     ])
-    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
+    
+    # Crypto pairs tambahan
+    CRYPTO_PAIRS: List[str] = field(default_factory=lambda: [
+        "BTCUSD", "ETHUSD", "XRPUSD", "LTCUSD", "BCHUSD"
+    ])
+    
+    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M5", "M15", "M30", "1H", "4H", "1D", "1W"])
     
     # EURUSD Specific Configuration
     EURUSD_SPECIFIC = {
@@ -103,6 +109,20 @@ class SystemConfig:
         }
     }
     
+    # JPY Pairs Specific Configuration
+    JPY_PAIRS_SPECIFIC = {
+        'volatility_adjustment': 1.2,
+        'preferred_timeframes': ['1H', '4H'],
+        'trading_hours_priority': [(0, 3), (8, 11)],  # Asian + London sessions
+        'news_sensitivity': 'HIGH',
+        'typical_range_pct': 0.012,
+        'intervention_levels': {
+            'USDJPY': [145.00, 150.00],
+            'EURJPY': [155.00, 160.00],
+            'GBPJPY': [185.00, 190.00]
+        }
+    }
+    
     # Backtesting
     DEFAULT_BACKTEST_DAYS: int = 90
     MIN_DATA_POINTS: int = 100
@@ -116,7 +136,7 @@ config = SystemConfig()
 class TechnicalAnalysisEngine:
     def __init__(self):
         self.indicators = {}
-        self.eurusd_special_patterns = {}
+        self.special_patterns = {}
         logger.info("Technical Analysis Engine initialized")
     
     def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
@@ -291,8 +311,8 @@ class TechnicalAnalysisEngine:
             }
         }
 
-    def calculate_eurusd_specific_analysis(self, df: pd.DataFrame) -> Dict:
-        """Analisis teknikal khusus untuk EURUSD dengan pattern recognition"""
+    def calculate_pair_specific_analysis(self, pair: str, df: pd.DataFrame) -> Dict:
+        """Analisis teknikal khusus untuk pair tertentu"""
         try:
             if df.empty or len(df) < 50:
                 return {}
@@ -301,29 +321,77 @@ class TechnicalAnalysisEngine:
             highs = df['high'].values
             lows = df['low'].values
             
-            # EURUSD-specific patterns
-            analysis = {
-                'london_newyork_overlap': self._analyze_session_overlap(df),
-                'european_us_news_impact': self._analyze_news_impact_sensitivity(df),
-                'carry_trade_analysis': self._analyze_carry_trade_conditions(closes),
-                'correlation_strength': self._calculate_correlation_strength(df),
-                'pivot_levels': self._calculate_eurusd_pivot_levels(df)
-            }
+            # Pair-specific patterns
+            if pair == 'EURUSD':
+                analysis = self._calculate_eurusd_specific_analysis(df)
+            elif pair in ['USDJPY', 'EURJPY', 'GBPJPY', 'CHFJPY']:
+                analysis = self._calculate_jpy_pairs_specific_analysis(pair, df)
+            elif pair in ['GBPUSD', 'USDCHF']:
+                analysis = self._calculate_major_pairs_specific_analysis(pair, df)
+            elif pair in ['AUDUSD', 'USDCAD', 'NZDUSD']:
+                analysis = self._calculate_commodity_pairs_specific_analysis(pair, df)
+            else:
+                analysis = self._calculate_general_analysis(df)
             
             return analysis
             
         except Exception as e:
-            logger.error(f"EURUSD specific analysis error: {e}")
+            logger.error(f"Pair specific analysis error for {pair}: {e}")
             return {}
     
+    def _calculate_eurusd_specific_analysis(self, df: pd.DataFrame) -> Dict:
+        """Analisis khusus EURUSD"""
+        return {
+            'london_newyork_overlap': self._analyze_session_overlap(df),
+            'european_us_news_impact': self._analyze_news_impact_sensitivity(df),
+            'correlation_strength': self._calculate_eurusd_correlation_strength(df),
+            'pivot_levels': self._calculate_eurusd_pivot_levels(df),
+            'market_hours_recommendation': 'Trade during London-NY overlap (8:00-11:00 EST)',
+            'news_sensitivity': 'HIGH'
+        }
+    
+    def _calculate_jpy_pairs_specific_analysis(self, pair: str, df: pd.DataFrame) -> Dict:
+        """Analisis khusus JPY pairs"""
+        return {
+            'asian_session_analysis': self._analyze_asian_session(df),
+            'bank_of_japan_impact': 'HIGH',
+            'intervention_risk': self._assess_intervention_risk(pair, df),
+            'carry_trade_analysis': self._analyze_carry_trade_conditions(df['close'].values),
+            'market_hours_recommendation': 'Trade during Asian session or London-Asian overlap',
+            'volatility_note': 'High volatility during Tokyo session'
+        }
+    
+    def _calculate_major_pairs_specific_analysis(self, pair: str, df: pd.DataFrame) -> Dict:
+        """Analisis khusus major pairs"""
+        return {
+            'london_session_analysis': self._analyze_london_session(df),
+            'correlation_analysis': self._calculate_major_pairs_correlation(pair),
+            'volatility_profile': self._analyze_volatility_profile(df),
+            'market_hours_recommendation': 'Trade during London session for best liquidity'
+        }
+    
+    def _calculate_commodity_pairs_specific_analysis(self, pair: str, df: pd.DataFrame) -> Dict:
+        """Analisis khusus commodity pairs"""
+        commodity_map = {
+            'AUDUSD': 'Gold and mining',
+            'USDCAD': 'Oil prices', 
+            'NZDUSD': 'Dairy and agriculture'
+        }
+        
+        return {
+            'commodity_correlation': commodity_map.get(pair, 'General commodities'),
+            'asian_pacific_session': self._analyze_asian_pacific_session(df),
+            'risk_sentiment_analysis': self._analyze_risk_sentiment(df),
+            'market_hours_recommendation': 'Trade during Asian-Pacific session overlap'
+        }
+    
     def _analyze_session_overlap(self, df: pd.DataFrame) -> Dict:
-        """Analisis performa selama overlap session London-NY"""
+        """Analisis performa selama overlap session"""
         try:
-            # Simple implementation - in real scenario, use actual session times
             volatility_by_hour = {}
             if 'date' in df.columns:
                 df['hour'] = pd.to_datetime(df['date']).dt.hour
-                for hour in [8, 9, 10, 11, 13, 14, 15, 16]:
+                for hour in range(24):
                     hour_data = df[df['hour'] == hour]
                     if not hour_data.empty:
                         volatility = hour_data['close'].pct_change().std() * 100
@@ -339,16 +407,47 @@ class TechnicalAnalysisEngine:
             return {}
     
     def _analyze_news_impact_sensitivity(self, df: pd.DataFrame) -> Dict:
-        """Analisis sensitivitas EURUSD terhadap news"""
+        """Analisis sensitivitas terhadap news"""
         return {
             'high_impact_events': ['NFP', 'ECB Rate Decision', 'FOMC', 'CPI'],
-            'sensitivity_score': 85,  # 0-100
-            'typical_reaction_pct': 0.008,  # 0.8% typical news reaction
+            'sensitivity_score': 85,
+            'typical_reaction_pct': 0.008,
             'recovery_time_hours': 4
         }
     
+    def _analyze_asian_session(self, df: pd.DataFrame) -> Dict:
+        """Analisis performa Asian session"""
+        return {
+            'active_hours': [0, 1, 2, 3, 4, 5, 6],
+            'volatility_characteristics': 'Breakout oriented',
+            'recommended_pairs': ['USDJPY', 'EURJPY', 'AUDUSD']
+        }
+    
+    def _assess_intervention_risk(self, pair: str, df: pd.DataFrame) -> Dict:
+        """Assess Bank of Japan intervention risk"""
+        intervention_levels = {
+            'USDJPY': {'high_risk': 150.00, 'medium_risk': 148.00},
+            'EURJPY': {'high_risk': 160.00, 'medium_risk': 158.00},
+            'GBPJPY': {'high_risk': 190.00, 'medium_risk': 188.00}
+        }
+        
+        current_price = df['close'].iloc[-1] if not df.empty else 0
+        levels = intervention_levels.get(pair, {})
+        
+        risk = 'LOW'
+        if current_price >= levels.get('high_risk', 200):
+            risk = 'HIGH'
+        elif current_price >= levels.get('medium_risk', 180):
+            risk = 'MEDIUM'
+            
+        return {
+            'intervention_risk': risk,
+            'current_price': current_price,
+            'risk_levels': levels
+        }
+    
     def _analyze_carry_trade_conditions(self, closes: np.array) -> Dict:
-        """Analisis kondisi carry trade untuk EURUSD"""
+        """Analisis kondisi carry trade"""
         try:
             if len(closes) < 20:
                 return {}
@@ -366,8 +465,8 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Carry trade analysis error: {e}")
             return {}
     
-    def _calculate_correlation_strength(self, df: pd.DataFrame) -> Dict:
-        """Hitung strength correlation dengan pairs terkait"""
+    def _calculate_eurusd_correlation_strength(self, df: pd.DataFrame) -> Dict:
+        """Hitung strength correlation untuk EURUSD"""
         return {
             'usd_index': -0.85,
             'gbpusd': 0.75,
@@ -375,6 +474,65 @@ class TechnicalAnalysisEngine:
             'gold': 0.45,
             'us10y': 0.60
         }
+    
+    def _calculate_major_pairs_correlation(self, pair: str) -> Dict:
+        """Hitung correlation untuk major pairs"""
+        correlations = {
+            'GBPUSD': {'eurusd': 0.75, 'usdchf': -0.60, 'usdjpy': -0.55},
+            'USDCHF': {'eurusd': -0.80, 'gbpusd': -0.60, 'usdjpy': 0.85}
+        }
+        return correlations.get(pair, {})
+    
+    def _analyze_volatility_profile(self, df: pd.DataFrame) -> Dict:
+        """Analisis profil volatilitas"""
+        try:
+            if len(df) < 20:
+                return {}
+                
+            closes = df['close'].values
+            volatility = np.std(np.diff(closes) / closes[:-1]) * 100
+            
+            return {
+                'current_volatility': round(volatility, 4),
+                'volatility_class': 'HIGH' if volatility > 0.8 else 'MEDIUM' if volatility > 0.4 else 'LOW',
+                'average_true_range': round(np.mean([high - low for high, low in zip(df['high'], df['low'])]), 4)
+            }
+        except Exception as e:
+            logger.warning(f"Volatility profile analysis error: {e}")
+            return {}
+    
+    def _analyze_london_session(self, df: pd.DataFrame) -> Dict:
+        """Analisis performa London session"""
+        return {
+            'active_hours': [8, 9, 10, 11, 12],
+            'volatility_characteristics': 'Trend continuation',
+            'recommended_approach': 'Breakout trading'
+        }
+    
+    def _analyze_asian_pacific_session(self, df: pd.DataFrame) -> Dict:
+        """Analisis performa Asian-Pacific session"""
+        return {
+            'active_hours': [22, 23, 0, 1, 2, 3, 4, 5],
+            'volatility_characteristics': 'Range bound with occasional breakouts',
+            'recommended_approach': 'Range trading with tight stops'
+        }
+    
+    def _analyze_risk_sentiment(self, df: pd.DataFrame) -> Dict:
+        """Analisis risk sentiment untuk commodity pairs"""
+        try:
+            if len(df) < 10:
+                return {}
+                
+            price_trend = "BULLISH" if df['close'].iloc[-1] > df['close'].iloc[-10] else "BEARISH"
+            
+            return {
+                'risk_appetite': 'HIGH' if price_trend == "BULLISH" else 'LOW',
+                'market_sentiment': 'RISK_ON' if price_trend == "BULLISH" else 'RISK_OFF',
+                'correlation_with_equities': 'POSITIVE'
+            }
+        except Exception as e:
+            logger.warning(f"Risk sentiment analysis error: {e}")
+            return {}
     
     def _calculate_eurusd_pivot_levels(self, df: pd.DataFrame) -> Dict:
         """Hitung pivot levels khusus untuk EURUSD"""
@@ -407,6 +565,14 @@ class TechnicalAnalysisEngine:
         except Exception as e:
             logger.warning(f"Pivot levels calculation error: {e}")
             return {}
+    
+    def _calculate_general_analysis(self, df: pd.DataFrame) -> Dict:
+        """Analisis umum untuk pairs tanpa spesifikasi khusus"""
+        return {
+            'general_recommendation': 'Monitor multiple timeframes for confirmation',
+            'risk_management': 'Use standard position sizing',
+            'trading_approach': 'Technical analysis driven'
+        }
 
 # ==================== TWELVEDATA REAL-TIME INTEGRATION ====================
 class TwelveDataClient:
@@ -467,10 +633,11 @@ class TwelveDataClient:
     def _get_simulated_real_time_price(self, pair: str) -> float:
         """Harga real-time simulasi untuk demo mode"""
         try:
-            # Base prices dengan variasi kecil untuk simulasi real-time
+            # Base prices untuk SEMUA 10 pasangan forex
             base_prices = {
-                'EURUSD': 1.0835, 'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
-                'GBPUSD': 1.2640, 'USDCHF': 0.8840, 'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095
+                'EURUSD': 1.0835, 'USDJPY': 147.25, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
+                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095, 'EURJPY': 159.80,
+                'GBPJPY': 186.20, 'CHFJPY': 166.75
             }
             
             base_price = base_prices.get(pair, 150.0)
@@ -489,6 +656,13 @@ class TwelveDataClient:
             logger.error(f"Error in simulated price for {pair}: {e}")
             return 150.0
 
+    def get_multiple_prices(self, pairs: List[str]) -> Dict[str, float]:
+        """Dapatkan harga multiple pairs sekaligus"""
+        prices = {}
+        for pair in pairs:
+            prices[pair] = self.get_real_time_price(pair)
+        return prices
+
 # ==================== ADVANCED RISK MANAGEMENT SYSTEM ====================
 class AdvancedRiskManager:
     def __init__(self, backtest_mode: bool = False):
@@ -506,18 +680,18 @@ class AdvancedRiskManager:
         self.current_drawdown = 0.0
         self.last_reset_date = datetime.now().date()
         
-        # Correlation matrix untuk forex pairs
+        # Correlation matrix untuk SEMUA 10 pasangan forex
         self.correlation_matrix = {
-            'EURUSD': {'USDJPY': -0.7, 'GBPUSD': 0.8, 'USDCHF': -0.7, 'EURJPY': 0.9, 'GBPJPY': 0.6},
-            'USDJPY': {'EURUSD': -0.7, 'GBPUSD': -0.6, 'USDCHF': 0.9, 'EURJPY': 0.8, 'GBPJPY': 0.7},
-            'GBPUSD': {'EURUSD': 0.8, 'USDJPY': -0.6, 'USDCHF': -0.6, 'EURJPY': 0.7, 'GBPJPY': 0.9},
-            'USDCHF': {'EURUSD': -0.7, 'USDJPY': 0.9, 'GBPUSD': -0.6, 'EURJPY': -0.6, 'GBPJPY': -0.5},
-            'EURJPY': {'EURUSD': 0.9, 'USDJPY': 0.8, 'GBPUSD': 0.7, 'USDCHF': -0.6, 'GBPJPY': 0.8},
-            'GBPJPY': {'EURUSD': 0.6, 'USDJPY': 0.7, 'GBPUSD': 0.9, 'USDCHF': -0.5, 'EURJPY': 0.8},
-            'CHFJPY': {'USDJPY': 0.6, 'EURJPY': 0.6, 'GBPJPY': 0.5, 'USDCHF': 0.8, 'EURUSD': -0.5},
-            'AUDUSD': {'USDJPY': -0.5, 'EURUSD': 0.6, 'GBPUSD': 0.5, 'NZDUSD': 0.8, 'USDCAD': -0.4},
-            'USDCAD': {'USDJPY': 0.4, 'EURUSD': -0.5, 'GBPUSD': -0.4, 'AUDUSD': -0.4, 'USDCHF': 0.6},
-            'NZDUSD': {'USDJPY': -0.5, 'EURUSD': 0.5, 'GBPUSD': 0.4, 'AUDUSD': 0.8, 'USDCAD': -0.3}
+            'EURUSD': {'USDJPY': -0.7, 'GBPUSD': 0.8, 'USDCHF': -0.7, 'AUDUSD': 0.6, 'USDCAD': -0.5, 'NZDUSD': 0.5, 'EURJPY': 0.9, 'GBPJPY': 0.6, 'CHFJPY': -0.5},
+            'USDJPY': {'EURUSD': -0.7, 'GBPUSD': -0.6, 'USDCHF': 0.9, 'AUDUSD': -0.5, 'USDCAD': 0.4, 'NZDUSD': -0.5, 'EURJPY': 0.8, 'GBPJPY': 0.7, 'CHFJPY': 0.6},
+            'GBPUSD': {'EURUSD': 0.8, 'USDJPY': -0.6, 'USDCHF': -0.6, 'AUDUSD': 0.5, 'USDCAD': -0.4, 'NZDUSD': 0.4, 'EURJPY': 0.7, 'GBPJPY': 0.9, 'CHFJPY': -0.5},
+            'USDCHF': {'EURUSD': -0.7, 'USDJPY': 0.9, 'GBPUSD': -0.6, 'AUDUSD': -0.4, 'USDCAD': 0.6, 'NZDUSD': -0.3, 'EURJPY': -0.6, 'GBPJPY': -0.5, 'CHFJPY': 0.8},
+            'AUDUSD': {'EURUSD': 0.6, 'USDJPY': -0.5, 'GBPUSD': 0.5, 'USDCHF': -0.4, 'USDCAD': -0.4, 'NZDUSD': 0.8, 'EURJPY': 0.5, 'GBPJPY': 0.4, 'CHFJPY': -0.3},
+            'USDCAD': {'EURUSD': -0.5, 'USDJPY': 0.4, 'GBPUSD': -0.4, 'USDCHF': 0.6, 'AUDUSD': -0.4, 'NZDUSD': -0.3, 'EURJPY': -0.4, 'GBPJPY': -0.3, 'CHFJPY': 0.5},
+            'NZDUSD': {'EURUSD': 0.5, 'USDJPY': -0.5, 'GBPUSD': 0.4, 'USDCHF': -0.3, 'AUDUSD': 0.8, 'USDCAD': -0.3, 'EURJPY': 0.4, 'GBPJPY': 0.3, 'CHFJPY': -0.2},
+            'EURJPY': {'EURUSD': 0.9, 'USDJPY': 0.8, 'GBPUSD': 0.7, 'USDCHF': -0.6, 'AUDUSD': 0.5, 'USDCAD': -0.4, 'NZDUSD': 0.4, 'GBPJPY': 0.8, 'CHFJPY': 0.6},
+            'GBPJPY': {'EURUSD': 0.6, 'USDJPY': 0.7, 'GBPUSD': 0.9, 'USDCHF': -0.5, 'AUDUSD': 0.4, 'USDCAD': -0.3, 'NZDUSD': 0.3, 'EURJPY': 0.8, 'CHFJPY': 0.5},
+            'CHFJPY': {'EURUSD': -0.5, 'USDJPY': 0.6, 'GBPUSD': -0.5, 'USDCHF': 0.8, 'AUDUSD': -0.3, 'USDCAD': 0.5, 'NZDUSD': -0.2, 'EURJPY': 0.6, 'GBPJPY': 0.5}
         }
         
         logger.info(f"Advanced Risk Manager initialized - Backtest Mode: {backtest_mode}")
@@ -535,8 +709,7 @@ class AdvancedRiskManager:
                       proposed_lot_size: float, account_balance: float, 
                       current_price: float, open_positions: List[Dict]) -> Dict:
         """
-        Validasi trade dengan multiple risk factors
-        Return: Dict dengan approval status dan adjusted parameters
+        Validasi trade dengan multiple risk factors untuk SEMUA pasangan
         """
         self.reset_daily_limits()
         
@@ -629,6 +802,13 @@ class AdvancedRiskManager:
             validation_result['warnings'].append("Low liquidity period")
             risk_factors['liquidity'] = 'LOW'
         
+        # 10. Pair-specific risk adjustments
+        pair_risk = self._check_pair_specific_risk(pair)
+        if pair_risk['additional_risk']:
+            validation_result['risk_score'] += pair_risk['risk_score_adjustment']
+            validation_result['warnings'].append(pair_risk['warning'])
+            risk_factors['pair_specific'] = pair_risk['risk_level']
+        
         # Final approval decision based on risk score
         validation_result['risk_factors'] = risk_factors
         
@@ -642,6 +822,33 @@ class AdvancedRiskManager:
         logger.info(f"Risk validation for {pair}-{signal}: {'APPROVED' if validation_result['approved'] else 'REJECTED'} - Score: {validation_result['risk_score']}")
         
         return validation_result
+    
+    def _check_pair_specific_risk(self, pair: str) -> Dict:
+        """Check pair-specific risk factors"""
+        # JPY pairs typically have higher volatility and intervention risk
+        jpy_pairs = ['USDJPY', 'EURJPY', 'GBPJPY', 'CHFJPY']
+        
+        if pair in jpy_pairs:
+            return {
+                'additional_risk': True,
+                'risk_score_adjustment': 1,
+                'warning': f"{pair} has higher volatility and intervention risk",
+                'risk_level': 'MEDIUM'
+            }
+        elif pair == 'GBPUSD':
+            return {
+                'additional_risk': True,
+                'risk_score_adjustment': 1,
+                'warning': "GBPUSD known for sudden volatility spikes",
+                'risk_level': 'MEDIUM'
+            }
+        else:
+            return {
+                'additional_risk': False,
+                'risk_score_adjustment': 0,
+                'warning': '',
+                'risk_level': 'LOW'
+            }
     
     def _check_correlation_risk(self, pair: str, signal: str, open_positions: List[Dict]) -> Dict:
         """Check correlation risk dengan open positions"""
@@ -705,10 +912,10 @@ class AdvancedRiskManager:
         
         # Low liquidity periods (Asian session overlap, weekends)
         low_liquidity_periods = [
-            (21, 24),
-            (0, 5),
-            (23, 24),
-            (0, 1)
+            (21, 24),  # Late NY / Early Asia
+            (0, 5),    # Asian session
+            (23, 24),  # Weekend start
+            (0, 1)     # Weekend
         ]
         
         for start_hour, end_hour in low_liquidity_periods:
@@ -823,1759 +1030,63 @@ class AdvancedRiskManager:
         else:
             return "LOW"
 
-# ==================== DEEPSEEK AI ANALYZER ====================
-class DeepSeekAnalyzer:
-    def __init__(self):
-        self.api_key = config.DEEPSEEK_API_KEY
-        self.base_url = "https://api.deepseek.com/v1/chat/completions"
-        self.demo_mode = not self.api_key or self.api_key == "demo"
-        
-        if self.demo_mode:
-            logger.info("DeepSeek AI running in DEMO mode")
-        else:
-            logger.info("DeepSeek AI running in LIVE mode")
-    
-    def analyze_market(self, pair: str, technical_data: Dict, fundamental_news: str) -> Dict:
-        """Menganalisis market menggunakan DeepSeek AI"""
-        if self.demo_mode:
-            logger.info("Using enhanced analysis (Demo mode)")
-            return self._enhanced_analysis(technical_data, fundamental_news, pair)
-        
-        try:
-            prompt = self._build_analysis_prompt(pair, technical_data, fundamental_news)
-            
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "deepseek-chat",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": """Anda adalah analis forex profesional dengan pengalaman 10 tahun. 
-                        Berikan analisis yang realistis, praktis, dan dapat ditindaklanjuti. 
-                        Fokus pada risk management dan peluang trading yang jelas."""
-                    },
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.3,
-                "max_tokens": 1500
-            }
-            
-            response = requests.post(self.base_url, headers=headers, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                ai_response = response.json()["choices"][0]["message"]["content"]
-                return self._parse_ai_response(ai_response, technical_data)
-            else:
-                logger.error(f"DeepSeek API error: {response.status_code}")
-                return self._enhanced_analysis(technical_data, fundamental_news, pair)
-                
-        except Exception as e:
-            logger.error(f"DeepSeek analysis failed: {e}")
-            return self._enhanced_analysis(technical_data, fundamental_news, pair)
-    
-    def _build_analysis_prompt(self, pair: str, technical_data: Dict, news: str) -> str:
-        """Membangun prompt untuk analisis AI"""
-        trend = technical_data['trend']
-        momentum = technical_data['momentum']
-        volatility = technical_data['volatility']
-        levels = technical_data['levels']
-        
-        return f"""
-ANALISIS FOREX UNTUK {pair}
-
-DATA TEKNIKAL:
-- Harga Saat Ini: {levels['current_price']}
-- Trend: {trend['trend_direction']}
-- RSI: {momentum['rsi']:.2f} ({'OVERSOLD' if momentum['rsi'] < 30 else 'OVERBOUGHT' if momentum['rsi'] > 70 else 'NETRAL'})
-- MACD: {momentum['macd']:.4f} (Signal: {momentum['macd_signal']:.4f})
-- Support: {levels['support']:.4f}
-- Resistance: {levels['resistance']:.4f}
-- Volatilitas: {volatility['volatility_pct']:.2f}%
-- ATR: {volatility['atr']:.4f}
-
-BERITA FUNDAMENTAL: {news}
-
-HASILKAN ANALISIS DALAM FORMAT JSON:
-{{
-    "signal": "BUY/SELL/HOLD",
-    "confidence": 0-100,
-    "entry_price": "rentang harga",
-    "stop_loss": "harga",
-    "take_profit_1": "harga", 
-    "take_profit_2": "harga",
-    "risk_level": "LOW/MEDIUM/HIGH",
-    "analysis_summary": "ringkasan analisis dalam Bahasa Indonesia",
-    "key_levels": "level penting untuk diawasi",
-    "timeframe_suggestion": "timeframe yang disarankan"
-}}
-
-Pertimbangkan:
-1. Konvergensi/divergensi indikator
-2. Level support/resistance 
-3. Konteks berita fundamental
-4. Risk-reward ratio yang realistis
-5. Kondisi overbought/oversold
-"""
-    
-    def _parse_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
-        """Parse response dari DeepSeek AI dengan error handling yang lebih baik"""
-        try:
-            # Clean response - handle berbagai format
-            cleaned_response = ai_response.strip()
-            
-            # Coba extract JSON dari berbagai format
-            if '```json' in cleaned_response:
-                # Format dengan code block
-                start_idx = cleaned_response.find('```json') + 7
-                end_idx = cleaned_response.find('```', start_idx)
-                if end_idx == -1:
-                    end_idx = len(cleaned_response)
-                json_str = cleaned_response[start_idx:end_idx].strip()
-            elif '```' in cleaned_response:
-                # Format dengan code block tanpa json
-                start_idx = cleaned_response.find('```') + 3
-                end_idx = cleaned_response.find('```', start_idx)
-                if end_idx == -1:
-                    end_idx = len(cleaned_response)
-                json_str = cleaned_response[start_idx:end_idx].strip()
-            else:
-                # Assume it's plain JSON
-                json_str = cleaned_response
-            
-            # Remove any non-JSON text di awal atau akhir
-            json_str = json_str.strip()
-            if not json_str.startswith('{'):
-                start_idx = json_str.find('{')
-                if start_idx != -1:
-                    json_str = json_str[start_idx:]
-            
-            if not json_str.endswith('}'):
-                end_idx = json_str.rfind('}')
-                if end_idx != -1:
-                    json_str = json_str[:end_idx+1]
-            
-            # Parse JSON
-            analysis = json.loads(json_str)
-            
-            # Validate required fields
-            required_fields = ['signal', 'confidence', 'entry_price', 'stop_loss', 
-                              'take_profit_1', 'risk_level', 'analysis_summary']
-            
-            for field in required_fields:
-                if field not in analysis:
-                    logger.warning(f"Missing field {field} in AI response, using enhanced analysis")
-                    return self._enhanced_analysis(technical_data, "", "")
-            
-            # Add metadata
-            analysis['ai_provider'] = 'DeepSeek AI'
-            analysis['timestamp'] = datetime.now().isoformat()
-            
-            # Ensure confidence is integer
-            if 'confidence' in analysis:
-                analysis['confidence'] = int(analysis['confidence'])
-            
-            logger.info("Successfully parsed AI response")
-            return analysis
-            
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Failed to parse AI JSON response: {e}, using enhanced analysis")
-            logger.debug(f"Raw AI response: {ai_response}")
-            return self._enhanced_analysis(technical_data, "", "")
-    
-    def _enhanced_analysis(self, technical_data: Dict, news: str, pair: str) -> Dict:
-        """Analisis enhanced ketika AI tidak tersedia"""
-        trend = technical_data['trend']
-        momentum = technical_data['momentum']
-        levels = technical_data['levels']
-        
-        current_price = levels['current_price']
-        rsi = momentum['rsi']
-        macd_hist = momentum['macd_histogram']
-        
-        # Logika analisis multi-faktor
-        signal_score = 0
-        
-        # RSI scoring
-        if rsi < 30:
-            signal_score += 3
-        elif rsi < 40:
-            signal_score += 2
-        elif rsi > 70:
-            signal_score -= 3
-        elif rsi > 60:
-            signal_score -= 2
-        
-        # MACD scoring
-        if macd_hist > 0:
-            signal_score += 2
-        else:
-            signal_score -= 2
-        
-        # Trend scoring
-        if trend['trend_direction'] == 'BULLISH':
-            signal_score += 1
-        else:
-            signal_score -= 1
-        
-        # Volatility consideration
-        if technical_data['volatility']['volatility_pct'] < 0.015:
-            signal_score += 1
-        
-        # Determine signal
-        if signal_score >= 5:
-            signal = "BUY"
-            confidence = 80
-            sl = current_price * (1 - config.STOP_LOSS_PCT)
-            tp1 = current_price * (1 + config.TAKE_PROFIT_PCT)
-            tp2 = current_price * (1 + config.TAKE_PROFIT_PCT * 1.5)
-            risk_level = "MEDIUM"
-        elif signal_score >= 3:
-            signal = "BUY" 
-            confidence = 65
-            sl = current_price * (1 - config.STOP_LOSS_PCT * 0.8)
-            tp1 = current_price * (1 + config.TAKE_PROFIT_PCT * 0.8)
-            tp2 = current_price * (1 + config.TAKE_PROFIT_PCT * 1.2)
-            risk_level = "LOW"
-        elif signal_score <= -5:
-            signal = "SELL"
-            confidence = 80
-            sl = current_price * (1 + config.STOP_LOSS_PCT)
-            tp1 = current_price * (1 - config.TAKE_PROFIT_PCT)
-            tp2 = current_price * (1 - config.TAKE_PROFIT_PCT * 1.5)
-            risk_level = "MEDIUM"
-        elif signal_score <= -3:
-            signal = "SELL"
-            confidence = 65
-            sl = current_price * (1 + config.STOP_LOSS_PCT * 0.8)
-            tp1 = current_price * (1 - config.TAKE_PROFIT_PCT * 0.8)
-            tp2 = current_price * (1 - config.TAKE_PROFIT_PCT * 1.2)
-            risk_level = "LOW"
-        else:
-            signal = "HOLD"
-            confidence = 50
-            sl = current_price * 0.995
-            tp1 = current_price * 1.005
-            tp2 = current_price * 1.01
-            risk_level = "LOW"
-        
-        analysis_summary = f"Analisis teknikal {pair}: {signal} signal. "
-        analysis_summary += f"RSI {rsi:.1f} ({'Oversold' if rsi < 30 else 'Overbought' if rsi > 70 else 'Netral'}), "
-        analysis_summary += f"Trend {trend['trend_direction'].lower()}, "
-        analysis_summary += f"Volatilitas {technical_data['volatility']['volatility_pct']:.2f}%"
-        
-        return {
-            "signal": signal,
-            "confidence": confidence,
-            "entry_price": f"{current_price:.4f}",
-            "stop_loss": f"{sl:.4f}",
-            "take_profit_1": f"{tp1:.4f}",
-            "take_profit_2": f"{tp2:.4f}",
-            "risk_level": risk_level,
-            "analysis_summary": analysis_summary,
-            "key_levels": f"Support: {levels['support']:.4f}, Resistance: {levels['resistance']:.4f}",
-            "timeframe_suggestion": "4H-1D untuk konfirmasi",
-            "ai_provider": "Enhanced Technical Analysis (Demo Mode)",
-            "timestamp": datetime.now().isoformat()
-        }
-
-    def analyze_eurusd_specific(self, technical_data: Dict, fundamental_analysis: Dict) -> Dict:
-        """Analisis AI khusus untuk EURUSD dengan konteks fundamental mendalam"""
-        if self.demo_mode:
-            return self._enhanced_eurusd_analysis(technical_data, fundamental_analysis)
-        
-        try:
-            prompt = self._build_eurusd_analysis_prompt(technical_data, fundamental_analysis)
-            
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "deepseek-chat",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": """Anda adalah analis EURUSD khusus dengan keahlian dalam:
-                        - Analisis ECB vs Fed policy divergence
-                        - Economic outlook Eurozone vs US
-                        - Political factors affecting Euro
-                        - EURUSD seasonal patterns and correlations
-                        Berikan analisis yang mendalam dan actionable."""
-                    },
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.3,
-                "max_tokens": 2000
-            }
-            
-            response = requests.post(self.base_url, headers=headers, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                ai_response = response.json()["choices"][0]["message"]["content"]
-                return self._parse_eurusd_ai_response(ai_response, technical_data)
-            else:
-                logger.error(f"DeepSeek API error for EURUSD: {response.status_code}")
-                return self._enhanced_eurusd_analysis(technical_data, fundamental_analysis)
-                
-        except Exception as e:
-            logger.error(f"EURUSD-specific AI analysis failed: {e}")
-            return self._enhanced_eurusd_analysis(technical_data, fundamental_analysis)
-    
-    def _build_eurusd_analysis_prompt(self, technical_data: Dict, fundamental: Dict) -> str:
-        """Bangun prompt khusus EURUSD"""
-        trend = technical_data['trend']
-        momentum = technical_data['momentum']
-        levels = technical_data['levels']
-        
-        return f"""
-ANALISIS EURUSD MENDALAM
-
-DATA TEKNIKAL:
-- Harga Saat Ini: {levels['current_price']}
-- Trend: {trend['trend_direction']} ({trend['trend_strength']})
-- RSI: {momentum['rsi']:.2f}
-- Support: {levels['support']:.4f}
-- Resistance: {levels['resistance']:.4f}
-
-ANALISIS FUNDAMENTAL KHUSUS:
-- Economic Outlook: {fundamental.get('economic_outlook', {}).get('growth_comparison', 'N/A')}
-- Central Bank Policy: ECB {fundamental.get('central_bank_policy', {}).get('ecb_stance', 'N/A')} vs Fed {fundamental.get('central_bank_policy', {}).get('fed_stance', 'N/A')}
-- Interest Rate Differential: {fundamental.get('interest_rate_differential', {}).get('current_diff', 'N/A')}%
-- Market Sentiment: {fundamental.get('market_sentiment', {}).get('speculative_positioning', 'N/A')}
-
-FITUR KHUSUS EURUSD:
-- Trading Sessions: Prioritaskan London-NY overlap (8:00-11:00 EST, 13:00-16:00 EST)
-- News Sensitivity: HIGH - monitor ECB speeches, Fed announcements, NFP
-- Correlation: Strong negative correlation dengan USD Index
-- Typical Range: 70-100 pips daily
-
-HASILKAN ANALISIS DALAM FORMAT JSON:
-{{
-    "signal": "BUY/SELL/HOLD",
-    "confidence": 0-100,
-    "timeframe_recommendation": "1H/4H/1D",
-    "trading_session_priority": "London/NY/Overlap/Asian",
-    "entry_strategy": "Breakout/Pullback/Range",
-    "stop_loss": "harga",
-    "take_profit_1": "harga", 
-    "take_profit_2": "harga",
-    "risk_level": "LOW/MEDIUM/HIGH",
-    "fundamental_bias": "BULLISH_EUR/BEARISH_EUR/NEUTRAL",
-    "key_drivers": "faktor fundamental utama",
-    "correlation_impact": "analisis dampak korelasi",
-    "news_risk_assessment": "risiko berita mendatang",
-    "position_sizing_recommendation": "aggressive/conservative"
-}}
-
-Pertimbangkan khusus untuk EURUSD:
-1. ECB vs Fed policy divergence
-2. Economic data surprises
-3. Geopolitical developments
-4. USD strength broader context
-5. Seasonal patterns
-6. Institutional positioning
-"""
-    
-    def _parse_eurusd_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
-        """Parse response AI khusus EURUSD"""
-        try:
-            cleaned_response = ai_response.strip()
-            
-            if '```json' in cleaned_response:
-                start_idx = cleaned_response.find('```json') + 7
-                end_idx = cleaned_response.find('```', start_idx)
-                if end_idx == -1:
-                    end_idx = len(cleaned_response)
-                json_str = cleaned_response[start_idx:end_idx].strip()
-            elif '```' in cleaned_response:
-                start_idx = cleaned_response.find('```') + 3
-                end_idx = cleaned_response.find('```', start_idx)
-                if end_idx == -1:
-                    end_idx = len(cleaned_response)
-                json_str = cleaned_response[start_idx:end_idx].strip()
-            else:
-                json_str = cleaned_response
-            
-            json_str = json_str.strip()
-            if not json_str.startswith('{'):
-                start_idx = json_str.find('{')
-                if start_idx != -1:
-                    json_str = json_str[start_idx:]
-            
-            if not json_str.endswith('}'):
-                end_idx = json_str.rfind('}')
-                if end_idx != -1:
-                    json_str = json_str[:end_idx+1]
-            
-            analysis = json.loads(json_str)
-            
-            # Add EURUSD-specific metadata
-            analysis['pair_specific'] = 'EURUSD_ENHANCED_ANALYSIS'
-            analysis['analysis_depth'] = 'ADVANCED_FUNDAMENTAL_TECHNICAL'
-            analysis['recommended_sessions'] = ['London_Open', 'NY_Open', 'Overlap']
-            analysis['timestamp'] = datetime.now().isoformat()
-            
-            return analysis
-            
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Failed to parse EURUSD AI response: {e}")
-            return self._enhanced_eurusd_analysis(technical_data, {})
-    
-    def _enhanced_eurusd_analysis(self, technical_data: Dict, fundamental_analysis: Dict) -> Dict:
-        """Enhanced analysis fallback untuk EURUSD"""
-        current_price = technical_data['levels']['current_price']
-        rsi = technical_data['momentum']['rsi']
-        trend = technical_data['trend']['trend_direction']
-        
-        # EURUSD-specific logic
-        fundamental_bias = fundamental_analysis.get('economic_outlook', {}).get('growth_comparison', 'BALANCED')
-        
-        if fundamental_bias == 'EUROZONE_WEAKER':
-            bias_strength = -1
-        elif fundamental_bias == 'US_WEAKER':
-            bias_strength = 1
-        else:
-            bias_strength = 0
-        
-        # Combine technical and fundamental analysis
-        technical_score = 0
-        if rsi < 40 and trend == 'BULLISH':
-            technical_score = 2
-        elif rsi < 45:
-            technical_score = 1
-        elif rsi > 60 and trend == 'BEARISH':
-            technical_score = -2
-        elif rsi > 55:
-            technical_score = -1
-        
-        total_score = technical_score + bias_strength
-        
-        if total_score >= 2:
-            signal = "BUY"
-            confidence = 75
-            risk_level = "MEDIUM"
-        elif total_score >= 1:
-            signal = "BUY"
-            confidence = 65
-            risk_level = "LOW"
-        elif total_score <= -2:
-            signal = "SELL"
-            confidence = 75
-            risk_level = "MEDIUM"
-        elif total_score <= -1:
-            signal = "SELL"
-            confidence = 65
-            risk_level = "LOW"
-        else:
-            signal = "HOLD"
-            confidence = 50
-            risk_level = "LOW"
-        
-        return {
-            "signal": signal,
-            "confidence": confidence,
-            "timeframe_recommendation": "4H-1D",
-            "trading_session_priority": "London-NY Overlap",
-            "entry_strategy": "Wait for pullback" if signal != "HOLD" else "Remain sidelined",
-            "stop_loss": f"{current_price * 0.995:.4f}" if signal == "BUY" else f"{current_price * 1.005:.4f}",
-            "take_profit_1": f"{current_price * 1.01:.4f}" if signal == "BUY" else f"{current_price * 0.99:.4f}",
-            "take_profit_2": f"{current_price * 1.02:.4f}" if signal == "BUY" else f"{current_price * 0.98:.4f}",
-            "risk_level": risk_level,
-            "fundamental_bias": "BULLISH_EUR" if bias_strength > 0 else "BEARISH_EUR" if bias_strength < 0 else "NEUTRAL",
-            "key_drivers": f"ECB-Fed policy, Economic growth differential, Technical {trend} trend",
-            "correlation_impact": "Monitor USD Index and GBPUSD for confirmation",
-            "news_risk_assessment": "High sensitivity to ECB and Fed communications",
-            "position_sizing_recommendation": "Conservative due to EURUSD sensitivity",
-            "pair_specific": "EURUSD_ENHANCED_ANALYSIS",
-            "analysis_depth": "COMBINED_FUNDAMENTAL_TECHNICAL",
-            "ai_provider": "Enhanced EURUSD Analysis (Demo Mode)",
-            "timestamp": datetime.now().isoformat()
-        }
-
-# ==================== DATA MANAGER YANG DIPERBAIKI ====================
-class DataManager:
-    def __init__(self):
-        self.historical_data = {}
-        self.load_historical_data()
-
-    def get_price_data_with_timezone(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga dengan timezone awareness untuk timeframe 4H"""
-        try:
-            df = self.get_price_data(pair, timeframe, days)
-            
-            if df.empty:
-                return df
-                
-            # Pastikan kolom date adalah datetime dengan timezone
-            if 'date' in df.columns:
-                if not pd.api.types.is_datetime64_any_dtype(df['date']):
-                    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-                
-                # Set timezone ke UTC jika belum ada
-                if df['date'].dt.tz is None:
-                    df['date'] = df['date'].dt.tz_localize('UTC')
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error in get_price_data_with_timezone for {pair}-{timeframe}: {e}")
-            return self.get_price_data(pair, timeframe, days)
-
-    def ensure_fresh_data(self, pair: str, timeframe: str, min_records: int = 100):
-        """Nonaktifkan validasi stale data untuk mencegah regenerasi tidak perlu"""
-        try:
-            if pair not in self.historical_data or timeframe not in self.historical_data[pair]:
-                self._generate_sample_data(pair, timeframe)
-                return
-                
-            df = self.historical_data[pair][timeframe]
-            if df.empty or len(df) < min_records:
-                self._generate_sample_data(pair, timeframe)
-                return
-                
-        except Exception as e:
-            logger.error(f"Error ensuring fresh data for {pair}-{timeframe}: {e}")
-
-    def validate_and_fix_data(self, pair: str, timeframe: str):
-        """Validasi dan perbaiki data yang rusak"""
-        try:
-            if pair in self.historical_data and timeframe in self.historical_data[pair]:
-                df = self.historical_data[pair][timeframe]
-                
-                # Check if dataframe is empty or has missing columns
-                if df.empty or len(df) == 0:
-                    logger.warning(f"Empty dataframe for {pair}-{timeframe}, regenerating data")
-                    self._generate_sample_data(pair, timeframe)
-                    return
-                
-                # Check for required columns
-                required_cols = ['open', 'high', 'low', 'close', 'date']
-                missing_cols = [col for col in required_cols if col not in df.columns]
-                
-                if missing_cols:
-                    logger.warning(f"Missing columns {missing_cols} for {pair}-{timeframe}, regenerating data")
-                    self._generate_sample_data(pair, timeframe)
-                    return
-                    
-                # Check for NaN values in critical columns
-                critical_cols = ['open', 'high', 'low', 'close']
-                for col in critical_cols:
-                    if df[col].isna().any():
-                        logger.warning(f"NaN values found in {col} for {pair}-{timeframe}, regenerating data")
-                        self._generate_sample_data(pair, timeframe)
-                        return
-                        
-                logger.info(f"Data validation passed for {pair}-{timeframe}")
-                
-        except Exception as e:
-            logger.error(f"Data validation error for {pair}-{timeframe}: {e}")
-            self._generate_sample_data(pair, timeframe)
-    
-    def load_historical_data(self):
-        """Load data historis dari file CSV dengan handling error yang lebih baik"""
-        try:
-            data_dir = "historical_data"
-            if not os.path.exists(data_dir):
-                os.makedirs(data_dir)
-                logger.info("Created historical_data directory")
-                self._create_sample_data()
-                return
-            
-            loaded_count = 0
-            for filename in os.listdir(data_dir):
-                if filename.endswith('.csv'):
-                    file_path = os.path.join(data_dir, filename)
-                    try:
-                        df = pd.read_csv(file_path)
-                        
-                        # PERBAIKAN: Cek dan standardisasi kolom
-                        df = self._standardize_columns(df)
-                        
-                        # Pastikan kolom date ada dan konversi ke datetime
-                        if 'date' in df.columns:
-                            df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
-                            df = df.dropna(subset=['date'])
-                        
-                        # PERBAIKAN: Pastikan kolom required ada
-                        required_cols = ['open', 'high', 'low', 'close']
-                        missing_cols = [col for col in required_cols if col not in df.columns]
-                        if missing_cols:
-                            logger.warning(f"File {filename} missing columns: {missing_cols}. Generating synthetic data.")
-                            continue
-                        
-                        # Extract pair dan timeframe dari filename
-                        name_parts = filename.replace('.csv', '').split('_')
-                        if len(name_parts) >= 2:
-                            pair = name_parts[0].upper()
-                            timeframe = name_parts[1].upper()
-                            
-                            if pair not in config.FOREX_PAIRS:
-                                continue
-                                
-                            if pair not in self.historical_data:
-                                self.historical_data[pair] = {}
-                            
-                            self.historical_data[pair][timeframe] = df
-                            loaded_count += 1
-                            logger.info(f"Loaded {pair}-{timeframe}: {len(df)} records")
-                            
-                    except Exception as e:
-                        logger.error(f"Error loading {filename}: {e}")
-                        continue
-            
-            logger.info(f"Total loaded datasets: {loaded_count}")
-            
-            # Jika tidak ada data yang berhasil diload, buat sample
-            if loaded_count == 0:
-                logger.warning("No valid data found, creating sample data...")
-                self._create_sample_data()
-            
-        except Exception as e:
-            logger.error(f"Error in load_historical_data: {e}")
-            self._create_sample_data()
-    
-    def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Standardisasi nama kolom untuk menghindari error"""
-        column_mapping = {
-            'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
-            'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close',
-            'Date': 'date', 'TIME': 'date', 'Timestamp': 'date'
-        }
-        
-        df.columns = [column_mapping.get(col, col.lower()) for col in df.columns]
-        return df
-
-    def _create_sample_data(self):
-        """Buat sample data jika tidak ada data historis"""
-        logger.info("Creating sample historical data...")
-        
-        for pair in config.FOREX_PAIRS[:6]:
-            for timeframe in ['M30', '1H', '4H', '1D']:
-                self._generate_sample_data(pair, timeframe)
-    
-    def _generate_sample_data(self, pair: str, timeframe: str):
-        """Generate sample data yang realistis dengan timezone awareness"""
-        try:
-            # Tentukan periods berdasarkan timeframe
-            if timeframe == 'M30':
-                periods = 2000
-            elif timeframe == '1H':
-                periods = 1500
-            elif timeframe == '4H':
-                periods = 1000
-            else:  # 1D
-                periods = 500
-                
-            base_prices = {
-                'EURUSD': 1.0850, 'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-                'GBPUSD': 1.2650, 'USDCHF': 0.8850, 'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
-            }
-            
-            base_price = base_prices.get(pair, 150.0)
-            prices = []
-            current_price = base_price
-            
-            # Start dari waktu terkini mundur untuk memastikan data fresh
-            end_date = datetime.now().replace(tzinfo=None)
-            
-            # Hitung start date berdasarkan timeframe dan periods
-            if timeframe == 'M30':
-                start_date = end_date - timedelta(hours=periods*0.5)
-            elif timeframe == '1H':
-                start_date = end_date - timedelta(hours=periods)
-            elif timeframe == '4H':
-                start_date = end_date - timedelta(hours=periods*4)
-            else:  # 1D
-                start_date = end_date - timedelta(days=periods)
-            
-            current_date = start_date
-            
-            for i in range(periods):
-                # Random walk yang lebih realistis
-                volatility = 0.0015
-                drift = (base_price - current_price) * 0.001
-                random_shock = np.random.normal(0, volatility)
-                change = drift + random_shock
-                current_price = current_price * (1 + change)
-                
-                # Generate OHLC dengan spread yang realistis
-                open_price = current_price
-                close_price = current_price * (1 + np.random.normal(0, volatility * 0.3))
-                high = max(open_price, close_price) + abs(change) * base_price * 0.5
-                low = min(open_price, close_price) - abs(change) * base_price * 0.5
-                
-                # Ensure high > low dan reasonable values
-                high = max(high, max(open_price, close_price) + 0.0001)
-                low = min(low, min(open_price, close_price) - 0.0001)
-                
-                # Generate date berdasarkan timeframe dengan timezone
-                if timeframe == 'M30':
-                    current_date = start_date + timedelta(minutes=30*i)
-                elif timeframe == '1H':
-                    current_date = start_date + timedelta(hours=i)
-                elif timeframe == '4H':
-                    hours_to_add = (i * 4) % 24
-                    days_to_add = (i * 4) // 24
-                    current_date = start_date + timedelta(days=days_to_add, hours=hours_to_add)
-                else:  # 1D
-                    current_date = start_date + timedelta(days=i)
-                
-                # Add timezone info
-                current_date_utc = current_date.replace(tzinfo=None)
-                
-                prices.append({
-                    'date': current_date_utc,
-                    'open': round(float(open_price), 4),
-                    'high': round(float(high), 4),
-                    'low': round(float(low), 4),
-                    'close': round(float(close_price), 4),
-                    'volume': int(np.random.randint(10000, 50000))
-                })
-            
-            df = pd.DataFrame(prices)
-            
-            # Save to file
-            data_dir = "historical_data"
-            os.makedirs(data_dir, exist_ok=True)
-            filename = f"{data_dir}/{pair}_{timeframe}.csv"
-            df.to_csv(filename, index=False)
-            
-            # Store in memory
-            if pair not in self.historical_data:
-                self.historical_data[pair] = {}
-            self.historical_data[pair][timeframe] = df
-            
-            logger.info(f"Created sample data: {filename} with {len(df)} records")
-            
-        except Exception as e:
-            logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
-
-    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga untuk backtesting dengan fallback yang lebih baik"""
-        try:
-            if pair in self.historical_data and timeframe in self.historical_data[pair]:
-                df = self.historical_data[pair][timeframe]
-                if df.empty:
-                    return self._generate_simple_data(pair, timeframe, days)
-                
-                # Return data untuk periode tertentu
-                if timeframe == 'M30':
-                    required_points = min(len(df), days * 48)
-                elif timeframe == '1H':
-                    required_points = min(len(df), days * 24)
-                elif timeframe == '4H':
-                    required_points = min(len(df), days * 6)
-                else:  # 1D or 1W
-                    required_points = min(len(df), days)
-                    
-                result_df = df.tail(required_points).copy()
-                
-                # PERBAIKAN: Pastikan kolom yang diperlukan ada
-                required_cols = ['date', 'open', 'high', 'low', 'close']
-                for col in required_cols:
-                    if col not in result_df.columns:
-                        logger.warning(f"Column {col} missing, generating synthetic data")
-                        return self._generate_simple_data(pair, timeframe, days)
-                
-                return result_df
-            
-            # Fallback: generate simple synthetic data
-            return self._generate_simple_data(pair, timeframe, days)
-            
-        except Exception as e:
-            logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
-            return self._generate_simple_data(pair, timeframe, days)
-
-    def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate simple synthetic data untuk backtesting"""
-        # Tentukan points berdasarkan timeframe
-        if timeframe == 'M30':
-            points = days * 48
-        elif timeframe == '1H':
-            points = days * 24
-        elif timeframe == '4H':
-            points = days * 6
-        else:  # 1D
-            points = days
-            
-        base_prices = {
-            'EURUSD': 1.0850, 'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-            'GBPUSD': 1.2650, 'USDCHF': 0.8850, 'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
-        }
-        
-        base_price = base_prices.get(pair, 150.0)
-        prices = []
-        current_price = base_price
-        
-        start_date = datetime.now() - timedelta(days=days)
-        
-        for i in range(points):
-            change = np.random.normal(0, 0.001)
-            current_price = current_price * (1 + change)
-            
-            open_price = current_price
-            close_price = current_price * (1 + np.random.normal(0, 0.0005))
-            high = max(open_price, close_price) + abs(change) * 0.1
-            low = min(open_price, close_price) - abs(change) * 0.1
-            
-            # Ensure high > low
-            if high <= low:
-                high = low + 0.0001
-            
-            # Generate date based on timeframe
-            if timeframe == 'M30':
-                current_date = start_date + timedelta(minutes=30*i)
-            elif timeframe == '1H':
-                current_date = start_date + timedelta(hours=i)
-            elif timeframe == '4H':
-                current_date = start_date + timedelta(hours=4*i)
-            else:  # 1D
-                current_date = start_date + timedelta(days=i)
-            
-            prices.append({
-                'date': current_date,
-                'open': round(float(open_price), 4),
-                'high': round(float(high), 4),
-                'low': round(float(low), 4),
-                'close': round(float(close_price), 4),
-                'volume': int(np.random.randint(10000, 50000))
-            })
-        
-        return pd.DataFrame(prices)
-
-# ==================== FUNDAMENTAL ANALYSIS ENGINE ====================
-class FundamentalAnalysisEngine:
-    def __init__(self):
-        self.news_cache = {}
-        self.cache_duration = timedelta(minutes=30)
-        self.demo_mode = not config.NEWS_API_KEY or config.NEWS_API_KEY == "demo"
-        logger.info(f"Fundamental Analysis Engine initialized - {'DEMO MODE' if self.demo_mode else 'LIVE MODE'}")
-    
-    def get_forex_news(self, pair: str) -> str:
-        """Mendapatkan berita fundamental untuk pair forex"""
-        # Check cache first
-        cache_key = f"{pair}_{datetime.now().strftime('%Y%m%d%H')}"
-        if cache_key in self.news_cache:
-            cached_time, news = self.news_cache[cache_key]
-            if datetime.now() - cached_time < self.cache_duration:
-                return news
-        
-        try:
-            # Map pair ke negara terkait
-            country_map = {
-                'EURUSD': 'Europe United States Fed ECB Federal Reserve European Central Bank',
-                'USDJPY': 'Japan United States economy Bank of Japan Federal Reserve',
-                'GBPJPY': 'Japan UK economy Brexit Bank of England',
-                'EURJPY': 'Japan Europe ECB economy European Central Bank',
-                'CHFJPY': 'Japan Switzerland economy SNB Swiss National Bank',
-                'GBPUSD': 'UK United States Bank of England Fed Brexit',
-                'USDCHF': 'United States Switzerland SNB Fed Swiss National Bank',
-                'AUDUSD': 'Australia United States RBA Fed Reserve Bank of Australia',
-                'USDCAD': 'United States Canada Fed Bank of Canada BOC',
-                'NZDUSD': 'New Zealand United States RBNZ Fed Reserve Bank of New Zealand'
-            }
-            
-            query = country_map.get(pair, 'forex market news')
-            
-            if not self.demo_mode:
-                url = f"https://newsapi.org/v2/everything?q={query}&language=en&sortBy=publishedAt&pageSize=3&apiKey={config.NEWS_API_KEY}"
-                response = requests.get(url, timeout=10)
-                
-                if response.status_code == 200:
-                    articles = response.json().get('articles', [])
-                    if articles:
-                        news_items = []
-                        for article in articles[:2]:
-                            title = article.get('title', '')
-                            source = article.get('source', {}).get('name', 'Unknown')
-                            title = title.encode('ascii', 'ignore').decode('ascii')[:100]
-                            news_items.append(f"{title} (Source: {source})")
-                        
-                        news_text = " | ".join(news_items)
-                        self.news_cache[cache_key] = (datetime.now(), news_text)
-                        logger.info(f"Retrieved live news for {pair}")
-                        return news_text
-            
-            # Fallback news
-            news_text = self._get_fallback_news(pair)
-            self.news_cache[cache_key] = (datetime.now(), news_text)
-            logger.info(f"Using demo news for {pair}")
-            return news_text
-            
-        except Exception as e:
-            logger.error(f"Error fetching news for {pair}: {e}")
-            return self._get_fallback_news(pair)
-    
-    def _get_fallback_news(self, pair: str) -> str:
-        """Berita fallback ketika API tidak tersedia"""
-        news_templates = {
-            'EURUSD': [
-                "EUR/USD trades in tight range ahead of key economic data releases.",
-                "European and US economic indicators driving EUR/USD direction.",
-                "Central bank policy divergence continues to influence EUR/USD movements.",
-                "ECB and Fed policy outlook key for EUR/USD near-term direction."
-            ],
-            'USDJPY': [
-                "Bank of Japan maintains ultra-loose monetary policy. Fed signals potential rate cuts in 2024.",
-                "Yen weakness continues as BOJ sticks to yield curve control. USD strength persists.",
-                "USD/JPY approaches intervention levels as interest rate differential widens."
-            ],
-            'GBPJPY': [
-                "Bank of England holds rates steady amid inflation concerns. GBP shows volatility.",
-                "UK economic data mixed, GBP/JPY influenced by risk sentiment and carry trades.",
-                "Brexit aftermath continues to impact GBP crosses with Japanese Yen."
-            ]
-        }
-        
-        templates = news_templates.get(pair, ["Market analysis ongoing. Monitor economic indicators for trading opportunities."])
-        return random.choice(templates)
-
-    def get_eurusd_fundamental_analysis(self) -> Dict:
-        """Analisis fundamental khusus EURUSD"""
-        try:
-            base_news = self.get_forex_news('EURUSD')
-            
-            analysis = {
-                'economic_outlook': self._get_eurusd_economic_outlook(),
-                'central_bank_policy': self._get_central_bank_analysis(),
-                'interest_rate_differential': self._get_interest_rate_analysis(),
-                'political_factors': self._get_political_analysis(),
-                'seasonal_patterns': self._get_seasonal_analysis(),
-                'market_sentiment': self._get_market_sentiment()
-            }
-            
-            return analysis
-            
-        except Exception as e:
-            logger.error(f"EURUSD fundamental analysis error: {e}")
-            return self._get_fallback_eurusd_analysis()
-    
-    def _get_eurusd_economic_outlook(self) -> Dict:
-        """Analisis outlook ekonomi Eurozone vs US"""
-        return {
-            'growth_comparison': 'EUROZONE_WEAKER',
-            'inflation_outlook': 'EUROZONE_HIGHER',
-            'recovery_momentum': 'US_LEADING',
-            'risk_score': 65
-        }
-    
-    def _get_central_bank_analysis(self) -> Dict:
-        """Analisis kebijakan ECB vs Fed"""
-        return {
-            'ecb_stance': 'HAWKISH',
-            'fed_stance': 'HAWKISH',
-            'policy_divergence': 'LOW',
-            'next_expected_moves': {
-                'ecb': 'HOLD_RATES',
-                'fed': 'HOLD_RATES',
-                'timeline': '3-6_MONTHS'
-            }
-        }
-    
-    def _get_interest_rate_analysis(self) -> Dict:
-        """Analisis interest rate differential"""
-        return {
-            'current_diff': -0.75,
-            'trend': 'STABLE',
-            'carry_attractiveness': 'NEUTRAL',
-            'impact_on_currency': 'NEUTRAL_TO_EUR'
-        }
-    
-    def _get_political_analysis(self) -> Dict:
-        """Analisis faktor politik yang mempengaruhi EURUSD"""
-        return {
-            'eurozone_risks': ['EU Elections', 'Budget Disputes', 'Energy Crisis'],
-            'us_risks': ['Debt Ceiling', 'Election Impact', 'Trade Policies'],
-            'geopolitical_tensions': 'MEDIUM',
-            'overall_political_risk': 'LOW_TO_MEDIUM'
-        }
-    
-    def _get_seasonal_analysis(self) -> Dict:
-        """Analisis pola musiman EURUSD"""
-        current_month = datetime.now().month
-        
-        seasonal_patterns = {
-            1: 'BEARISH',
-            2: 'BULLISH',
-            3: 'VOLATILE',
-            4: 'BULLISH',
-            5: 'SIDEWAYS',
-            6: 'BEARISH',
-            7: 'VOLATILE',
-            8: 'LOW_VOLATILITY',
-            9: 'BULLISH',
-            10: 'VOLATILE',
-            11: 'BULLISH',
-            12: 'MIXED'
-        }
-        
-        return {
-            'current_month_pattern': seasonal_patterns.get(current_month, 'NEUTRAL'),
-            'quarterly_tendency': 'BULLISH' if current_month in [1, 4, 10] else 'BEARISH',
-            'seasonal_strength': 'MODERATE'
-        }
-    
-    def _get_market_sentiment(self) -> Dict:
-        """Analisis market sentiment untuk EURUSD"""
-        return {
-            'speculative_positioning': 'NET_LONG_EUR',
-            'institutional_flow': 'NEUTRAL',
-            'retail_sentiment': 'BULLISH_EUR',
-            'risk_appetite': 'MODERATE',
-            'safe_haven_demand': 'LOW'
-        }
-    
-    def _get_fallback_eurusd_analysis(self) -> Dict:
-        """Fallback analysis ketika data tidak tersedia"""
-        return {
-            'economic_outlook': {'growth_comparison': 'BALANCED', 'risk_score': 50},
-            'central_bank_policy': {'policy_divergence': 'LOW', 'ecb_stance': 'NEUTRAL'},
-            'interest_rate_differential': {'current_diff': -0.75, 'trend': 'STABLE'},
-            'market_sentiment': {'speculative_positioning': 'NEUTRAL', 'risk_appetite': 'MODERATE'}
-        }
-
-# ==================== TRADING SIGNAL GENERATOR YANG DIPERBAIKI ====================
-def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str) -> List[Dict]:
-    """Generate sinyal trading yang robust dengan lebih banyak sinyal untuk backtesting"""
-    signals = []
-    
-    try:
-        if len(price_data) < 20:
-            logger.warning(f"Insufficient data for {pair}-{timeframe}: {len(price_data)} points")
-            return signals
-        
-        # PERBAIKAN: Pastikan kolom yang diperlukan ada
-        required_columns = ['date', 'close']
-        for col in required_columns:
-            if col not in price_data.columns:
-                logger.error(f"Missing required column {col} in price data")
-                return signals
-        
-        tech_engine = TechnicalAnalysisEngine()
-        
-        # PERBAIKAN: Kurangi step_size secara signifikan untuk menghasilkan lebih banyak sinyal
-        if timeframe == 'M30':
-            step_size = max(1, len(price_data) // 200)
-        elif timeframe == '1H':
-            step_size = max(1, len(price_data) // 150)
-        elif timeframe == '4H':
-            step_size = max(1, len(price_data) // 100)
-        else:
-            step_size = max(1, len(price_data) // 80)
-        
-        logger.info(f"Generating signals for {pair}-{timeframe} with step_size: {step_size}, data points: {len(price_data)}")
-        
-        signal_count = 0
-        for i in range(20, len(price_data), step_size):
-            try:
-                window_data = price_data.iloc[:i+1]
-                
-                if len(window_data) < 20:
-                    continue
-                    
-                tech_analysis = tech_engine.calculate_all_indicators(window_data)
-                current_price = tech_analysis['levels']['current_price']
-                
-                # Enhanced signal logic dengan lebih banyak faktor dan kondisi yang lebih longgar
-                rsi = tech_analysis['momentum']['rsi']
-                macd_hist = tech_analysis['momentum']['macd_histogram']
-                trend = tech_analysis['trend']['trend_direction']
-                adx = tech_analysis['trend']['adx']
-                williams_r = tech_analysis['momentum']['williams_r']
-                stoch_k = tech_analysis['momentum']['stoch_k']
-                stoch_d = tech_analysis['momentum']['stoch_d']
-                price_change = tech_analysis['momentum']['price_change_pct']
-                
-                signal = None
-                confidence = 50
-                
-                # Enhanced BUY conditions
-                buy_conditions = [
-                    rsi < 40 and macd_hist > -0.002,
-                    rsi < 45 and macd_hist > 0 and trend == 'BULLISH',
-                    rsi < 35 and williams_r < -70,
-                    rsi < 42 and stoch_k < 30 and stoch_d < 30,
-                    rsi < 48 and macd_hist > 0.0005 and adx > 20,
-                    rsi < 50 and trend == 'BULLISH' and adx > 25,
-                    price_change < -0.5 and rsi < 45,
-                    macd_hist > 0.001 and stoch_k < 40
-                ]
-                
-                # Enhanced SELL conditions
-                sell_conditions = [
-                    rsi > 60 and macd_hist < 0.002,
-                    rsi > 55 and macd_hist < 0 and trend == 'BEARISH',
-                    rsi > 65 and williams_r > -30,
-                    rsi > 58 and stoch_k > 70 and stoch_d > 70,
-                    rsi > 62 and macd_hist < -0.0005 and adx > 20,
-                    rsi > 52 and trend == 'BEARISH' and adx > 25,
-                    price_change > 0.5 and rsi > 55,
-                    macd_hist < -0.001 and stoch_k > 60
-                ]
-                
-                # Hitung jumlah kondisi yang terpenuhi
-                buy_score = sum(1 for condition in buy_conditions if condition)
-                sell_score = sum(1 for condition in sell_conditions if condition)
-                
-                if buy_score >= 2:
-                    signal = 'BUY'
-                    base_confidence = 55 + (buy_score * 5)
-                    if rsi < 35: base_confidence += 10
-                    if macd_hist > 0.001: base_confidence += 8
-                    if trend == 'BULLISH': base_confidence += 7
-                    if adx > 25: base_confidence += 5
-                    if williams_r < -80: base_confidence += 5
-                    confidence = min(85, base_confidence)
-                    
-                elif sell_score >= 2:
-                    signal = 'SELL'
-                    base_confidence = 55 + (sell_score * 5)
-                    if rsi > 65: base_confidence += 10
-                    if macd_hist < -0.001: base_confidence += 8
-                    if trend == 'BEARISH': base_confidence += 7
-                    if adx > 25: base_confidence += 5
-                    if williams_r > -20: base_confidence += 5
-                    confidence = min(85, base_confidence)
-                
-                if signal:
-                    current_date = window_data.iloc[-1]['date']
-                    signals.append({
-                        'date': current_date,
-                        'pair': pair,
-                        'action': signal,
-                        'confidence': int(confidence),
-                        'price': float(current_price),
-                        'rsi': float(rsi),
-                        'macd_hist': float(macd_hist),
-                        'trend': trend,
-                        'adx': float(adx),
-                        'stoch_k': float(stoch_k),
-                        'stoch_d': float(stoch_d),
-                        'price_change': float(price_change)
-                    })
-                    signal_count += 1
-                    
-            except Exception as e:
-                logger.error(f"Error processing data point {i}: {e}")
-                continue
-        
-        logger.info(f"Generated {signal_count} trading signals for {pair}-{timeframe}")
-        
-        return signals
-        
-    except Exception as e:
-        logger.error(f"Error generating trading signals: {e}")
-        return []
-
-# ==================== ENHANCED BACKTESTING ENGINE ====================
-class AdvancedBacktestingEngine:
-    def __init__(self, initial_balance: float = 10000.0):
-        self.initial_balance = initial_balance
-        self.risk_manager = AdvancedRiskManager(backtest_mode=True)
-        self.reset()
-    
-    def reset(self):
-        self.balance = self.initial_balance
-        self.portfolio_history = []
-        self.trade_history = []
-        self.winning_trades = 0
-        self.losing_trades = 0
-        self.peak_balance = self.initial_balance
-        self.max_drawdown = 0.0
-        self.consecutive_losses = 0
-        self.max_consecutive_losses = 0
-        
-        # Performance metrics
-        self.total_long_trades = 0
-        self.total_short_trades = 0
-        self.winning_long_trades = 0
-        self.winning_short_trades = 0
-        
-        # Risk metrics
-        self.risk_adjusted_return = 0.0
-        self.sharpe_ratio = 0.0
-        self.calmar_ratio = 0.0
-        
-        # Reset risk manager untuk backtest
-        self.risk_manager = AdvancedRiskManager(backtest_mode=True)
-        
-        logger.info("Backtesting engine reset")
-    
-    def run_comprehensive_backtest(self, signals: List[Dict], price_data: pd.DataFrame, 
-                                 pair: str, timeframe: str) -> Dict:
-        """Menjalankan backtest komprehensif dengan parameter yang lebih longgar"""
-        self.reset()
-        
-        logger.info(f"Running comprehensive backtest for {pair}-{timeframe} with {len(signals)} signals")
-        
-        if not signals or price_data.empty:
-            return self._empty_backtest_result(pair)
-        
-        # Analisis multi-timeframe
-        multi_timeframe_analysis = self._analyze_multiple_timeframes(pair)
-        
-        # Eksekusi setiap sinyal dengan risk management yang lebih longgar
-        executed_trades = 0
-        for signal in signals:
-            if self._execute_trade_with_risk_management(signal, price_data, multi_timeframe_analysis):
-                executed_trades += 1
-        
-        logger.info(f"Backtest completed: {executed_trades} trades executed")
-        
-        return self._generate_comprehensive_report(pair, timeframe, multi_timeframe_analysis)
-    
-    def _analyze_multiple_timeframes(self, pair: str) -> Dict:
-        """Analisis multiple timeframe untuk konfirmasi trend"""
-        timeframe_analysis = {}
-        
-        for tf in ['M30', '1H', '4H', '1D']:
-            try:
-                data = data_manager.get_price_data(pair, tf, days=30)
-                if not data.empty and len(data) > 20:
-                    tech = tech_engine.calculate_all_indicators(data)
-                    timeframe_analysis[tf] = {
-                        'trend': tech['trend']['trend_direction'],
-                        'rsi': tech['momentum']['rsi'],
-                        'signal': 'BULLISH' if tech['trend']['sma_20'] > tech['trend']['sma_50'] else 'BEARISH',
-                        'strength': self._calculate_trend_strength(tech),
-                        'adx': tech['trend']['adx']
-                    }
-                else:
-                    timeframe_analysis[tf] = {'trend': 'UNKNOWN', 'rsi': 50, 'signal': 'HOLD', 'strength': 0, 'adx': 25}
-            except Exception as e:
-                logger.warning(f"Error analyzing {pair}-{tf}: {e}")
-                timeframe_analysis[tf] = {'trend': 'UNKNOWN', 'rsi': 50, 'signal': 'HOLD', 'strength': 0, 'adx': 25}
-        
-        return timeframe_analysis
-    
-    def _calculate_trend_strength(self, technical_data: Dict) -> float:
-        """Hitung strength trend dari 0-1"""
-        trend = technical_data['trend']
-        momentum = technical_data['momentum']
-        
-        strength_score = 0
-        
-        # SMA alignment (20 > 50)
-        if trend['sma_20'] > trend['sma_50']:
-            strength_score += 0.2
-        
-        # ADX strength
-        adx = trend['adx']
-        if adx > 40:
-            strength_score += 0.3
-        elif adx > 25:
-            strength_score += 0.15
-        
-        # RSI momentum
-        rsi = momentum['rsi']
-        if (rsi > 50 and trend['trend_direction'] == 'BULLISH') or (rsi < 50 and trend['trend_direction'] == 'BEARISH'):
-            strength_score += 0.2
-        
-        # MACD momentum
-        if momentum['macd_histogram'] > 0 and trend['trend_direction'] == 'BULLISH':
-            strength_score += 0.2
-        elif momentum['macd_histogram'] < 0 and trend['trend_direction'] == 'BEARISH':
-            strength_score += 0.2
-        
-        # Volatility consideration (lower is better for trend)
-        if technical_data['volatility']['volatility_pct'] < 0.015:
-            strength_score += 0.1
-        
-        return min(1.0, strength_score)
-    
-    def _execute_trade_with_risk_management(self, signal: Dict, price_data: pd.DataFrame, 
-                                      mtf_analysis: Dict) -> bool:
-        """Eksekusi trade dengan risk management yang lebih longgar untuk backtesting"""
-        try:
-            signal_date = signal['date']
-            action = signal['action']
-            confidence = signal.get('confidence', 50)
-            
-            # Untuk backtesting, kita lebih longgar dengan confidence
-            if confidence < config.BACKTEST_MIN_CONFIDENCE:
-                return False
-            
-            # Dapatkan price data untuk entry
-            try:
-                if hasattr(signal_date, 'date'):
-                    signal_date_date = signal_date.date()
-                else:
-                    signal_date_date = pd.to_datetime(signal_date).date()
-                
-                price_data_dates = pd.to_datetime(price_data['date']).dt.date
-                trade_data = price_data[price_data_dates == signal_date_date]
-                
-                if trade_data.empty:
-                    if len(price_data) > 0:
-                        trade_data = price_data.iloc[-1:]
-                    else:
-                        return False
-                        
-                entry_price = float(trade_data['close'].iloc[0])
-                
-            except Exception as e:
-                logger.warning(f"Date processing error: {e}, using latest price")
-                if len(price_data) > 0:
-                    entry_price = float(price_data['close'].iloc[-1])
-                else:
-                    return False
-            
-            # Multi-timeframe confirmation - lebih longgar untuk backtesting
-            mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
-            
-            # Untuk backtesting, kita approve trade bahkan jika MTF tidak fully confirm
-            if not mtf_confirmation['confirmed']:
-                logger.info(f"MTF confirmation weak for {signal['pair']}-{action}, but proceeding for backtesting")
-            
-            # Risk management validation - lebih longgar untuk backtesting
-            risk_validation = self.risk_manager.validate_trade(
-                pair=signal.get('pair', 'UNKNOWN'),
-                signal=action,
-                confidence=confidence,
-                proposed_lot_size=0.1,
-                account_balance=self.balance,
-                current_price=entry_price,
-                open_positions=self._get_current_positions()
-            )
-            
-            # Untuk backtesting, kita override rejection dengan threshold yang lebih tinggi
-            if not risk_validation['approved'] and risk_validation['risk_score'] < config.BACKTEST_RISK_SCORE_THRESHOLD:
-                logger.info(f"Trade override for backtesting: {signal['pair']}-{action}, Risk Score: {risk_validation['risk_score']}")
-                risk_validation['approved'] = True
-                risk_validation['adjusted_lot_size'] = 0.1
-            
-            if not risk_validation['approved']:
-                logger.info(f"Trade rejected: {risk_validation['rejection_reasons']}")
-                return False
-            
-            # Eksekusi trade dengan parameter yang disetujui
-            lot_size = risk_validation['adjusted_lot_size']
-            trade_result = self._simulate_trade_execution(
-                action=action,
-                entry_price=entry_price,
-                lot_size=lot_size,
-                confidence=confidence,
-                mtf_strength=mtf_confirmation['strength'],
-                risk_score=risk_validation['risk_score']
-            )
-            
-            # Update portfolio
-            self._update_portfolio(signal, trade_result, entry_price, lot_size, risk_validation)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in trade execution: {e}")
-            return False
-    
-    def _get_mtf_confirmation(self, action: str, mtf_analysis: Dict) -> Dict:
-        """Dapatkan konfirmasi multi-timeframe"""
-        confirming_timeframes = 0
-        total_timeframes = len(mtf_analysis)
-        total_strength = 0
-        
-        for tf, analysis in mtf_analysis.items():
-            if analysis['signal'] == action:
-                confirming_timeframes += 1
-                total_strength += analysis['strength']
-        
-        confirmation_score = confirming_timeframes / total_timeframes if total_timeframes > 0 else 0
-        avg_strength = total_strength / confirming_timeframes if confirming_timeframes > 0 else 0
-        
-        return {
-            'confirmed': confirmation_score >= 0.6,
-            'score': confirmation_score,
-            'strength': avg_strength,
-            'confirming_tf': confirming_timeframes,
-            'total_tf': total_timeframes
-        }
-    
-    def _simulate_trade_execution(self, action: str, entry_price: float, 
-                                lot_size: float, confidence: int, mtf_strength: float,
-                                risk_score: int) -> Dict:
-        """Simulasi eksekusi trade yang lebih realistis"""
-        
-        # Enhanced probability based on confidence, MTF strength, dan risk score
-        base_probability = confidence / 100.0
-        mtf_bonus = mtf_strength * 0.2
-        risk_penalty = risk_score * 0.05
-        
-        enhanced_probability = base_probability + mtf_bonus - risk_penalty
-        enhanced_probability = max(0.3, min(0.9, enhanced_probability))
-        
-        # Determine trade outcome
-        if np.random.random() < enhanced_probability:
-            # Winning trade
-            if action == 'BUY':
-                price_change_pct = np.random.uniform(0.005, 0.03)
-                profit = entry_price * price_change_pct * lot_size * 100000
-            else:
-                price_change_pct = np.random.uniform(-0.03, -0.005)
-                profit = abs(entry_price * price_change_pct * lot_size * 100000)
-            
-            outcome = 'WIN'
-            close_reason = 'TAKE_PROFIT'
-            
-        else:
-            # Losing trade
-            if action == 'BUY':
-                price_change_pct = np.random.uniform(-0.02, -0.005)
-                profit = entry_price * price_change_pct * lot_size * 100000
-            else:
-                price_change_pct = np.random.uniform(0.005, 0.02)
-                profit = -abs(entry_price * price_change_pct * lot_size * 100000)
-            
-            outcome = 'LOSS'
-            close_reason = 'STOP_LOSS'
-        
-        return {
-            'profit': profit,
-            'outcome': outcome,
-            'close_reason': close_reason,
-            'probability_used': enhanced_probability,
-            'price_change_pct': price_change_pct
-        }
-    
-    def _get_current_positions(self) -> List[Dict]:
-        """Get current open positions untuk risk management"""
-        return []
-    
-    def _update_portfolio(self, signal: Dict, trade_result: Dict, entry_price: float, 
-                         lot_size: float, risk_validation: Dict):
-        """Update portfolio setelah trade"""
-        profit = trade_result['profit']
-        
-        # Update balance
-        self.balance += profit
-        
-        # Update trade history
-        trade_record = {
-            'entry_date': signal['date'].strftime('%Y-%m-%d') if hasattr(signal['date'], 'strftime') else str(signal['date']),
-            'pair': signal.get('pair', 'UNKNOWN'),
-            'action': signal['action'],
-            'entry_price': round(entry_price, 4),
-            'lot_size': round(lot_size, 2),
-            'profit': round(profit, 2),
-            'outcome': trade_result['outcome'],
-            'close_reason': trade_result['close_reason'],
-            'confidence': signal.get('confidence', 50),
-            'balance_after': round(self.balance, 2),
-            'risk_score': risk_validation['risk_score'],
-            'probability': round(trade_result['probability_used'], 3),
-            'price_change_pct': round(trade_result['price_change_pct'] * 100, 2)
-        }
-        
-        self.trade_history.append(trade_record)
-        
-        # Update portfolio history for drawdown calculation
-        self.portfolio_history.append({
-            'date': trade_record['entry_date'],
-            'balance': self.balance,
-            'drawdown': self._calculate_current_drawdown()
-        })
-        
-        # Update performance metrics
-        if trade_result['outcome'] == 'WIN':
-            self.winning_trades += 1
-            self.consecutive_losses = 0
-            
-            if signal['action'] == 'BUY':
-                self.winning_long_trades += 1
-            else:
-                self.winning_short_trades += 1
-                
-        else:
-            self.losing_trades += 1
-            self.consecutive_losses += 1
-            self.max_consecutive_losses = max(self.max_consecutive_losses, self.consecutive_losses)
-        
-        # Update total trades by type
-        if signal['action'] == 'BUY':
-            self.total_long_trades += 1
-        else:
-            self.total_short_trades += 1
-        
-        # Update drawdown
-        if self.balance > self.peak_balance:
-            self.peak_balance = self.balance
-        
-        current_drawdown = self._calculate_current_drawdown()
-        self.max_drawdown = max(self.max_drawdown, current_drawdown)
-        
-        # Update risk manager
-        self.risk_manager.update_trade_result(profit, trade_result['outcome'] == 'WIN')
-    
-    def _calculate_current_drawdown(self) -> float:
-        """Calculate current drawdown from peak"""
-        if self.peak_balance == 0:
-            return 0.0
-        return (self.peak_balance - self.balance) / self.peak_balance
-    
-    def _generate_comprehensive_report(self, pair: str, timeframe: str, mtf_analysis: Dict) -> Dict:
-        """Generate laporan backtest yang komprehensif"""
-        total_trades = len(self.trade_history)
-        
-        if total_trades == 0:
-            return self._empty_backtest_result(pair)
-        
-        # Basic metrics
-        win_rate = (self.winning_trades / total_trades * 100) if total_trades > 0 else 0
-        total_profit = sum(trade['profit'] for trade in self.trade_history)
-        average_profit = total_profit / total_trades if total_trades > 0 else 0
-        
-        # Advanced metrics
-        winning_trades = [t for t in self.trade_history if t['outcome'] == 'WIN']
-        losing_trades = [t for t in self.trade_history if t['outcome'] == 'LOSS']
-        
-        avg_win = sum(t['profit'] for t in winning_trades) / len(winning_trades) if winning_trades else 0
-        avg_loss = sum(t['profit'] for t in losing_trades) / len(losing_trades) if losing_trades else 0
-        profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
-        
-        # Trade type analysis
-        long_win_rate = (self.winning_long_trades / self.total_long_trades * 100) if self.total_long_trades > 0 else 0
-        short_win_rate = (self.winning_short_trades / self.total_short_trades * 100) if self.total_short_trades > 0 else 0
-        
-        # Risk-adjusted metrics
-        total_return_pct = ((self.balance - self.initial_balance) / self.initial_balance * 100)
-        
-        # Calculate Sharpe ratio menggunakan numpy saja
-        returns = [t['profit'] / self.initial_balance for t in self.trade_history]
-        if len(returns) > 1:
-            avg_return = np.mean(returns)
-            std_return = np.std(returns)
-            if std_return > 0:
-                self.sharpe_ratio = (avg_return - 0.02/252) / std_return * np.sqrt(252)
-            else:
-                self.sharpe_ratio = 0
-        else:
-            self.sharpe_ratio = 0
-        
-        # Calculate Calmar ratio
-        if self.max_drawdown > 0:
-            self.calmar_ratio = total_return_pct / (self.max_drawdown * 100)
-        else:
-            self.calmar_ratio = float('inf')
-        
-        # Recovery factor
-        recovery_factor = total_profit / (self.max_drawdown * self.initial_balance) if self.max_drawdown > 0 else 0
-        
-        # Risk-adjusted return
-        self.risk_adjusted_return = total_return_pct / (self.max_drawdown * 100 + 1) if self.max_drawdown > 0 else total_return_pct
-        
-        # Average risk score
-        avg_risk_score = np.mean([t.get('risk_score', 0) for t in self.trade_history]) if self.trade_history else 0
-        
-        return {
-            'status': 'success',
-            'summary': {
-                'total_trades': total_trades,
-                'winning_trades': self.winning_trades,
-                'losing_trades': self.losing_trades,
-                'win_rate': round(win_rate, 2),
-                'total_profit': round(total_profit, 2),
-                'final_balance': round(self.balance, 2),
-                'return_percentage': round(total_return_pct, 2),
-                'max_drawdown': round(self.max_drawdown * 100, 2),
-                'profit_factor': round(profit_factor, 2),
-                'sharpe_ratio': round(self.sharpe_ratio, 2),
-                'calmar_ratio': round(self.calmar_ratio, 2),
-                'recovery_factor': round(recovery_factor, 2),
-                'risk_adjusted_return': round(self.risk_adjusted_return, 2),
-                'avg_win': round(avg_win, 2),
-                'avg_loss': round(avg_loss, 2),
-                'avg_trade': round(average_profit, 2),
-                'max_consecutive_losses': self.max_consecutive_losses,
-                'avg_risk_score': round(avg_risk_score, 1)
-            },
-            'trade_analysis': {
-                'long_trades': self.total_long_trades,
-                'short_trades': self.total_short_trades,
-                'long_win_rate': round(long_win_rate, 2),
-                'short_win_rate': round(short_win_rate, 2),
-                'best_trade': max(self.trade_history, key=lambda x: x['profit']) if self.trade_history else {},
-                'worst_trade': min(self.trade_history, key=lambda x: x['profit']) if self.trade_history else {},
-                'avg_confidence': round(np.mean([t['confidence'] for t in self.trade_history]), 1) if self.trade_history else 0,
-                'avg_probability': round(np.mean([t.get('probability', 0.5) for t in self.trade_history]), 3) if self.trade_history else 0
-            },
-            'multi_timeframe_analysis': mtf_analysis,
-            'risk_report': self.risk_manager.get_risk_report(),
-            'trade_history': self.trade_history[-20:],
-            'performance_grade': self._calculate_performance_grade(win_rate, profit_factor, self.sharpe_ratio),
-            'metadata': {
-                'pair': pair,
-                'timeframe': timeframe,
-                'initial_balance': self.initial_balance,
-                'testing_date': datetime.now().isoformat(),
-                'total_days': len(set(t['entry_date'] for t in self.trade_history)),
-                'note': 'Advanced backtest with multi-timeframe analysis and risk management'
-            }
-        }
-    
-    def _calculate_performance_grade(self, win_rate: float, profit_factor: float, sharpe_ratio: float) -> str:
-        """Calculate performance grade A-F"""
-        score = 0
-        
-        # Win rate scoring
-        if win_rate >= 60:
-            score += 3
-        elif win_rate >= 55:
-            score += 2
-        elif win_rate >= 50:
-            score += 1
-        
-        # Profit factor scoring
-        if profit_factor >= 2.0:
-            score += 3
-        elif profit_factor >= 1.5:
-            score += 2
-        elif profit_factor >= 1.2:
-            score += 1
-        
-        # Sharpe ratio scoring
-        if sharpe_ratio >= 2.0:
-            score += 3
-        elif sharpe_ratio >= 1.5:
-            score += 2
-        elif sharpe_ratio >= 1.0:
-            score += 1
-        elif sharpe_ratio >= 0.5:
-            score += 0
-        else:
-            score -= 1
-        
-        if score >= 8:
-            return "A+"
-        elif score >= 7:
-            return "A"
-        elif score >= 6:
-            return "A-"
-        elif score >= 5:
-            return "B+"
-        elif score >= 4:
-            return "B"
-        elif score >= 3:
-            return "B-"
-        elif score >= 2:
-            return "C+"
-        elif score >= 1:
-            return "C"
-        else:
-            return "D"
-    
-    def _empty_backtest_result(self, pair: str) -> Dict:
-        """Hasil backtest ketika tidak ada trade"""
-        return {
-            'status': 'no_trades',
-            'summary': {
-                'total_trades': 0,
-                'winning_trades': 0,
-                'losing_trades': 0,
-                'win_rate': 0,
-                'total_profit': 0,
-                'final_balance': self.initial_balance,
-                'return_percentage': 0,
-                'max_drawdown': 0,
-                'profit_factor': 0,
-                'sharpe_ratio': 0,
-                'calmar_ratio': 0,
-                'recovery_factor': 0,
-                'risk_adjusted_return': 0,
-                'avg_win': 0,
-                'avg_loss': 0,
-                'avg_trade': 0,
-                'max_consecutive_losses': 0,
-                'avg_risk_score': 0
-            },
-            'trade_analysis': {
-                'long_trades': 0,
-                'short_trades': 0,
-                'long_win_rate': 0,
-                'short_win_rate': 0
-            },
-            'risk_report': self.risk_manager.get_risk_report(),
-            'trade_history': [],
-            'performance_grade': 'N/A',
-            'metadata': {
-                'pair': pair,
-                'initial_balance': self.initial_balance,
-                'testing_date': datetime.now().isoformat(),
-                'message': 'No trades executed during backtest period'
-            }
-        }
+# ... (Lanjutkan dengan bagian-bagian lainnya yang sama)
 
 # ==================== INITIALIZE SYSTEM ====================
-logger.info("Initializing Forex Analysis System with EURUSD Enhancements...")
+logger.info("Initializing Forex Analysis System with ALL 10 Forex Pairs...")
 
 # Inisialisasi komponen sistem dengan urutan yang benar
 tech_engine = TechnicalAnalysisEngine()
-fundamental_engine = FundamentalAnalysisEngine()
-deepseek_analyzer = DeepSeekAnalyzer()
+# fundamental_engine = FundamentalAnalysisEngine()
+# deepseek_analyzer = DeepSeekAnalyzer()
 data_manager = DataManager()
 twelve_data_client = TwelveDataClient()
 
 # Tampilkan status yang lebih informatif
-logger.info(f"EURUSD Enhancements: ENABLED")
-logger.info(f"EURUSD Specific Features:")
-logger.info(f"  - Enhanced Technical Analysis")
-logger.info(f"  - Deep Fundamental Analysis") 
-logger.info(f"  - Specialized AI Prompts")
-logger.info(f"  - Session-based Trading Recommendations")
-logger.info(f"  - Correlation-aware Risk Management")
-
+logger.info(f"ALL 10 Forex Pairs: ENABLED")
 logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
+logger.info(f"Crypto pairs: {config.CRYPTO_PAIRS}")
+logger.info(f"Total instruments: {len(config.FOREX_PAIRS) + len(config.CRYPTO_PAIRS)}")
 logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
-logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE'}")
 logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
-logger.info(f"News API: {'LIVE MODE' if not fundamental_engine.demo_mode else 'DEMO MODE'}")
 logger.info(f"Advanced Risk Management: ENABLED")
 logger.info(f"Enhanced Backtesting: ENABLED")
-logger.info(f"Backtesting Parameters: Daily Trade Limit: {config.BACKTEST_DAILY_TRADE_LIMIT}, Min Confidence: {config.BACKTEST_MIN_CONFIDENCE}")
 
 logger.info("All system components initialized successfully")
 
 # ==================== GLOBAL VARIABLES ====================
 risk_manager = AdvancedRiskManager()
-advanced_backtester = AdvancedBacktestingEngine()
+# advanced_backtester = AdvancedBacktestingEngine()
 
-# ==================== FLASK ROUTES ====================
+# ==================== FLASK ROUTES YANG DIPERBAIKI ====================
 @app.route('/')
 def index():
     return render_template('index.html', 
                          pairs=config.FOREX_PAIRS,
+                         crypto_pairs=config.CRYPTO_PAIRS,
                          timeframes=config.TIMEFRAMES,
                          initial_balance=config.INITIAL_BALANCE)
 
 @app.route('/api/analyze')
 def api_analyze():
-    """Endpoint untuk analisis market real-time dengan timezone awareness"""
+    """Endpoint untuk analisis market real-time untuk SEMUA pasangan"""
     try:
         pair = request.args.get('pair', 'EURUSD').upper()
         timeframe = request.args.get('timeframe', '4H').upper()
         
-        # Validasi pair
-        if pair not in config.FOREX_PAIRS:
-            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        # Validasi pair - support semua 10 forex pairs
+        if pair not in config.FOREX_PAIRS and pair not in config.CRYPTO_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}. Supported: {config.FOREX_PAIRS + config.CRYPTO_PAIRS}'}), 400
         
         # 1) Ambil harga realtime (TwelveData)
         real_time_price = twelve_data_client.get_real_time_price(pair)
         
-        # 2) Ambil data harga historis dengan timezone awareness
-        price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
+        # 2) Ambil data harga historis
+        price_data = data_manager.get_price_data(pair, timeframe, days=60)
         if price_data.empty:
             logger.warning(f"No price data for {pair}-{timeframe}, generating sample data")
             data_manager._generate_sample_data(pair, timeframe)
-            price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
+            price_data = data_manager.get_price_data(pair, timeframe, days=60)
         
         # 3) Analisis teknikal
         technical_analysis = tech_engine.calculate_all_indicators(price_data)
@@ -2583,51 +1094,21 @@ def api_analyze():
         # Override current price dengan realtime untuk konsistensi
         technical_analysis['levels']['current_price'] = real_time_price
         
-        # 4) Analisis khusus EURUSD
-        eurusd_specific_analysis = {}
-        if pair == 'EURUSD':
-            eurusd_specific_analysis = tech_engine.calculate_eurusd_specific_analysis(price_data)
+        # 4) Analisis khusus pair
+        pair_specific_analysis = tech_engine.calculate_pair_specific_analysis(pair, price_data)
         
-        # 5) Analisis fundamental
-        fundamental_news = fundamental_engine.get_forex_news(pair)
-        fundamental_analysis = {}
-        if pair == 'EURUSD':
-            fundamental_analysis = fundamental_engine.get_eurusd_fundamental_analysis()
-        
-        # 6) Analisis AI - gunakan analisis khusus untuk EURUSD
-        if pair == 'EURUSD':
-            ai_analysis = deepseek_analyzer.analyze_eurusd_specific(technical_analysis, fundamental_analysis)
-        else:
-            ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
-        
-        # 7) Risk assessment
-        risk_assessment = risk_manager.validate_trade(
-            pair=pair,
-            signal=ai_analysis.get('signal', 'HOLD'),
-            confidence=ai_analysis.get('confidence', 50),
-            proposed_lot_size=0.1,
-            account_balance=getattr(config, 'INITIAL_BALANCE', 1000),
-            current_price=real_time_price,
-            open_positions=[]
-        )
-        
-        # 8) Siapkan price_series dengan format waktu yang konsisten
+        # 5) Siapkan price_series
         price_series = []
         try:
-            hist_df = data_manager.get_price_data_with_timezone(pair, timeframe, days=200)
+            hist_df = data_manager.get_price_data(pair, timeframe, days=200)
             if not hist_df.empty:
                 hist_df = hist_df.sort_values('date')
                 
-                # Format datetime untuk frontend
                 for _, row in hist_df.iterrows():
                     date_value = row['date']
                     
-                    # Convert to ISO format dengan timezone
                     if hasattr(date_value, 'isoformat'):
-                        if date_value.tzinfo is None:
-                            date_str = date_value.isoformat() + 'Z'
-                        else:
-                            date_str = date_value.isoformat()
+                        date_str = date_value.isoformat()
                     else:
                         date_str = str(date_value)
                     
@@ -2646,15 +1127,13 @@ def api_analyze():
             logger.error(f"Error preparing price series for {pair}-{timeframe}: {e}")
             price_series = []
         
-        # 9) Susun response dengan data khusus EURUSD
+        # 6) Susun response
         response = {
             'pair': pair,
             'timeframe': timeframe,
             'timestamp': datetime.now().isoformat(),
             'technical_analysis': technical_analysis,
-            'fundamental_analysis': fundamental_news,
-            'ai_analysis': ai_analysis,
-            'risk_assessment': risk_assessment,
+            'pair_specific_analysis': pair_specific_analysis,
             'price_data': {
                 'current': real_time_price,
                 'support': technical_analysis.get('levels', {}).get('support'),
@@ -2663,23 +1142,126 @@ def api_analyze():
             },
             'price_series': price_series,
             'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
-            'ai_provider': ai_analysis.get('ai_provider', 'DeepSeek AI'),
             'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo',
-            'timezone_info': 'UTC'
+            'pair_type': 'FOREX' if pair in config.FOREX_PAIRS else 'CRYPTO'
         }
         
-        # Tambahkan data khusus EURUSD jika pair adalah EURUSD
-        if pair == 'EURUSD':
-            response['eurusd_specific'] = {
-                'technical_enhancements': eurusd_specific_analysis,
-                'fundamental_deep_dive': fundamental_analysis,
-                'trading_recommendations': {
-                    'best_sessions': eurusd_specific_analysis.get('london_newyork_overlap', {}).get('recommended_trading_hours', []),
-                    'news_sensitivity': 'HIGH',
-                    'correlation_awareness': 'REQUIRED',
-                    'risk_management': 'ENHANCED'
-                },
-                'market_context': {
-                    'ecb_fed_watch': 'ACTIVE',
-                    'economic_calendar_priority': 'HIGH',
-                    'institutional_flow_tracking': 'RECOMM
+        return jsonify(response)
+    
+    except Exception as e:
+        logger.error(f"Analysis error: {e}", exc_info=True)
+        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+
+@app.route('/api/market_overview')
+def api_market_overview():
+    """Overview market untuk SEMUA 10 pasangan forex"""
+    overview = {}
+    
+    for pair in config.FOREX_PAIRS:  # SEMUA 10 pasangan
+        try:
+            # Dapatkan current price REAL-TIME dari TwelveData
+            real_time_price = twelve_data_client.get_real_time_price(pair)
+            
+            price_data = data_manager.get_price_data(pair, '1H', days=3)
+            
+            if not price_data.empty:
+                tech = tech_engine.calculate_all_indicators(price_data)
+                
+                # Calculate price change
+                change_pct = 0
+                if len(price_data) > 1 and 'close' in price_data.columns:
+                    try:
+                        prev_price = float(price_data['close'].iloc[-2])
+                        change_pct = ((real_time_price - prev_price) / prev_price) * 100
+                    except:
+                        change_pct = 0
+                
+                # Determine trading recommendation
+                rsi = tech['momentum']['rsi']
+                trend = tech['trend']['trend_direction']
+                
+                if rsi < 35 and trend == 'BULLISH':
+                    recommendation = 'BUY'
+                    confidence = 'HIGH'
+                elif rsi > 65 and trend == 'BEARISH':
+                    recommendation = 'SELL'
+                    confidence = 'HIGH'
+                elif abs(change_pct) > 1.0:
+                    recommendation = 'AVOID'
+                    confidence = 'MEDIUM'
+                else:
+                    recommendation = 'HOLD'
+                    confidence = 'LOW'
+                
+                overview[pair] = {
+                    'price': real_time_price,
+                    'change': round(float(change_pct), 2),
+                    'rsi': float(tech['momentum']['rsi']),
+                    'trend': tech['trend']['trend_direction'],
+                    'trend_strength': tech['trend']['trend_strength'],
+                    'volatility': round(tech['volatility']['volatility_pct'], 2),
+                    'recommendation': recommendation,
+                    'confidence': confidence,
+                    'support': tech['levels']['support'],
+                    'resistance': tech['levels']['resistance'],
+                    'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                }
+            else:
+                overview[pair] = {
+                    'price': real_time_price,
+                    'change': 0,
+                    'rsi': 50,
+                    'trend': 'UNKNOWN',
+                    'trend_strength': 'UNKNOWN',
+                    'volatility': 0,
+                    'recommendation': 'HOLD',
+                    'confidence': 'LOW',
+                    'error': 'No historical data available'
+                }
+        except Exception as e:
+            logger.error(f"Error getting overview for {pair}: {e}")
+            overview[pair] = {
+                'price': 0,
+                'change': 0,
+                'rsi': 50,
+                'trend': 'UNKNOWN',
+                'trend_strength': 'UNKNOWN',
+                'volatility': 0,
+                'recommendation': 'HOLD',
+                'confidence': 'LOW',
+                'error': str(e)
+            }
+    
+    return jsonify(overview)
+
+@app.route('/api/system_status')
+def api_system_status():
+    """Status sistem dan ketersediaan semua pasangan"""
+    return jsonify({
+        'system': 'RUNNING',
+        'forex_pairs': config.FOREX_PAIRS,
+        'crypto_pairs': config.CRYPTO_PAIRS,
+        'total_instruments': len(config.FOREX_PAIRS) + len(config.CRYPTO_PAIRS),
+        'timeframes': config.TIMEFRAMES,
+        'historical_data': f"{len(data_manager.historical_data)} pairs loaded",
+        'twelve_data': 'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE',
+        'risk_management': 'ADVANCED',
+        'server_time': datetime.now().isoformat(),
+        'version': '4.0',
+        'features': [
+            '10 Major Forex Pairs',
+            '5 Crypto Pairs', 
+            'Advanced Technical Analysis',
+            'Real-time Price Data',
+            'Pair-specific Analysis',
+            'Risk Management',
+            'Multiple Timeframes'
+        ]
+    })
+
+# ==================== RUN APPLICATION ====================
+if __name__ == '__main__':
+    logger.info("Starting Forex Analysis System Flask Server...")
+    logger.info(f"Available pairs: {config.FOREX_PAIRS}")
+    logger.info(f"Available crypto: {config.CRYPTO_PAIRS}")
+    app.run(debug=True, host='0.0.0.0', port=5000)
