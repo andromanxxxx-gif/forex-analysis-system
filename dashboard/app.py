@@ -662,7 +662,385 @@ class TwelveDataClient:
         for pair in pairs:
             prices[pair] = self.get_real_time_price(pair)
         return prices
+# ==================== DATA MANAGER YANG DIPERBAIKI ====================
+class DataManager:
+    def __init__(self):
+        self.historical_data = {}
+        self.load_historical_data()
 
+    def get_price_data_with_timezone(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
+        """Dapatkan data harga dengan timezone awareness"""
+        try:
+            df = self.get_price_data(pair, timeframe, days)
+            
+            if df.empty:
+                return df
+                
+            # Pastikan kolom date adalah datetime dengan timezone
+            if 'date' in df.columns:
+                if not pd.api.types.is_datetime64_any_dtype(df['date']):
+                    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                
+                # Set timezone ke UTC jika belum ada
+                if df['date'].dt.tz is None:
+                    df['date'] = df['date'].dt.tz_localize('UTC')
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error in get_price_data_with_timezone for {pair}-{timeframe}: {e}")
+            return self.get_price_data(pair, timeframe, days)
+
+    def ensure_fresh_data(self, pair: str, timeframe: str, min_records: int = 100):
+        """Nonaktifkan validasi stale data untuk mencegah regenerasi tidak perlu"""
+        try:
+            if pair not in self.historical_data or timeframe not in self.historical_data[pair]:
+                self._generate_sample_data(pair, timeframe)
+                return
+                
+            df = self.historical_data[pair][timeframe]
+            if df.empty or len(df) < min_records:
+                self._generate_sample_data(pair, timeframe)
+                return
+                
+        except Exception as e:
+            logger.error(f"Error ensuring fresh data for {pair}-{timeframe}: {e}")
+
+    def validate_and_fix_data(self, pair: str, timeframe: str):
+        """Validasi dan perbaiki data yang rusak"""
+        try:
+            if pair in self.historical_data and timeframe in self.historical_data[pair]:
+                df = self.historical_data[pair][timeframe]
+                
+                # Check if dataframe is empty or has missing columns
+                if df.empty or len(df) == 0:
+                    logger.warning(f"Empty dataframe for {pair}-{timeframe}, regenerating data")
+                    self._generate_sample_data(pair, timeframe)
+                    return
+                
+                # Check for required columns
+                required_cols = ['open', 'high', 'low', 'close', 'date']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                
+                if missing_cols:
+                    logger.warning(f"Missing columns {missing_cols} for {pair}-{timeframe}, regenerating data")
+                    self._generate_sample_data(pair, timeframe)
+                    return
+                    
+                # Check for NaN values in critical columns
+                critical_cols = ['open', 'high', 'low', 'close']
+                for col in critical_cols:
+                    if df[col].isna().any():
+                        logger.warning(f"NaN values found in {col} for {pair}-{timeframe}, regenerating data")
+                        self._generate_sample_data(pair, timeframe)
+                        return
+                        
+                logger.info(f"Data validation passed for {pair}-{timeframe}")
+                
+        except Exception as e:
+            logger.error(f"Data validation error for {pair}-{timeframe}: {e}")
+            self._generate_sample_data(pair, timeframe)
+    
+    def load_historical_data(self):
+        """Load data historis dari file CSV dengan handling error yang lebih baik"""
+        try:
+            data_dir = "historical_data"
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+                logger.info("Created historical_data directory")
+                self._create_sample_data()
+                return
+            
+            loaded_count = 0
+            for filename in os.listdir(data_dir):
+                if filename.endswith('.csv'):
+                    file_path = os.path.join(data_dir, filename)
+                    try:
+                        df = pd.read_csv(file_path)
+                        
+                        # PERBAIKAN: Cek dan standardisasi kolom
+                        df = self._standardize_columns(df)
+                        
+                        # Pastikan kolom date ada dan konversi ke datetime
+                        if 'date' in df.columns:
+                            df['date'] = pd.to_datetime(df['date'], errors='coerce', format='mixed')
+                            df = df.dropna(subset=['date'])
+                        
+                        # PERBAIKAN: Pastikan kolom required ada
+                        required_cols = ['open', 'high', 'low', 'close']
+                        missing_cols = [col for col in required_cols if col not in df.columns]
+                        if missing_cols:
+                            logger.warning(f"File {filename} missing columns: {missing_cols}. Generating synthetic data.")
+                            continue
+                        
+                        # Extract pair dan timeframe dari filename
+                        name_parts = filename.replace('.csv', '').split('_')
+                        if len(name_parts) >= 2:
+                            pair = name_parts[0].upper()
+                            timeframe = name_parts[1].upper()
+                            
+                            if pair not in config.FOREX_PAIRS and pair not in config.CRYPTO_PAIRS:
+                                continue
+                                
+                            if pair not in self.historical_data:
+                                self.historical_data[pair] = {}
+                            
+                            self.historical_data[pair][timeframe] = df
+                            loaded_count += 1
+                            logger.info(f"Loaded {pair}-{timeframe}: {len(df)} records")
+                            
+                    except Exception as e:
+                        logger.error(f"Error loading {filename}: {e}")
+                        continue
+            
+            logger.info(f"Total loaded datasets: {loaded_count}")
+            
+            # Jika tidak ada data yang berhasil diload, buat sample
+            if loaded_count == 0:
+                logger.warning("No valid data found, creating sample data...")
+                self._create_sample_data()
+            
+        except Exception as e:
+            logger.error(f"Error in load_historical_data: {e}")
+            self._create_sample_data()
+    
+    def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Standardisasi nama kolom untuk menghindari error"""
+        column_mapping = {
+            'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
+            'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close',
+            'Date': 'date', 'TIME': 'date', 'Timestamp': 'date'
+        }
+        
+        df.columns = [column_mapping.get(col, col.lower()) for col in df.columns]
+        return df
+
+    def _create_sample_data(self):
+        """Buat sample data jika tidak ada data historis"""
+        logger.info("Creating sample historical data for all pairs...")
+        
+        # Generate data untuk semua forex pairs
+        for pair in config.FOREX_PAIRS:
+            for timeframe in ['M30', '1H', '4H', '1D']:
+                self._generate_sample_data(pair, timeframe)
+        
+        # Generate data untuk crypto pairs
+        for pair in config.CRYPTO_PAIRS:
+            for timeframe in ['1H', '4H', '1D']:
+                self._generate_sample_data(pair, timeframe)
+    
+    def _generate_sample_data(self, pair: str, timeframe: str):
+        """Generate sample data yang realistis untuk semua pairs"""
+        try:
+            # Tentukan periods berdasarkan timeframe
+            if timeframe == 'M30':
+                periods = 2000
+            elif timeframe == '1H':
+                periods = 1500
+            elif timeframe == '4H':
+                periods = 1000
+            else:  # 1D
+                periods = 500
+                
+            # Base prices untuk SEMUA pasangan
+            base_prices = {
+                # Forex pairs
+                'EURUSD': 1.0835, 'USDJPY': 147.25, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
+                'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095, 'EURJPY': 159.80,
+                'GBPJPY': 186.20, 'CHFJPY': 166.75,
+                # Crypto pairs
+                'BTCUSD': 45000.0, 'ETHUSD': 3000.0, 'XRPUSD': 0.65, 'LTCUSD': 75.0, 'BCHUSD': 350.0
+            }
+            
+            base_price = base_prices.get(pair, 150.0)
+            prices = []
+            current_price = base_price
+            
+            # Start dari waktu terkini mundur untuk memastikan data fresh
+            end_date = datetime.now().replace(tzinfo=None)
+            
+            # Hitung start date berdasarkan timeframe dan periods
+            if timeframe == 'M30':
+                start_date = end_date - timedelta(hours=periods*0.5)
+            elif timeframe == '1H':
+                start_date = end_date - timedelta(hours=periods)
+            elif timeframe == '4H':
+                start_date = end_date - timedelta(hours=periods*4)
+            else:  # 1D
+                start_date = end_date - timedelta(days=periods)
+            
+            current_date = start_date
+            
+            for i in range(periods):
+                # Random walk yang lebih realistis
+                volatility = 0.0015 if pair in config.FOREX_PAIRS else 0.03  # Crypto lebih volatile
+                drift = (base_price - current_price) * 0.001
+                random_shock = np.random.normal(0, volatility)
+                change = drift + random_shock
+                current_price = current_price * (1 + change)
+                
+                # Generate OHLC dengan spread yang realistis
+                open_price = current_price
+                close_price = current_price * (1 + np.random.normal(0, volatility * 0.3))
+                high = max(open_price, close_price) + abs(change) * base_price * 0.5
+                low = min(open_price, close_price) - abs(change) * base_price * 0.5
+                
+                # Ensure high > low dan reasonable values
+                high = max(high, max(open_price, close_price) + 0.0001)
+                low = min(low, min(open_price, close_price) - 0.0001)
+                
+                # Generate date berdasarkan timeframe
+                if timeframe == 'M30':
+                    current_date = start_date + timedelta(minutes=30*i)
+                elif timeframe == '1H':
+                    current_date = start_date + timedelta(hours=i)
+                elif timeframe == '4H':
+                    hours_to_add = (i * 4) % 24
+                    days_to_add = (i * 4) // 24
+                    current_date = start_date + timedelta(days=days_to_add, hours=hours_to_add)
+                else:  # 1D
+                    current_date = start_date + timedelta(days=i)
+                
+                # Add timezone info
+                current_date_utc = current_date.replace(tzinfo=None)
+                
+                prices.append({
+                    'date': current_date_utc,
+                    'open': round(float(open_price), 4),
+                    'high': round(float(high), 4),
+                    'low': round(float(low), 4),
+                    'close': round(float(close_price), 4),
+                    'volume': int(np.random.randint(10000, 50000))
+                })
+            
+            df = pd.DataFrame(prices)
+            
+            # Save to file
+            data_dir = "historical_data"
+            os.makedirs(data_dir, exist_ok=True)
+            filename = f"{data_dir}/{pair}_{timeframe}.csv"
+            df.to_csv(filename, index=False)
+            
+            # Store in memory
+            if pair not in self.historical_data:
+                self.historical_data[pair] = {}
+            self.historical_data[pair][timeframe] = df
+            
+            logger.info(f"Created sample data: {filename} with {len(df)} records")
+            
+        except Exception as e:
+            logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
+
+    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
+        """Dapatkan data harga untuk backtesting dengan fallback yang lebih baik"""
+        try:
+            if pair in self.historical_data and timeframe in self.historical_data[pair]:
+                df = self.historical_data[pair][timeframe]
+                if df.empty:
+                    return self._generate_simple_data(pair, timeframe, days)
+                
+                # Return data untuk periode tertentu
+                if timeframe == 'M30':
+                    required_points = min(len(df), days * 48)
+                elif timeframe == '1H':
+                    required_points = min(len(df), days * 24)
+                elif timeframe == '4H':
+                    required_points = min(len(df), days * 6)
+                else:  # 1D or 1W
+                    required_points = min(len(df), days)
+                    
+                result_df = df.tail(required_points).copy()
+                
+                # PERBAIKAN: Pastikan kolom yang diperlukan ada
+                required_cols = ['date', 'open', 'high', 'low', 'close']
+                for col in required_cols:
+                    if col not in result_df.columns:
+                        logger.warning(f"Column {col} missing, generating synthetic data")
+                        return self._generate_simple_data(pair, timeframe, days)
+                
+                return result_df
+            
+            # Fallback: generate simple synthetic data
+            return self._generate_simple_data(pair, timeframe, days)
+            
+        except Exception as e:
+            logger.error(f"Error getting price data for {pair}-{timeframe}: {e}")
+            return self._generate_simple_data(pair, timeframe, days)
+
+    def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Generate simple synthetic data untuk backtesting"""
+        # Tentukan points berdasarkan timeframe
+        if timeframe == 'M30':
+            points = days * 48
+        elif timeframe == '1H':
+            points = days * 24
+        elif timeframe == '4H':
+            points = days * 6
+        else:  # 1D
+            points = days
+            
+        # Base prices untuk semua pairs
+        base_prices = {
+            # Forex pairs
+            'EURUSD': 1.0835, 'USDJPY': 147.25, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
+            'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095, 'EURJPY': 159.80,
+            'GBPJPY': 186.20, 'CHFJPY': 166.75,
+            # Crypto pairs
+            'BTCUSD': 45000.0, 'ETHUSD': 3000.0, 'XRPUSD': 0.65, 'LTCUSD': 75.0, 'BCHUSD': 350.0
+        }
+        
+        base_price = base_prices.get(pair, 150.0)
+        prices = []
+        current_price = base_price
+        
+        start_date = datetime.now() - timedelta(days=days)
+        
+        for i in range(points):
+            volatility = 0.001 if pair in config.FOREX_PAIRS else 0.02  # Crypto lebih volatile
+            change = np.random.normal(0, volatility)
+            current_price = current_price * (1 + change)
+            
+            open_price = current_price
+            close_price = current_price * (1 + np.random.normal(0, volatility * 0.5))
+            high = max(open_price, close_price) + abs(change) * 0.1
+            low = min(open_price, close_price) - abs(change) * 0.1
+            
+            # Ensure high > low
+            if high <= low:
+                high = low + 0.0001
+            
+            # Generate date based on timeframe
+            if timeframe == 'M30':
+                current_date = start_date + timedelta(minutes=30*i)
+            elif timeframe == '1H':
+                current_date = start_date + timedelta(hours=i)
+            elif timeframe == '4H':
+                current_date = start_date + timedelta(hours=4*i)
+            else:  # 1D
+                current_date = start_date + timedelta(days=i)
+            
+            prices.append({
+                'date': current_date,
+                'open': round(float(open_price), 4),
+                'high': round(float(high), 4),
+                'low': round(float(low), 4),
+                'close': round(float(close_price), 4),
+                'volume': int(np.random.randint(10000, 50000))
+            })
+        
+        return pd.DataFrame(prices)
+
+    def get_all_pairs_data(self, timeframe: str, days: int = 7) -> Dict[str, pd.DataFrame]:
+        """Dapatkan data untuk semua pairs sekaligus"""
+        all_data = {}
+        for pair in config.FOREX_PAIRS + config.CRYPTO_PAIRS:
+            try:
+                data = self.get_price_data(pair, timeframe, days)
+                if not data.empty:
+                    all_data[pair] = data
+            except Exception as e:
+                logger.error(f"Error getting data for {pair}: {e}")
+        return all_data
 # ==================== ADVANCED RISK MANAGEMENT SYSTEM ====================
 class AdvancedRiskManager:
     def __init__(self, backtest_mode: bool = False):
