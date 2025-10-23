@@ -1,5 +1,3 @@
-[file content begin]
-# [FILE: app_enhanced.py] - FOREX TRADING ANALYSIS SYSTEM v3.1
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -79,9 +77,9 @@ class SystemConfig:
     BACKTEST_MIN_CONFIDENCE: int = 40  # Lower confidence threshold for backtesting
     BACKTEST_RISK_SCORE_THRESHOLD: int = 8  # Higher risk tolerance for backtesting
     
-    # Supported Instruments
+    # Supported Instruments - DIPERBAIKI: Tambahkan CADJPY dan pastikan EURUSD ada
     FOREX_PAIRS: List[str] = field(default_factory=lambda: [
-        "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", "CADJPY",  # <- TAMBAHKAN CADJPY
+        "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", "CADJPY",
         "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
     ])
     TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
@@ -332,10 +330,9 @@ class TwelveDataClient:
     def _get_simulated_real_time_price(self, pair: str) -> float:
         """Harga real-time simulasi untuk demo mode"""
         try:
-            # Base prices dengan variasi kecil untuk simulasi real-time
+            # Base prices dengan variasi kecil untuk simulasi real-time - DIPERBAIKI: tambahkan CADJPY
             base_prices = {
-                'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
-                'CADJPY': 108.50,  # <- TAMBAHKAN CADJPY
+                'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30, 'CADJPY': 108.50,
                 'EURUSD': 1.0835, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
                 'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095
             }
@@ -373,7 +370,7 @@ class AdvancedRiskManager:
         self.current_drawdown = 0.0
         self.last_reset_date = datetime.now().date()
         
-        # Correlation matrix untuk forex pairs
+        # Correlation matrix untuk forex pairs - DIPERBAIKI: tambahkan CADJPY
         self.correlation_matrix = {
             'USDJPY': {'EURUSD': -0.7, 'GBPUSD': -0.6, 'USDCHF': 0.9, 'EURJPY': 0.8, 'GBPJPY': 0.7, 'CADJPY': 0.6},
             'EURUSD': {'USDJPY': -0.7, 'GBPUSD': 0.8, 'USDCHF': -0.7, 'EURJPY': 0.9, 'GBPJPY': 0.6, 'CADJPY': -0.4},
@@ -382,7 +379,7 @@ class AdvancedRiskManager:
             'EURJPY': {'USDJPY': 0.8, 'EURUSD': 0.9, 'GBPUSD': 0.7, 'USDCHF': -0.6, 'GBPJPY': 0.8, 'CADJPY': 0.7},
             'GBPJPY': {'USDJPY': 0.7, 'EURUSD': 0.6, 'GBPUSD': 0.9, 'USDCHF': -0.5, 'EURJPY': 0.8, 'CADJPY': 0.6},
             'CHFJPY': {'USDJPY': 0.6, 'EURJPY': 0.6, 'GBPJPY': 0.5, 'USDCHF': 0.8, 'EURUSD': -0.5, 'CADJPY': 0.4},
-            'CADJPY': {'USDJPY': 0.6, 'EURJPY': 0.7, 'GBPJPY': 0.6, 'USDCAD': -0.8, 'USDCHF': 0.5, 'EURUSD': -0.4},  # <- TAMBAHKAN CADJPY
+            'CADJPY': {'USDJPY': 0.6, 'EURJPY': 0.7, 'GBPJPY': 0.6, 'USDCAD': -0.8, 'USDCHF': 0.5, 'EURUSD': -0.4},
             'AUDUSD': {'USDJPY': -0.5, 'EURUSD': 0.6, 'GBPUSD': 0.5, 'NZDUSD': 0.8, 'USDCAD': -0.4, 'CADJPY': -0.3},
             'USDCAD': {'USDJPY': 0.4, 'EURUSD': -0.5, 'GBPUSD': -0.4, 'AUDUSD': -0.4, 'USDCHF': 0.6, 'CADJPY': -0.8},
             'NZDUSD': {'USDJPY': -0.5, 'EURUSD': 0.5, 'GBPUSD': 0.4, 'AUDUSD': 0.8, 'USDCAD': -0.3, 'CADJPY': -0.2}
@@ -1136,8 +1133,7 @@ class DataManager:
                 periods = 500
                 
             base_prices = {
-                'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-                'CADJPY': 108.5,  # <- TAMBAHKAN CADJPY
+                'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0, 'CADJPY': 108.5,
                 'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
                 'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
             }
@@ -1271,8 +1267,7 @@ class DataManager:
             points = days
             
         base_prices = {
-            'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0,
-            'CADJPY': 108.5,  # <- TAMBAHKAN CADJPY
+            'USDJPY': 147.0, 'GBPJPY': 198.0, 'EURJPY': 172.0, 'CHFJPY': 184.0, 'CADJPY': 108.5,
             'EURUSD': 1.0850, 'GBPUSD': 1.2650, 'USDCHF': 0.8850,
             'AUDUSD': 0.6550, 'USDCAD': 1.3500, 'NZDUSD': 0.6100
         }
@@ -1341,7 +1336,7 @@ class FundamentalAnalysisEngine:
                 'GBPJPY': 'Japan UK economy Brexit Bank of England',
                 'EURJPY': 'Japan Europe ECB economy European Central Bank',
                 'CHFJPY': 'Japan Switzerland economy SNB Swiss National Bank',
-                'CADJPY': 'Japan Canada economy Bank of Canada BOC',  # <- TAMBAHKAN CADJPY
+                'CADJPY': 'Japan Canada economy Bank of Canada Bank of Japan',
                 'EURUSD': 'Europe United States Fed ECB Federal Reserve European Central Bank',
                 'GBPUSD': 'UK United States Bank of England Fed Brexit',
                 'USDCHF': 'United States Switzerland SNB Fed Swiss National Bank',
@@ -1405,7 +1400,7 @@ class FundamentalAnalysisEngine:
                 "CHF/JPY influenced by safe-haven flows and Bank of Japan policy decisions.",
                 "Switzerland inflation stays within target range, supporting CHF stability."
             ],
-            'CADJPY': [  # <- TAMBAHKAN CADJPY
+            'CADJPY': [
                 "CAD/JPY influenced by oil prices and Bank of Canada policy decisions.",
                 "Canadian dollar shows volatility against yen amid commodity price fluctuations.",
                 "Bank of Canada and Bank of Japan policy divergence impacts CAD/JPY cross."
@@ -2401,7 +2396,8 @@ def api_market_overview():
     """Overview market untuk semua pair dengan REAL-TIME prices dari TwelveData"""
     overview = {}
     
-    for pair in config.FOREX_PAIRS:  # PERBAIKAN: Tampilkan semua pair, bukan hanya 6 pertama
+    # PERBAIKAN: Tampilkan SEMUA pair, bukan hanya 6 pertama
+    for pair in config.FOREX_PAIRS:  # Hapus [:6]
         try:
             # Dapatkan current price REAL-TIME dari TwelveData
             real_time_price = twelve_data_client.get_real_time_price(pair)
@@ -2465,6 +2461,7 @@ def api_market_overview():
                 }
         except Exception as e:
             logger.error(f"Error getting overview for {pair}: {e}")
+            # PERBAIKAN: Berikan informasi error yang lebih detail
             overview[pair] = {
                 'price': 0,
                 'change': 0,
@@ -2474,7 +2471,7 @@ def api_market_overview():
                 'volatility': 0,
                 'recommendation': 'HOLD',
                 'confidence': 'LOW',
-                'error': str(e)
+                'error': f'Processing error: {str(e)}'
             }
     
     return jsonify(overview)
@@ -2634,4 +2631,3 @@ if __name__ == '__main__':
     logger.info("Forex Analysis System is ready and running on http://localhost:5000")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
-[file content end]
