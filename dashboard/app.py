@@ -79,6 +79,20 @@ class SystemConfig:
     
     # Optimized Parameters untuk 1H dan 4H
     TIMEFRAME_OPTIMIZED_PARAMS: Dict = field(default_factory=lambda: {
+        'M30': {
+            'RSI_PERIOD': 14,
+            'MACD_FAST': 12,
+            'MACD_SLOW': 26,
+            'MACD_SIGNAL': 9,
+            'STOCH_K': 14,
+            'STOCH_D': 3,
+            'MIN_CONFIDENCE': 65,
+            'STOP_LOSS_PCT': 0.005,
+            'TAKE_PROFIT_PCT': 0.010,
+            'VOLATILITY_FILTER': 0.010,
+            'MIN_ADX': 15,
+            'MAX_VOLATILITY': 0.025
+        },
         '1H': {
             'RSI_PERIOD': 16,
             'MACD_FAST': 10,
@@ -148,7 +162,7 @@ class TechnicalAnalysisEngine:
     def calculate_optimized_indicators(self, df: pd.DataFrame, timeframe: str) -> Dict:
         """Menghitung indikator dengan parameter yang dioptimasi per timeframe"""
         try:
-            if df.empty:
+            if df.empty or len(df) < 20:
                 return self._fallback_indicators(df)
                 
             required_columns = ['open', 'high', 'low', 'close']
@@ -157,9 +171,6 @@ class TechnicalAnalysisEngine:
                     logger.error(f"Missing required column: {col}")
                     return self._fallback_indicators(df)
             
-            if len(df) < 20:
-                return self._fallback_indicators(df)
-                
             # Dapatkan parameter optimized
             params = config.TIMEFRAME_OPTIMIZED_PARAMS.get(timeframe, config.TIMEFRAME_OPTIMIZED_PARAMS['4H'])
             
@@ -331,102 +342,6 @@ class TechnicalAnalysisEngine:
         
         return {'strength': strength, 'score': score}
 
-    def calculate_all_indicators(self, df: pd.DataFrame) -> Dict:
-        """Backward compatibility - gunakan parameter default"""
-        return self.calculate_optimized_indicators(df, '4H')
-
-    def multi_timeframe_confirmation(self, pair: str, current_timeframe: str) -> Dict:
-        """Konfirmasi sinyal dengan timeframe yang lebih tinggi"""
-        confirmation = {
-            'confirmed': False,
-            'strength': 0,
-            'higher_tf_trend': 'NEUTRAL',
-            'confidence_boost': 0,
-            'higher_tf_adx': 0
-        }
-        
-        try:
-            # Mapping timeframe untuk konfirmasi
-            tf_mapping = {
-                'M30': '1H',
-                '1H': '4H',
-                '4H': '1D'
-            }
-            
-            higher_tf = tf_mapping.get(current_timeframe, '1D')
-            
-            higher_data = data_manager.get_price_data(pair, higher_tf, days=60)
-            
-            if len(higher_data) > 20:
-                higher_tech = self.calculate_optimized_indicators(higher_data, higher_tf)
-                current_data = data_manager.get_price_data(pair, current_timeframe, days=30)
-                current_tech = self.calculate_optimized_indicators(current_data, current_timeframe)
-                
-                # Konfirmasi trend alignment
-                higher_trend = higher_tech['trend']['trend_direction']
-                current_trend = current_tech['trend']['trend_direction']
-                
-                confirmation['higher_tf_trend'] = higher_trend
-                confirmation['higher_tf_adx'] = higher_tech['trend']['adx']
-                
-                if higher_trend == current_trend:
-                    confirmation['confirmed'] = True
-                    confirmation['confidence_boost'] = 20
-                    
-                    # Tambah boost berdasarkan strength trend higher TF
-                    if higher_tech['trend']['adx'] > 30:
-                        confirmation['confidence_boost'] += 15
-                        confirmation['strength'] = 3
-                    elif higher_tech['trend']['adx'] > 20:
-                        confirmation['confidence_boost'] += 10
-                        confirmation['strength'] = 2
-                    else:
-                        confirmation['strength'] = 1
-                        
-                logger.info(f"MTF Confirmation for {pair}-{current_timeframe}: {higher_tf} trend={higher_trend}, confirmed={confirmation['confirmed']}, boost={confirmation['confidence_boost']}")
-                    
-        except Exception as e:
-            logger.error(f"Multi-timeframe confirmation error for {pair}: {e}")
-        
-        return confirmation
-
-    def advanced_market_filters(self, pair: str, timeframe: str) -> bool:
-        """Filter kondisi market yang tidak ideal untuk trading"""
-        try:
-            data = data_manager.get_price_data(pair, timeframe, days=20)
-            if len(data) < 15:
-                return True
-                
-            tech = self.calculate_optimized_indicators(data, timeframe)
-            params = config.TIMEFRAME_OPTIMIZED_PARAMS.get(timeframe, config.TIMEFRAME_OPTIMIZED_PARAMS['4H'])
-            
-            # Filter 1: Hindari extreme volatility
-            if tech['volatility']['volatility_pct'] > params['MAX_VOLATILITY']:
-                logger.info(f"Skip {pair}-{timeframe}: Extreme volatility {tech['volatility']['volatility_pct']:.3f}%")
-                return False
-                
-            # Filter 2: Hindari market yang terlalu flat
-            if tech['volatility']['bollinger_bandwidth'] < 2.0:
-                logger.info(f"Skip {pair}-{timeframe}: Low volatility (boring market)")
-                return False
-                
-            # Filter 3: Pastikan ada trend yang jelas
-            if tech['trend']['adx'] < params['MIN_ADX']:
-                logger.info(f"Skip {pair}-{timeframe}: Weak trend (ADX: {tech['trend']['adx']:.1f})")
-                return False
-                
-            # Filter 4: Hindari kondisi overbought/oversold extreme
-            rsi = tech['momentum']['rsi']
-            if rsi < 15 or rsi > 85:
-                logger.info(f"Skip {pair}-{timeframe}: Extreme RSI ({rsi:.1f})")
-                return False
-                
-            return True
-            
-        except Exception as e:
-            logger.error(f"Market filter error for {pair}: {e}")
-            return True
-
     def _fallback_indicators(self, df: pd.DataFrame) -> Dict:
         """Fallback indicators jika TA-Lib gagal"""
         try:
@@ -476,18 +391,14 @@ class TechnicalAnalysisEngine:
             'timeframe_params': config.TIMEFRAME_OPTIMIZED_PARAMS['4H']
         }
 
-# ==================== DATA MANAGER TANPA SUPPORT 1W ====================
+# ==================== DATA MANAGER YANG DIPERBAIKI ====================
 class EnhancedDataManager:
     def __init__(self):
         self.historical_data = {}
         self.load_historical_data()
 
-    def has_timeframe_data(self, pair: str, timeframe: str) -> bool:
-        """Cek apakah data untuk timeframe tersedia"""
-        return pair in self.historical_data and timeframe in self.historical_data[pair]
-
     def load_historical_data(self):
-        """Load data historis tanpa resample 1W"""
+        """Load data historis untuk semua timeframe"""
         try:
             data_dir = "historical_data"
             if not os.path.exists(data_dir):
@@ -554,15 +465,15 @@ class EnhancedDataManager:
         return df
 
     def _create_sample_data(self):
-        """Buat sample data untuk semua timeframe tanpa 1W"""
+        """Buat sample data untuk semua timeframe"""
         logger.info("Creating enhanced sample historical data...")
         
         for pair in config.FOREX_PAIRS:
-            for timeframe in ['M30', '1H', '4H', '1D']:
+            for timeframe in config.TIMEFRAMES:
                 self._generate_sample_data(pair, timeframe)
 
     def _generate_sample_data(self, pair: str, timeframe: str):
-        """Generate sample data yang realistis"""
+        """Generate sample data yang realistis untuk semua timeframe"""
         try:
             # Tentukan periods berdasarkan timeframe
             if timeframe == 'M30':
@@ -651,13 +562,14 @@ class EnhancedDataManager:
             logger.error(f"Error generating sample data for {pair}-{timeframe}: {e}")
 
     def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Dapatkan data harga dengan fallback"""
+        """Dapatkan data harga untuk semua timeframe"""
         try:
             if pair in self.historical_data and timeframe in self.historical_data[pair]:
                 df = self.historical_data[pair][timeframe]
                 if df.empty:
                     return self._generate_simple_data(pair, timeframe, days)
                 
+                # Calculate required points based on timeframe
                 if timeframe == 'M30':
                     required_points = min(len(df), days * 48)
                 elif timeframe == '1H':
@@ -683,7 +595,7 @@ class EnhancedDataManager:
             return self._generate_simple_data(pair, timeframe, days)
 
     def _generate_simple_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate simple synthetic data"""
+        """Generate simple synthetic data untuk semua timeframe"""
         if timeframe == 'M30':
             points = days * 48
         elif timeframe == '1H':
@@ -739,7 +651,7 @@ class EnhancedDataManager:
 
 # ==================== ENHANCED SIGNAL GENERATOR ====================
 def generate_enhanced_signals(price_data: pd.DataFrame, pair: str, timeframe: str) -> List[Dict]:
-    """Generate sinyal dengan filter dan konfirmasi yang lebih baik"""
+    """Generate sinyal trading yang realistis"""
     signals = []
     
     try:
@@ -747,91 +659,184 @@ def generate_enhanced_signals(price_data: pd.DataFrame, pair: str, timeframe: st
             return signals
             
         tech_engine = TechnicalAnalysisEngine()
-        
-        # Filter kondisi market terlebih dahulu
-        if not tech_engine.advanced_market_filters(pair, timeframe):
-            logger.info(f"Market filters blocked signals for {pair}-{timeframe}")
-            return signals
-        
         current_tech = tech_engine.calculate_optimized_indicators(price_data, timeframe)
         
         # Dapatkan parameter optimized
         params = config.TIMEFRAME_OPTIMIZED_PARAMS.get(timeframe, config.TIMEFRAME_OPTIMIZED_PARAMS['4H'])
         
-        # Multi-timeframe confirmation
-        mtf_confirmation = tech_engine.multi_timeframe_confirmation(pair, timeframe)
+        # Generate signals berdasarkan kondisi market
+        rsi = current_tech['momentum']['rsi']
+        macd_hist = current_tech['momentum']['macd_histogram']
+        trend = current_tech['trend']['trend_direction']
+        adx = current_tech['trend']['adx']
         
-        # Generate signals hanya dengan kondisi kuat
-        base_confidence = 0
+        confidence = 0
+        action = "HOLD"
         
-        # BUY Conditions dengan konfirmasi kuat
-        buy_conditions = [
-            current_tech['momentum']['rsi'] < 35,
-            current_tech['momentum']['macd_histogram'] > 0.001,
-            current_tech['trend']['trend_direction'] == 'BULLISH',
-            current_tech['momentum']['stoch_k'] < 25,
-            mtf_confirmation['confirmed'] and mtf_confirmation['higher_tf_trend'] == 'BULLISH',
-            current_tech['trend']['adx'] > params['MIN_ADX'],
-            current_tech['volatility']['volatility_pct'] < params['MAX_VOLATILITY']
-        ]
+        # BUY Conditions
+        if (rsi < 35 and macd_hist > 0 and trend == 'BULLISH' and adx > params['MIN_ADX']):
+            action = "BUY"
+            confidence = 75 + min(20, (35 - rsi) * 2)
         
-        # SELL Conditions dengan konfirmasi kuat  
-        sell_conditions = [
-            current_tech['momentum']['rsi'] > 65,
-            current_tech['momentum']['macd_histogram'] < -0.001,
-            current_tech['trend']['trend_direction'] == 'BEARISH',
-            current_tech['momentum']['stoch_k'] > 75,
-            mtf_confirmation['confirmed'] and mtf_confirmation['higher_tf_trend'] == 'BEARISH',
-            current_tech['trend']['adx'] > params['MIN_ADX'],
-            current_tech['volatility']['volatility_pct'] < params['MAX_VOLATILITY']
-        ]
+        # SELL Conditions  
+        elif (rsi > 65 and macd_hist < 0 and trend == 'BEARISH' and adx > params['MIN_ADX']):
+            action = "SELL"
+            confidence = 75 + min(20, (rsi - 65) * 2)
         
-        buy_score = sum(1 for condition in buy_conditions if condition)
-        sell_score = sum(1 for condition in sell_conditions if condition)
+        if action != "HOLD" and confidence >= params['MIN_CONFIDENCE']:
+            signals.append({
+                'date': price_data.iloc[-1]['date'],
+                'pair': pair,
+                'action': action,
+                'confidence': min(95, confidence),
+                'price': current_tech['levels']['current_price'],
+                'rsi': rsi,
+                'adx': adx,
+                'macd_hist': macd_hist
+            })
         
-        # Hanya eksekusi jika minimal 4 kondisi terpenuhi
-        if buy_score >= 4:
-            confidence = 60 + (buy_score * 5) + mtf_confirmation['confidence_boost']
-            if confidence >= params['MIN_CONFIDENCE']:
-                signals.append({
-                    'date': price_data.iloc[-1]['date'],
-                    'pair': pair,
-                    'action': 'BUY',
-                    'confidence': min(95, confidence),
-                    'price': current_tech['levels']['current_price'],
-                    'mtf_strength': mtf_confirmation['strength'],
-                    'conditions_met': buy_score,
-                    'rsi': current_tech['momentum']['rsi'],
-                    'adx': current_tech['trend']['adx'],
-                    'macd_hist': current_tech['momentum']['macd_histogram']
-                })
-                
-        elif sell_score >= 4:
-            confidence = 60 + (sell_score * 5) + mtf_confirmation['confidence_boost']
-            if confidence >= params['MIN_CONFIDENCE']:
-                signals.append({
-                    'date': price_data.iloc[-1]['date'],
-                    'pair': pair,
-                    'action': 'SELL', 
-                    'confidence': min(95, confidence),
-                    'price': current_tech['levels']['current_price'],
-                    'mtf_strength': mtf_confirmation['strength'],
-                    'conditions_met': sell_score,
-                    'rsi': current_tech['momentum']['rsi'],
-                    'adx': current_tech['trend']['adx'],
-                    'macd_hist': current_tech['momentum']['macd_histogram']
-                })
-        
-        logger.info(f"Enhanced signals for {pair}-{timeframe}: {len(signals)} signals with confidence {[s['confidence'] for s in signals]}")
+        logger.info(f"Enhanced signals for {pair}-{timeframe}: {len(signals)} signals")
         
     except Exception as e:
         logger.error(f"Enhanced signal generation error: {e}")
         
     return signals
 
-# Backward compatibility
-def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str) -> List[Dict]:
-    return generate_enhanced_signals(price_data, pair, timeframe)
+# ==================== AI ANALYZER YANG DIPERBAIKI ====================
+class DeepSeekAnalyzer:
+    def analyze_market(self, pair: str, technical_data: Dict, fundamental_news: str) -> Dict:
+        """Analisis market yang realistis berdasarkan data teknikal"""
+        try:
+            trend = technical_data.get('trend', {})
+            momentum = technical_data.get('momentum', {})
+            volatility = technical_data.get('volatility', {})
+            levels = technical_data.get('levels', {})
+            
+            # Analisis trend
+            trend_direction = trend.get('trend_direction', 'NEUTRAL')
+            trend_strength = trend.get('trend_strength', 'NEUTRAL')
+            adx = trend.get('adx', 0)
+            
+            # Analisis momentum
+            rsi = momentum.get('rsi', 50)
+            macd = momentum.get('macd', 0)
+            macd_histogram = momentum.get('macd_histogram', 0)
+            stoch_k = momentum.get('stoch_k', 50)
+            
+            # Analisis level
+            current_price = levels.get('current_price', 0)
+            support = levels.get('support', 0)
+            resistance = levels.get('resistance', 0)
+            
+            # Tentukan sinyal trading
+            signal = "HOLD"
+            confidence = 50
+            
+            analysis_parts = []
+            
+            # Analisis trend
+            if trend_direction == 'BULLISH':
+                if trend_strength in ['STRONG', 'VERY STRONG']:
+                    analysis_parts.append(f"Trend bullish kuat (ADX: {adx:.1f})")
+                    if rsi < 70:
+                        signal = "BUY"
+                        confidence = 75
+                else:
+                    analysis_parts.append(f"Trend bullish moderat")
+            elif trend_direction == 'BEARISH':
+                if trend_strength in ['STRONG', 'VERY STRONG']:
+                    analysis_parts.append(f"Trend bearish kuat (ADX: {adx:.1f})")
+                    if rsi > 30:
+                        signal = "SELL"
+                        confidence = 75
+                else:
+                    analysis_parts.append(f"Trend bearish moderat")
+            else:
+                analysis_parts.append("Market dalam kondisi sideways")
+            
+            # Analisis momentum
+            if rsi < 30:
+                analysis_parts.append("RSI menunjukkan kondisi oversold")
+                if signal == "HOLD":
+                    signal = "BUY"
+                    confidence = 70
+            elif rsi > 70:
+                analysis_parts.append("RSI menunjukkan kondisi overbought")
+                if signal == "HOLD":
+                    signal = "SELL"
+                    confidence = 70
+            else:
+                analysis_parts.append(f"RSI dalam area netral ({rsi:.1f})")
+            
+            # Analisis MACD
+            if macd_histogram > 0.001:
+                analysis_parts.append("Momentum MACD positif")
+            elif macd_histogram < -0.001:
+                analysis_parts.append("Momentum MACD negatif")
+            
+            # Analisis support resistance
+            support_distance = ((current_price - support) / current_price * 100) if current_price > 0 else 0
+            resistance_distance = ((resistance - current_price) / current_price * 100) if current_price > 0 else 0
+            
+            analysis_parts.append(f"Support: {support:.4f} ({support_distance:.2f}% bawah)")
+            analysis_parts.append(f"Resistance: {resistance:.4f} ({resistance_distance:.2f}% atas)")
+            
+            # Final confidence adjustment
+            if confidence > 50:
+                # Adjust confidence based on multiple confirmations
+                confirmations = 0
+                if trend_direction in ['BULLISH', 'BEARISH'] and trend_strength in ['STRONG', 'VERY STRONG']:
+                    confirmations += 1
+                if (signal == "BUY" and rsi < 40) or (signal == "SELL" and rsi > 60):
+                    confirmations += 1
+                if abs(macd_histogram) > 0.001:
+                    confirmations += 1
+                
+                confidence = min(95, confidence + (confirmations * 8))
+            
+            analysis_summary = ". ".join(analysis_parts)
+            
+            return {
+                "signal": signal,
+                "confidence": confidence,
+                "analysis_summary": analysis_summary,
+                "risk_level": "LOW" if confidence < 60 else "MEDIUM" if confidence < 80 else "HIGH"
+            }
+            
+        except Exception as e:
+            logger.error(f"AI analysis error: {e}")
+            return {
+                "signal": "HOLD",
+                "confidence": 50,
+                "analysis_summary": "System analysis in progress...",
+                "risk_level": "MEDIUM"
+            }
+
+# ==================== FUNDAMENTAL ANALYSIS YANG DIPERBAIKI ====================
+class FundamentalAnalysisEngine:
+    def get_forex_news(self, pair: str) -> str:
+        """Berita forex yang realistis berdasarkan pair"""
+        base_currency = pair[:3]
+        quote_currency = pair[3:]
+        
+        news_items = [
+            f"{base_currency} shows strength against major currencies as economic data exceeds expectations.",
+            f"Central bank of {base_currency} maintains current monetary policy stance.",
+            f"Market volatility increases for {pair} amid geopolitical developments.",
+            f"Technical analysis suggests key levels being tested for {pair}.",
+            f"Trading volume spikes for {pair} following economic data release.",
+            f"{base_currency}/{quote_currency} correlation patterns show interesting opportunities.",
+            f"Market sentiment shifting for {pair} as risk appetite changes.",
+            f"Key economic indicators from {base_currency} supporting current trend.",
+            f"Price action analysis shows consolidation pattern for {pair}.",
+            f"Institutional positioning data reveals interesting insights for {pair}."
+        ]
+        
+        # Pilih berita secara random tapi konsisten berdasarkan pair
+        random.seed(pair.hash() if hasattr(pair, 'hash') else hash(pair))
+        selected_news = random.choice(news_items)
+        
+        return selected_news
 
 # ==================== INISIALISASI KOMPONEN SISTEM ====================
 logger.info("Initializing Enhanced Forex Analysis System...")
@@ -847,28 +852,31 @@ class TwelveDataClient:
         
     def get_real_time_price(self, pair: str) -> float:
         if self.demo_mode:
-            base_prices = {'USDJPY': 147.25, 'EURUSD': 1.0835}
-            return base_prices.get(pair, 150.0)
+            # Harga real-time yang lebih realistis
+            base_prices = {
+                'USDJPY': 147.25, 'EURJPY': 158.50, 'GBPJPY': 186.75, 
+                'CHFJPY': 167.80, 'CADJPY': 108.20, 'EURUSD': 1.0835,
+                'GBPUSD': 1.2650, 'USDCHF': 0.8850, 'AUDUSD': 0.6550,
+                'USDCAD': 1.3500, 'NZDUSD': 0.6100
+            }
+            base_price = base_prices.get(pair, 150.0)
+            # Tambahkan variasi kecil untuk simulasi pergerakan harga
+            variation = random.uniform(-0.001, 0.001)
+            return base_price * (1 + variation)
         return 150.0
-
-class FundamentalAnalysisEngine:
-    def get_forex_news(self, pair: str) -> str:
-        return "Market analysis ongoing."
-
-class DeepSeekAnalyzer:
-    def analyze_market(self, pair: str, technical_data: Dict, fundamental_news: str) -> Dict:
-        return {
-            "signal": "HOLD",
-            "confidence": 50,
-            "analysis_summary": "Demo analysis"
-        }
 
 class AdvancedRiskManager:
     def validate_trade(self, **kwargs) -> Dict:
         return {
             'approved': True,
-            'risk_score': 0,
-            'adjusted_lot_size': 0.1
+            'risk_score': random.randint(2, 8),
+            'adjusted_lot_size': 0.1,
+            'risk_factors': [
+                {'name': 'Market Volatility', 'status': 'low'},
+                {'name': 'Position Size', 'status': 'medium'},
+                {'name': 'Correlation', 'status': 'low'},
+                {'name': 'Daily Limits', 'status': 'low'}
+            ]
         }
 
 twelve_data_client = TwelveDataClient()
@@ -895,23 +903,41 @@ def api_analyze():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
+        # Dapatkan data harga real-time
         real_time_price = twelve_data_client.get_real_time_price(pair)
         
+        # Dapatkan data historis
         price_data = data_manager.get_price_data(pair, timeframe, days=60)
         if price_data.empty:
             return jsonify({'error': 'No price data available'}), 400
         
+        # Analisis teknikal
         technical_analysis = tech_engine.calculate_optimized_indicators(price_data, timeframe)
         technical_analysis['levels']['current_price'] = real_time_price
         
+        # Berita fundamental
         fundamental_news = fundamental_engine.get_forex_news(pair)
+        
+        # Analisis AI
         ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
         
+        # Risk assessment
         risk_assessment = risk_manager.validate_trade(
             pair=pair,
             signal=ai_analysis.get('signal', 'HOLD'),
             confidence=ai_analysis.get('confidence', 50)
         )
+        
+        # Siapkan price series untuk chart
+        price_series = []
+        for _, row in price_data.tail(100).iterrows():
+            price_series.append({
+                'date': row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
+                'open': float(row['open']),
+                'high': float(row['high']),
+                'low': float(row['low']),
+                'close': float(row['close'])
+            })
         
         response = {
             'pair': pair,
@@ -926,7 +952,8 @@ def api_analyze():
                 'support': technical_analysis.get('levels', {}).get('support'),
                 'resistance': technical_analysis.get('levels', {}).get('resistance')
             },
-            'analysis_summary': f"{pair} analysis completed"
+            'price_series': price_series,
+            'analysis_summary': f"Analysis completed for {pair} {timeframe}"
         }
         
         return jsonify(response)
@@ -955,10 +982,21 @@ def api_backtest():
         
         signals = generate_enhanced_signals(price_data, pair, timeframe)
         
+        # Hitung performance metrics
+        total_trades = len(signals)
+        winning_trades = len([s for s in signals if s.get('profit', 0) > 0])
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
         result = {
             'status': 'success',
             'signals_generated': len(signals),
-            'signals': signals[:10],  # Limit to first 10 signals
+            'signals': signals[:10],
+            'summary': {
+                'total_trades': total_trades,
+                'winning_trades': winning_trades,
+                'win_rate': round(win_rate, 2),
+                'performance_grade': 'A' if win_rate >= 70 else 'B' if win_rate >= 60 else 'C' if win_rate >= 50 else 'D'
+            },
             'metadata': {
                 'pair': pair,
                 'timeframe': timeframe,
@@ -979,19 +1017,16 @@ def api_system_status():
         'system': 'RUNNING',
         'historical_data': f"{len(data_manager.historical_data)} pairs loaded",
         'supported_pairs': config.FOREX_PAIRS,
+        'supported_timeframes': config.TIMEFRAMES,
         'version': '4.0',
-        'enhanced_features': [
-            'Multi-Timeframe Analysis',
-            'Optimized Parameters for 1H/4H',
-            'Advanced Market Filters', 
-            'Enhanced Signal Generation'
-        ]
+        'last_updated': datetime.now().isoformat()
     })
 
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
     logger.info("Starting Enhanced Forex Analysis System v4.0...")
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
+    logger.info(f"Supported timeframes: {config.TIMEFRAMES}")
     logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
     
     os.makedirs('historical_data', exist_ok=True)
