@@ -304,14 +304,16 @@
                 return;
             }
             
-            const pair = pairSelect.value;
+            // Ambil pair dan hapus slash, lalu ubah ke uppercase
+            let pair = pairSelect.value;
+            pair = pair.replace('/', '').toUpperCase();
             const tf = timeframeSelect.value;
             
             // Show loading indicator
             if (chartLoading) chartLoading.style.display = 'block';
             
-            // Update pair ticker
-            updatePairTicker(pair);
+            // Update pair ticker (tampilkan dengan slash)
+            updatePairTicker(pairSelect.value);
             
             try {
                 console.log(`Fetching analysis for ${pair}-${tf}...`);
