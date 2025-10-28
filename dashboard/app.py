@@ -128,7 +128,7 @@ class SystemConfig:
         "USDJPY", "GBPJPY", "EURJPY", "CHFJPY", "CADJPY",
         "EURUSD", "GBPUSD", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"
     ])
-    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D", "1W"])
+    TIMEFRAMES: List[str] = field(default_factory=lambda: ["M30", "1H", "4H", "1D"])
     
     # Backtesting
     DEFAULT_BACKTEST_DAYS: int = 90
@@ -350,16 +350,10 @@ class TechnicalAnalysisEngine:
             tf_mapping = {
                 'M30': '1H',
                 '1H': '4H',
-                '4H': '1D', 
-                '1D': '1W'
+                '4H': '1D'
             }
             
             higher_tf = tf_mapping.get(current_timeframe, '1D')
-            
-            # Jika minta 1W tapi tidak ada data, gunakan 1D sebagai fallback
-            if higher_tf == '1W' and not data_manager.has_timeframe_data(pair, '1W'):
-                higher_tf = '1D'
-                logger.info(f"Using 1D as higher timeframe for {pair} (1W not available)")
             
             higher_data = data_manager.get_price_data(pair, higher_tf, days=60)
             
@@ -482,7 +476,7 @@ class TechnicalAnalysisEngine:
             'timeframe_params': config.TIMEFRAME_OPTIMIZED_PARAMS['4H']
         }
 
-# ==================== DATA MANAGER DENGAN SUPPORT 1W ====================
+# ==================== DATA MANAGER TANPA SUPPORT 1W ====================
 class EnhancedDataManager:
     def __init__(self):
         self.historical_data = {}
@@ -492,36 +486,8 @@ class EnhancedDataManager:
         """Cek apakah data untuk timeframe tersedia"""
         return pair in self.historical_data and timeframe in self.historical_data[pair]
 
-    def resample_daily_to_weekly(self, daily_data: pd.DataFrame) -> pd.DataFrame:
-        """Resample data 1D menjadi 1W"""
-        try:
-            # Pastikan kolom date adalah datetime
-            if 'date' in daily_data.columns:
-                daily_data = daily_data.copy()
-                daily_data['date'] = pd.to_datetime(daily_data['date'])
-                daily_data = daily_data.set_index('date')
-            
-            # Resample ke weekly
-            weekly_data = daily_data.resample('W').agg({
-                'open': 'first',
-                'high': 'max', 
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum' if 'volume' in daily_data.columns else 'count'
-            }).dropna()
-            
-            # Reset index untuk konsistensi
-            weekly_data = weekly_data.reset_index()
-            
-            logger.info(f"Resampled {len(daily_data)} daily records to {len(weekly_data)} weekly records")
-            return weekly_data
-            
-        except Exception as e:
-            logger.error(f"Error resampling daily to weekly: {e}")
-            return pd.DataFrame()
-
     def load_historical_data(self):
-        """Load data historis dengan support resample 1W"""
+        """Load data historis tanpa resample 1W"""
         try:
             data_dir = "historical_data"
             if not os.path.exists(data_dir):
@@ -531,7 +497,6 @@ class EnhancedDataManager:
                 return
             
             loaded_count = 0
-            weekly_created = 0
             
             for filename in os.listdir(data_dir):
                 if filename.endswith('.csv'):
@@ -563,19 +528,11 @@ class EnhancedDataManager:
                             self.historical_data[pair][timeframe] = df
                             loaded_count += 1
                             
-                            # Jika ini data 1D, buat data 1W dari nya
-                            if timeframe == '1D' and '1W' not in self.historical_data[pair]:
-                                weekly_data = self.resample_daily_to_weekly(df)
-                                if not weekly_data.empty:
-                                    self.historical_data[pair]['1W'] = weekly_data
-                                    weekly_created += 1
-                                    logger.info(f"Created weekly data for {pair} from daily data")
-                            
                     except Exception as e:
                         logger.error(f"Error loading {filename}: {e}")
                         continue
             
-            logger.info(f"Loaded {loaded_count} datasets, created {weekly_created} weekly datasets")
+            logger.info(f"Loaded {loaded_count} datasets")
             
             if loaded_count == 0:
                 logger.warning("No valid data found, creating sample data...")
@@ -597,27 +554,12 @@ class EnhancedDataManager:
         return df
 
     def _create_sample_data(self):
-        """Buat sample data untuk semua timeframe termasuk 1W"""
+        """Buat sample data untuk semua timeframe tanpa 1W"""
         logger.info("Creating enhanced sample historical data...")
         
         for pair in config.FOREX_PAIRS:
             for timeframe in ['M30', '1H', '4H', '1D']:
                 self._generate_sample_data(pair, timeframe)
-            
-            # Buat data 1W dari 1D
-            if pair in self.historical_data and '1D' in self.historical_data[pair]:
-                daily_data = self.historical_data[pair]['1D']
-                weekly_data = self.resample_daily_to_weekly(daily_data)
-                if not weekly_data.empty:
-                    if pair not in self.historical_data:
-                        self.historical_data[pair] = {}
-                    self.historical_data[pair]['1W'] = weekly_data
-                    
-                    # Save weekly data to file
-                    data_dir = "historical_data"
-                    filename = f"{data_dir}/{pair}_1W.csv"
-                    weekly_data.to_csv(filename, index=False)
-                    logger.info(f"Saved weekly data: {filename}")
 
     def _generate_sample_data(self, pair: str, timeframe: str):
         """Generate sample data yang realistis"""
@@ -722,7 +664,7 @@ class EnhancedDataManager:
                     required_points = min(len(df), days * 24)
                 elif timeframe == '4H':
                     required_points = min(len(df), days * 6)
-                else:  # 1D or 1W
+                else:  # 1D
                     required_points = min(len(df), days)
                     
                 result_df = df.tail(required_points).copy()
@@ -748,7 +690,7 @@ class EnhancedDataManager:
             points = days * 24
         elif timeframe == '4H':
             points = days * 6
-        else:  # 1D or 1W
+        else:  # 1D
             points = days
             
         base_prices = {
@@ -781,7 +723,7 @@ class EnhancedDataManager:
                 current_date = start_date + timedelta(hours=i)
             elif timeframe == '4H':
                 current_date = start_date + timedelta(hours=4*i)
-            else:  # 1D or 1W
+            else:  # 1D
                 current_date = start_date + timedelta(days=i)
             
             prices.append({
@@ -1042,8 +984,7 @@ def api_system_status():
             'Multi-Timeframe Analysis',
             'Optimized Parameters for 1H/4H',
             'Advanced Market Filters', 
-            'Enhanced Signal Generation',
-            'Weekly Data Resampling'
+            'Enhanced Signal Generation'
         ]
     })
 
