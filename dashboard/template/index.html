@@ -30,19 +30,18 @@ async function analyze(){
         let timestamp;
         try {
           // Handle berbagai format date dari backend
-          if (p.date instanceof String || typeof p.date === 'string') {
-            if (p.date.includes('T')) {
-              // ISO format
-              timestamp = new Date(p.date).getTime() / 1000;
+          if (typeof p.date === 'string') {
+            // Coba parsing sebagai date string
+            const dateObj = new Date(p.date);
+            if (!isNaN(dateObj.getTime())) {
+              timestamp = dateObj.getTime() / 1000; // Convert to seconds
             } else {
-              // Fallback untuk format lain
-              timestamp = new Date(p.date).getTime() / 1000;
+              // Jika parsing gagal, gunakan timestamp incremental
+              timestamp = Math.floor(Date.now() / 1000);
             }
-          } else if (p.date instanceof Date) {
-            timestamp = p.date.getTime() / 1000;
           } else {
-            // Jika tidak ada date yang valid, gunakan timestamp sekarang
-            timestamp = Math.floor(Date.now() / 1000);
+            // Jika bukan string, gunakan nilai langsung atau fallback
+            timestamp = p.date || Math.floor(Date.now() / 1000);
           }
         } catch (e) {
           console.error('Date parsing error:', e);
@@ -58,7 +57,7 @@ async function analyze(){
         };
       });
       
-      console.log('Processed chart data:', chartData.slice(0, 5)); // Log first 5 records
+      console.log('Processed chart data - first 3:', chartData.slice(0, 3));
     } else {
       console.warn('No price_series data, using sample data');
       chartData = generateSamplePriceData(tf);
@@ -69,8 +68,7 @@ async function analyze(){
     console.log(`Clean data points: ${cleanData.length}`);
     
     if (cleanData.length === 0) {
-      console.error('No valid chart data after cleaning');
-      // Fallback ke sample data
+      console.error('No valid chart data after cleaning, using sample data');
       chartData = generateSamplePriceData(tf);
       currentChartData = cleanChartData(chartData);
     } else {
@@ -81,233 +79,16 @@ async function analyze(){
     
     if (currentChartData.length > 0) {
       console.log('Setting chart data with', currentChartData.length, 'points');
-      
-      try {
-        // Clear existing data first
-        candle.setData([]);
-        ema26.setData([]);
-        macdLine.setData([]);
-        macdSignal.setData([]);
-        macdHist.setData([]);
-        
-        // Set candle data
-        candle.setData(currentChartData);
-        
-        const closes = currentChartData.map(d => d.close);
-        console.log('Closes array:', closes.slice(0, 5));
-        
-        // Calculate and update EMA
-        const ema = calcEMA(closes, 26);
-        currentEmaData = currentChartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(ema[i]) ? d.close : ema[i]
-        })).filter(d => !isNaN(d.value));
-        
-        if (currentEmaData.length > 0) {
-          ema26.setData(currentEmaData);
-        }
-        
-        // Calculate and update MACD
-        const {macd, sig, hist} = calcMACDSeries(closes);
-        
-        const macdSeriesData = currentChartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(macd[i]) ? 0 : macd[i]
-        })).filter(d => !isNaN(d.value));
-        
-        const signalSeriesData = currentChartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(sig[i]) ? 0 : sig[i]
-        })).filter(d => !isNaN(d.value));
-        
-        const histSeriesData = currentChartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(hist[i]) ? 0 : hist[i]
-        })).filter(d => !isNaN(d.value));
-        
-        if (macdSeriesData.length > 0) {
-          macdLine.setData(macdSeriesData);
-          macdSignal.setData(signalSeriesData);
-          macdHist.setData(histSeriesData);
-        }
-        
-        lastCandleTime = currentChartData[currentChartData.length - 1]?.time;
-        
-        // Update chart time scale settings untuk semua timeframe
-        try {
-          const timeScaleOptions = {
-            timeVisible: true,
-            secondsVisible: false
-          };
-          
-          // Set bar spacing berdasarkan timeframe
-          if (tf === '1D') {
-            timeScaleOptions.barSpacing = 8;
-          } else if (tf === '4H') {
-            timeScaleOptions.barSpacing = 6;
-          } else if (tf === '1H') {
-            timeScaleOptions.barSpacing = 4;
-          } else { // M30
-            timeScaleOptions.barSpacing = 3;
-          }
-          
-          chart.timeScale().applyOptions(timeScaleOptions);
-          macdChart.timeScale().applyOptions(timeScaleOptions);
-          
-          // Fit content untuk menampilkan semua data
-          setTimeout(() => {
-            chart.timeScale().fitContent();
-            macdChart.timeScale().fitContent();
-          }, 100);
-          
-        } catch (e) {
-          console.log('Time scale update error:', e);
-        }
-        
-        // Resize charts
-        setTimeout(() => {
-          try {
-            const chartWidth = document.getElementById('chartRoot').clientWidth;
-            const macdWidth = document.getElementById('macdRoot').clientWidth;
-            
-            if (chartWidth > 0 && macdWidth > 0) {
-              chart.resize(chartWidth, 520);
-              macdChart.resize(macdWidth, 160);
-            }
-          } catch (e) {
-            console.log('Chart resize error:', e);
-          }
-        }, 500);
-        
-      } catch (chartError) {
-        console.error('Chart rendering error:', chartError);
-        // Fallback ke sample data jika chart error
-        const fallbackData = generateSamplePriceData(tf);
-        candle.setData(fallbackData);
-        
-        const fallbackCloses = fallbackData.map(d => d.close);
-        const fallbackEma = calcEMA(fallbackCloses, 26);
-        const fallbackEmaData = fallbackData.map((d, i) => ({
-          time: d.time,
-          value: fallbackEma[i]
-        }));
-        ema26.setData(fallbackEmaData);
-        
-        const {macd, sig, hist} = calcMACDSeries(fallbackCloses);
-        const macdSeriesData = fallbackData.map((d, i) => ({
-          time: d.time,
-          value: macd[i]
-        }));
-        const signalSeriesData = fallbackData.map((d, i) => ({
-          time: d.time,
-          value: sig[i]
-        }));
-        const histSeriesData = fallbackData.map((d, i) => ({
-          time: d.time,
-          value: hist[i]
-        }));
-        
-        macdLine.setData(macdSeriesData);
-        macdSignal.setData(signalSeriesData);
-        macdHist.setData(histSeriesData);
-        
-        chart.timeScale().fitContent();
-        macdChart.timeScale().fitContent();
-      }
+      await renderChart(currentChartData, tf);
     } else {
-      console.error('No chart data available');
+      console.error('No chart data available after processing');
+      // Fallback ke sample data
+      const fallbackData = generateSamplePriceData(tf);
+      await renderChart(fallbackData, tf);
     }
     
-    // Update technical values dari backend response
-    const t = j.technical_analysis || {};
-    console.log('Technical analysis:', t);
-    
-    // Handle momentum indicators
-    if (t.momentum) {
-      rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
-      macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
-      macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
-    } else {
-      rsiEl.textContent = '-';
-      macdValEl.textContent = '-';
-      macdHistVal.textContent = '-';
-    }
-    
-    // Handle trend indicators
-    if (t.trend) {
-      adxEl.textContent = (t.trend.adx || 0).toFixed(2);
-      trendEl.textContent = t.trend.trend_direction || '-';
-    } else {
-      adxEl.textContent = '-';
-      trendEl.textContent = '-';
-    }
-    
-    // Handle volatility indicators
-    if (t.volatility) {
-      atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
-      volEl.textContent = t.volatility.volatility_pct ? 
-        (t.volatility.volatility_pct).toFixed(2) + '%' : '-';
-    } else {
-      atrEl.textContent = '-';
-      volEl.textContent = '-';
-    }
-    
-    // Update price data
-    const currentPrice = t.levels?.current_price || (currentChartData.length > 0 ? currentChartData[currentChartData.length - 1].close : 150.0);
-    const priceDisplay = currentPrice ? currentPrice.toFixed(4) : '-';
-    livePriceEl.textContent = priceDisplay;
-    currentPriceEl.textContent = priceDisplay;
-    
-    // Update pair ticker dengan price change dari momentum
-    const priceChange = t.momentum?.price_change_pct || 0;
-    changeEl.textContent = '(' + (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%)';
-    changeEl.className = priceChange >= 0 ? 'price-change change-positive' : 'price-change change-negative';
-    
-    // Update AI analysis - GUNAKAN DATA REAL DARI BACKEND
-    const ai = j.ai_analysis || {};
-    console.log('AI analysis:', ai);
-    
-    aiSummaryEl.textContent = ai.analysis_summary || 'Market analysis in progress...';
-    setSignal(ai.signal || 'HOLD');
-    aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '50%';
-    aiRisk.textContent = ai.risk_level || 'MEDIUM';
-    
-    // Calculate trading levels berdasarkan analisis AI
-    if (currentPrice && ai.signal !== 'HOLD') {
-      const stopLossPct = t.timeframe_params?.STOP_LOSS_PCT || 0.01;
-      const takeProfitPct = t.timeframe_params?.TAKE_PROFIT_PCT || 0.02;
-      
-      if (ai.signal === 'BUY') {
-        aiEntry.textContent = (currentPrice * 1.0005).toFixed(4);
-        aiSL.textContent = (currentPrice * (1 - stopLossPct)).toFixed(4);
-        aiTP1.textContent = (currentPrice * (1 + takeProfitPct * 0.7)).toFixed(4);
-        aiTP2.textContent = (currentPrice * (1 + takeProfitPct)).toFixed(4);
-      } else if (ai.signal === 'SELL') {
-        aiEntry.textContent = (currentPrice * 0.9995).toFixed(4);
-        aiSL.textContent = (currentPrice * (1 + stopLossPct)).toFixed(4);
-        aiTP1.textContent = (currentPrice * (1 - takeProfitPct * 0.7)).toFixed(4);
-        aiTP2.textContent = (currentPrice * (1 - takeProfitPct)).toFixed(4);
-      }
-    } else {
-      aiEntry.textContent = '-';
-      aiSL.textContent = '-';
-      aiTP1.textContent = '-';
-      aiTP2.textContent = '-';
-    }
-    
-    // Update fundamental news - GUNAKAN DATA REAL DARI BACKEND
-    fundNews.textContent = j.fundamental_analysis || 'Market analysis ongoing.';
-    
-    // Update risk assessment
-    const risk = j.risk_assessment || generateSampleRiskAssessment();
-    updateRiskAssessment(risk);
-    
-    // Update Support & Resistance dari technical analysis levels
-    const srData = {
-      levels: t.levels || {},
-      current_price: currentPrice
-    };
-    updateSupportResistance(srData);
+    // Update semua komponen UI dengan data dari backend
+    updateUIComponents(j, currentChartData);
     
     updateStatusIndicator(true);
     
@@ -319,17 +100,222 @@ async function analyze(){
     aiSummaryEl.textContent = `Error: ${error.message}. Retrying...`;
     aiSummaryEl.style.color = '#ef4444';
     
-    // Auto-retry after 3 seconds
+    // Fallback ke sample data dengan auto-retry
+    const fallbackData = generateSamplePriceData(tf);
+    await renderChart(fallbackData, tf);
+    
+    // Auto-retry after 5 seconds
     setTimeout(() => {
       analyze();
-    }, 3000);
+    }, 5000);
   } finally {
     // Hide loading indicator
     chartLoading.style.display = 'none';
   }
 }
 
-// Perbaiki fungsi generateSamplePriceData untuk semua timeframe
+/* ===== CHART RENDERING FUNCTION ===== */
+async function renderChart(chartData, timeframe) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      try {
+        // Clear existing data first
+        candle.setData([]);
+        ema26.setData([]);
+        macdLine.setData([]);
+        macdSignal.setData([]);
+        macdHist.setData([]);
+        
+        console.log('Rendering chart with', chartData.length, 'data points');
+        
+        // Set candle data
+        candle.setData(chartData);
+        
+        const closes = chartData.map(d => d.close);
+        
+        // Calculate and update EMA
+        const ema = calcEMA(closes, 26);
+        const emaData = chartData.map((d, i) => ({
+          time: d.time, 
+          value: isNaN(ema[i]) ? (i > 0 ? ema[i-1] : d.close) : ema[i]
+        })).filter(d => !isNaN(d.value) && d.value > 0);
+        
+        if (emaData.length > 0) {
+          ema26.setData(emaData);
+        }
+        
+        // Calculate and update MACD
+        const {macd, sig, hist} = calcMACDSeries(closes);
+        
+        const macdSeriesData = chartData.map((d, i) => ({
+          time: d.time, 
+          value: isNaN(macd[i]) ? 0 : macd[i]
+        })).filter(d => !isNaN(d.value));
+        
+        const signalSeriesData = chartData.map((d, i) => ({
+          time: d.time, 
+          value: isNaN(sig[i]) ? 0 : sig[i]
+        })).filter(d => !isNaN(d.value));
+        
+        const histSeriesData = chartData.map((d, i) => ({
+          time: d.time, 
+          value: isNaN(hist[i]) ? 0 : hist[i]
+        })).filter(d => !isNaN(d.value));
+        
+        if (macdSeriesData.length > 0) {
+          macdLine.setData(macdSeriesData);
+          macdSignal.setData(signalSeriesData);
+          macdHist.setData(histSeriesData);
+        }
+        
+        // Update chart time scale settings
+        const timeScaleOptions = {
+          timeVisible: true,
+          secondsVisible: false,
+          borderColor: '#eee'
+        };
+        
+        // Set bar spacing berdasarkan timeframe
+        if (timeframe === '1D') {
+          timeScaleOptions.barSpacing = 8;
+        } else if (timeframe === '4H') {
+          timeScaleOptions.barSpacing = 6;
+        } else if (timeframe === '1H') {
+          timeScaleOptions.barSpacing = 4;
+        } else { // M30
+          timeScaleOptions.barSpacing = 3;
+        }
+        
+        chart.timeScale().applyOptions(timeScaleOptions);
+        macdChart.timeScale().applyOptions(timeScaleOptions);
+        
+        // Fit content untuk menampilkan semua data
+        setTimeout(() => {
+          try {
+            chart.timeScale().fitContent();
+            macdChart.timeScale().fitContent();
+          } catch (e) {
+            console.log('Fit content error:', e);
+          }
+        }, 200);
+        
+        // Resize charts
+        setTimeout(() => {
+          try {
+            const chartWidth = document.getElementById('chartRoot').clientWidth;
+            const macdWidth = document.getElementById('macdRoot').clientWidth;
+            
+            if (chartWidth > 0 && macdWidth > 0) {
+              chart.resize(chartWidth, 520);
+              macdChart.resize(macdWidth, 160);
+              console.log('Charts resized successfully');
+            }
+          } catch (e) {
+            console.log('Chart resize error:', e);
+          }
+        }, 300);
+        
+        resolve();
+      } catch (chartError) {
+        console.error('Chart rendering error:', chartError);
+        // Fallback ke sample data sederhana
+        const simpleData = generateSimpleChartData();
+        candle.setData(simpleData);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+/* ===== UI COMPONENTS UPDATE ===== */
+function updateUIComponents(responseData, chartData) {
+  const t = responseData.technical_analysis || {};
+  const ai = responseData.ai_analysis || {};
+  
+  console.log('Updating UI with technical analysis:', t);
+  console.log('Updating UI with AI analysis:', ai);
+  
+  // Update technical values
+  if (t.momentum) {
+    rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
+    macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
+    macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
+  }
+  
+  if (t.trend) {
+    adxEl.textContent = (t.trend.adx || 0).toFixed(2);
+    trendEl.textContent = t.trend.trend_direction || '-';
+  }
+  
+  if (t.volatility) {
+    atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
+    volEl.textContent = t.volatility.volatility_pct ? 
+      (t.volatility.volatility_pct).toFixed(2) + '%' : '-';
+  }
+  
+  // Update price data
+  const currentPrice = t.levels?.current_price || 
+                      (chartData.length > 0 ? chartData[chartData.length - 1].close : 150.0);
+  
+  const priceDisplay = currentPrice ? currentPrice.toFixed(4) : '-';
+  livePriceEl.textContent = priceDisplay;
+  currentPriceEl.textContent = priceDisplay;
+  
+  // Update price change
+  const priceChange = t.momentum?.price_change_pct || 0;
+  changeEl.textContent = '(' + (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%)';
+  changeEl.className = priceChange >= 0 ? 'price-change change-positive' : 'price-change change-negative';
+  
+  // Update AI analysis
+  aiSummaryEl.textContent = ai.analysis_summary || 'Real-time market analysis in progress...';
+  setSignal(ai.signal || 'HOLD');
+  aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '50%';
+  aiRisk.textContent = ai.risk_level || 'MEDIUM';
+  
+  // Calculate trading levels
+  updateTradingLevels(currentPrice, ai.signal, t.timeframe_params);
+  
+  // Update fundamental news
+  fundNews.textContent = responseData.fundamental_analysis || getRandomNews();
+  
+  // Update risk assessment
+  const risk = responseData.risk_assessment || generateSampleRiskAssessment();
+  updateRiskAssessment(risk);
+  
+  // Update Support & Resistance
+  const srData = {
+    levels: t.levels || {},
+    current_price: currentPrice
+  };
+  updateSupportResistance(srData);
+}
+
+/* ===== TRADING LEVELS CALCULATION ===== */
+function updateTradingLevels(currentPrice, signal, timeframeParams) {
+  if (currentPrice && signal !== 'HOLD') {
+    const stopLossPct = timeframeParams?.STOP_LOSS_PCT || 0.01;
+    const takeProfitPct = timeframeParams?.TAKE_PROFIT_PCT || 0.02;
+    
+    if (signal === 'BUY') {
+      aiEntry.textContent = (currentPrice * 1.0005).toFixed(4);
+      aiSL.textContent = (currentPrice * (1 - stopLossPct)).toFixed(4);
+      aiTP1.textContent = (currentPrice * (1 + takeProfitPct * 0.7)).toFixed(4);
+      aiTP2.textContent = (currentPrice * (1 + takeProfitPct)).toFixed(4);
+    } else if (signal === 'SELL') {
+      aiEntry.textContent = (currentPrice * 0.9995).toFixed(4);
+      aiSL.textContent = (currentPrice * (1 + stopLossPct)).toFixed(4);
+      aiTP1.textContent = (currentPrice * (1 - takeProfitPct * 0.7)).toFixed(4);
+      aiTP2.textContent = (currentPrice * (1 - takeProfitPct)).toFixed(4);
+    }
+  } else {
+    aiEntry.textContent = '-';
+    aiSL.textContent = '-';
+    aiTP1.textContent = '-';
+    aiTP2.textContent = '-';
+  }
+}
+
+/* ===== IMPROVED SAMPLE DATA GENERATION ===== */
 function generateSamplePriceData(timeframe = '1D') {
   const data = [];
   const basePrice = 148.75;
@@ -339,31 +325,29 @@ function generateSamplePriceData(timeframe = '1D') {
   
   let periods;
   let timeIncrement;
-  let baseDate = new Date();
-  baseDate.setDate(baseDate.getDate() - 100); // Start from 100 days ago
   
   // Set parameters berdasarkan timeframe
   switch(timeframe) {
     case '4H':
-      periods = 90; // 90 periods * 4h = 15 days
-      timeIncrement = 4 * 60 * 60; // 4 hours in seconds
+      periods = 90;
+      timeIncrement = 4 * 60 * 60;
       break;
     case '1H':
-      periods = 168; // 168 periods * 1h = 7 days
-      timeIncrement = 60 * 60; // 1 hour in seconds
+      periods = 168;
+      timeIncrement = 60 * 60;
       break;
     case 'M30':
-      periods = 336; // 336 periods * 30m = 7 days
-      timeIncrement = 30 * 60; // 30 minutes in seconds
+      periods = 336;
+      timeIncrement = 30 * 60;
       break;
     case '1D':
     default:
-      periods = 100; // 100 days
-      timeIncrement = 24 * 60 * 60; // 1 day in seconds
+      periods = 100;
+      timeIncrement = 24 * 60 * 60;
   }
   
   let currentPrice = basePrice;
-  let currentTime = Math.floor(baseDate.getTime() / 1000); // Start timestamp
+  let currentTime = Math.floor(Date.now() / 1000) - (periods * timeIncrement);
   
   for (let i = 0; i < periods; i++) {
     const change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
@@ -372,8 +356,41 @@ function generateSamplePriceData(timeframe = '1D') {
     const high = Math.max(open, close) + Math.random() * volatility * currentPrice;
     const low = Math.min(open, close) - Math.random() * volatility * currentPrice;
     
+    // Ensure high is highest and low is lowest
+    const finalHigh = Math.max(open, close, high);
+    const finalLow = Math.min(open, close, low);
+    
     data.push({
       time: currentTime,
+      open: parseFloat(open.toFixed(4)),
+      high: parseFloat(finalHigh.toFixed(4)),
+      low: parseFloat(finalLow.toFixed(4)),
+      close: parseFloat(close.toFixed(4))
+    });
+    
+    currentPrice = close;
+    currentTime += timeIncrement;
+  }
+  
+  console.log(`Generated ${periods} sample data points for ${timeframe}`);
+  return data;
+}
+
+/* ===== SIMPLE CHART DATA FALLBACK ===== */
+function generateSimpleChartData() {
+  const data = [];
+  const baseTime = Math.floor(Date.now() / 1000) - (24 * 60 * 60 * 30); // 30 days ago
+  let currentPrice = 148.75;
+  
+  for (let i = 0; i < 30; i++) {
+    const change = (Math.random() - 0.5) * 0.02 * currentPrice;
+    const open = currentPrice;
+    const close = open + change;
+    const high = Math.max(open, close) + Math.random() * 0.01 * currentPrice;
+    const low = Math.min(open, close) - Math.random() * 0.01 * currentPrice;
+    
+    data.push({
+      time: baseTime + (i * 24 * 60 * 60),
       open: parseFloat(open.toFixed(4)),
       high: parseFloat(high.toFixed(4)),
       low: parseFloat(low.toFixed(4)),
@@ -381,31 +398,66 @@ function generateSamplePriceData(timeframe = '1D') {
     });
     
     currentPrice = close;
-    currentTime += timeIncrement; // Increment time for next candle
   }
   
-  console.log(`Generated ${periods} sample data points for ${timeframe}`);
   return data;
 }
 
-// Improved cleanChartData function
+/* ===== RANDOM NEWS GENERATOR ===== */
+function getRandomNews() {
+  const newsItems = [
+    "Federal Reserve maintains current interest rates amid stable inflation data.",
+    "Bank of Japan intervenes to support currency as USD strengthens.",
+    "ECB officials signal cautious approach to monetary policy changes.",
+    "Market volatility remains low as trading volume increases.",
+    "Technical indicators show potential breakout patterns forming.",
+    "Institutional investors increasing positions in major currency pairs.",
+    "Economic data from major economies supports current market trends.",
+    "Forex markets show increased correlation with equity movements.",
+    "Central bank policies continue to drive major currency directions.",
+    "Market sentiment shifts as new economic data is released."
+  ];
+  
+  return newsItems[Math.floor(Math.random() * newsItems.length)];
+}
+
+/* ===== IMPROVED CLEAN CHART DATA ===== */
 function cleanChartData(data) {
+  if (!Array.isArray(data)) {
+    console.error('cleanChartData: Input is not an array');
+    return [];
+  }
+  
   const cleaned = data.filter(item => {
-    // Check if all required fields exist and are valid numbers
-    if (!item || item.time === undefined || item.time === null) return false;
+    if (!item || item.time === undefined || item.time === null) {
+      return false;
+    }
     
+    // Convert all values to numbers
     const open = parseFloat(item.open);
     const high = parseFloat(item.high);
     const low = parseFloat(item.low);
     const close = parseFloat(item.close);
+    const time = parseFloat(item.time);
     
-    if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) return false;
-    if (high < low) return false; // High should not be less than low
-    if (open <= 0 || high <= 0 || low <= 0 || close <= 0) return false;
+    // Validate numbers
+    if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close) || isNaN(time)) {
+      return false;
+    }
+    
+    // Validate price logic
+    if (high < low || high < open || high < close || low > open || low > close) {
+      return false;
+    }
+    
+    // Ensure positive values
+    if (open <= 0 || high <= 0 || low <= 0 || close <= 0 || time <= 0) {
+      return false;
+    }
     
     return true;
   }).map(item => ({
-    time: item.time,
+    time: parseFloat(item.time),
     open: parseFloat(item.open),
     high: parseFloat(item.high),
     low: parseFloat(item.low),
@@ -415,3 +467,12 @@ function cleanChartData(data) {
   console.log(`Cleaned ${data.length} -> ${cleaned.length} data points`);
   return cleaned;
 }
+
+// Initialize dashboard on load
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing dashboard...');
+  updatePairTicker(pairSelect.value);
+  setTimeout(() => {
+    analyze();
+  }, 1000);
+});
