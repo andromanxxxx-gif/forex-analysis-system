@@ -6,183 +6,463 @@
     <title>Forex Analysis Dashboard</title>
     <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        /* Tambahkan CSS styling sesuai kebutuhan */
-        .loading { display: none; }
-        .price-change { font-weight: bold; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header Styles */
+        .dashboard-header {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        select, button {
+            background: #334155;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:hover, button:hover {
+            background: #475569;
+            border-color: #64748b;
+        }
+
+        button {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border: none;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+            transform: translateY(-1px);
+        }
+
+        #pairTicker {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3b82f6;
+            margin-left: auto;
+        }
+
+        .status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* Price Display */
+        .price-display {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+
+        #livePrice {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+
+        .price-change {
+            font-size: 16px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
         .change-positive { color: #10b981; }
         .change-negative { color: #ef4444; }
-        .signal { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+
+        /* Charts */
+        .chart-container {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            position: relative;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(30, 41, 59, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Card Styles */
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .card h3 {
+            color: #3b82f6;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        /* Technical Indicators */
+        .technical-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .indicator {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .indicator label {
+            display: block;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+
+        .indicator span {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e2e8f0;
+        }
+
+        /* AI Analysis */
+        .ai-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .ai-item {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .signal {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
         .signal.buy { background: #10b981; color: white; }
         .signal.sell { background: #ef4444; color: white; }
         .signal.hold { background: #6b7280; color: white; }
-        .status-connected { color: #10b981; }
-        .status-disconnected { color: #ef4444; }
+
+        /* Trading Levels */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .level {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        /* Support Resistance */
+        .sr-levels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pivot-levels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .pivot, .resistance-levels, .support-levels {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        /* News Section */
+        .news-risk-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .news-risk-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        #fundamentalNews, #riskAssessment {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            min-height: 80px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
-    <!-- Header Controls -->
-    <div class="dashboard-header">
-        <select id="pairSelect">
-            <option value="EUR/USD">EUR/USD</option>
-            <option value="GBP/USD">GBP/USD</option>
-            <option value="USD/JPY">USD/JPY</option>
-            <option value="AUD/USD">AUD/USD</option>
-        </select>
-        
-        <select id="timeframeSelect">
-            <option value="1D">1 Day</option>
-            <option value="4H">4 Hours</option>
-            <option value="1H">1 Hour</option>
-            <option value="M30">30 Minutes</option>
-        </select>
-        
-        <button id="analyzeBtn">Analyze</button>
-        <button id="runBacktestBtn">Backtest</button>
-        
-        <div id="pairTicker">EUR/USD</div>
-        <div id="statusIndicator" class="status-connected">Connected</div>
-    </div>
+    <div class="container">
+        <!-- Header Controls -->
+        <div class="dashboard-header">
+            <div class="control-group">
+                <select id="pairSelect">
+                    <option value="EURUSD">EUR/USD</option>
+                    <option value="GBPUSD">GBP/USD</option>
+                    <option value="USDJPY">USD/JPY</option>
+                    <option value="AUDUSD">AUD/USD</option>
+                    <option value="USDCAD">USD/CAD</option>
+                    <option value="USDCHF">USD/CHF</option>
+                    <option value="NZDUSD">NZD/USD</option>
+                    <option value="EURJPY">EUR/JPY</option>
+                    <option value="GBPJPY">GBP/JPY</option>
+                </select>
+                
+                <select id="timeframeSelect">
+                    <option value="1D">1 Day</option>
+                    <option value="4H">4 Hours</option>
+                    <option value="1H">1 Hour</option>
+                    <option value="M30">30 Minutes</option>
+                </select>
+                
+                <button id="analyzeBtn">Analyze</button>
+                <button id="runBacktestBtn">Backtest</button>
+            </div>
+            
+            <div id="pairTicker">EUR/USD</div>
+            <div id="statusIndicator" class="status status-connected">Connected</div>
+        </div>
 
-    <!-- Price Display -->
-    <div class="price-display">
-        <span id="livePrice">-</span>
-        <span id="priceChange" class="price-change">-</span>
-    </div>
+        <!-- Price Display -->
+        <div class="price-display">
+            <span id="livePrice">-</span>
+            <span id="priceChange" class="price-change">-</span>
+        </div>
 
-    <!-- Charts -->
-    <div class="chart-container">
-        <div id="chartRoot" style="width: 100%; height: 520px;"></div>
-        <div id="macdRoot" style="width: 100%; height: 160px;"></div>
-        <div id="chartLoading" class="loading">Loading chart data...</div>
-    </div>
+        <!-- Charts -->
+        <div class="chart-container">
+            <div id="chartRoot" style="width: 100%; height: 520px;"></div>
+            <div id="macdRoot" style="width: 100%; height: 160px; margin-top: 10px;"></div>
+            <div id="chartLoading" class="loading" style="display: none;">Loading chart data...</div>
+        </div>
 
-    <!-- Technical Indicators -->
-    <div class="technical-section">
-        <div class="indicator">
-            <label>RSI:</label>
-            <span id="rsiValue">-</span>
-        </div>
-        <div class="indicator">
-            <label>MACD:</label>
-            <span id="macdValue">-</span>
-        </div>
-        <div class="indicator">
-            <label>MACD Hist:</label>
-            <span id="macdHistValue">-</span>
-        </div>
-        <div class="indicator">
-            <label>ADX:</label>
-            <span id="adxValue">-</span>
-        </div>
-        <div class="indicator">
-            <label>Trend:</label>
-            <span id="trendValue">-</span>
-        </div>
-        <div class="indicator">
-            <label>ATR:</label>
-            <span id="atrValue">-</span>
-        </div>
-        <div class="indicator">
-            <label>Volatility:</label>
-            <span id="volatilityValue">-</span>
-        </div>
-    </div>
+        <!-- Main Grid -->
+        <div class="dashboard-grid">
+            <!-- Technical Indicators -->
+            <div class="card">
+                <h3>Technical Indicators</h3>
+                <div class="technical-grid">
+                    <div class="indicator">
+                        <label>RSI</label>
+                        <span id="rsiValue">-</span>
+                    </div>
+                    <div class="indicator">
+                        <label>MACD</label>
+                        <span id="macdValue">-</span>
+                    </div>
+                    <div class="indicator">
+                        <label>MACD Hist</label>
+                        <span id="macdHistValue">-</span>
+                    </div>
+                    <div class="indicator">
+                        <label>ADX</label>
+                        <span id="adxValue">-</span>
+                    </div>
+                    <div class="indicator">
+                        <label>Trend</label>
+                        <span id="trendValue">-</span>
+                    </div>
+                    <div class="indicator">
+                        <label>ATR</label>
+                        <span id="atrValue">-</span>
+                    </div>
+                    <div class="indicator">
+                        <label>Volatility</label>
+                        <span id="volatilityValue">-</span>
+                    </div>
+                </div>
+            </div>
 
-    <!-- AI Analysis -->
-    <div class="ai-section">
-        <div class="ai-summary">
-            <h3>AI Analysis</h3>
-            <div id="aiSummary">Real-time market analysis in progress...</div>
+            <!-- AI Analysis -->
+            <div class="card">
+                <h3>AI Analysis</h3>
+                <div id="aiSummary" style="margin-bottom: 15px; line-height: 1.5;">
+                    Real-time market analysis in progress...
+                </div>
+                <div class="ai-details">
+                    <div class="ai-item">
+                        <label>Signal</label>
+                        <div id="aiSignal" class="signal hold">HOLD</div>
+                    </div>
+                    <div class="ai-item">
+                        <label>Confidence</label>
+                        <div id="aiConfidence">50%</div>
+                    </div>
+                    <div class="ai-item">
+                        <label>Risk Level</label>
+                        <div id="aiRisk">MEDIUM</div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="ai-details">
-            <div class="ai-signal">
-                <label>Signal:</label>
-                <span id="aiSignal" class="signal hold">HOLD</span>
-            </div>
-            <div class="ai-confidence">
-                <label>Confidence:</label>
-                <span id="aiConfidence">50%</span>
-            </div>
-            <div class="ai-risk">
-                <label>Risk Level:</label>
-                <span id="aiRisk">MEDIUM</span>
-            </div>
-        </div>
-    </div>
 
-    <!-- Trading Levels -->
-    <div class="trading-levels">
-        <h3>Trading Levels</h3>
-        <div class="level-grid">
-            <div class="level">
-                <label>Entry:</label>
-                <span id="aiEntry">-</span>
-            </div>
-            <div class="level">
-                <label>Stop Loss:</label>
-                <span id="aiSL">-</span>
-            </div>
-            <div class="level">
-                <label>Take Profit 1:</label>
-                <span id="aiTP1">-</span>
-            </div>
-            <div class="level">
-                <label>Take Profit 2:</label>
-                <span id="aiTP2">-</span>
+        <!-- Trading Levels -->
+        <div class="card">
+            <h3>Trading Levels</h3>
+            <div class="level-grid">
+                <div class="level">
+                    <label>Entry Price</label>
+                    <div id="aiEntry">-</div>
+                </div>
+                <div class="level">
+                    <label>Stop Loss</label>
+                    <div id="aiSL">-</div>
+                </div>
+                <div class="level">
+                    <label>Take Profit 1</label>
+                    <div id="aiTP1">-</div>
+                </div>
+                <div class="level">
+                    <label>Take Profit 2</label>
+                    <div id="aiTP2">-</div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Support & Resistance -->
-    <div class="support-resistance">
-        <h3>Support & Resistance</h3>
-        <div class="sr-levels">
-            <div class="level">
-                <label>Support:</label>
-                <span id="supportLevel">-</span>
-                <span id="supportDistance">-</span>
+        <!-- Support & Resistance -->
+        <div class="card">
+            <h3>Support & Resistance</h3>
+            <div class="sr-levels">
+                <div class="level">
+                    <label>Support Level</label>
+                    <div id="supportLevel">-</div>
+                    <div id="supportDistance" style="font-size: 12px; color: #94a3b8;">-</div>
+                </div>
+                <div class="level">
+                    <label>Resistance Level</label>
+                    <div id="resistanceLevel">-</div>
+                    <div id="resistanceDistance" style="font-size: 12px; color: #94a3b8;">-</div>
+                </div>
             </div>
-            <div class="level">
-                <label>Resistance:</label>
-                <span id="resistanceLevel">-</span>
-                <span id="resistanceDistance">-</span>
+            
+            <h4 style="margin: 20px 0 10px 0; color: #94a3b8;">Pivot Points</h4>
+            <div class="pivot-levels">
+                <div class="pivot">
+                    <label>Pivot</label>
+                    <div id="pivotPoint">-</div>
+                </div>
+                <div class="resistance-levels">
+                    <label>R1</label>
+                    <div id="pivotR1">-</div>
+                    <label>R2</label>
+                    <div id="pivotR2">-</div>
+                    <label>R3</label>
+                    <div id="pivotR3">-</div>
+                </div>
+                <div class="support-levels">
+                    <label>S1</label>
+                    <div id="pivotS1">-</div>
+                    <label>S2</label>
+                    <div id="pivotS2">-</div>
+                    <label>S3</label>
+                    <div id="pivotS3">-</div>
+                </div>
             </div>
         </div>
-        
-        <h4>Pivot Points</h4>
-        <div class="pivot-levels">
-            <div class="pivot">
-                <label>Pivot:</label>
-                <span id="pivotPoint">-</span>
-            </div>
-            <div class="resistance-levels">
-                <label>R1:</label><span id="pivotR1">-</span>
-                <label>R2:</label><span id="pivotR2">-</span>
-                <label>R3:</label><span id="pivotR3">-</span>
-            </div>
-            <div class="support-levels">
-                <label>S1:</label><span id="pivotS1">-</span>
-                <label>S2:</label><span id="pivotS2">-</span>
-                <label>S3:</label><span id="pivotS3">-</span>
-            </div>
-        </div>
-    </div>
 
-    <!-- News & Risk -->
-    <div class="news-risk-section">
-        <div class="news">
-            <h3>Fundamental News</h3>
-            <div id="fundamentalNews">Loading market news...</div>
+        <!-- News & Risk -->
+        <div class="news-risk-section">
+            <div class="card">
+                <h3>Fundamental News</h3>
+                <div id="fundamentalNews">Loading market news...</div>
+            </div>
+            <div class="card">
+                <h3>Risk Assessment</h3>
+                <div id="riskAssessment">-</div>
+            </div>
         </div>
-        <div class="risk">
-            <h3>Risk Assessment</h3>
-            <div id="riskAssessment">-</div>
-        </div>
-    </div>
-
-    <!-- Backtest Modal -->
-    <div id="backtestModal" style="display: none;">
-        <!-- Backtest modal content -->
     </div>
 
     <script>
@@ -241,28 +521,43 @@
                 width: chartContainer.clientWidth,
                 height: 520,
                 layout: {
-                    backgroundColor: '#ffffff',
-                    textColor: '#333',
+                    backgroundColor: '#1e293b',
+                    textColor: '#94a3b8',
                 },
                 grid: {
-                    vertLines: { color: '#f0f0f0' },
-                    horzLines: { color: '#f0f0f0' },
+                    vertLines: { color: '#334155' },
+                    horzLines: { color: '#334155' },
                 },
                 crosshair: {
                     mode: LightweightCharts.CrosshairMode.Normal,
                 },
                 rightPriceScale: {
-                    borderColor: '#ccc',
+                    borderColor: '#334155',
+                    scaleMargins: {
+                        top: 0.1,
+                        bottom: 0.1,
+                    },
                 },
                 timeScale: {
-                    borderColor: '#ccc',
+                    borderColor: '#334155',
                     timeVisible: true,
                     secondsVisible: false,
                 },
             });
 
-            candle = chart.addCandlestickSeries();
-            ema26 = chart.addLineSeries({ color: 'blue', lineWidth: 1 });
+            candle = chart.addCandlestickSeries({
+                upColor: '#10b981',
+                downColor: '#ef4444',
+                borderVisible: false,
+                wickUpColor: '#10b981',
+                wickDownColor: '#ef4444',
+            });
+
+            ema26 = chart.addLineSeries({ 
+                color: '#3b82f6', 
+                lineWidth: 2,
+                lineStyle: 0,
+            });
 
             // Initialize MACD chart
             const macdContainer = document.getElementById('macdRoot');
@@ -270,25 +565,31 @@
                 width: macdContainer.clientWidth,
                 height: 160,
                 layout: {
-                    backgroundColor: '#ffffff',
-                    textColor: '#333',
+                    backgroundColor: '#1e293b',
+                    textColor: '#94a3b8',
                 },
                 grid: {
-                    vertLines: { color: '#f0f0f0' },
-                    horzLines: { color: '#f0f0f0' },
+                    vertLines: { color: '#334155' },
+                    horzLines: { color: '#334155' },
                 },
                 rightPriceScale: {
-                    borderColor: '#ccc',
+                    borderColor: '#334155',
                 },
                 timeScale: {
-                    borderColor: '#ccc',
+                    borderColor: '#334155',
                 },
             });
 
-            macdLine = macdChart.addLineSeries({ color: 'blue', lineWidth: 1 });
-            macdSignal = macdChart.addLineSeries({ color: 'red', lineWidth: 1 });
+            macdLine = macdChart.addLineSeries({ 
+                color: '#3b82f6', 
+                lineWidth: 2 
+            });
+            macdSignal = macdChart.addLineSeries({ 
+                color: '#ef4444', 
+                lineWidth: 1 
+            });
             macdHist = macdChart.addHistogramSeries({ 
-                color: 'green',
+                color: '#10b981',
                 priceFormat: {
                     type: 'volume',
                 },
@@ -304,15 +605,14 @@
                 return;
             }
             
-            // Ambil pair dan hapus slash, lalu ubah ke uppercase
-            let pair = pairSelect.value;
-            pair = pair.replace('/', '').toUpperCase();
+            // PERBAIKAN: Format pair sesuai dengan backend (tanpa slash)
+            const pair = pairSelect.value; // Sudah dalam format EURUSD, USDJPY, dll
             const tf = timeframeSelect.value;
             
             // Show loading indicator
             if (chartLoading) chartLoading.style.display = 'block';
             
-            // Update pair ticker (tampilkan dengan slash)
+            // Update pair ticker
             updatePairTicker(pairSelect.value);
             
             try {
@@ -321,6 +621,7 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
+                // PERBAIKAN: Gunakan pair yang sudah dalam format benar
                 const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`, {
                     signal: controller.signal
                 });
@@ -524,7 +825,7 @@
             const timeScaleOptions = {
                 timeVisible: true,
                 secondsVisible: false,
-                borderColor: '#2D3748',
+                borderColor: '#334155',
                 barSpacing: getBarSpacing(timeframe)
             };
             
@@ -624,7 +925,6 @@
             const priceDisplay = currentPrice ? currentPrice.toFixed(4) : '-';
             
             if (livePriceEl) livePriceEl.textContent = priceDisplay;
-            if (currentPriceEl) currentPriceEl.textContent = priceDisplay;
             
             // Update price change
             const priceChange = technical.momentum?.price_change_pct || 0;
@@ -679,17 +979,22 @@
             
             if (isSuccess) {
                 statusElement.textContent = 'Connected';
-                statusElement.className = 'status-connected';
+                statusElement.className = 'status status-connected';
             } else {
                 statusElement.textContent = 'Disconnected';
-                statusElement.className = 'status-disconnected';
+                statusElement.className = 'status status-disconnected';
             }
         }
 
         function updatePairTicker(pair) {
             const tickerElement = document.getElementById('pairTicker');
             if (tickerElement) {
-                tickerElement.textContent = pair || 'EUR/USD';
+                // Format tampilan dengan slash
+                let displayPair = pair;
+                if (pair.length === 6) {
+                    displayPair = pair.substring(0, 3) + '/' + pair.substring(3);
+                }
+                tickerElement.textContent = displayPair;
             }
         }
 
@@ -739,7 +1044,7 @@
             }
         }
 
-        // ===== SAMPLE DATA GENERATORS (Keep your existing functions) =====
+        // ===== SAMPLE DATA GENERATORS =====
         function generateSamplePriceData(timeframe = '1D') {
             const data = [];
             const basePrice = 148.75;
@@ -1026,17 +1331,13 @@
         }
 
         function showBacktestModal() {
-            const modal = document.getElementById('backtestModal');
-            if (modal) {
-                modal.style.display = 'block';
-                console.log('Backtest modal opened');
-            }
+            console.log('Backtest modal would open here');
+            alert('Backtest feature would be implemented here');
         }
 
         function runBacktest() {
             console.log('Running backtest...');
-            // Implement backtest logic here
-            alert('Backtest feature would be implemented here');
+            alert('Backtest execution would start here');
         }
 
         // ===== INITIALIZATION =====
@@ -1063,11 +1364,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             const analyzeBtn = document.getElementById('analyzeBtn');
             const runBacktestBtn = document.getElementById('runBacktestBtn');
-            const startBacktestBtn = document.getElementById('startBacktestBtn');
             
             if (analyzeBtn) analyzeBtn.addEventListener('click', analyze);
             if (runBacktestBtn) runBacktestBtn.addEventListener('click', showBacktestModal);
-            if (startBacktestBtn) startBacktestBtn.addEventListener('click', runBacktest);
             
             if (pairSelect) {
                 pairSelect.addEventListener('change', function() {
