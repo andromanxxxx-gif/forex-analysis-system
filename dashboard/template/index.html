@@ -1,632 +1,1096 @@
-/* ===== Fetch + Render ===== */
-async function analyze(){
-  const pair = pairSelect.value, tf = timeframeSelect.value;
-  
-  // Show loading indicator
-  chartLoading.style.display = 'block';
-  
-  // Update pair ticker text
-  updatePairTicker(pair);
-  
-  try {
-    console.log(`Fetching analysis for ${pair}-${tf}...`);
-    const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
-    
-    if (!r.ok) {
-      throw new Error(`HTTP error! status: ${r.status}`);
-    }
-    
-    const j = await r.json();
-    console.log('Analysis response:', j);
-    
-    // Update price series chart - GUNAKAN DATA DARI BACKEND
-    let chartData = [];
-    
-    if (j.price_series && j.price_series.length > 0) {
-      console.log(`Processing ${j.price_series.length} price series data points`);
-      
-      // Convert backend data to chart format dengan handling date yang benar
-      chartData = j.price_series.map(p => {
-        let timestamp;
-        try {
-          // Handle berbagai format date dari backend
-          if (typeof p.date === 'string') {
-            // Coba parsing sebagai date string
-            const dateObj = new Date(p.date);
-            if (!isNaN(dateObj.getTime())) {
-              timestamp = dateObj.getTime() / 1000; // Convert to seconds
-            } else {
-              // Jika parsing gagal, gunakan timestamp incremental
-              timestamp = Math.floor(Date.now() / 1000);
-            }
-          } else {
-            // Jika bukan string, gunakan nilai langsung atau fallback
-            timestamp = p.date || Math.floor(Date.now() / 1000);
-          }
-        } catch (e) {
-          console.error('Date parsing error:', e);
-          timestamp = Math.floor(Date.now() / 1000);
-        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Analysis Dashboard</title>
+    <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        /* Tambahkan CSS styling sesuai kebutuhan */
+        .loading { display: none; }
+        .price-change { font-weight: bold; }
+        .change-positive { color: #10b981; }
+        .change-negative { color: #ef4444; }
+        .signal { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .signal.buy { background: #10b981; color: white; }
+        .signal.sell { background: #ef4444; color: white; }
+        .signal.hold { background: #6b7280; color: white; }
+        .status-connected { color: #10b981; }
+        .status-disconnected { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <!-- Header Controls -->
+    <div class="dashboard-header">
+        <select id="pairSelect">
+            <option value="EUR/USD">EUR/USD</option>
+            <option value="GBP/USD">GBP/USD</option>
+            <option value="USD/JPY">USD/JPY</option>
+            <option value="AUD/USD">AUD/USD</option>
+        </select>
         
-        return {
-          time: timestamp,
-          open: parseFloat(p.open) || 0,
-          high: parseFloat(p.high) || 0,
-          low: parseFloat(p.low) || 0,
-          close: parseFloat(p.close) || 0
-        };
-      });
-      
-      console.log('Processed chart data - first 3:', chartData.slice(0, 3));
-    } else {
-      console.warn('No price_series data, using sample data');
-      chartData = generateSamplePriceData(tf);
-    }
-    
-    // Clean and set chart data
-    const cleanData = cleanChartData(chartData);
-    console.log(`Clean data points: ${cleanData.length}`);
-    
-    if (cleanData.length === 0) {
-      console.error('No valid chart data after cleaning, using sample data');
-      chartData = generateSamplePriceData(tf);
-      currentChartData = cleanChartData(chartData);
-    } else {
-      currentChartData = cleanData;
-    }
-    
-    isRealtimeMode = false; // Nonaktifkan realtime mode untuk sementara
-    
-    if (currentChartData.length > 0) {
-      console.log('Setting chart data with', currentChartData.length, 'points');
-      await renderChart(currentChartData, tf);
-    } else {
-      console.error('No chart data available after processing');
-      // Fallback ke sample data
-      const fallbackData = generateSamplePriceData(tf);
-      await renderChart(fallbackData, tf);
-    }
-    
-    // Update semua komponen UI dengan data dari backend
-    updateUIComponents(j, currentChartData);
-    
-    updateStatusIndicator(true);
-    
-  } catch (error) {
-    console.error('Analysis error:', error);
-    updateStatusIndicator(false);
-    
-    // Show error to user
-    aiSummaryEl.textContent = `Error: ${error.message}. Retrying...`;
-    aiSummaryEl.style.color = '#ef4444';
-    
-    // Fallback ke sample data dengan auto-retry
-    const fallbackData = generateSamplePriceData(tf);
-    await renderChart(fallbackData, tf);
-    
-    // Auto-retry after 5 seconds
-    setTimeout(() => {
-      analyze();
-    }, 5000);
-  } finally {
-    // Hide loading indicator
-    chartLoading.style.display = 'none';
-  }
-}
+        <select id="timeframeSelect">
+            <option value="1D">1 Day</option>
+            <option value="4H">4 Hours</option>
+            <option value="1H">1 Hour</option>
+            <option value="M30">30 Minutes</option>
+        </select>
+        
+        <button id="analyzeBtn">Analyze</button>
+        <button id="runBacktestBtn">Backtest</button>
+        
+        <div id="pairTicker">EUR/USD</div>
+        <div id="statusIndicator" class="status-connected">Connected</div>
+    </div>
 
-/* ===== CHART RENDERING FUNCTION ===== */
-async function renderChart(chartData, timeframe) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      try {
-        // Clear existing data first
-        candle.setData([]);
-        ema26.setData([]);
-        macdLine.setData([]);
-        macdSignal.setData([]);
-        macdHist.setData([]);
+    <!-- Price Display -->
+    <div class="price-display">
+        <span id="livePrice">-</span>
+        <span id="priceChange" class="price-change">-</span>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-container">
+        <div id="chartRoot" style="width: 100%; height: 520px;"></div>
+        <div id="macdRoot" style="width: 100%; height: 160px;"></div>
+        <div id="chartLoading" class="loading">Loading chart data...</div>
+    </div>
+
+    <!-- Technical Indicators -->
+    <div class="technical-section">
+        <div class="indicator">
+            <label>RSI:</label>
+            <span id="rsiValue">-</span>
+        </div>
+        <div class="indicator">
+            <label>MACD:</label>
+            <span id="macdValue">-</span>
+        </div>
+        <div class="indicator">
+            <label>MACD Hist:</label>
+            <span id="macdHistValue">-</span>
+        </div>
+        <div class="indicator">
+            <label>ADX:</label>
+            <span id="adxValue">-</span>
+        </div>
+        <div class="indicator">
+            <label>Trend:</label>
+            <span id="trendValue">-</span>
+        </div>
+        <div class="indicator">
+            <label>ATR:</label>
+            <span id="atrValue">-</span>
+        </div>
+        <div class="indicator">
+            <label>Volatility:</label>
+            <span id="volatilityValue">-</span>
+        </div>
+    </div>
+
+    <!-- AI Analysis -->
+    <div class="ai-section">
+        <div class="ai-summary">
+            <h3>AI Analysis</h3>
+            <div id="aiSummary">Real-time market analysis in progress...</div>
+        </div>
+        <div class="ai-details">
+            <div class="ai-signal">
+                <label>Signal:</label>
+                <span id="aiSignal" class="signal hold">HOLD</span>
+            </div>
+            <div class="ai-confidence">
+                <label>Confidence:</label>
+                <span id="aiConfidence">50%</span>
+            </div>
+            <div class="ai-risk">
+                <label>Risk Level:</label>
+                <span id="aiRisk">MEDIUM</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trading Levels -->
+    <div class="trading-levels">
+        <h3>Trading Levels</h3>
+        <div class="level-grid">
+            <div class="level">
+                <label>Entry:</label>
+                <span id="aiEntry">-</span>
+            </div>
+            <div class="level">
+                <label>Stop Loss:</label>
+                <span id="aiSL">-</span>
+            </div>
+            <div class="level">
+                <label>Take Profit 1:</label>
+                <span id="aiTP1">-</span>
+            </div>
+            <div class="level">
+                <label>Take Profit 2:</label>
+                <span id="aiTP2">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Support & Resistance -->
+    <div class="support-resistance">
+        <h3>Support & Resistance</h3>
+        <div class="sr-levels">
+            <div class="level">
+                <label>Support:</label>
+                <span id="supportLevel">-</span>
+                <span id="supportDistance">-</span>
+            </div>
+            <div class="level">
+                <label>Resistance:</label>
+                <span id="resistanceLevel">-</span>
+                <span id="resistanceDistance">-</span>
+            </div>
+        </div>
         
-        console.log('Rendering chart with', chartData.length, 'data points');
-        
-        // Set candle data
-        candle.setData(chartData);
-        
-        const closes = chartData.map(d => d.close);
-        
-        // Calculate and update EMA
-        const ema = calcEMA(closes, 26);
-        const emaData = chartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(ema[i]) ? (i > 0 ? ema[i-1] : d.close) : ema[i]
-        })).filter(d => !isNaN(d.value) && d.value > 0);
-        
-        if (emaData.length > 0) {
-          ema26.setData(emaData);
-        }
-        
-        // Calculate and update MACD
-        const {macd, sig, hist} = calcMACDSeries(closes);
-        
-        const macdSeriesData = chartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(macd[i]) ? 0 : macd[i]
-        })).filter(d => !isNaN(d.value));
-        
-        const signalSeriesData = chartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(sig[i]) ? 0 : sig[i]
-        })).filter(d => !isNaN(d.value));
-        
-        const histSeriesData = chartData.map((d, i) => ({
-          time: d.time, 
-          value: isNaN(hist[i]) ? 0 : hist[i]
-        })).filter(d => !isNaN(d.value));
-        
-        if (macdSeriesData.length > 0) {
-          macdLine.setData(macdSeriesData);
-          macdSignal.setData(signalSeriesData);
-          macdHist.setData(histSeriesData);
-        }
-        
-        // Update chart time scale settings
-        const timeScaleOptions = {
-          timeVisible: true,
-          secondsVisible: false,
-          borderColor: '#eee'
-        };
-        
-        // Set bar spacing berdasarkan timeframe
-        if (timeframe === '1D') {
-          timeScaleOptions.barSpacing = 8;
-        } else if (timeframe === '4H') {
-          timeScaleOptions.barSpacing = 6;
-        } else if (timeframe === '1H') {
-          timeScaleOptions.barSpacing = 4;
-        } else { // M30
-          timeScaleOptions.barSpacing = 3;
-        }
-        
-        chart.timeScale().applyOptions(timeScaleOptions);
-        macdChart.timeScale().applyOptions(timeScaleOptions);
-        
-        // Fit content untuk menampilkan semua data
-        setTimeout(() => {
-          try {
-            chart.timeScale().fitContent();
-            macdChart.timeScale().fitContent();
-          } catch (e) {
-            console.log('Fit content error:', e);
-          }
-        }, 200);
-        
-        // Resize charts
-        setTimeout(() => {
-          try {
-            const chartWidth = document.getElementById('chartRoot').clientWidth;
-            const macdWidth = document.getElementById('macdRoot').clientWidth;
+        <h4>Pivot Points</h4>
+        <div class="pivot-levels">
+            <div class="pivot">
+                <label>Pivot:</label>
+                <span id="pivotPoint">-</span>
+            </div>
+            <div class="resistance-levels">
+                <label>R1:</label><span id="pivotR1">-</span>
+                <label>R2:</label><span id="pivotR2">-</span>
+                <label>R3:</label><span id="pivotR3">-</span>
+            </div>
+            <div class="support-levels">
+                <label>S1:</label><span id="pivotS1">-</span>
+                <label>S2:</label><span id="pivotS2">-</span>
+                <label>S3:</label><span id="pivotS3">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- News & Risk -->
+    <div class="news-risk-section">
+        <div class="news">
+            <h3>Fundamental News</h3>
+            <div id="fundamentalNews">Loading market news...</div>
+        </div>
+        <div class="risk">
+            <h3>Risk Assessment</h3>
+            <div id="riskAssessment">-</div>
+        </div>
+    </div>
+
+    <!-- Backtest Modal -->
+    <div id="backtestModal" style="display: none;">
+        <!-- Backtest modal content -->
+    </div>
+
+    <script>
+        // ===== GLOBAL VARIABLES DECLARATION =====
+        let pairSelect, timeframeSelect, chart, macdChart;
+        let candle, ema26, macdLine, macdSignal, macdHist;
+        let currentChartData = [];
+        let isRealtimeMode = false;
+
+        // UI Elements
+        let chartLoading, livePriceEl, currentPriceEl, changeEl;
+        let rsiEl, macdValEl, macdHistVal, adxEl, trendEl, atrEl, volEl;
+        let aiSummaryEl, aiConfidence, aiRisk, fundNews;
+        let aiEntry, aiSL, aiTP1, aiTP2;
+
+        // ===== INITIALIZATION FUNCTIONS =====
+        function initializeDashboard() {
+            // Initialize DOM elements
+            pairSelect = document.getElementById('pairSelect');
+            timeframeSelect = document.getElementById('timeframeSelect');
+            chartLoading = document.getElementById('chartLoading');
             
-            if (chartWidth > 0 && macdWidth > 0) {
-              chart.resize(chartWidth, 520);
-              macdChart.resize(macdWidth, 160);
-              console.log('Charts resized successfully');
+            // Price elements
+            livePriceEl = document.getElementById('livePrice');
+            currentPriceEl = document.getElementById('currentPrice');
+            changeEl = document.getElementById('priceChange');
+            
+            // Technical indicators
+            rsiEl = document.getElementById('rsiValue');
+            macdValEl = document.getElementById('macdValue');
+            macdHistVal = document.getElementById('macdHistValue');
+            adxEl = document.getElementById('adxValue');
+            trendEl = document.getElementById('trendValue');
+            atrEl = document.getElementById('atrValue');
+            volEl = document.getElementById('volatilityValue');
+            
+            // AI Analysis
+            aiSummaryEl = document.getElementById('aiSummary');
+            aiConfidence = document.getElementById('aiConfidence');
+            aiRisk = document.getElementById('aiRisk');
+            fundNews = document.getElementById('fundamentalNews');
+            
+            // Trading levels
+            aiEntry = document.getElementById('aiEntry');
+            aiSL = document.getElementById('aiSL');
+            aiTP1 = document.getElementById('aiTP1');
+            aiTP2 = document.getElementById('aiTP2');
+            
+            console.log('Dashboard initialized successfully');
+        }
+
+        function initializeCharts() {
+            // Initialize main chart
+            const chartContainer = document.getElementById('chartRoot');
+            chart = LightweightCharts.createChart(chartContainer, {
+                width: chartContainer.clientWidth,
+                height: 520,
+                layout: {
+                    backgroundColor: '#ffffff',
+                    textColor: '#333',
+                },
+                grid: {
+                    vertLines: { color: '#f0f0f0' },
+                    horzLines: { color: '#f0f0f0' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: '#ccc',
+                },
+                timeScale: {
+                    borderColor: '#ccc',
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+
+            candle = chart.addCandlestickSeries();
+            ema26 = chart.addLineSeries({ color: 'blue', lineWidth: 1 });
+
+            // Initialize MACD chart
+            const macdContainer = document.getElementById('macdRoot');
+            macdChart = LightweightCharts.createChart(macdContainer, {
+                width: macdContainer.clientWidth,
+                height: 160,
+                layout: {
+                    backgroundColor: '#ffffff',
+                    textColor: '#333',
+                },
+                grid: {
+                    vertLines: { color: '#f0f0f0' },
+                    horzLines: { color: '#f0f0f0' },
+                },
+                rightPriceScale: {
+                    borderColor: '#ccc',
+                },
+                timeScale: {
+                    borderColor: '#ccc',
+                },
+            });
+
+            macdLine = macdChart.addLineSeries({ color: 'blue', lineWidth: 1 });
+            macdSignal = macdChart.addLineSeries({ color: 'red', lineWidth: 1 });
+            macdHist = macdChart.addHistogramSeries({ 
+                color: 'green',
+                priceFormat: {
+                    type: 'volume',
+                },
+            });
+
+            console.log('Charts initialized successfully');
+        }
+
+        // ===== CORE ANALYSIS FUNCTION =====
+        async function analyze() {
+            if (!pairSelect || !timeframeSelect) {
+                console.error('Dashboard not properly initialized');
+                return;
             }
-          } catch (e) {
-            console.log('Chart resize error:', e);
-          }
-        }, 300);
-        
-        resolve();
-      } catch (chartError) {
-        console.error('Chart rendering error:', chartError);
-        // Fallback ke sample data sederhana
-        const simpleData = generateSimpleChartData();
-        candle.setData(simpleData);
-        resolve();
-      }
-    }, 100);
-  });
-}
+            
+            const pair = pairSelect.value;
+            const tf = timeframeSelect.value;
+            
+            // Show loading indicator
+            if (chartLoading) chartLoading.style.display = 'block';
+            
+            // Update pair ticker
+            updatePairTicker(pair);
+            
+            try {
+                console.log(`Fetching analysis for ${pair}-${tf}...`);
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Analysis response received:', data);
+                
+                // Process and render chart data
+                await processAndRenderChart(data, tf);
+                
+                // Update all UI components
+                updateUIComponents(data, currentChartData);
+                
+                updateStatusIndicator(true);
+                
+            } catch (error) {
+                console.error('Analysis error:', error);
+                await handleAnalysisError(error, tf);
+            } finally {
+                // Hide loading indicator
+                if (chartLoading) chartLoading.style.display = 'none';
+            }
+        }
 
-/* ===== UI COMPONENTS UPDATE ===== */
-function updateUIComponents(responseData, chartData) {
-  const t = responseData.technical_analysis || {};
-  const ai = responseData.ai_analysis || {};
-  
-  console.log('Updating UI with technical analysis:', t);
-  console.log('Updating UI with AI analysis:', ai);
-  
-  // Update technical values
-  if (t.momentum) {
-    rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
-    macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
-    macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
-  } else {
-    rsiEl.textContent = '-';
-    macdValEl.textContent = '-';
-    macdHistVal.textContent = '-';
-  }
-  
-  if (t.trend) {
-    adxEl.textContent = (t.trend.adx || 0).toFixed(2);
-    trendEl.textContent = t.trend.trend_direction || '-';
-  } else {
-    adxEl.textContent = '-';
-    trendEl.textContent = '-';
-  }
-  
-  if (t.volatility) {
-    atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
-    volEl.textContent = t.volatility.volatility_pct ? 
-      (t.volatility.volatility_pct).toFixed(2) + '%' : '-';
-  } else {
-    atrEl.textContent = '-';
-    volEl.textContent = '-';
-  }
-  
-  // Update price data
-  const currentPrice = t.levels?.current_price || 
-                      (chartData.length > 0 ? chartData[chartData.length - 1].close : 150.0);
-  
-  const priceDisplay = currentPrice ? currentPrice.toFixed(4) : '-';
-  livePriceEl.textContent = priceDisplay;
-  currentPriceEl.textContent = priceDisplay;
-  
-  // Update price change
-  const priceChange = t.momentum?.price_change_pct || 0;
-  changeEl.textContent = '(' + (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%)';
-  changeEl.className = priceChange >= 0 ? 'price-change change-positive' : 'price-change change-negative';
-  
-  // Update AI analysis
-  aiSummaryEl.textContent = ai.analysis_summary || 'Real-time market analysis in progress...';
-  setSignal(ai.signal || 'HOLD');
-  aiConfidence.textContent = ai.confidence ? ai.confidence + '%' : '50%';
-  aiRisk.textContent = ai.risk_level || 'MEDIUM';
-  
-  // Calculate trading levels
-  updateTradingLevels(currentPrice, ai.signal, t.timeframe_params);
-  
-  // Update fundamental news
-  fundNews.textContent = responseData.fundamental_analysis || getRandomNews();
-  
-  // Update risk assessment
-  const risk = responseData.risk_assessment || generateSampleRiskAssessment();
-  updateRiskAssessment(risk);
-  
-  // Update Support & Resistance
-  const srData = {
-    levels: t.levels || {},
-    current_price: currentPrice
-  };
-  updateSupportResistance(srData);
-}
+        // ===== CHART DATA PROCESSING =====
+        async function processAndRenderChart(responseData, timeframe) {
+            let chartData = [];
+            
+            if (responseData.price_series?.length > 0) {
+                console.log(`Processing ${responseData.price_series.length} price series data points`);
+                chartData = processPriceSeriesData(responseData.price_series);
+            } else {
+                console.warn('No price_series data, using sample data');
+                chartData = generateSamplePriceData(timeframe);
+            }
+            
+            // Clean and validate chart data
+            const cleanData = cleanChartData(chartData);
+            console.log(`Data cleaning: ${chartData.length} -> ${cleanData.length} valid points`);
+            
+            if (cleanData.length === 0) {
+                console.error('No valid chart data after cleaning');
+                chartData = generateSamplePriceData(timeframe);
+                currentChartData = cleanChartData(chartData);
+            } else {
+                currentChartData = cleanData;
+            }
+            
+            isRealtimeMode = false;
+            
+            // Render chart with the processed data
+            if (currentChartData.length > 0) {
+                await renderChart(currentChartData, timeframe);
+            } else {
+                console.error('No chart data available for rendering');
+                const fallbackData = generateSamplePriceData(timeframe);
+                await renderChart(fallbackData, timeframe);
+            }
+        }
 
-/* ===== TRADING LEVELS CALCULATION ===== */
-function updateTradingLevels(currentPrice, signal, timeframeParams) {
-  if (currentPrice && signal !== 'HOLD') {
-    const stopLossPct = timeframeParams?.STOP_LOSS_PCT || 0.01;
-    const takeProfitPct = timeframeParams?.TAKE_PROFIT_PCT || 0.02;
-    
-    if (signal === 'BUY') {
-      aiEntry.textContent = (currentPrice * 1.0005).toFixed(4);
-      aiSL.textContent = (currentPrice * (1 - stopLossPct)).toFixed(4);
-      aiTP1.textContent = (currentPrice * (1 + takeProfitPct * 0.7)).toFixed(4);
-      aiTP2.textContent = (currentPrice * (1 + takeProfitPct)).toFixed(4);
-    } else if (signal === 'SELL') {
-      aiEntry.textContent = (currentPrice * 0.9995).toFixed(4);
-      aiSL.textContent = (currentPrice * (1 + stopLossPct)).toFixed(4);
-      aiTP1.textContent = (currentPrice * (1 - takeProfitPct * 0.7)).toFixed(4);
-      aiTP2.textContent = (currentPrice * (1 - takeProfitPct)).toFixed(4);
-    }
-  } else {
-    aiEntry.textContent = '-';
-    aiSL.textContent = '-';
-    aiTP1.textContent = '-';
-    aiTP2.textContent = '-';
-  }
-}
+        function processPriceSeriesData(priceSeries) {
+            return priceSeries.map((point, index) => {
+                try {
+                    // Handle timestamp conversion
+                    let timestamp;
+                    if (typeof point.date === 'string') {
+                        const dateObj = new Date(point.date);
+                        timestamp = !isNaN(dateObj.getTime()) ? 
+                            dateObj.getTime() / 1000 : 
+                            Math.floor(Date.now() / 1000) - (priceSeries.length - index) * 3600;
+                    } else {
+                        timestamp = point.date || Math.floor(Date.now() / 1000) - (priceSeries.length - index) * 3600;
+                    }
+                    
+                    // Parse and validate price values
+                    const open = parseFloat(point.open) || 0;
+                    const high = parseFloat(point.high) || 0;
+                    const low = parseFloat(point.low) || 0;
+                    const close = parseFloat(point.close) || 0;
+                    
+                    // Validate price logic
+                    const validatedHigh = Math.max(open, close, high);
+                    const validatedLow = Math.min(open, close, low);
+                    
+                    return {
+                        time: timestamp,
+                        open: open,
+                        high: validatedHigh,
+                        low: validatedLow,
+                        close: close
+                    };
+                    
+                } catch (error) {
+                    console.error('Error processing price point:', error, point);
+                    // Return fallback data point
+                    const fallbackTime = Math.floor(Date.now() / 1000) - (priceSeries.length - index) * 3600;
+                    return {
+                        time: fallbackTime,
+                        open: 150.0,
+                        high: 151.0,
+                        low: 149.0,
+                        close: 150.5
+                    };
+                }
+            });
+        }
 
-/* ===== IMPROVED SAMPLE DATA GENERATION ===== */
-function generateSamplePriceData(timeframe = '1D') {
-  const data = [];
-  const basePrice = 148.75;
-  const volatility = timeframe === '1D' ? 0.002 : 
-                    timeframe === '4H' ? 0.0015 : 
-                    timeframe === '1H' ? 0.001 : 0.0008;
-  
-  let periods;
-  let timeIncrement;
-  
-  // Set parameters berdasarkan timeframe
-  switch(timeframe) {
-    case '4H':
-      periods = 90;
-      timeIncrement = 4 * 60 * 60;
-      break;
-    case '1H':
-      periods = 168;
-      timeIncrement = 60 * 60;
-      break;
-    case 'M30':
-      periods = 336;
-      timeIncrement = 30 * 60;
-      break;
-    case '1D':
-    default:
-      periods = 100;
-      timeIncrement = 24 * 60 * 60;
-  }
-  
-  let currentPrice = basePrice;
-  let currentTime = Math.floor(Date.now() / 1000) - (periods * timeIncrement);
-  
-  for (let i = 0; i < periods; i++) {
-    const change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
-    const open = currentPrice;
-    const close = open + change;
-    const high = Math.max(open, close) + Math.random() * volatility * currentPrice;
-    const low = Math.min(open, close) - Math.random() * volatility * currentPrice;
-    
-    // Ensure high is highest and low is lowest
-    const finalHigh = Math.max(open, close, high);
-    const finalLow = Math.min(open, close, low);
-    
-    data.push({
-      time: currentTime,
-      open: parseFloat(open.toFixed(4)),
-      high: parseFloat(finalHigh.toFixed(4)),
-      low: parseFloat(finalLow.toFixed(4)),
-      close: parseFloat(close.toFixed(4))
-    });
-    
-    currentPrice = close;
-    currentTime += timeIncrement;
-  }
-  
-  console.log(`Generated ${periods} sample data points for ${timeframe}`);
-  return data;
-}
+        // ===== CHART RENDERING =====
+        async function renderChart(chartData, timeframe) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    try {
+                        if (!candle || !ema26) {
+                            console.error('Chart series not initialized');
+                            resolve();
+                            return;
+                        }
+                        
+                        // Clear existing data
+                        candle.setData([]);
+                        ema26.setData([]);
+                        if (macdLine) macdLine.setData([]);
+                        if (macdSignal) macdSignal.setData([]);
+                        if (macdHist) macdHist.setData([]);
+                        
+                        console.log('Rendering chart with', chartData.length, 'data points');
+                        
+                        // Set candle data
+                        candle.setData(chartData);
+                        
+                        // Calculate and set indicators
+                        calculateAndSetIndicators(chartData);
+                        
+                        // Configure chart appearance
+                        configureChartAppearance(timeframe);
+                        
+                        // Schedule post-render operations
+                        schedulePostRenderOperations();
+                        
+                        resolve();
+                        
+                    } catch (chartError) {
+                        console.error('Chart rendering error:', chartError);
+                        // Fallback to simple data
+                        const simpleData = generateSimpleChartData();
+                        if (candle) candle.setData(simpleData);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
 
-/* ===== SIMPLE CHART DATA FALLBACK ===== */
-function generateSimpleChartData() {
-  const data = [];
-  const baseTime = Math.floor(Date.now() / 1000) - (24 * 60 * 60 * 30); // 30 days ago
-  let currentPrice = 148.75;
-  
-  for (let i = 0; i < 30; i++) {
-    const change = (Math.random() - 0.5) * 0.02 * currentPrice;
-    const open = currentPrice;
-    const close = open + change;
-    const high = Math.max(open, close) + Math.random() * 0.01 * currentPrice;
-    const low = Math.min(open, close) - Math.random() * 0.01 * currentPrice;
-    
-    data.push({
-      time: baseTime + (i * 24 * 60 * 60),
-      open: parseFloat(open.toFixed(4)),
-      high: parseFloat(high.toFixed(4)),
-      low: parseFloat(low.toFixed(4)),
-      close: parseFloat(close.toFixed(4))
-    });
-    
-    currentPrice = close;
-  }
-  
-  return data;
-}
+        function calculateAndSetIndicators(chartData) {
+            const closes = chartData.map(d => d.close);
+            
+            // Calculate and set EMA
+            const ema = calcEMA(closes, 26);
+            const emaData = chartData.map((d, i) => ({
+                time: d.time, 
+                value: isNaN(ema[i]) ? (i > 0 ? ema[i-1] : d.close) : ema[i]
+            })).filter(d => !isNaN(d.value) && d.value > 0);
+            
+            if (emaData.length > 0 && ema26) {
+                ema26.setData(emaData);
+            }
+            
+            // Calculate and set MACD if MACD chart exists
+            if (macdLine && macdSignal && macdHist) {
+                const {macd, sig, hist} = calcMACDSeries(closes);
+                
+                const macdSeriesData = chartData.map((d, i) => ({
+                    time: d.time, 
+                    value: isNaN(macd[i]) ? 0 : macd[i]
+                })).filter(d => !isNaN(d.value));
+                
+                const signalSeriesData = chartData.map((d, i) => ({
+                    time: d.time, 
+                    value: isNaN(sig[i]) ? 0 : sig[i]
+                })).filter(d => !isNaN(d.value));
+                
+                const histSeriesData = chartData.map((d, i) => ({
+                    time: d.time, 
+                    value: isNaN(hist[i]) ? 0 : hist[i]
+                })).filter(d => !isNaN(d.value));
+                
+                if (macdSeriesData.length > 0) {
+                    macdLine.setData(macdSeriesData);
+                    macdSignal.setData(signalSeriesData);
+                    macdHist.setData(histSeriesData);
+                }
+            }
+        }
 
-/* ===== RANDOM NEWS GENERATOR ===== */
-function getRandomNews() {
-  const newsItems = [
-    "Federal Reserve maintains current interest rates amid stable inflation data.",
-    "Bank of Japan intervenes to support currency as USD strengthens.",
-    "ECB officials signal cautious approach to monetary policy changes.",
-    "Market volatility remains low as trading volume increases.",
-    "Technical indicators show potential breakout patterns forming.",
-    "Institutional investors increasing positions in major currency pairs.",
-    "Economic data from major economies supports current market trends.",
-    "Forex markets show increased correlation with equity movements.",
-    "Central bank policies continue to drive major currency directions.",
-    "Market sentiment shifts as new economic data is released."
-  ];
-  
-  return newsItems[Math.floor(Math.random() * newsItems.length)];
-}
+        function configureChartAppearance(timeframe) {
+            const timeScaleOptions = {
+                timeVisible: true,
+                secondsVisible: false,
+                borderColor: '#2D3748',
+                barSpacing: getBarSpacing(timeframe)
+            };
+            
+            if (chart) {
+                chart.timeScale().applyOptions(timeScaleOptions);
+            }
+            if (macdChart) {
+                macdChart.timeScale().applyOptions(timeScaleOptions);
+            }
+        }
 
-/* ===== IMPROVED CLEAN CHART DATA ===== */
-function cleanChartData(data) {
-  if (!Array.isArray(data)) {
-    console.error('cleanChartData: Input is not an array');
-    return [];
-  }
-  
-  const cleaned = data.filter(item => {
-    if (!item || item.time === undefined || item.time === null) {
-      return false;
-    }
-    
-    // Convert all values to numbers
-    const open = parseFloat(item.open);
-    const high = parseFloat(item.high);
-    const low = parseFloat(item.low);
-    const close = parseFloat(item.close);
-    const time = parseFloat(item.time);
-    
-    // Validate numbers
-    if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close) || isNaN(time)) {
-      return false;
-    }
-    
-    // Validate price logic
-    if (high < low || high < open || high < close || low > open || low > close) {
-      return false;
-    }
-    
-    // Ensure positive values
-    if (open <= 0 || high <= 0 || low <= 0 || close <= 0 || time <= 0) {
-      return false;
-    }
-    
-    return true;
-  }).map(item => ({
-    time: parseFloat(item.time),
-    open: parseFloat(item.open),
-    high: parseFloat(item.high),
-    low: parseFloat(item.low),
-    close: parseFloat(item.close)
-  }));
-  
-  console.log(`Cleaned ${data.length} -> ${cleaned.length} data points`);
-  return cleaned;
-}
+        function getBarSpacing(timeframe) {
+            const spacingMap = {
+                '1D': 8,
+                '4H': 6,
+                '1H': 4,
+                'M30': 3
+            };
+            return spacingMap[timeframe] || 6;
+        }
 
-/* ===== IMPROVED CALCULATION FUNCTIONS ===== */
-function calcEMA(values, period) {
-  if (!values || values.length === 0 || period <= 0) return [];
-  
-  const k = 2 / (period + 1);
-  let ema = [values[0]]; // Start with first value
-  
-  for (let i = 1; i < values.length; i++) {
-    const currentEMA = values[i] * k + ema[i - 1] * (1 - k);
-    ema.push(isNaN(currentEMA) ? ema[i - 1] : currentEMA);
-  }
-  
-  return ema;
-}
+        function schedulePostRenderOperations() {
+            // Fit content after a short delay
+            setTimeout(() => {
+                try {
+                    if (chart) chart.timeScale().fitContent();
+                    if (macdChart) macdChart.timeScale().fitContent();
+                } catch (e) {
+                    console.log('Fit content error:', e);
+                }
+            }, 200);
+            
+            // Resize charts after render
+            setTimeout(() => {
+                resizeCharts();
+            }, 300);
+        }
 
-function calcMACDSeries(closes, short = 12, long = 26, signal = 9) {
-  if (!closes || closes.length === 0) {
-    return { macd: [], sig: [], hist: [] };
-  }
-  
-  try {
-    const emaShort = calcEMA(closes, short);
-    const emaLong = calcEMA(closes, long);
-    
-    const macd = closes.map((_, i) => {
-      if (i < Math.max(short, long)) return 0;
-      return (emaShort[i] - emaLong[i]) || 0;
-    });
-    
-    const sig = calcEMA(macd, signal);
-    const hist = macd.map((value, i) => (value - (sig[i] || 0)) || 0);
-    
-    return { macd, sig, hist };
-  } catch (error) {
-    console.error('MACD calculation error:', error);
-    return { 
-      macd: Array(closes.length).fill(0), 
-      sig: Array(closes.length).fill(0), 
-      hist: Array(closes.length).fill(0) 
-    };
-  }
-}
+        // ===== UI UPDATE FUNCTIONS =====
+        function updateUIComponents(responseData, chartData) {
+            if (!responseData) {
+                console.error('No response data provided');
+                return;
+            }
+            
+            const t = responseData.technical_analysis || {};
+            const ai = responseData.ai_analysis || {};
+            
+            console.log('Updating UI components with analysis data');
+            
+            // Update technical indicators
+            updateTechnicalIndicators(t);
+            
+            // Update price information
+            updatePriceInformation(t, chartData);
+            
+            // Update AI analysis
+            updateAIAnalysis(ai);
+            
+            // Update trading levels
+            updateTradingLevels(
+                getCurrentPrice(t, chartData), 
+                ai.signal, 
+                t.timeframe_params
+            );
+            
+            // Update news and risk assessment
+            updateNewsAndRisk(responseData);
+            
+            // Update Support & Resistance
+            updateSupportResistance({
+                levels: t.levels || {},
+                current_price: getCurrentPrice(t, chartData)
+            });
+        }
 
-/* ===== IMPROVED SUPPORT RESISTANCE ===== */
-function updateSupportResistance(data) {
-  const levels = data.levels || {};
-  const currentPrice = data.current_price || 150.0;
-  
-  // Update Support & Resistance levels
-  const supportLevel = levels.support || (currentPrice * 0.99).toFixed(4);
-  const resistanceLevel = levels.resistance || (currentPrice * 1.01).toFixed(4);
-  
-  document.getElementById('supportLevel').textContent = supportLevel;
-  document.getElementById('resistanceLevel').textContent = resistanceLevel;
-  
-  // Calculate and display distances
-  if (currentPrice > 0) {
-    const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
-    const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
-    
-    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
-    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
-  }
-  
-  // Calculate and update Pivot Points
-  const pivotPoint = levels.pivot_point || currentPrice;
-  const pivots = calculatePivotPoints(
-    parseFloat(resistanceLevel) || currentPrice * 1.02,
-    parseFloat(supportLevel) || currentPrice * 0.98,
-    parseFloat(pivotPoint) || currentPrice
-  );
-  
-  document.getElementById('pivotPoint').textContent = pivots.pivot.toFixed(4);
-  document.getElementById('pivotR1').textContent = pivots.r1.toFixed(4);
-  document.getElementById('pivotR2').textContent = pivots.r2.toFixed(4);
-  document.getElementById('pivotR3').textContent = pivots.r3.toFixed(4);
-  document.getElementById('pivotS1').textContent = pivots.s1.toFixed(4);
-  document.getElementById('pivotS2').textContent = pivots.s2.toFixed(4);
-  document.getElementById('pivotS3').textContent = pivots.s3.toFixed(4);
-}
+        function updateTechnicalIndicators(technical) {
+            // Momentum indicators
+            if (rsiEl) rsiEl.textContent = (technical.momentum?.rsi || 0).toFixed(2);
+            if (macdValEl) macdValEl.textContent = (technical.momentum?.macd || 0).toFixed(4);
+            if (macdHistVal) macdHistVal.textContent = (technical.momentum?.macd_histogram || 0).toFixed(4);
+            
+            // Trend indicators
+            if (adxEl) adxEl.textContent = (technical.trend?.adx || 0).toFixed(2);
+            if (trendEl) trendEl.textContent = technical.trend?.trend_direction || '-';
+            
+            // Volatility indicators
+            if (atrEl) atrEl.textContent = (technical.volatility?.atr || 0).toFixed(4);
+            if (volEl) {
+                const volatilityPct = technical.volatility?.volatility_pct;
+                volEl.textContent = volatilityPct ? `${volatilityPct.toFixed(2)}%` : '-';
+            }
+        }
 
-/* ===== IMPROVED PIVOT POINTS CALCULATION ===== */
-function calculatePivotPoints(high, low, close) {
-  const pivot = (high + low + close) / 3;
-  const r1 = (2 * pivot) - low;
-  const s1 = (2 * pivot) - high;
-  const r2 = pivot + (high - low);
-  const s2 = pivot - (high - low);
-  const r3 = high + 2 * (pivot - low);
-  const s3 = low - 2 * (high - pivot);
-  
-  return {
-    pivot: isNaN(pivot) ? 0 : pivot,
-    r1: isNaN(r1) ? 0 : r1,
-    r2: isNaN(r2) ? 0 : r2,
-    r3: isNaN(r3) ? 0 : r3,
-    s1: isNaN(s1) ? 0 : s1,
-    s2: isNaN(s2) ? 0 : s2,
-    s3: isNaN(s3) ? 0 : s3
-  };
-}
+        function updatePriceInformation(technical, chartData) {
+            const currentPrice = getCurrentPrice(technical, chartData);
+            const priceDisplay = currentPrice ? currentPrice.toFixed(4) : '-';
+            
+            if (livePriceEl) livePriceEl.textContent = priceDisplay;
+            if (currentPriceEl) currentPriceEl.textContent = priceDisplay;
+            
+            // Update price change
+            const priceChange = technical.momentum?.price_change_pct || 0;
+            if (changeEl) {
+                changeEl.textContent = `(${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%)`;
+                changeEl.className = `price-change ${priceChange >= 0 ? 'change-positive' : 'change-negative'}`;
+            }
+        }
 
-// Initialize dashboard on load
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM loaded, initializing dashboard...');
-  updatePairTicker(pairSelect.value);
-  
-  // Initialize charts dengan data kosong terlebih dahulu
-  setTimeout(() => {
-    // Set initial empty data untuk menghindari error
-    candle.setData([]);
-    ema26.setData([]);
-    macdLine.setData([]);
-    macdSignal.setData([]);
-    macdHist.setData([]);
-    
-    // Start analysis
-    analyze();
-  }, 500);
-});
+        function getCurrentPrice(technical, chartData) {
+            return technical.levels?.current_price || 
+                   (chartData.length > 0 ? chartData[chartData.length - 1].close : 150.0);
+        }
 
-// Event listeners untuk tombol analisis
-document.getElementById('analyzeBtn').addEventListener('click', analyze);
-document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
-document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+        function updateAIAnalysis(aiAnalysis) {
+            if (aiSummaryEl) {
+                aiSummaryEl.textContent = aiAnalysis.analysis_summary || 'Real-time market analysis in progress...';
+            }
+            
+            setSignal(aiAnalysis.signal || 'HOLD');
+            
+            if (aiConfidence) {
+                aiConfidence.textContent = aiAnalysis.confidence ? `${aiAnalysis.confidence}%` : '50%';
+            }
+            
+            if (aiRisk) {
+                aiRisk.textContent = aiAnalysis.risk_level || 'MEDIUM';
+            }
+        }
 
-pairSelect.addEventListener('change', function() {
-  updatePairTicker(this.value);
-  analyze();
-});
+        function updateNewsAndRisk(responseData) {
+            if (fundNews) {
+                fundNews.textContent = responseData.fundamental_analysis || getRandomNews();
+            }
+            
+            const risk = responseData.risk_assessment || generateSampleRiskAssessment();
+            updateRiskAssessment(risk);
+        }
 
-timeframeSelect.addEventListener('change', analyze);
+        // ===== SUPPORTING FUNCTIONS =====
+        function setSignal(signal) {
+            const signalElement = document.getElementById('aiSignal');
+            if (!signalElement) return;
+            
+            signalElement.textContent = signal;
+            signalElement.className = `signal ${signal.toLowerCase()}`;
+        }
 
-// Improved window resize handler
-let resizeTimeout;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(() => {
-    try {
-      const chartWidth = document.getElementById('chartRoot').clientWidth;
-      const macdWidth = document.getElementById('macdRoot').clientWidth;
-      
-      if (chartWidth > 0 && macdWidth > 0) {
-        chart.resize(chartWidth, 520);
-        macdChart.resize(macdWidth, 160);
-        console.log('Charts resized on window resize');
-      }
-    } catch (e) {
-      console.log('Window resize error:', e);
-    }
-  }, 250);
-});
+        function updateStatusIndicator(isSuccess) {
+            const statusElement = document.getElementById('statusIndicator');
+            if (!statusElement) return;
+            
+            if (isSuccess) {
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'status-connected';
+            } else {
+                statusElement.textContent = 'Disconnected';
+                statusElement.className = 'status-disconnected';
+            }
+        }
+
+        function updatePairTicker(pair) {
+            const tickerElement = document.getElementById('pairTicker');
+            if (tickerElement) {
+                tickerElement.textContent = pair || 'EUR/USD';
+            }
+        }
+
+        function resizeCharts() {
+            try {
+                const chartRoot = document.getElementById('chartRoot');
+                const macdRoot = document.getElementById('macdRoot');
+                
+                if (chartRoot && chart) {
+                    const chartWidth = chartRoot.clientWidth;
+                    if (chartWidth > 0) {
+                        chart.resize(chartWidth, 520);
+                    }
+                }
+                
+                if (macdRoot && macdChart) {
+                    const macdWidth = macdRoot.clientWidth;
+                    if (macdWidth > 0) {
+                        macdChart.resize(macdWidth, 160);
+                    }
+                }
+                
+                console.log('Charts resized successfully');
+            } catch (e) {
+                console.log('Chart resize error:', e);
+            }
+        }
+
+        async function handleAnalysisError(error, timeframe) {
+            updateStatusIndicator(false);
+            
+            // Show user-friendly error message
+            if (aiSummaryEl) {
+                aiSummaryEl.textContent = `Error: ${error.message}. Retrying...`;
+                aiSummaryEl.style.color = '#ef4444';
+            }
+            
+            // Fallback to sample data
+            const fallbackData = generateSamplePriceData(timeframe);
+            await renderChart(fallbackData, timeframe);
+            
+            // Auto-retry after 5 seconds only if it's a network error
+            if (error.name !== 'AbortError') {
+                setTimeout(() => {
+                    analyze();
+                }, 5000);
+            }
+        }
+
+        // ===== SAMPLE DATA GENERATORS (Keep your existing functions) =====
+        function generateSamplePriceData(timeframe = '1D') {
+            const data = [];
+            const basePrice = 148.75;
+            const volatility = timeframe === '1D' ? 0.002 : 
+                              timeframe === '4H' ? 0.0015 : 
+                              timeframe === '1H' ? 0.001 : 0.0008;
+            
+            let periods;
+            let timeIncrement;
+            
+            switch(timeframe) {
+                case '4H':
+                    periods = 90;
+                    timeIncrement = 4 * 60 * 60;
+                    break;
+                case '1H':
+                    periods = 168;
+                    timeIncrement = 60 * 60;
+                    break;
+                case 'M30':
+                    periods = 336;
+                    timeIncrement = 30 * 60;
+                    break;
+                case '1D':
+                default:
+                    periods = 100;
+                    timeIncrement = 24 * 60 * 60;
+            }
+            
+            let currentPrice = basePrice;
+            let currentTime = Math.floor(Date.now() / 1000) - (periods * timeIncrement);
+            
+            for (let i = 0; i < periods; i++) {
+                const change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
+                const open = currentPrice;
+                const close = open + change;
+                const high = Math.max(open, close) + Math.random() * volatility * currentPrice;
+                const low = Math.min(open, close) - Math.random() * volatility * currentPrice;
+                
+                const finalHigh = Math.max(open, close, high);
+                const finalLow = Math.min(open, close, low);
+                
+                data.push({
+                    time: currentTime,
+                    open: parseFloat(open.toFixed(4)),
+                    high: parseFloat(finalHigh.toFixed(4)),
+                    low: parseFloat(finalLow.toFixed(4)),
+                    close: parseFloat(close.toFixed(4))
+                });
+                
+                currentPrice = close;
+                currentTime += timeIncrement;
+            }
+            
+            console.log(`Generated ${periods} sample data points for ${timeframe}`);
+            return data;
+        }
+
+        function generateSimpleChartData() {
+            const data = [];
+            const baseTime = Math.floor(Date.now() / 1000) - (24 * 60 * 60 * 30);
+            let currentPrice = 148.75;
+            
+            for (let i = 0; i < 30; i++) {
+                const change = (Math.random() - 0.5) * 0.02 * currentPrice;
+                const open = currentPrice;
+                const close = open + change;
+                const high = Math.max(open, close) + Math.random() * 0.01 * currentPrice;
+                const low = Math.min(open, close) - Math.random() * 0.01 * currentPrice;
+                
+                data.push({
+                    time: baseTime + (i * 24 * 60 * 60),
+                    open: parseFloat(open.toFixed(4)),
+                    high: parseFloat(high.toFixed(4)),
+                    low: parseFloat(low.toFixed(4)),
+                    close: parseFloat(close.toFixed(4))
+                });
+                
+                currentPrice = close;
+            }
+            
+            return data;
+        }
+
+        function getRandomNews() {
+            const newsItems = [
+                "Federal Reserve maintains current interest rates amid stable inflation data.",
+                "Bank of Japan intervenes to support currency as USD strengthens.",
+                "ECB officials signal cautious approach to monetary policy changes.",
+                "Market volatility remains low as trading volume increases.",
+                "Technical indicators show potential breakout patterns forming.",
+                "Institutional investors increasing positions in major currency pairs.",
+                "Economic data from major economies supports current market trends.",
+                "Forex markets show increased correlation with equity movements.",
+                "Central bank policies continue to drive major currency directions.",
+                "Market sentiment shifts as new economic data is released."
+            ];
+            
+            return newsItems[Math.floor(Math.random() * newsItems.length)];
+        }
+
+        function cleanChartData(data) {
+            if (!Array.isArray(data)) {
+                console.error('cleanChartData: Input is not an array');
+                return [];
+            }
+            
+            const cleaned = data.filter(item => {
+                if (!item || item.time === undefined || item.time === null) {
+                    return false;
+                }
+                
+                const open = parseFloat(item.open);
+                const high = parseFloat(item.high);
+                const low = parseFloat(item.low);
+                const close = parseFloat(item.close);
+                const time = parseFloat(item.time);
+                
+                if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close) || isNaN(time)) {
+                    return false;
+                }
+                
+                if (high < low || high < open || high < close || low > open || low > close) {
+                    return false;
+                }
+                
+                if (open <= 0 || high <= 0 || low <= 0 || close <= 0 || time <= 0) {
+                    return false;
+                }
+                
+                return true;
+            }).map(item => ({
+                time: parseFloat(item.time),
+                open: parseFloat(item.open),
+                high: parseFloat(item.high),
+                low: parseFloat(item.low),
+                close: parseFloat(item.close)
+            }));
+            
+            console.log(`Cleaned ${data.length} -> ${cleaned.length} data points`);
+            return cleaned;
+        }
+
+        function calcEMA(values, period) {
+            if (!values || values.length === 0 || period <= 0) return [];
+            
+            const k = 2 / (period + 1);
+            let ema = [values[0]];
+            
+            for (let i = 1; i < values.length; i++) {
+                const currentEMA = values[i] * k + ema[i - 1] * (1 - k);
+                ema.push(isNaN(currentEMA) ? ema[i - 1] : currentEMA);
+            }
+            
+            return ema;
+        }
+
+        function calcMACDSeries(closes, short = 12, long = 26, signal = 9) {
+            if (!closes || closes.length === 0) {
+                return { macd: [], sig: [], hist: [] };
+            }
+            
+            try {
+                const emaShort = calcEMA(closes, short);
+                const emaLong = calcEMA(closes, long);
+                
+                const macd = closes.map((_, i) => {
+                    if (i < Math.max(short, long)) return 0;
+                    return (emaShort[i] - emaLong[i]) || 0;
+                });
+                
+                const sig = calcEMA(macd, signal);
+                const hist = macd.map((value, i) => (value - (sig[i] || 0)) || 0);
+                
+                return { macd, sig, hist };
+            } catch (error) {
+                console.error('MACD calculation error:', error);
+                return { 
+                    macd: Array(closes.length).fill(0), 
+                    sig: Array(closes.length).fill(0), 
+                    hist: Array(closes.length).fill(0) 
+                };
+            }
+        }
+
+        function updateTradingLevels(currentPrice, signal, timeframeParams) {
+            if (currentPrice && signal !== 'HOLD') {
+                const stopLossPct = timeframeParams?.STOP_LOSS_PCT || 0.01;
+                const takeProfitPct = timeframeParams?.TAKE_PROFIT_PCT || 0.02;
+                
+                if (signal === 'BUY') {
+                    if (aiEntry) aiEntry.textContent = (currentPrice * 1.0005).toFixed(4);
+                    if (aiSL) aiSL.textContent = (currentPrice * (1 - stopLossPct)).toFixed(4);
+                    if (aiTP1) aiTP1.textContent = (currentPrice * (1 + takeProfitPct * 0.7)).toFixed(4);
+                    if (aiTP2) aiTP2.textContent = (currentPrice * (1 + takeProfitPct)).toFixed(4);
+                } else if (signal === 'SELL') {
+                    if (aiEntry) aiEntry.textContent = (currentPrice * 0.9995).toFixed(4);
+                    if (aiSL) aiSL.textContent = (currentPrice * (1 + stopLossPct)).toFixed(4);
+                    if (aiTP1) aiTP1.textContent = (currentPrice * (1 - takeProfitPct * 0.7)).toFixed(4);
+                    if (aiTP2) aiTP2.textContent = (currentPrice * (1 - takeProfitPct)).toFixed(4);
+                }
+            } else {
+                if (aiEntry) aiEntry.textContent = '-';
+                if (aiSL) aiSL.textContent = '-';
+                if (aiTP1) aiTP1.textContent = '-';
+                if (aiTP2) aiTP2.textContent = '-';
+            }
+        }
+
+        function updateSupportResistance(data) {
+            const levels = data.levels || {};
+            const currentPrice = data.current_price || 150.0;
+            
+            // Update Support & Resistance levels
+            const supportLevel = levels.support || (currentPrice * 0.99).toFixed(4);
+            const resistanceLevel = levels.resistance || (currentPrice * 1.01).toFixed(4);
+            
+            const supportLevelEl = document.getElementById('supportLevel');
+            const resistanceLevelEl = document.getElementById('resistanceLevel');
+            if (supportLevelEl) supportLevelEl.textContent = supportLevel;
+            if (resistanceLevelEl) resistanceLevelEl.textContent = resistanceLevel;
+            
+            // Calculate and display distances
+            if (currentPrice > 0) {
+                const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
+                const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
+                
+                const supportDistanceEl = document.getElementById('supportDistance');
+                const resistanceDistanceEl = document.getElementById('resistanceDistance');
+                if (supportDistanceEl) supportDistanceEl.textContent = `${supportDistance}% below`;
+                if (resistanceDistanceEl) resistanceDistanceEl.textContent = `${resistanceDistance}% above`;
+            }
+            
+            // Calculate and update Pivot Points
+            const pivotPoint = levels.pivot_point || currentPrice;
+            const pivots = calculatePivotPoints(
+                parseFloat(resistanceLevel) || currentPrice * 1.02,
+                parseFloat(supportLevel) || currentPrice * 0.98,
+                parseFloat(pivotPoint) || currentPrice
+            );
+            
+            // Update pivot points in UI
+            const pivotIds = ['pivotPoint', 'pivotR1', 'pivotR2', 'pivotR3', 'pivotS1', 'pivotS2', 'pivotS3'];
+            const pivotValues = [pivots.pivot, pivots.r1, pivots.r2, pivots.r3, pivots.s1, pivots.s2, pivots.s3];
+            
+            pivotIds.forEach((id, index) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = pivotValues[index].toFixed(4);
+                }
+            });
+        }
+
+        function calculatePivotPoints(high, low, close) {
+            const pivot = (high + low + close) / 3;
+            const r1 = (2 * pivot) - low;
+            const s1 = (2 * pivot) - high;
+            const r2 = pivot + (high - low);
+            const s2 = pivot - (high - low);
+            const r3 = high + 2 * (pivot - low);
+            const s3 = low - 2 * (high - pivot);
+            
+            return {
+                pivot: isNaN(pivot) ? 0 : pivot,
+                r1: isNaN(r1) ? 0 : r1,
+                r2: isNaN(r2) ? 0 : r2,
+                r3: isNaN(r3) ? 0 : r3,
+                s1: isNaN(s1) ? 0 : s1,
+                s2: isNaN(s2) ? 0 : s2,
+                s3: isNaN(s3) ? 0 : s3
+            };
+        }
+
+        // ===== MISSING FUNCTION IMPLEMENTATIONS =====
+        function updateRiskAssessment(risk) {
+            const riskElement = document.getElementById('riskAssessment');
+            if (riskElement) {
+                riskElement.textContent = typeof risk === 'string' ? risk : JSON.stringify(risk);
+            }
+        }
+
+        function generateSampleRiskAssessment() {
+            return "Market conditions stable. Moderate volatility expected.";
+        }
+
+        function showBacktestModal() {
+            const modal = document.getElementById('backtestModal');
+            if (modal) {
+                modal.style.display = 'block';
+                console.log('Backtest modal opened');
+            }
+        }
+
+        function runBacktest() {
+            console.log('Running backtest...');
+            // Implement backtest logic here
+            alert('Backtest feature would be implemented here');
+        }
+
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing dashboard...');
+            
+            initializeDashboard();
+            initializeCharts();
+            
+            // Initialize charts with empty data first
+            setTimeout(() => {
+                if (candle) candle.setData([]);
+                if (ema26) ema26.setData([]);
+                if (macdLine) macdLine.setData([]);
+                if (macdSignal) macdSignal.setData([]);
+                if (macdHist) macdHist.setData([]);
+                
+                // Start initial analysis
+                analyze();
+            }, 500);
+        });
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const runBacktestBtn = document.getElementById('runBacktestBtn');
+            const startBacktestBtn = document.getElementById('startBacktestBtn');
+            
+            if (analyzeBtn) analyzeBtn.addEventListener('click', analyze);
+            if (runBacktestBtn) runBacktestBtn.addEventListener('click', showBacktestModal);
+            if (startBacktestBtn) startBacktestBtn.addEventListener('click', runBacktest);
+            
+            if (pairSelect) {
+                pairSelect.addEventListener('change', function() {
+                    updatePairTicker(this.value);
+                    analyze();
+                });
+            }
+            
+            if (timeframeSelect) {
+                timeframeSelect.addEventListener('change', analyze);
+            }
+        });
+
+        // Improved window resize handler
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                resizeCharts();
+            }, 250);
+        });
+
+        // Export functions for global access
+        window.analyze = analyze;
+        window.resizeCharts = resizeCharts;
+    </script>
+</body>
+</html>
