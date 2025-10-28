@@ -240,17 +240,27 @@ function updateUIComponents(responseData, chartData) {
     rsiEl.textContent = (t.momentum.rsi || 0).toFixed(2);
     macdValEl.textContent = (t.momentum.macd || 0).toFixed(4);
     macdHistVal.textContent = (t.momentum.macd_histogram || 0).toFixed(4);
+  } else {
+    rsiEl.textContent = '-';
+    macdValEl.textContent = '-';
+    macdHistVal.textContent = '-';
   }
   
   if (t.trend) {
     adxEl.textContent = (t.trend.adx || 0).toFixed(2);
     trendEl.textContent = t.trend.trend_direction || '-';
+  } else {
+    adxEl.textContent = '-';
+    trendEl.textContent = '-';
   }
   
   if (t.volatility) {
     atrEl.textContent = (t.volatility.atr || 0).toFixed(4);
     volEl.textContent = t.volatility.volatility_pct ? 
       (t.volatility.volatility_pct).toFixed(2) + '%' : '-';
+  } else {
+    atrEl.textContent = '-';
+    volEl.textContent = '-';
   }
   
   // Update price data
@@ -468,11 +478,155 @@ function cleanChartData(data) {
   return cleaned;
 }
 
+/* ===== IMPROVED CALCULATION FUNCTIONS ===== */
+function calcEMA(values, period) {
+  if (!values || values.length === 0 || period <= 0) return [];
+  
+  const k = 2 / (period + 1);
+  let ema = [values[0]]; // Start with first value
+  
+  for (let i = 1; i < values.length; i++) {
+    const currentEMA = values[i] * k + ema[i - 1] * (1 - k);
+    ema.push(isNaN(currentEMA) ? ema[i - 1] : currentEMA);
+  }
+  
+  return ema;
+}
+
+function calcMACDSeries(closes, short = 12, long = 26, signal = 9) {
+  if (!closes || closes.length === 0) {
+    return { macd: [], sig: [], hist: [] };
+  }
+  
+  try {
+    const emaShort = calcEMA(closes, short);
+    const emaLong = calcEMA(closes, long);
+    
+    const macd = closes.map((_, i) => {
+      if (i < Math.max(short, long)) return 0;
+      return (emaShort[i] - emaLong[i]) || 0;
+    });
+    
+    const sig = calcEMA(macd, signal);
+    const hist = macd.map((value, i) => (value - (sig[i] || 0)) || 0);
+    
+    return { macd, sig, hist };
+  } catch (error) {
+    console.error('MACD calculation error:', error);
+    return { 
+      macd: Array(closes.length).fill(0), 
+      sig: Array(closes.length).fill(0), 
+      hist: Array(closes.length).fill(0) 
+    };
+  }
+}
+
+/* ===== IMPROVED SUPPORT RESISTANCE ===== */
+function updateSupportResistance(data) {
+  const levels = data.levels || {};
+  const currentPrice = data.current_price || 150.0;
+  
+  // Update Support & Resistance levels
+  const supportLevel = levels.support || (currentPrice * 0.99).toFixed(4);
+  const resistanceLevel = levels.resistance || (currentPrice * 1.01).toFixed(4);
+  
+  document.getElementById('supportLevel').textContent = supportLevel;
+  document.getElementById('resistanceLevel').textContent = resistanceLevel;
+  
+  // Calculate and display distances
+  if (currentPrice > 0) {
+    const supportDistance = ((currentPrice - supportLevel) / currentPrice * 100).toFixed(2);
+    const resistanceDistance = ((resistanceLevel - currentPrice) / currentPrice * 100).toFixed(2);
+    
+    document.getElementById('supportDistance').textContent = `${supportDistance}% below`;
+    document.getElementById('resistanceDistance').textContent = `${resistanceDistance}% above`;
+  }
+  
+  // Calculate and update Pivot Points
+  const pivotPoint = levels.pivot_point || currentPrice;
+  const pivots = calculatePivotPoints(
+    parseFloat(resistanceLevel) || currentPrice * 1.02,
+    parseFloat(supportLevel) || currentPrice * 0.98,
+    parseFloat(pivotPoint) || currentPrice
+  );
+  
+  document.getElementById('pivotPoint').textContent = pivots.pivot.toFixed(4);
+  document.getElementById('pivotR1').textContent = pivots.r1.toFixed(4);
+  document.getElementById('pivotR2').textContent = pivots.r2.toFixed(4);
+  document.getElementById('pivotR3').textContent = pivots.r3.toFixed(4);
+  document.getElementById('pivotS1').textContent = pivots.s1.toFixed(4);
+  document.getElementById('pivotS2').textContent = pivots.s2.toFixed(4);
+  document.getElementById('pivotS3').textContent = pivots.s3.toFixed(4);
+}
+
+/* ===== IMPROVED PIVOT POINTS CALCULATION ===== */
+function calculatePivotPoints(high, low, close) {
+  const pivot = (high + low + close) / 3;
+  const r1 = (2 * pivot) - low;
+  const s1 = (2 * pivot) - high;
+  const r2 = pivot + (high - low);
+  const s2 = pivot - (high - low);
+  const r3 = high + 2 * (pivot - low);
+  const s3 = low - 2 * (high - pivot);
+  
+  return {
+    pivot: isNaN(pivot) ? 0 : pivot,
+    r1: isNaN(r1) ? 0 : r1,
+    r2: isNaN(r2) ? 0 : r2,
+    r3: isNaN(r3) ? 0 : r3,
+    s1: isNaN(s1) ? 0 : s1,
+    s2: isNaN(s2) ? 0 : s2,
+    s3: isNaN(s3) ? 0 : s3
+  };
+}
+
 // Initialize dashboard on load
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOM loaded, initializing dashboard...');
   updatePairTicker(pairSelect.value);
+  
+  // Initialize charts dengan data kosong terlebih dahulu
   setTimeout(() => {
+    // Set initial empty data untuk menghindari error
+    candle.setData([]);
+    ema26.setData([]);
+    macdLine.setData([]);
+    macdSignal.setData([]);
+    macdHist.setData([]);
+    
+    // Start analysis
     analyze();
-  }, 1000);
+  }, 500);
+});
+
+// Event listeners untuk tombol analisis
+document.getElementById('analyzeBtn').addEventListener('click', analyze);
+document.getElementById('runBacktestBtn').addEventListener('click', showBacktestModal);
+document.getElementById('startBacktestBtn').addEventListener('click', runBacktest);
+
+pairSelect.addEventListener('change', function() {
+  updatePairTicker(this.value);
+  analyze();
+});
+
+timeframeSelect.addEventListener('change', analyze);
+
+// Improved window resize handler
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    try {
+      const chartWidth = document.getElementById('chartRoot').clientWidth;
+      const macdWidth = document.getElementById('macdRoot').clientWidth;
+      
+      if (chartWidth > 0 && macdWidth > 0) {
+        chart.resize(chartWidth, 520);
+        macdChart.resize(macdWidth, 160);
+        console.log('Charts resized on window resize');
+      }
+    } catch (e) {
+      console.log('Window resize error:', e);
+    }
+  }, 250);
 });
