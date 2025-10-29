@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 import talib
 import random
-from app import DataManager  # Import DataManager dari app utama
+
 # ==================== KONFIGURASI LOGGING ====================
 def setup_logging():
     """Setup logging yang compatible dengan Windows"""
@@ -221,7 +221,7 @@ class DataManager:
             pair, 
             timeframe, 
             days, 
-            start_date=latest_existing_date + timedelta(days=1)
+            start_date=latest_existing_date
         )
         
         # Gabungkan dengan data existing jika ada
@@ -301,7 +301,7 @@ class DataManager:
             noise = np.random.normal(0, volatility)
             change = trend + noise
             
-            current_price = current_price * (1 + change)
+            current_price = max(0.1, current_price * (1 + change))  # Prevent negative prices
             
             # Generate realistic OHLC
             open_price = current_price
@@ -316,10 +316,10 @@ class DataManager:
             
             prices.append({
                 'date': date,
-                'open': open_price,
-                'high': high_price,
-                'low': low_price,
-                'close': close_price,
+                'open': round(open_price, 5),
+                'high': round(high_price, 5),
+                'low': round(low_price, 5),
+                'close': round(close_price, 5),
                 'volume': np.random.randint(10000, 100000)
             })
         
@@ -336,7 +336,7 @@ class DataManager:
             # Data harian - skip weekend (Sabtu dan Minggu)
             while current_date <= end_date and len(dates) < points:
                 if current_date.weekday() < 5:  # Senin-Jumat
-                    dates.append(current_date)
+                    dates.append(current_date.replace(hour=0, minute=0, second=0, microsecond=0))
                 current_date += timedelta(days=1)
                 
         elif timeframe == '4H':
@@ -373,12 +373,14 @@ class DataManager:
         else:  # Default ke harian
             while current_date <= end_date and len(dates) < points:
                 if current_date.weekday() < 5:
-                    dates.append(current_date)
+                    dates.append(current_date.replace(hour=0, minute=0, second=0, microsecond=0))
                 current_date += timedelta(days=1)
         
         # Jika tidak cukup points, isi dengan data terbaru
         while len(dates) < points:
-            dates.append(end_date - timedelta(days=len(dates)))
+            new_date = end_date - timedelta(days=len(dates))
+            if new_date.weekday() < 5:  # Skip weekend
+                dates.append(new_date.replace(hour=0, minute=0, second=0, microsecond=0))
         
         dates.sort()
         return dates
@@ -401,7 +403,7 @@ class DataManager:
     def _calculate_target_points(self, timeframe: str, days: int) -> int:
         """Hitung target jumlah data points"""
         if timeframe == '1D':
-            return days
+            return min(days, 365)  # Max 1 tahun data
         elif timeframe == '4H':
             return days * 6
         elif timeframe == '1H':
@@ -426,93 +428,12 @@ class DataManager:
             logger.info(f"Saved data to {csv_filename} with {len(data)} records")
             
         except Exception as e:
-            logger.error(f"Error saving CSV: {e}")    
-  def update_all_historical_data():
-    """Update semua data historis hingga hari ini"""
-    
-    print("Updating historical data to current date...")
-    
-    # Inisialisasi DataManager
-    data_manager = DataManager()
-    
-    # Semua pair dan timeframe
-    pairs = [
-        'USDJPY', 'EURUSD', 'GBPUSD', 'USDCHF', 'AUDUSD', 
-        'USDCAD', 'NZDUSD', 'EURJPY', 'GBPJPY', 'CHFJPY', 'CADJPY'
-    ]
-    
-    timeframes = ['M30', '1H', '4H', '1D']
-    
-    for pair in pairs:
-        for timeframe in timeframes:
-            try:
-                print(f"Updating {pair}-{timeframe}...")
-                
-                # Dapatkan data terbaru (ini akan otomatis generate data hingga hari ini)
-                data = data_manager.get_price_data(pair, timeframe, days=90)
-                
-                if not data.empty:
-                    latest_date = data['date'].max().strftime('%Y-%m-%d')
-                    print(f"✓ {pair}-{timeframe}: {len(data)} records, up to {latest_date}")
-                else:
-                    print(f"✗ {pair}-{timeframe}: Failed to generate data")
-                    
-            except Exception as e:
-                print(f"✗ Error updating {pair}-{timeframe}: {e}")
-    
-    print("Historical data update completed!")
-
-def check_data_coverage():
-    """Cek coverage data untuk semua pair"""
-    
-    print("Checking data coverage...")
-    
-    data_manager = DataManager()
-    pairs = ['USDJPY', 'EURUSD', 'GBPUSD']
-    timeframes = ['M30', '1H', '4H', '1D']
-    
-    today = datetime.now().date()
-    
-    for pair in pairs:
-        for timeframe in timeframes:
-            try:
-                csv_file = f"historical_data/{pair}_{timeframe}.csv"
-                if os.path.exists(csv_file):
-                    df = pd.read_csv(csv_file)
-                    if 'date' in df.columns or 'timestamp' in df.columns:
-                        date_col = 'date' if 'date' in df.columns else 'timestamp'
-                        df[date_col] = pd.to_datetime(df[date_col])
-                        latest_date = df[date_col].max().date()
-                        days_diff = (today - latest_date).days
-                        
-                        status = "✓ UP TO DATE" if days_diff <= 1 else f"✗ OUTDATED by {days_diff} days"
-                        print(f"{pair}-{timeframe}: {status} (Latest: {latest_date})")
-                    else:
-                        print(f"{pair}-{timeframe}: NO DATE COLUMN")
-                else:
-                    print(f"{pair}-{timeframe}: FILE NOT EXISTS")
-                    
-            except Exception as e:
-                print(f"{pair}-{timeframe}: ERROR - {e}")
-
-if __name__ == '__main__':
-    print("Historical Data Manager")
-    print("1. Update all data")
-    print("2. Check data coverage")
-    
-    choice = input("Select option (1 or 2): ").strip()
-    
-    if choice == '1':
-        update_all_historical_data()
-    elif choice == '2':
-        check_data_coverage()
-    else:
-        print("Invalid option")
+            logger.error(f"Error saving CSV: {e}")
 
     def get_current_price(self, pair: str) -> float:
-        """Get current price - improved version"""
+        """Get current price dari data terbaru"""
         try:
-            # Coba dapatkan dari data terbaru
+            # Dapatkan data terbaru
             data = self.get_price_data(pair, '1H', 1)
             if not data.empty:
                 current_price = float(data['close'].iloc[-1])
@@ -534,36 +455,10 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Error getting current price for {pair}: {e}")
             return 150.0
-    def get_current_price(self, pair: str) -> float:
-        """Get current price dari TwelveData API"""
-        try:
-            if config.TWELVE_DATA_KEY == "demo":
-                # Return price dari historical data sebagai fallback
-                data = self.get_price_data(pair, '1H', 1)
-                if not data.empty:
-                    return float(data['close'].iloc[-1])
-                return 150.0
-            
-            symbol = f"{pair[:3]}/{pair[3:]}"
-            url = f"https://api.twelvedata.com/price"
-            params = {
-                'symbol': symbol,
-                'apikey': config.TWELVE_DATA_KEY
-            }
-            
-            response = requests.get(url, params=params, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                return float(data.get('price', 150.0))
-            else:
-                logger.warning(f"TwelveData price API error: {response.status_code}")
-                data = self.get_price_data(pair, '1H', 1)
-                return float(data['close'].iloc[-1]) if not data.empty else 150.0
-                
-        except Exception as e:
-            logger.error(f"Error getting current price for {pair}: {e}")
-            data = self.get_price_data(pair, '1H', 1)
-            return float(data['close'].iloc[-1]) if not data.empty else 150.0
+
+    def _generate_sample_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Fallback sample data generator"""
+        return self._generate_realistic_sample_data(pair, timeframe, days)
 
 # ==================== DEEPSEEK AI ANALYZER ====================
 class DeepSeekAnalyzer:
@@ -1240,19 +1135,6 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
         logger.error(f"Error generating trading signals: {e}")
         return []
 
-# ==================== INISIALISASI SISTEM ====================
-logger.info("Initializing Enhanced Forex Analysis System...")
-
-# Initialize components
-data_manager = DataManager()
-tech_engine = TechnicalAnalysisEngine()
-deepseek_analyzer = DeepSeekAnalyzer()
-news_analyzer = NewsAnalyzer()
-risk_manager = AdvancedRiskManager()
-backtesting_engine = AdvancedBacktestingEngine()
-
-logger.info("All system components initialized successfully")
-
 # ==================== UTILITY FUNCTIONS ====================
 def convert_numpy_types(obj):
     """Convert numpy types to native Python types"""
@@ -1268,6 +1150,49 @@ def convert_numpy_types(obj):
         return [convert_numpy_types(item) for item in obj]
     else:
         return obj
+
+def initialize_historical_data():
+    """Initialize historical data pada startup"""
+    try:
+        logger.info("Initializing historical data...")
+        
+        # Generate data untuk pair utama dan timeframe
+        main_pairs = ['USDJPY', 'EURUSD', 'GBPUSD']
+        timeframes = ['1D', '4H', '1H', 'M30']
+        
+        for pair in main_pairs:
+            for timeframe in timeframes:
+                try:
+                    # Ini akan otomatis create data jika belum ada
+                    data = data_manager.get_price_data(pair, timeframe, days=90)
+                    if not data.empty:
+                        latest_date = data['date'].max().strftime('%Y-%m-%d')
+                        logger.info(f"✓ {pair}-{timeframe}: {len(data)} records, up to {latest_date}")
+                    else:
+                        logger.warning(f"✗ {pair}-{timeframe}: Failed to generate data")
+                except Exception as e:
+                    logger.error(f"Error initializing {pair}-{timeframe}: {e}")
+                    
+        logger.info("Historical data initialization completed")
+                    
+    except Exception as e:
+        logger.error(f"Error in historical data initialization: {e}")
+
+# ==================== INISIALISASI SISTEM ====================
+logger.info("Initializing Enhanced Forex Analysis System...")
+
+# Initialize components
+data_manager = DataManager()
+tech_engine = TechnicalAnalysisEngine()
+deepseek_analyzer = DeepSeekAnalyzer()
+news_analyzer = NewsAnalyzer()
+risk_manager = AdvancedRiskManager()
+backtesting_engine = AdvancedBacktestingEngine()
+
+# Initialize historical data
+initialize_historical_data()
+
+logger.info("All system components initialized successfully")
 
 # ==================== FLASK ROUTES ====================
 @app.route('/')
@@ -1404,47 +1329,52 @@ def api_current_price(pair):
     except Exception as e:
         logger.error(f"Current price error for {pair}: {e}")
         return jsonify({'error': str(e)}), 500
-# ==================== INISIALISASI DATA ====================
-def initialize_historical_data():
-    """Initialize historical data pada startup"""
-    try:
-        # Cek apakah data sudah up-to-date
-        sample_file = "historical_data/USDJPY_1D.csv"
-        if os.path.exists(sample_file):
-            df = pd.read_csv(sample_file)
-            if 'timestamp' in df.columns or 'date' in df.columns:
-                date_col = 'timestamp' if 'timestamp' in df.columns else 'date'
-                df[date_col] = pd.to_datetime(df[date_col])
-                latest_date = df[date_col].max().date()
-                current_date = datetime.now().date()
-                
-                if (current_date - latest_date).days > 7:
-                    logger.info("Historical data is outdated, updating...")
-                    # Update data untuk pair utama
-                    main_pairs = ['USDJPY', 'EURUSD', 'GBPUSD']
-                    for pair in main_pairs:
-                        for timeframe in ['1D', '4H', '1H']:
-                            data_manager.get_price_data(pair, timeframe, days=30)
-        else:
-            logger.info("No historical data found, generating initial data...")
-            # Generate data awal untuk pair utama
-            main_pairs = ['USDJPY', 'EURUSD', 'GBPUSD']
-            for pair in main_pairs:
-                for timeframe in ['1D', '4H', '1H']:
-                    data_manager.get_price_data(pair, timeframe, days=90)
-                    
-    except Exception as e:
-        logger.error(f"Error initializing historical data: {e}")
 
-# ==================== RUN APPLICATION ====================
-if __name__ == '__main__':
-    logger.info("Starting Enhanced Forex Analysis System...")
-    
-    # Initialize historical data
-    initialize_historical_data()
-    
-    logger.info("Forex Analysis System is ready and running on http://localhost:5000")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+@app.route('/api/historical_data/<pair>/<timeframe>')
+def api_historical_data(pair, timeframe):
+    """Get historical data untuk chart"""
+    try:
+        days = int(request.args.get('days', 30))
+        
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        if timeframe not in config.TIMEFRAMES:
+            return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
+        
+        # Get price data
+        price_data = data_manager.get_price_data(pair, timeframe, days)
+        if price_data.empty:
+            return jsonify({'error': 'No historical data available'}), 400
+        
+        # Format data untuk chart
+        chart_data = []
+        for _, row in price_data.iterrows():
+            chart_data.append({
+                'time': row['date'].strftime('%Y-%m-%d %H:%M:%S'),
+                'open': float(row['open']),
+                'high': float(row['high']),
+                'low': float(row['low']),
+                'close': float(row['close'])
+            })
+        
+        response = {
+            'pair': pair,
+            'timeframe': timeframe,
+            'data': chart_data,
+            'count': len(chart_data),
+            'date_range': {
+                'start': price_data['date'].min().strftime('%Y-%m-%d'),
+                'end': price_data['date'].max().strftime('%Y-%m-%d')
+            }
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"Historical data error for {pair}-{timeframe}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
     logger.info("Starting Enhanced Forex Analysis System v2.0...")
