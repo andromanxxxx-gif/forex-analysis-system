@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 import talib
 import random
-
+from app import DataManager  # Import DataManager dari app utama
 # ==================== KONFIGURASI LOGGING ====================
 def setup_logging():
     """Setup logging yang compatible dengan Windows"""
