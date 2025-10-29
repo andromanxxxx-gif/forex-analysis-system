@@ -1934,6 +1934,26 @@ logger.info(f"Conservative Trading Parameters: ENABLED")
 
 logger.info("All enhanced system components initialized successfully")
 
+# ==================== UTILITY FUNCTIONS ====================
+def convert_numpy_types(obj):
+    """Convert numpy types to native Python types for JSON serialization"""
+    if isinstance(obj, (np.bool_, np.bool8)):
+        return bool(obj)
+    elif isinstance(obj, (np.integer, np.int8, np.int16, np.int32, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    else:
+        return obj
+
 # ==================== FLASK ROUTES ====================
 @app.route('/')
 def index():
@@ -2039,6 +2059,9 @@ def api_analyze():
             'market_condition': technical_analysis.get('market_condition', {})
         }
         
+        # Convert numpy types to native Python types for JSON serialization
+        response = convert_numpy_types(response)
+        
         return jsonify(response)
     
     except Exception as e:
@@ -2070,6 +2093,9 @@ def api_backtest():
         
         simple_backtester = AdvancedBacktestingEngine(initial_balance)
         result = simple_backtester.run_comprehensive_backtest(signals, price_data, pair, timeframe)
+        
+        # Convert numpy types
+        result = convert_numpy_types(result)
         
         return jsonify(result)
         
@@ -2124,6 +2150,9 @@ def api_advanced_backtest():
                 'min_adx': config.MIN_ADX
             }
         }
+        
+        # Convert numpy types
+        result = convert_numpy_types(result)
         
         return jsonify(result)
         
@@ -2217,6 +2246,9 @@ def api_market_overview():
                 'confidence': 'LOW',
                 'error': f'Processing error: {str(e)}'
             }
+    
+    # Convert numpy types
+    overview = convert_numpy_types(overview)
     
     return jsonify(overview)
 
@@ -2314,7 +2346,7 @@ def api_risk_dashboard():
                 logger.error(f"Error generating recommendation for {pair}: {e}")
                 continue
         
-        return jsonify({
+        response = {
             'risk_management': risk_report,
             'market_conditions': market_analysis,
             'trading_recommendations': trading_recommendations,
@@ -2331,7 +2363,12 @@ def api_risk_dashboard():
                 },
                 'data_provider': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
             }
-        })
+        }
+        
+        # Convert numpy types
+        response = convert_numpy_types(response)
+        
+        return jsonify(response)
         
     except Exception as e:
         logger.error(f"Risk dashboard error: {e}")
