@@ -1,4 +1,4 @@
-# app.py - Enhanced Forex Trading System with Real Data Sources
+# app.py - Enhanced Forex Trading System with CSV Data Only
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -43,15 +43,15 @@ logger = setup_logging()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'forex-secure-key-2024')
 
-# ==================== KONFIGURASI SISTEM YANG DIPERBAIKI ====================
+# ==================== KONFIGURASI SISTEM ====================
 @dataclass
 class SystemConfig:
-    # API Configuration - KEMBALI KE STRUKTUR AWAL
+    # API Configuration
     DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "demo")
     NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
     
-    # ENHANCED Trading Parameters
+    # Trading Parameters
     INITIAL_BALANCE: float = 10000.0
     RISK_PER_TRADE: float = 0.01
     MAX_DAILY_LOSS: float = 0.02
@@ -60,7 +60,7 @@ class SystemConfig:
     STOP_LOSS_PCT: float = 0.008
     TAKE_PROFIT_PCT: float = 0.02
     
-    # Enhanced Risk Management Parameters
+    # Risk Management Parameters
     CORRELATION_THRESHOLD: float = 0.75
     VOLATILITY_THRESHOLD: float = 0.02
     DAILY_TRADE_LIMIT: int = 15
@@ -92,373 +92,193 @@ class SystemConfig:
 
 config = SystemConfig()
 
-# ==================== DATA MANAGER YANG DIPERBAIKI ====================
+# ==================== DATA MANAGER DENGAN CSV ONLY ====================
 class DataManager:
     def __init__(self):
         self.historical_data = {}
         self.historical_data_path = "historical_data"
         os.makedirs(self.historical_data_path, exist_ok=True)
-        logger.info("Data Manager with updated date handling initialized")
+        logger.info("Data Manager - CSV Only Mode initialized")
     
     def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Mendapatkan data harga dengan memastikan data hingga hari terakhir"""
+        """Mendapatkan data harga HANYA dari CSV yang sudah ada"""
         try:
             cache_key = f"{pair}_{timeframe}_{days}"
             
             if cache_key in self.historical_data:
                 return self.historical_data[cache_key]
             
-            # Coba baca dari file CSV
+            # Coba baca dari file CSV - PRIORITAS UTAMA
             csv_file = f"{self.historical_data_path}/{pair}_{timeframe}.csv"
             if os.path.exists(csv_file):
-                data = self._load_from_csv_with_current_dates(csv_file, timeframe, days)
+                data = self._load_from_csv_strict(csv_file, days)
                 if not data.empty:
                     self.historical_data[cache_key] = data
-                    logger.info(f"Loaded {len(data)} records for {pair}-{timeframe} from CSV")
-                    logger.info(f"Date range: {data['date'].min()} to {data['date'].max()}")
+                    logger.info(f"✓ Loaded {len(data)} records for {pair}-{timeframe} from CSV")
+                    logger.info(f"  Date range: {data['date'].min()} to {data['date'].max()}")
                     return data
+                else:
+                    logger.warning(f"CSV file {csv_file} is empty or invalid")
             
-            # Jika CSV tidak ada atau kosong, buat data baru
-            logger.info(f"Creating updated data for {pair}-{timeframe}")
-            data = self._create_updated_csv_data(pair, timeframe, days)
-            if not data.empty:
-                self.historical_data[cache_key] = data
-                return data
+            # Jika CSV tidak valid, beri error message yang jelas
+            logger.error(f"✗ No valid CSV data found for {pair}-{timeframe}")
+            logger.error(f"  Expected file: {self.historical_data_path}/{pair}_{timeframe}.csv")
+            logger.error(f"  Required columns: date, open, high, low, close, volume")
             
-            # Final fallback
-            data = self._generate_sample_data(pair, timeframe, days)
-            self.historical_data[cache_key] = data
-            return data
+            return pd.DataFrame()
             
         except Exception as e:
             logger.error(f"Error getting price data for {pair}: {e}")
-            return self._generate_sample_data(pair, timeframe, days)
+            return pd.DataFrame()
     
-    def _load_from_csv_with_current_dates(self, csv_file: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Load data dari CSV dan pastikan data hingga tanggal terakhir"""
+    def _load_from_csv_strict(self, csv_file: str, days: int) -> pd.DataFrame:
+        """Load data dari CSV dengan format yang spesifik"""
         try:
-            df = pd.read_csv(csv_file)
+            logger.info(f"Attempting to load CSV: {csv_file}")
             
-            # Mapping kolom yang fleksibel
-            column_mapping = {
-                'timestamp': ['timestamp', 'date', 'datetime', 'time', 'Date', 'DateTime'],
-                'open': ['open', 'Open', 'OPEN'],
-                'high': ['high', 'High', 'HIGH'],
-                'low': ['low', 'Low', 'LOW'], 
-                'close': ['close', 'Close', 'CLOSE'],
-                'volume': ['volume', 'Volume', 'VOLUME']
-            }
+            # Baca CSV dengan berbagai encoding
+            encodings = ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']
+            df = None
             
-            # Cari kolom yang sesuai
-            actual_columns = {}
-            for standard_col, possible_names in column_mapping.items():
-                for possible_name in possible_names:
-                    if possible_name in df.columns:
-                        actual_columns[standard_col] = possible_name
-                        break
+            for encoding in encodings:
+                try:
+                    df = pd.read_csv(csv_file, encoding=encoding)
+                    logger.info(f"Successfully read CSV with {encoding} encoding")
+                    break
+                except UnicodeDecodeError:
+                    continue
             
-            # Jika tidak ada kolom timestamp, buat berdasarkan index
-            if 'timestamp' not in actual_columns:
-                logger.warning(f"No timestamp column found in {csv_file}, generating dates...")
-                return self._generate_data_with_current_dates(csv_file, timeframe, days)
+            if df is None:
+                logger.error(f"Could not read CSV with any encoding: {csv_file}")
+                return pd.DataFrame()
             
-            # Rename kolom ke standar
-            rename_dict = {actual_columns[std]: std for std in actual_columns}
-            df = df.rename(columns=rename_dict)
+            # Log kolom yang ditemukan
+            logger.info(f"Columns found: {df.columns.tolist()}")
             
-            # Konversi timestamp
-            df['date'] = pd.to_datetime(df['timestamp'])
+            # Standardize column names (case insensitive)
+            column_mapping = {}
+            for col in df.columns:
+                col_lower = col.lower().strip()
+                if col_lower == 'date':
+                    column_mapping[col] = 'date'
+                elif col_lower == 'open':
+                    column_mapping[col] = 'open'
+                elif col_lower == 'high':
+                    column_mapping[col] = 'high'
+                elif col_lower == 'low':
+                    column_mapping[col] = 'low'
+                elif col_lower == 'close':
+                    column_mapping[col] = 'close'
+                elif col_lower == 'volume':
+                    column_mapping[col] = 'volume'
+            
+            # Rename columns
+            df = df.rename(columns=column_mapping)
+            
+            # Check required columns
+            required_columns = ['date', 'open', 'high', 'low', 'close']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                logger.error(f"Missing required columns: {missing_columns}")
+                logger.error(f"Available columns: {df.columns.tolist()}")
+                return pd.DataFrame()
+            
+            # Convert date column
+            df['date'] = pd.to_datetime(df['date'])
+            
+            # Convert numeric columns
+            for col in ['open', 'high', 'low', 'close', 'volume']:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # Remove rows with NaN values
+            df = df.dropna()
+            
+            # Sort by date
             df = df.sort_values('date').reset_index(drop=True)
             
-            # Periksa apakah data sudah sampai hari ini
-            latest_date = df['date'].max()
-            current_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            # Filter for requested days
+            if len(df) > 0:
+                end_date = df['date'].max()
+                start_date = end_date - timedelta(days=days)
+                df = df[df['date'] >= start_date]
             
-            # Jika data tidak sampai hari ini, generate data tambahan
-            if latest_date.date() < current_date.date():
-                logger.info(f"Data in {csv_file} ends at {latest_date}, but today is {current_date}. Generating updated data...")
-                return self._generate_updated_data(pair, timeframe, days, df)
+            logger.info(f"Successfully processed {len(df)} records from CSV")
             
-            # Filter untuk jumlah data yang diminta
-            target_points = self._calculate_target_points(timeframe, days)
-            if len(df) > target_points:
-                df = df.tail(target_points)
-            
-            logger.info(f"Data loaded successfully: {len(df)} records from {df['date'].min()} to {df['date'].max()}")
+            if len(df) == 0:
+                logger.error("No data remaining after processing")
+                return pd.DataFrame()
+                
             return df
             
         except Exception as e:
-            logger.error(f"Error loading CSV file {csv_file}: {e}")
-            return self._generate_data_with_current_dates(csv_file, timeframe, days)
-    
-    def _generate_data_with_current_dates(self, csv_file: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate data dengan tanggal terkini jika CSV tidak valid"""
-        try:
-            # Extract pair dari filename
-            filename = os.path.basename(csv_file)
-            pair = filename.split('_')[0]
-            
-            logger.info(f"Generating new data with current dates for {pair}-{timeframe}")
-            return self._create_updated_csv_data(pair, timeframe, days)
-        except Exception as e:
-            logger.error(f"Error generating data with current dates: {e}")
+            logger.error(f"Error loading CSV file {csv_file}: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return pd.DataFrame()
-    
-    def _generate_updated_data(self, pair: str, timeframe: str, days: int, existing_data: pd.DataFrame = None) -> pd.DataFrame:
-        """Generate data yang diperbarui hingga hari ini"""
-        logger.info(f"Generating updated data for {pair}-{timeframe} up to today")
-        
-        # Jika ada existing data, gunakan sebagai base
-        if existing_data is not None and not existing_data.empty:
-            base_data = existing_data
-            latest_existing_date = base_data['date'].max()
-        else:
-            base_data = None
-            latest_existing_date = datetime.now() - timedelta(days=days*2)
-        
-        # Generate data baru dari tanggal terakhir yang ada hingga sekarang
-        new_data = self._generate_realistic_sample_data(
-            pair, 
-            timeframe, 
-            days, 
-            start_date=latest_existing_date
-        )
-        
-        # Gabungkan dengan data existing jika ada
-        if base_data is not None and not base_data.empty:
-            combined_data = pd.concat([base_data, new_data], ignore_index=True)
-            combined_data = combined_data.drop_duplicates('date').sort_values('date').reset_index(drop=True)
-        else:
-            combined_data = new_data
-        
-        # Simpan ke CSV
-        self._save_to_csv(pair, timeframe, combined_data)
-        
-        # Filter untuk jumlah data yang diminta
-        target_points = self._calculate_target_points(timeframe, days)
-        if len(combined_data) > target_points:
-            combined_data = combined_data.tail(target_points)
-        
-        logger.info(f"Updated data generated: {len(combined_data)} records from {combined_data['date'].min()} to {combined_data['date'].max()}")
-        return combined_data
-    
-    def _create_updated_csv_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Buat data CSV yang diperbarui"""
-        data = self._generate_realistic_sample_data(pair, timeframe, days)
-        
-        if data.empty:
-            return pd.DataFrame()
-        
-        # Simpan ke CSV
-        self._save_to_csv(pair, timeframe, data)
-        
-        logger.info(f"Created updated CSV data for {pair}-{timeframe}: {len(data)} records")
-        return data
-    
-    def _generate_realistic_sample_data(self, pair: str, timeframe: str, days: int, start_date: datetime = None) -> pd.DataFrame:
-        """Generate realistic sample data hingga hari ini"""
-        logger.info(f"Generating realistic sample data for {pair}-{timeframe} up to today")
-        
-        # Base prices yang realistis
-        base_prices = {
-            'USDJPY': 148.50, 'EURUSD': 1.0850, 'GBPUSD': 1.2650,
-            'USDCHF': 0.8950, 'AUDUSD': 0.6580, 'USDCAD': 1.3580,
-            'NZDUSD': 0.6080, 'EURJPY': 161.00, 'GBPJPY': 187.50,
-            'CHFJPY': 166.00, 'CADJPY': 109.50
-        }
-        
-        base_price = base_prices.get(pair, 150.0)
-        
-        # Tentukan tanggal mulai dan akhir
-        if start_date is None:
-            start_date = datetime.now() - timedelta(days=days*2)  # Buffer untuk memastikan cukup data
-        end_date = datetime.now()
-        
-        # Hitung jumlah data points berdasarkan timeframe
-        points = self._calculate_data_points(timeframe, start_date, end_date)
-        points = max(100, min(points, 10000))
-        
-        # Generate dates berdasarkan timeframe
-        dates = self._generate_dates_based_on_timeframe(timeframe, start_date, end_date, points)
-        
-        # Tentukan volatility berdasarkan pair
-        volatility_map = {
-            'USDJPY': 0.0008, 'EURUSD': 0.0005, 'GBPUSD': 0.0006,
-            'USDCHF': 0.0004, 'AUDUSD': 0.0007, 'USDCAD': 0.0005,
-            'NZDUSD': 0.0008, 'EURJPY': 0.0009, 'GBPJPY': 0.0010,
-            'CHFJPY': 0.0007, 'CADJPY': 0.0006
-        }
-        
-        volatility = volatility_map.get(pair, 0.0005)
-        
-        # Generate price data
-        prices = []
-        current_price = base_price
-        
-        for i, date in enumerate(dates):
-            # Realistic price movement dengan trend dan noise
-            trend = np.sin(i / 50) * 0.0002  # Slow trend
-            noise = np.random.normal(0, volatility)
-            change = trend + noise
-            
-            current_price = max(0.1, current_price * (1 + change))  # Prevent negative prices
-            
-            # Generate realistic OHLC
-            open_price = current_price
-            daily_volatility = volatility * 3
-            high_price = open_price * (1 + abs(np.random.normal(0, daily_volatility)))
-            low_price = open_price * (1 - abs(np.random.normal(0, daily_volatility)))
-            close_price = open_price * (1 + np.random.normal(0, volatility * 0.5))
-            
-            # Pastikan hubungan OHLC yang realistis
-            high_price = max(open_price, close_price, high_price)
-            low_price = min(open_price, close_price, low_price)
-            
-            prices.append({
-                'date': date,
-                'open': round(open_price, 5),
-                'high': round(high_price, 5),
-                'low': round(low_price, 5),
-                'close': round(close_price, 5),
-                'volume': np.random.randint(10000, 100000)
-            })
-        
-        df = pd.DataFrame(prices)
-        logger.info(f"Generated {len(df)} realistic data points for {pair} from {df['date'].min()} to {df['date'].max()}")
-        return df
-    
-    def _generate_dates_based_on_timeframe(self, timeframe: str, start_date: datetime, end_date: datetime, points: int) -> List[datetime]:
-        """Generate list of dates berdasarkan timeframe"""
-        dates = []
-        current_date = start_date
-        
-        if timeframe == '1D':
-            # Data harian - skip weekend (Sabtu dan Minggu)
-            while current_date <= end_date and len(dates) < points:
-                if current_date.weekday() < 5:  # Senin-Jumat
-                    dates.append(current_date.replace(hour=0, minute=0, second=0, microsecond=0))
-                current_date += timedelta(days=1)
-                
-        elif timeframe == '4H':
-            # Data 4 jam - trading hours saja (Senin-Jumat)
-            while current_date <= end_date and len(dates) < points:
-                if current_date.weekday() < 5:  # Senin-Jumat
-                    for hour in [0, 4, 8, 12, 16, 20]:  # Setiap 4 jam
-                        trading_date = current_date.replace(hour=hour, minute=0, second=0, microsecond=0)
-                        if trading_date <= end_date:
-                            dates.append(trading_date)
-                current_date += timedelta(days=1)
-                
-        elif timeframe == '1H':
-            # Data 1 jam - trading hours saja
-            while current_date <= end_date and len(dates) < points:
-                if current_date.weekday() < 5:  # Senin-Jumat
-                    for hour in range(24):  # Setiap jam
-                        trading_date = current_date.replace(hour=hour, minute=0, second=0, microsecond=0)
-                        if trading_date <= end_date:
-                            dates.append(trading_date)
-                current_date += timedelta(days=1)
-                
-        elif timeframe == 'M30':
-            # Data 30 menit - trading hours saja
-            while current_date <= end_date and len(dates) < points:
-                if current_date.weekday() < 5:  # Senin-Jumat
-                    for hour in range(24):
-                        for minute in [0, 30]:
-                            trading_date = current_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                            if trading_date <= end_date:
-                                dates.append(trading_date)
-                current_date += timedelta(days=1)
-                
-        else:  # Default ke harian
-            while current_date <= end_date and len(dates) < points:
-                if current_date.weekday() < 5:
-                    dates.append(current_date.replace(hour=0, minute=0, second=0, microsecond=0))
-                current_date += timedelta(days=1)
-        
-        # Jika tidak cukup points, isi dengan data terbaru
-        while len(dates) < points:
-            new_date = end_date - timedelta(days=len(dates))
-            if new_date.weekday() < 5:  # Skip weekend
-                dates.append(new_date.replace(hour=0, minute=0, second=0, microsecond=0))
-        
-        dates.sort()
-        return dates
-    
-    def _calculate_data_points(self, timeframe: str, start_date: datetime, end_date: datetime) -> int:
-        """Hitung jumlah data points berdasarkan timeframe dan rentang tanggal"""
-        trading_days = np.busday_count(start_date.date(), end_date.date())
-        
-        if timeframe == '1D':
-            return trading_days
-        elif timeframe == '4H':
-            return trading_days * 6  # 6 sesi 4 jam per hari
-        elif timeframe == '1H':
-            return trading_days * 24  # 24 jam per hari
-        elif timeframe == 'M30':
-            return trading_days * 48  # 48 sesi 30 menit per hari
-        else:
-            return trading_days * 24  # Default ke hourly
-    
-    def _calculate_target_points(self, timeframe: str, days: int) -> int:
-        """Hitung target jumlah data points"""
-        if timeframe == '1D':
-            return min(days, 365)  # Max 1 tahun data
-        elif timeframe == '4H':
-            return days * 6
-        elif timeframe == '1H':
-            return days * 24
-        elif timeframe == 'M30':
-            return days * 48
-        else:
-            return days * 24
-    
-    def _save_to_csv(self, pair: str, timeframe: str, data: pd.DataFrame):
-        """Simpan data ke CSV"""
-        try:
-            csv_filename = f"{self.historical_data_path}/{pair}_{timeframe}.csv"
-            
-            # Siapkan data untuk CSV
-            csv_data = data.copy()
-            csv_data['timestamp'] = csv_data['date']
-            csv_data = csv_data[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
-            
-            # Simpan ke file
-            csv_data.to_csv(csv_filename, index=False)
-            logger.info(f"Saved data to {csv_filename} with {len(data)} records")
-            
-        except Exception as e:
-            logger.error(f"Error saving CSV: {e}")
 
     def get_current_price(self, pair: str) -> float:
-        """Get current price dari data terbaru"""
+        """Get current price dari data CSV terbaru"""
         try:
-            # Dapatkan data terbaru
+            # Dapatkan data terbaru dari CSV
             data = self.get_price_data(pair, '1H', 1)
             if not data.empty:
                 current_price = float(data['close'].iloc[-1])
-                logger.info(f"Got current price for {pair} from historical data: {current_price}")
+                logger.info(f"Got current price for {pair} from CSV: {current_price}")
                 return current_price
             
-            # Fallback ke nilai default berdasarkan pair
-            base_prices = {
-                'USDJPY': 148.50, 'EURUSD': 1.0850, 'GBPUSD': 1.2650,
-                'USDCHF': 0.8950, 'AUDUSD': 0.6580, 'USDCAD': 1.3580,
-                'NZDUSD': 0.6080, 'EURJPY': 161.00, 'GBPJPY': 187.50,
-                'CHFJPY': 166.00, 'CADJPY': 109.50
-            }
-            
-            price = base_prices.get(pair, 150.0)
-            logger.info(f"Using default price for {pair}: {price}")
-            return price
+            logger.error(f"Cannot get current price for {pair} - no CSV data available")
+            return 0.0  # Return 0 untuk indikasi error
             
         except Exception as e:
             logger.error(f"Error getting current price for {pair}: {e}")
-            return 150.0
+            return 0.0
 
-    def _generate_sample_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Fallback sample data generator"""
-        return self._generate_realistic_sample_data(pair, timeframe, days)
+    def validate_csv_files(self):
+        """Validasi semua file CSV yang tersedia"""
+        logger.info("Validating CSV files...")
+        
+        pairs = config.FOREX_PAIRS
+        timeframes = ['M30', '1H', '4H', '1D']
+        
+        valid_files = 0
+        for pair in pairs:
+            for timeframe in timeframes:
+                csv_file = f"{self.historical_data_path}/{pair}_{timeframe}.csv"
+                if os.path.exists(csv_file):
+                    data = self._load_from_csv_strict(csv_file, 1)
+                    if not data.empty:
+                        valid_files += 1
+                        latest_date = data['date'].max().strftime('%Y-%m-%d')
+                        logger.info(f"✓ {pair}-{timeframe}: VALID ({len(data)} records, up to {latest_date})")
+                    else:
+                        logger.error(f"✗ {pair}-{timeframe}: INVALID")
+                else:
+                    logger.warning(f"? {pair}-{timeframe}: NOT FOUND")
+        
+        logger.info(f"CSV validation completed: {valid_files} valid files found")
+        return valid_files
+
+    def get_available_pairs_timeframes(self):
+        """Dapatkan daftar pair dan timeframe yang tersedia"""
+        available_data = {}
+        
+        for pair in config.FOREX_PAIRS:
+            for timeframe in config.TIMEFRAMES:
+                csv_file = f"{self.historical_data_path}/{pair}_{timeframe}.csv"
+                if os.path.exists(csv_file):
+                    data = self._load_from_csv_strict(csv_file, 1)
+                    if not data.empty:
+                        if pair not in available_data:
+                            available_data[pair] = []
+                        available_data[pair].append({
+                            'timeframe': timeframe,
+                            'records': len(data),
+                            'latest_date': data['date'].max().strftime('%Y-%m-%d')
+                        })
+        
+        return available_data
 
 # ==================== DEEPSEEK AI ANALYZER ====================
 class DeepSeekAnalyzer:
@@ -1151,33 +971,6 @@ def convert_numpy_types(obj):
     else:
         return obj
 
-def initialize_historical_data():
-    """Initialize historical data pada startup"""
-    try:
-        logger.info("Initializing historical data...")
-        
-        # Generate data untuk pair utama dan timeframe
-        main_pairs = ['USDJPY', 'EURUSD', 'GBPUSD']
-        timeframes = ['1D', '4H', '1H', 'M30']
-        
-        for pair in main_pairs:
-            for timeframe in timeframes:
-                try:
-                    # Ini akan otomatis create data jika belum ada
-                    data = data_manager.get_price_data(pair, timeframe, days=90)
-                    if not data.empty:
-                        latest_date = data['date'].max().strftime('%Y-%m-%d')
-                        logger.info(f"✓ {pair}-{timeframe}: {len(data)} records, up to {latest_date}")
-                    else:
-                        logger.warning(f"✗ {pair}-{timeframe}: Failed to generate data")
-                except Exception as e:
-                    logger.error(f"Error initializing {pair}-{timeframe}: {e}")
-                    
-        logger.info("Historical data initialization completed")
-                    
-    except Exception as e:
-        logger.error(f"Error in historical data initialization: {e}")
-
 # ==================== INISIALISASI SISTEM ====================
 logger.info("Initializing Enhanced Forex Analysis System...")
 
@@ -1189,18 +982,30 @@ news_analyzer = NewsAnalyzer()
 risk_manager = AdvancedRiskManager()
 backtesting_engine = AdvancedBacktestingEngine()
 
-# Initialize historical data
-initialize_historical_data()
+# Validate CSV files on startup
+logger.info("Validating CSV data files...")
+valid_files = data_manager.validate_csv_files()
+
+if valid_files == 0:
+    logger.error("❌ No valid CSV files found! Please check your historical_data folder.")
+    logger.error("   Required format: date,open,high,low,close,volume")
+    logger.error("   Expected files: USDJPY_1D.csv, EURUSD_4H.csv, etc.")
+else:
+    logger.info(f"✅ {valid_files} valid CSV files loaded successfully")
 
 logger.info("All system components initialized successfully")
 
 # ==================== FLASK ROUTES ====================
 @app.route('/')
 def index():
+    # Dapatkan data yang tersedia untuk ditampilkan di frontend
+    available_data = data_manager.get_available_pairs_timeframes()
+    
     return render_template('index.html', 
                          pairs=config.FOREX_PAIRS,
                          timeframes=config.TIMEFRAMES,
-                         initial_balance=config.INITIAL_BALANCE)
+                         initial_balance=config.INITIAL_BALANCE,
+                         available_data=available_data)
 
 @app.route('/api/analyze')
 def api_analyze():
@@ -1212,10 +1017,10 @@ def api_analyze():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # Get price data
+        # Get price data - HANYA dari CSV
         price_data = data_manager.get_price_data(pair, timeframe, days=60)
         if price_data.empty:
-            return jsonify({'error': 'No price data available'}), 400
+            return jsonify({'error': f'No CSV data available for {pair}-{timeframe}. Please check historical_data folder.'}), 400
         
         # Technical analysis
         technical_analysis = tech_engine.calculate_all_indicators(price_data)
@@ -1228,6 +1033,8 @@ def api_analyze():
         
         # Current price
         current_price = data_manager.get_current_price(pair)
+        if current_price == 0:
+            current_price = technical_analysis['levels']['current_price']
         
         response = {
             'pair': pair,
@@ -1272,10 +1079,10 @@ def api_backtest():
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
-        # Get price data
+        # Get price data - HANYA dari CSV
         price_data = data_manager.get_price_data(pair, timeframe, days)
         if price_data.empty:
-            return jsonify({'error': 'No price data available for backtesting'}), 400
+            return jsonify({'error': f'No CSV data available for backtesting {pair}-{timeframe}'}), 400
         
         # Generate signals
         signals = generate_trading_signals(price_data, pair, timeframe)
@@ -1303,17 +1110,19 @@ def api_backtest():
 @app.route('/api/system_status')
 def api_system_status():
     """Status sistem"""
+    available_data = data_manager.get_available_pairs_timeframes()
+    
     return jsonify({
         'system': 'RUNNING',
         'supported_pairs': config.FOREX_PAIRS,
         'data_sources': {
-            'historical_data': 'CSV Files',
-            'realtime_data': 'TwelveData API',
+            'historical_data': 'CSV Files Only',
             'ai_analysis': 'DeepSeek AI',
             'news': 'NewsAPI'
         },
+        'available_data': available_data,
         'server_time': datetime.now().isoformat(),
-        'version': '2.0 - Real Data Sources'
+        'version': '2.0 - CSV Data Only'
     })
 
 @app.route('/api/current_price/<pair>')
@@ -1321,6 +1130,9 @@ def api_current_price(pair):
     """Get current price untuk pair tertentu"""
     try:
         price = data_manager.get_current_price(pair)
+        if price == 0:
+            return jsonify({'error': f'No CSV data available for {pair}'}), 404
+            
         return jsonify({
             'pair': pair,
             'price': price,
@@ -1342,10 +1154,10 @@ def api_historical_data(pair, timeframe):
         if timeframe not in config.TIMEFRAMES:
             return jsonify({'error': f'Unsupported timeframe: {timeframe}'}), 400
         
-        # Get price data
+        # Get price data - HANYA dari CSV
         price_data = data_manager.get_price_data(pair, timeframe, days)
         if price_data.empty:
-            return jsonify({'error': 'No historical data available'}), 400
+            return jsonify({'error': f'No CSV data available for {pair}-{timeframe}'}), 404
         
         # Format data untuk chart
         chart_data = []
@@ -1375,11 +1187,87 @@ def api_historical_data(pair, timeframe):
         logger.error(f"Historical data error for {pair}-{timeframe}: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/debug/csv_status')
+def api_debug_csv_status():
+    """Endpoint untuk debug status CSV files"""
+    try:
+        historical_data_path = "historical_data"
+        csv_files = []
+        
+        if os.path.exists(historical_data_path):
+            for f in os.listdir(historical_data_path):
+                if f.endswith('.csv'):
+                    file_path = os.path.join(historical_data_path, f)
+                    file_size = os.path.getsize(file_path)
+                    
+                    # Try to read the file
+                    try:
+                        df = pd.read_csv(file_path)
+                        status = "VALID"
+                        records = len(df)
+                        columns = list(df.columns)
+                        
+                        # Check date range
+                        if 'date' in df.columns:
+                            df['date'] = pd.to_datetime(df['date'])
+                            date_range = f"{df['date'].min().strftime('%Y-%m-%d')} to {df['date'].max().strftime('%Y-%m-%d')}"
+                        else:
+                            date_range = "N/A"
+                            
+                    except Exception as e:
+                        status = f"INVALID: {str(e)}"
+                        records = 0
+                        columns = []
+                        date_range = "N/A"
+                    
+                    csv_files.append({
+                        'filename': f,
+                        'size_kb': round(file_size / 1024, 2),
+                        'status': status,
+                        'records': records,
+                        'columns': columns,
+                        'date_range': date_range
+                    })
+        
+        return jsonify({
+            'csv_files': csv_files,
+            'historical_data_path': os.path.abspath(historical_data_path),
+            'total_files': len(csv_files)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/debug/csv_sample/<pair>/<timeframe>')
+def api_debug_csv_sample(pair, timeframe):
+    """Endpoint untuk melihat sample data dari CSV"""
+    try:
+        csv_file = f"historical_data/{pair}_{timeframe}.csv"
+        
+        if not os.path.exists(csv_file):
+            return jsonify({'error': f'File not found: {csv_file}'}), 404
+        
+        df = pd.read_csv(csv_file)
+        
+        return jsonify({
+            'filename': csv_file,
+            'columns': list(df.columns),
+            'total_records': len(df),
+            'sample_data': df.head(10).to_dict('records'),
+            'date_range': {
+                'min': df['date'].min() if 'date' in df.columns else 'N/A',
+                'max': df['date'].max() if 'date' in df.columns else 'N/A'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
-    logger.info("Starting Enhanced Forex Analysis System v2.0...")
+    logger.info("Starting Enhanced Forex Analysis System v2.0 - CSV Only Mode...")
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
-    logger.info("Data Sources: CSV Historical + TwelveData Real-time + DeepSeek AI + NewsAPI")
+    logger.info("Data Sources: CSV Historical Data Only")
     
     # Create necessary directories
     os.makedirs('historical_data', exist_ok=True)
