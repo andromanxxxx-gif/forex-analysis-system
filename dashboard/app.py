@@ -93,6 +93,195 @@ class SystemConfig:
 
 config = SystemConfig()
 
+# ==================== DATA MANAGER YANG DIPERBAIKI ====================
+class DataManager:
+    def __init__(self):
+        self.historical_data = {}
+        logger.info("Data Manager initialized")
+    
+    def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
+        """Mendapatkan data harga dengan fallback ke data sintetis jika API gagal"""
+        try:
+            cache_key = f"{pair}_{timeframe}_{days}"
+            
+            if cache_key in self.historical_data:
+                return self.historical_data[cache_key]
+            
+            # Coba dapatkan data dari yfinance
+            yf_symbol = self._convert_to_yfinance_symbol(pair)
+            if yf_symbol:
+                try:
+                    data = self._get_yfinance_data(yf_symbol, timeframe, days)
+                    if not data.empty:
+                        self.historical_data[cache_key] = data
+                        logger.info(f"Loaded {len(data)} records for {pair}-{timeframe} from yfinance")
+                        return data
+                except Exception as e:
+                    logger.warning(f"yFinance failed for {pair}: {e}")
+            
+            # Fallback ke data sintetis
+            logger.info(f"Using synthetic data for {pair}-{timeframe}")
+            data = self._generate_synthetic_data(pair, timeframe, days)
+            self.historical_data[cache_key] = data
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error getting price data for {pair}: {e}")
+            return self._generate_synthetic_data(pair, timeframe, days)
+    
+    def _convert_to_yfinance_symbol(self, pair: str) -> str:
+        """Convert forex pair to yfinance symbol"""
+        forex_mapping = {
+            'USDJPY': 'USDJPY=X',
+            'EURUSD': 'EURUSD=X',
+            'GBPUSD': 'GBPUSD=X',
+            'USDCHF': 'USDCHF=X',
+            'AUDUSD': 'AUDUSD=X',
+            'USDCAD': 'USDCAD=X',
+            'NZDUSD': 'NZDUSD=X',
+            'EURJPY': 'EURJPY=X',
+            'GBPJPY': 'GBPJPY=X',
+            'CHFJPY': 'CHFJPY=X',
+            'CADJPY': 'CADJPY=X'
+        }
+        return forex_mapping.get(pair, '')
+    
+    def _get_yfinance_data(self, symbol: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Get data from yfinance"""
+        # Map timeframe to yfinance interval
+        interval_map = {
+            'M30': '30m',
+            '1H': '1h',
+            '4H': '4h',
+            '1D': '1d',
+            '1W': '1wk'
+        }
+        
+        interval = interval_map.get(timeframe, '1h')
+        
+        # Calculate period based on days and timeframe
+        if timeframe == 'M30':
+            period = f"{min(days * 2, 60)}d"
+        elif timeframe == '1H':
+            period = f"{min(days * 2, 60)}d"
+        elif timeframe == '4H':
+            period = f"{min(days * 4, 120)}d"
+        else:
+            period = f"{min(days, 365)}d"
+        
+        try:
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(interval=interval, period=period)
+            
+            if data.empty:
+                return pd.DataFrame()
+            
+            # Reset index and rename columns
+            data = data.reset_index()
+            data = data.rename(columns={
+                'Date': 'date',
+                'Open': 'open',
+                'High': 'high',
+                'Low': 'low',
+                'Close': 'close',
+                'Volume': 'volume'
+            })
+            
+            # Ensure we have required columns
+            required_cols = ['date', 'open', 'high', 'low', 'close']
+            for col in required_cols:
+                if col not in data.columns:
+                    logger.error(f"Missing column {col} in yfinance data")
+                    return pd.DataFrame()
+            
+            # Sort by date
+            data = data.sort_values('date').reset_index(drop=True)
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"yFinance error for {symbol}: {e}")
+            return pd.DataFrame()
+    
+    def _generate_synthetic_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Generate synthetic price data untuk testing"""
+        logger.info(f"Generating synthetic data for {pair}-{timeframe} ({days} days)")
+        
+        # Base prices untuk different pairs
+        base_prices = {
+            'USDJPY': 150.0,
+            'EURUSD': 1.0800,
+            'GBPUSD': 1.2600,
+            'USDCHF': 0.8800,
+            'AUDUSD': 0.6500,
+            'USDCAD': 1.3600,
+            'NZDUSD': 0.5900,
+            'EURJPY': 162.0,
+            'GBPJPY': 189.0,
+            'CHFJPY': 170.0,
+            'CADJPY': 110.0
+        }
+        
+        base_price = base_prices.get(pair, 150.0)
+        
+        # Points per day berdasarkan timeframe
+        points_per_day = {
+            'M30': 48,   # 24 hours * 2 (30-min intervals)
+            '1H': 24,    # 24 hours
+            '4H': 6,     # 24 hours / 4
+            '1D': 1,
+            '1W': 1
+        }
+        
+        points = days * points_per_day.get(timeframe, 24)
+        points = max(100, min(points, 10000))  # Batasi antara 100-10000 points
+        
+        dates = []
+        prices = []
+        
+        current_price = base_price
+        current_date = datetime.now() - timedelta(days=days)
+        
+        volatility = 0.001  # 0.1% volatility
+        
+        for i in range(points):
+            dates.append(current_date)
+            
+            # Random price movement
+            change = np.random.normal(0, volatility)
+            current_price = current_price * (1 + change)
+            
+            # Generate OHLC data
+            open_price = current_price
+            high_price = open_price * (1 + abs(np.random.normal(0, volatility/2)))
+            low_price = open_price * (1 - abs(np.random.normal(0, volatility/2)))
+            close_price = open_price * (1 + np.random.normal(0, volatility))
+            
+            prices.append({
+                'date': current_date,
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
+                'volume': np.random.randint(1000, 10000)
+            })
+            
+            # Increment time based on timeframe
+            if timeframe == 'M30':
+                current_date += timedelta(minutes=30)
+            elif timeframe == '1H':
+                current_date += timedelta(hours=1)
+            elif timeframe == '4H':
+                current_date += timedelta(hours=4)
+            elif timeframe == '1D':
+                current_date += timedelta(days=1)
+            elif timeframe == '1W':
+                current_date += timedelta(weeks=1)
+        
+        df = pd.DataFrame(prices)
+        logger.info(f"Generated {len(df)} synthetic data points for {pair}")
+        return df
+
 # ==================== ENHANCED TECHNICAL ANALYSIS ENGINE ====================
 class TechnicalAnalysisEngine:
     def __init__(self):
@@ -1264,10 +1453,6 @@ class AdvancedBacktestingEngine:
                 'message': 'No trades executed during backtest period'
             }
         }
-
-# ==================== INISIALISASI KOMPONEN SISTEM ====================
-# ... (kode untuk TwelveDataClient, DeepSeekAnalyzer, DataManager, FundamentalAnalysisEngine tetap sama)
-# Untuk menghemat ruang, saya tidak menulis ulang komponen yang tidak berubah
 
 # ==================== UTILITY FUNCTIONS ====================
 def convert_numpy_types(obj):
