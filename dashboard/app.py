@@ -92,39 +92,45 @@ class SystemConfig:
 
 config = SystemConfig()
 
-# ==================== DATA MANAGER DENGAN CSV HISTORICAL DATA ====================
+# ==================== DATA MANAGER YANG DIPERBAIKI ====================
 class DataManager:
     def __init__(self):
         self.historical_data = {}
         self.historical_data_path = "historical_data"
-        logger.info("Data Manager with CSV historical data initialized")
+        os.makedirs(self.historical_data_path, exist_ok=True)
+        logger.info("Data Manager with flexible CSV handling initialized")
     
     def get_price_data(self, pair: str, timeframe: str, days: int = 30) -> pd.DataFrame:
-        """Mendapatkan data harga dari CSV historical data"""
+        """Mendapatkan data harga dari CSV historical data dengan handling format yang fleksibel"""
         try:
             cache_key = f"{pair}_{timeframe}_{days}"
             
             if cache_key in self.historical_data:
                 return self.historical_data[cache_key]
             
-            # Coba baca dari file CSV
-            csv_file = f"{self.historical_data_path}/{pair}_{timeframe}.csv"
-            if os.path.exists(csv_file):
-                data = self._load_from_csv(csv_file, days)
-                if not data.empty:
-                    self.historical_data[cache_key] = data
-                    logger.info(f"Loaded {len(data)} records for {pair}-{timeframe} from CSV")
-                    return data
+            # Coba baca dari file CSV dengan berbagai format
+            csv_files = [
+                f"{self.historical_data_path}/{pair}_{timeframe}.csv",
+                f"{self.historical_data_path}/{pair}.csv",
+                f"{self.historical_data_path}/{pair.replace('/', '')}_{timeframe}.csv"
+            ]
             
-            # Fallback ke TwelveData API
-            logger.info(f"Trying to fetch data from TwelveData for {pair}-{timeframe}")
-            data = self._get_twelvedata_data(pair, timeframe, days)
+            for csv_file in csv_files:
+                if os.path.exists(csv_file):
+                    data = self._load_from_csv_flexible(csv_file, days)
+                    if not data.empty:
+                        self.historical_data[cache_key] = data
+                        logger.info(f"Loaded {len(data)} records for {pair}-{timeframe} from {csv_file}")
+                        return data
+            
+            # Jika CSV tidak ada, buat sample CSV
+            logger.info(f"No CSV found for {pair}-{timeframe}, creating sample data...")
+            data = self._create_sample_csv_data(pair, timeframe, days)
             if not data.empty:
                 self.historical_data[cache_key] = data
                 return data
             
-            # Final fallback ke data sample
-            logger.warning(f"Using sample data for {pair}-{timeframe}")
+            # Final fallback
             data = self._generate_sample_data(pair, timeframe, days)
             self.historical_data[cache_key] = data
             return data
@@ -133,139 +139,249 @@ class DataManager:
             logger.error(f"Error getting price data for {pair}: {e}")
             return self._generate_sample_data(pair, timeframe, days)
     
-    def _load_from_csv(self, csv_file: str, days: int) -> pd.DataFrame:
-        """Load data dari file CSV"""
+    def _load_from_csv_flexible(self, csv_file: str, days: int) -> pd.DataFrame:
+        """Load data dari file CSV dengan handling format yang fleksibel"""
         try:
-            df = pd.read_csv(csv_file)
+            # Coba baca dengan encoding berbeda
+            encodings = ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']
             
-            # Pastikan kolom yang diperlukan ada
-            required_columns = ['timestamp', 'open', 'high', 'low', 'close']
-            for col in required_columns:
-                if col not in df.columns:
-                    logger.error(f"Missing column {col} in CSV file {csv_file}")
-                    return pd.DataFrame()
+            for encoding in encodings:
+                try:
+                    df = pd.read_csv(csv_file, encoding=encoding)
+                    logger.info(f"Successfully read {csv_file} with {encoding} encoding")
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                logger.error(f"Could not read {csv_file} with any encoding")
+                return pd.DataFrame()
+            
+            # Debug: log columns found
+            logger.info(f"Columns found in CSV: {df.columns.tolist()}")
+            
+            # Mapping kolom yang fleksibel
+            column_mapping = {
+                'timestamp': ['timestamp', 'date', 'datetime', 'time', 'Date', 'DateTime'],
+                'open': ['open', 'Open', 'OPEN'],
+                'high': ['high', 'High', 'HIGH'],
+                'low': ['low', 'Low', 'LOW'], 
+                'close': ['close', 'Close', 'CLOSE'],
+                'volume': ['volume', 'Volume', 'VOLUME']
+            }
+            
+            # Cari kolom yang sesuai
+            actual_columns = {}
+            for standard_col, possible_names in column_mapping.items():
+                for possible_name in possible_names:
+                    if possible_name in df.columns:
+                        actual_columns[standard_col] = possible_name
+                        break
+                if standard_col not in actual_columns:
+                    logger.warning(f"Column {standard_col} not found in CSV. Available: {df.columns.tolist()}")
+            
+            # Jika tidak ada kolom timestamp, coba gunakan index
+            if 'timestamp' not in actual_columns:
+                if 'date' in actual_columns:
+                    actual_columns['timestamp'] = actual_columns['date']
+                else:
+                    # Buat timestamp dari index
+                    df['timestamp'] = pd.date_range(start='2020-01-01', periods=len(df), freq='H')
+                    actual_columns['timestamp'] = 'timestamp'
+                    logger.info("Created timestamp from index")
+            
+            # Pastikan kolom OHLC ada
+            required_ohlc = ['open', 'high', 'low', 'close']
+            missing_ohlc = [col for col in required_ohlc if col not in actual_columns]
+            if missing_ohlc:
+                logger.error(f"Missing required columns: {missing_ohlc}")
+                return pd.DataFrame()
+            
+            # Rename kolom ke standar
+            rename_dict = {actual_columns[std]: std for std in actual_columns}
+            df = df.rename(columns=rename_dict)
+            
+            # Pastikan kita hanya mengambil kolom yang diperlukan
+            required_cols = ['timestamp'] + required_ohlc
+            optional_cols = ['volume']
+            
+            available_cols = [col for col in required_cols if col in df.columns]
+            available_cols += [col for col in optional_cols if col in df.columns]
+            
+            df = df[available_cols]
             
             # Konversi timestamp
             df['date'] = pd.to_datetime(df['timestamp'])
             df = df.sort_values('date').reset_index(drop=True)
             
-            # Filter untuk jumlah hari yang diminta
-            if len(df) > days:
-                df = df.tail(days)
+            # Konversi kolom numerik
+            for col in required_ohlc + optional_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
             
+            # Hapus rows dengan NaN
+            df = df.dropna()
+            
+            # Filter untuk jumlah hari yang diminta
+            if len(df) > days * 24:  # Asumsi data hourly
+                df = df.tail(days * 24)
+            
+            logger.info(f"Successfully processed {len(df)} records from {csv_file}")
             return df
             
         except Exception as e:
             logger.error(f"Error loading CSV file {csv_file}: {e}")
             return pd.DataFrame()
     
-    def _get_twelvedata_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Get real-time data dari TwelveData API"""
+    def _create_sample_csv_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Buat sample CSV data untuk testing"""
         try:
-            if config.TWELVE_DATA_KEY == "demo":
-                logger.warning("Using demo TwelveData key - limited functionality")
+            # Generate sample data
+            data = self._generate_realistic_sample_data(pair, timeframe, days)
+            
+            if data.empty:
                 return pd.DataFrame()
             
-            # Map timeframe ke interval TwelveData
-            interval_map = {
-                'M30': '30min',
-                '1H': '1h',
-                '4H': '4h',
-                '1D': '1day',
-                '1W': '1week'
-            }
+            # Simpan ke CSV
+            csv_filename = f"{self.historical_data_path}/{pair}_{timeframe}.csv"
             
-            interval = interval_map.get(timeframe, '1h')
-            symbol = f"{pair[:3]}/{pair[3:]}"
+            # Siapkan data untuk CSV
+            csv_data = data.copy()
+            csv_data['timestamp'] = csv_data['date']
+            csv_data = csv_data[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
             
-            url = f"https://api.twelvedata.com/time_series"
-            params = {
-                'symbol': symbol,
-                'interval': interval,
-                'outputsize': min(days * 5, 5000),  # Max 5000 data points
-                'apikey': config.TWELVE_DATA_KEY,
-                'format': 'JSON'
-            }
+            # Simpan ke file
+            csv_data.to_csv(csv_filename, index=False)
+            logger.info(f"Created sample CSV data: {csv_filename} with {len(data)} records")
             
-            response = requests.get(url, params=params, timeout=10)
+            return data
             
-            if response.status_code == 200:
-                data = response.json()
-                
-                if 'values' in data:
-                    df = pd.DataFrame(data['values'])
-                    
-                    # Convert dan rename columns
-                    df['date'] = pd.to_datetime(df['datetime'])
-                    df = df.rename(columns={
-                        'open': 'open',
-                        'high': 'high', 
-                        'low': 'low',
-                        'close': 'close',
-                        'volume': 'volume'
-                    })
-                    
-                    # Convert to numeric
-                    for col in ['open', 'high', 'low', 'close', 'volume']:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                    
-                    df = df.dropna().sort_values('date').reset_index(drop=True)
-                    logger.info(f"Successfully fetched {len(df)} records from TwelveData for {pair}")
-                    return df
-                else:
-                    logger.warning(f"No data in TwelveData response for {pair}")
-                    return pd.DataFrame()
-            else:
-                logger.warning(f"TwelveData API error: {response.status_code}")
-                return pd.DataFrame()
-                
         except Exception as e:
-            logger.error(f"TwelveData API error for {pair}: {e}")
+            logger.error(f"Error creating sample CSV: {e}")
             return pd.DataFrame()
     
-    def _generate_sample_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
-        """Generate sample data hanya untuk fallback"""
-        logger.info(f"Generating sample data for {pair}-{timeframe}")
+    def _generate_realistic_sample_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Generate realistic sample data berdasarkan pair forex"""
+        logger.info(f"Generating realistic sample data for {pair}-{timeframe}")
         
+        # Base prices untuk different pairs (realistic values)
         base_prices = {
-            'USDJPY': 150.0, 'EURUSD': 1.0800, 'GBPUSD': 1.2600,
-            'USDCHF': 0.8800, 'AUDUSD': 0.6500, 'USDCAD': 1.3600,
-            'NZDUSD': 0.5900, 'EURJPY': 162.0, 'GBPJPY': 189.0,
-            'CHFJPY': 170.0, 'CADJPY': 110.0
+            'USDJPY': 148.50, 'EURUSD': 1.0850, 'GBPUSD': 1.2650,
+            'USDCHF': 0.8950, 'AUDUSD': 0.6580, 'USDCAD': 1.3580,
+            'NZDUSD': 0.6080, 'EURJPY': 161.00, 'GBPJPY': 187.50,
+            'CHFJPY': 166.00, 'CADJPY': 109.50
         }
         
         base_price = base_prices.get(pair, 150.0)
-        points = min(days * 24, 1000)  # Max 1000 points
         
-        dates = [datetime.now() - timedelta(hours=i) for i in range(points)][::-1]
+        # Tentukan jumlah data points berdasarkan timeframe
+        points_map = {
+            'M30': days * 48,   # 48 points per day (24 hours * 2)
+            '1H': days * 24,    # 24 points per day
+            '4H': days * 6,     # 6 points per day
+            '1D': days,         # 1 point per day
+            '1W': min(days // 7, 52)  # 52 weeks max
+        }
         
+        points = points_map.get(timeframe, days * 24)
+        points = max(100, min(points, 5000))  # Batasi antara 100-5000 points
+        
+        # Tentukan volatility berdasarkan pair
+        volatility_map = {
+            'USDJPY': 0.0008, 'EURUSD': 0.0005, 'GBPUSD': 0.0006,
+            'USDCHF': 0.0004, 'AUDUSD': 0.0007, 'USDCAD': 0.0005,
+            'NZDUSD': 0.0008, 'EURJPY': 0.0009, 'GBPJPY': 0.0010,
+            'CHFJPY': 0.0007, 'CADJPY': 0.0006
+        }
+        
+        volatility = volatility_map.get(pair, 0.0005)
+        
+        dates = []
         prices = []
-        current_price = base_price
         
-        for i, date in enumerate(dates):
-            # Realistic price movement
-            change = np.random.normal(0, 0.001)
+        current_price = base_price
+        current_date = datetime.now() - timedelta(days=days)
+        
+        for i in range(points):
+            dates.append(current_date)
+            
+            # Realistic price movement dengan trend dan noise
+            trend = np.sin(i / 50) * 0.0002  # Slow trend
+            noise = np.random.normal(0, volatility)
+            change = trend + noise
+            
             current_price = current_price * (1 + change)
             
-            # Generate OHLC
+            # Generate realistic OHLC
             open_price = current_price
-            high_price = open_price * (1 + abs(np.random.normal(0, 0.0005)))
-            low_price = open_price * (1 - abs(np.random.normal(0, 0.0005)))
-            close_price = open_price * (1 + np.random.normal(0, 0.0005))
+            # High dan Low yang realistic (tidak terlalu jauh dari open)
+            daily_volatility = volatility * 3  # Lebih volatile untuk high/low
+            high_price = open_price * (1 + abs(np.random.normal(0, daily_volatility)))
+            low_price = open_price * (1 - abs(np.random.normal(0, daily_volatility)))
+            
+            # Close price yang correlated dengan open
+            close_noise = np.random.normal(0, volatility * 0.5)
+            close_price = open_price * (1 + close_noise)
+            
+            # Pastikan high > low dan high >= open,close dan low <= open,close
+            high_price = max(open_price, close_price, high_price)
+            low_price = min(open_price, close_price, low_price)
             
             prices.append({
-                'date': date,
+                'date': current_date,
                 'open': open_price,
                 'high': high_price,
                 'low': low_price,
                 'close': close_price,
-                'volume': np.random.randint(1000, 10000)
+                'volume': np.random.randint(10000, 100000)
             })
+            
+            # Increment time based on timeframe
+            if timeframe == 'M30':
+                current_date += timedelta(minutes=30)
+            elif timeframe == '1H':
+                current_date += timedelta(hours=1)
+            elif timeframe == '4H':
+                current_date += timedelta(hours=4)
+            elif timeframe == '1D':
+                current_date += timedelta(days=1)
+            elif timeframe == '1W':
+                current_date += timedelta(weeks=1)
+            else:
+                current_date += timedelta(hours=1)
         
         df = pd.DataFrame(prices)
-        logger.info(f"Generated {len(df)} sample data points for {pair}")
+        logger.info(f"Generated {len(df)} realistic sample data points for {pair}")
         return df
+    
+    def _generate_sample_data(self, pair: str, timeframe: str, days: int) -> pd.DataFrame:
+        """Fallback sample data generator"""
+        return self._generate_realistic_sample_data(pair, timeframe, days)
 
+    def get_current_price(self, pair: str) -> float:
+        """Get current price - improved version"""
+        try:
+            # Coba dapatkan dari data terbaru
+            data = self.get_price_data(pair, '1H', 1)
+            if not data.empty:
+                current_price = float(data['close'].iloc[-1])
+                logger.info(f"Got current price for {pair} from historical data: {current_price}")
+                return current_price
+            
+            # Fallback ke nilai default berdasarkan pair
+            base_prices = {
+                'USDJPY': 148.50, 'EURUSD': 1.0850, 'GBPUSD': 1.2650,
+                'USDCHF': 0.8950, 'AUDUSD': 0.6580, 'USDCAD': 1.3580,
+                'NZDUSD': 0.6080, 'EURJPY': 161.00, 'GBPJPY': 187.50,
+                'CHFJPY': 166.00, 'CADJPY': 109.50
+            }
+            
+            price = base_prices.get(pair, 150.0)
+            logger.info(f"Using default price for {pair}: {price}")
+            return price
+            
+        except Exception as e:
+            logger.error(f"Error getting current price for {pair}: {e}")
+            return 150.0
     def get_current_price(self, pair: str) -> float:
         """Get current price dari TwelveData API"""
         try:
