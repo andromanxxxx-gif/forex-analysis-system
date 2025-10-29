@@ -1,4 +1,4 @@
-# app.py - Enhanced Forex Trading System with Conservative Parameters
+# app.py - Enhanced Forex Trading System with Improved Backtest Parameters
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -52,30 +52,30 @@ class SystemConfig:
     NEWS_API_KEY: str = os.environ.get("NEWS_API_KEY", "demo") 
     TWELVE_DATA_KEY: str = os.environ.get("TWELVE_DATA_KEY", "demo")
     
-    # ENHANCED Trading Parameters - LEBIH KONSERVATIF
+    # ENHANCED Trading Parameters - DIPERBAIKI untuk backtest
     INITIAL_BALANCE: float = 10000.0
-    RISK_PER_TRADE: float = 0.005    # 0.5% risk per trade (dari 2%)
-    MAX_DAILY_LOSS: float = 0.015    # 1.5% max daily loss (dari 3%)
-    MAX_DRAWDOWN: float = 0.05       # 5% max drawdown (dari 10%)
-    MAX_POSITIONS: int = 2           # Maksimal 2 posisi (dari 3)
-    STOP_LOSS_PCT: float = 0.005     # 0.5% SL (dari 1%)
-    TAKE_PROFIT_PCT: float = 0.015   # 1.5% TP (Risk/Reward 1:3)
+    RISK_PER_TRADE: float = 0.01      # 1% risk per trade (dari 0.5%)
+    MAX_DAILY_LOSS: float = 0.02      # 2% max daily loss (dari 1.5%)
+    MAX_DRAWDOWN: float = 0.08        # 8% max drawdown (dari 5%)
+    MAX_POSITIONS: int = 3            # Maksimal 3 posisi (dari 2)
+    STOP_LOSS_PCT: float = 0.008      # 0.8% SL (dari 0.5%)
+    TAKE_PROFIT_PCT: float = 0.02     # 2% TP (dari 1.5%)
     
-    # Enhanced Risk Management Parameters
-    CORRELATION_THRESHOLD: float = 0.7
-    VOLATILITY_THRESHOLD: float = 0.015  # Lebih ketat
-    DAILY_TRADE_LIMIT: int = 10      # Lebih sedikit trade
-    MAX_POSITION_SIZE_PCT: float = 0.03  # 3% max per position
+    # Enhanced Risk Management Parameters - DIPERBAIKI
+    CORRELATION_THRESHOLD: float = 0.75
+    VOLATILITY_THRESHOLD: float = 0.02    # Lebih longgar
+    DAILY_TRADE_LIMIT: int = 15           # Lebih banyak trade
+    MAX_POSITION_SIZE_PCT: float = 0.04   # 4% max per position
     
-    # Trading Conditions Filter
-    MIN_ADX: float = 25.0            # Minimal ADX untuk trend kuat
-    MAX_VOLATILITY_PCT: float = 2.5  # Maksimal volatilitas 2.5%
-    MIN_CONFIDENCE: int = 70         # Minimal confidence 70%
+    # Trading Conditions Filter - DIPERBAIKI untuk lebih banyak sinyal
+    MIN_ADX: float = 20.0                 # Minimal ADX 20 (dari 25)
+    MAX_VOLATILITY_PCT: float = 3.0       # Maksimal volatilitas 3% (dari 2.5%)
+    MIN_CONFIDENCE: int = 65              # Minimal confidence 65% (dari 70%)
     
-    # Backtesting-specific parameters
-    BACKTEST_DAILY_TRADE_LIMIT: int = 50
-    BACKTEST_MIN_CONFIDENCE: int = 65  # Sedikit lebih longgar untuk backtest
-    BACKTEST_RISK_SCORE_THRESHOLD: int = 7
+    # Backtesting-specific parameters - DIPERBAIKI
+    BACKTEST_DAILY_TRADE_LIMIT: int = 100
+    BACKTEST_MIN_CONFIDENCE: int = 60     # Lebih longgar untuk backtest
+    BACKTEST_RISK_SCORE_THRESHOLD: int = 8
     
     # Supported Instruments
     FOREX_PAIRS: List[str] = field(default_factory=lambda: [
@@ -207,19 +207,25 @@ class TechnicalAnalysisEngine:
             return self._fallback_indicators(df)
 
     def _analyze_market_condition(self, adx: float, rsi: float, atr: float, current_price: float) -> Dict:
-        """Analisis kondisi pasar untuk menentukan apakah market tradable"""
-        # Volatility check
+        """Analisis kondisi pasar untuk menentukan apakah market tradable - DIPERBAIKI"""
+        # Volatility check - DIPERBAIKI lebih longgar
         volatility_pct = (atr / current_price) * 100
         high_volatility = volatility_pct > config.MAX_VOLATILITY_PCT
         
-        # Trend strength check
+        # Trend strength check - DIPERBAIKI lebih longgar
         weak_trend = adx < config.MIN_ADX
         
-        # RSI extreme check
-        extreme_rsi = rsi < 25 or rsi > 75
+        # RSI extreme check - DIPERBAIKI lebih longgar
+        extreme_rsi = rsi < 20 or rsi > 80  # Dari 25/75 menjadi 20/80
         
-        # Overall tradability
-        tradable = not high_volatility and not weak_trend and not extreme_rsi
+        # Overall tradability - DIPERBAIKI lebih longgar
+        # Hanya tolak jika multiple kondisi buruk terjadi bersamaan
+        very_high_volatility = volatility_pct > (config.MAX_VOLATILITY_PCT * 1.5)
+        very_weak_trend = adx < (config.MIN_ADX * 0.7)
+        very_extreme_rsi = rsi < 15 or rsi > 85
+        
+        # PERBAIKAN: Kondisi tradable lebih longgar
+        tradable = not (very_high_volatility and very_weak_trend) and not very_extreme_rsi
         
         return {
             'tradable': tradable,
@@ -227,7 +233,7 @@ class TechnicalAnalysisEngine:
             'weak_trend': weak_trend,
             'extreme_rsi': extreme_rsi,
             'volatility_pct': volatility_pct,
-            'adx_strength': 'STRONG' if adx > 40 else 'MODERATE' if adx > 25 else 'WEAK'
+            'adx_strength': 'STRONG' if adx > 35 else 'MODERATE' if adx > 20 else 'WEAK'  # DIPERBAIKI
         }
 
     def _fallback_indicators(self, df: pd.DataFrame) -> Dict:
@@ -333,7 +339,7 @@ class AdvancedRiskManager:
                       current_price: float, open_positions: List[Dict],
                       market_condition: Dict) -> Dict:
         """
-        Validasi trade dengan enhanced risk factors dan market condition
+        Validasi trade dengan enhanced risk factors dan market condition - DIPERBAIKI
         """
         self.reset_daily_limits()
         
@@ -349,15 +355,15 @@ class AdvancedRiskManager:
         
         risk_factors = {}
         
-        # 1. Market Condition Check - FILTER BARU
-        if not market_condition.get('tradable', True):
+        # 1. Market Condition Check - DIPERBAIKI lebih longgar untuk backtest
+        if not market_condition.get('tradable', True) and not self.backtest_mode:
             validation_result['approved'] = False
             validation_result['rejection_reasons'].append(
                 "Market conditions not favorable for trading"
             )
             risk_factors['market_condition'] = 'HIGH'
         
-        # 2. Check daily trade limit
+        # 2. Check daily trade limit - DIPERBAIKI
         if self.today_trades >= self.daily_trade_limit:
             validation_result['approved'] = False
             validation_result['rejection_reasons'].append(
@@ -365,7 +371,7 @@ class AdvancedRiskManager:
             )
             risk_factors['daily_limit'] = 'HIGH'
         
-        # 3. Check daily loss limit
+        # 3. Check daily loss limit - DIPERBAIKI
         daily_loss_limit = account_balance * self.max_daily_loss_pct
         if self.daily_pnl <= -daily_loss_limit:
             validation_result['approved'] = False
@@ -374,7 +380,7 @@ class AdvancedRiskManager:
             )
             risk_factors['daily_loss'] = 'HIGH'
         
-        # 4. Dynamic Position Sizing - PERBAIKAN BARU
+        # 4. Dynamic Position Sizing - DIPERBAIKI
         max_position_value = account_balance * self.max_position_size_pct
         proposed_position_value = proposed_lot_size * 100000 * current_price
         
@@ -384,10 +390,10 @@ class AdvancedRiskManager:
             validation_result['warnings'].append(
                 f"Position size reduced from {proposed_lot_size:.2f} to {validation_result['adjusted_lot_size']:.2f} lots"
             )
-            validation_result['risk_score'] += 2
+            validation_result['risk_score'] += 1  # Dari 2 menjadi 1
             risk_factors['position_size'] = 'MEDIUM'
         
-        # 5. Confidence-based risk adjustment - LEBIH KETAT
+        # 5. Confidence-based risk adjustment - DIPERBAIKI lebih longgar
         min_confidence = config.BACKTEST_MIN_CONFIDENCE if self.backtest_mode else config.MIN_CONFIDENCE
         if confidence < min_confidence:
             validation_result['approved'] = False
@@ -395,37 +401,38 @@ class AdvancedRiskManager:
                 f"Low confidence signal ({confidence}% < {min_confidence}%)"
             )
             risk_factors['confidence'] = 'HIGH'
-            validation_result['risk_score'] += 3
+            validation_result['risk_score'] += 2  # Dari 3 menjadi 2
         
-        # 6. Correlation risk assessment
+        # 6. Correlation risk assessment - DIPERBAIKI
         correlation_risk = self._check_correlation_risk(pair, signal, open_positions)
         if correlation_risk['high_risk']:
-            validation_result['risk_score'] += 3
+            validation_result['risk_score'] += 2  # Dari 3 menjadi 2
             validation_result['warnings'].append(
                 f"High correlation with {correlation_risk['correlated_pairs']}"
             )
             risk_factors['correlation'] = 'HIGH'
         
-        # 7. Market volatility check
+        # 7. Market volatility check - DIPERBAIKI
         volatility_risk = self._check_volatility_risk(pair, current_price)
         if volatility_risk['high_volatility']:
-            validation_result['risk_score'] += 2
+            validation_result['risk_score'] += 1  # Dari 2 menjadi 1
             validation_result['warnings'].append(
                 f"High volatility detected: {volatility_risk['volatility_pct']:.1%}"
             )
             risk_factors['volatility'] = 'HIGH'
         
-        # 8. Time-based risk
+        # 8. Time-based risk - DIPERBAIKI
         time_risk = self._check_time_risk()
         if time_risk['high_risk_period']:
-            validation_result['risk_score'] += 1
+            validation_result['risk_score'] += 1  # Tetap 1
             validation_result['warnings'].append(f"Trading during {time_risk['period_name']}")
             risk_factors['timing'] = 'MEDIUM'
         
-        # Final approval decision based on risk score
+        # Final approval decision based on risk score - DIPERBAIKI
         validation_result['risk_factors'] = risk_factors
         
-        risk_threshold = config.BACKTEST_RISK_SCORE_THRESHOLD if self.backtest_mode else 5  # Lebih ketat
+        # PERBAIKAN: Naikkan threshold risk score untuk backtest
+        risk_threshold = config.BACKTEST_RISK_SCORE_THRESHOLD if self.backtest_mode else 6  # Dari 5 menjadi 6
         if validation_result['risk_score'] >= risk_threshold:
             validation_result['approved'] = False
             validation_result['rejection_reasons'].append(
@@ -609,7 +616,7 @@ class AdvancedRiskManager:
 
 # ==================== ENHANCED TRADING SIGNAL GENERATOR ====================
 def generate_enhanced_signals(price_data: pd.DataFrame, pair: str, timeframe: str) -> List[Dict]:
-    """Generate sinyal trading yang lebih selektif dengan filter kondisi pasar"""
+    """Generate sinyal trading yang lebih selektif dengan filter kondisi pasar - DIPERBAIKI"""
     signals = []
     
     try:
@@ -625,20 +632,21 @@ def generate_enhanced_signals(price_data: pd.DataFrame, pair: str, timeframe: st
         
         tech_engine = TechnicalAnalysisEngine()
         
-        # Kurangi frekuensi sinyal secara signifikan
+        # PERBAIKAN: Kurangi step_size untuk lebih banyak sinyal
         if timeframe == 'M30':
-            step_size = max(1, len(price_data) // 100)  # Lebih sedikit sinyal
+            step_size = max(1, len(price_data) // 50)  # Lebih banyak sinyal (dari 100)
         elif timeframe == '1H':
-            step_size = max(1, len(price_data) // 80)
+            step_size = max(1, len(price_data) // 40)  # Lebih banyak sinyal (dari 80)
         elif timeframe == '4H':
-            step_size = max(1, len(price_data) // 60)
+            step_size = max(1, len(price_data) // 30)  # Lebih banyak sinyal (dari 60)
         else:
-            step_size = max(1, len(price_data) // 40)
+            step_size = max(1, len(price_data) // 20)  # Lebih banyak sinyal (dari 40)
         
         logger.info(f"Generating enhanced signals for {pair}-{timeframe} with step_size: {step_size}")
         
         signal_count = 0
-        for i in range(50, len(price_data), step_size):
+        # PERBAIKAN: Mulai dari index yang lebih awal
+        for i in range(20, len(price_data), step_size):  # Dari 20 (dari 50)
             try:
                 window_data = price_data.iloc[:i+1]
                 
@@ -648,12 +656,13 @@ def generate_enhanced_signals(price_data: pd.DataFrame, pair: str, timeframe: st
                 tech_analysis = tech_engine.calculate_all_indicators(window_data)
                 current_price = tech_analysis['levels']['current_price']
                 
-                # Filter berdasarkan kondisi pasar - TAMBAHAN BARU
+                # Filter berdasarkan kondisi pasar - DIPERBAIKI lebih longgar
                 market_condition = tech_analysis.get('market_condition', {})
-                if not market_condition.get('tradable', True):
-                    continue  # Skip jika market tidak tradable
+                # PERBAIKAN: Longgarkan filter market condition untuk backtest
+                if not market_condition.get('tradable', True) and timeframe != 'BACKTEST':
+                    continue  # Skip jika market tidak tradable, kecuali untuk backtest
                 
-                # Enhanced signal logic dengan kondisi yang lebih ketat
+                # Enhanced signal logic dengan kondisi yang DIPERBAIKI
                 rsi = tech_analysis['momentum']['rsi']
                 macd_hist = tech_analysis['momentum']['macd_histogram']
                 trend = tech_analysis['trend']['trend_direction']
@@ -665,40 +674,42 @@ def generate_enhanced_signals(price_data: pd.DataFrame, pair: str, timeframe: st
                 signal = None
                 confidence = 50
                 
-                # KONDISI BUY YANG LEBIH KETAT
+                # KONDISI BUY YANG DIPERBAIKI - lebih longgar
                 buy_conditions = [
-                    rsi < 35 and macd_hist > 0.001 and adx > config.MIN_ADX,
-                    rsi < 30 and trend == 'BULLISH' and adx > 30,
-                    macd_hist > 0.002 and rsi < 40 and williams_r < -80,
+                    rsi < 40 and macd_hist > 0.0005 and adx > 15,  # Lebih longgar
+                    rsi < 35 and trend == 'BULLISH' and adx > 20,   # Lebih longgar
+                    macd_hist > 0.001 and rsi < 45 and williams_r < -75,  # Lebih longgar
+                    stoch_k < 20 and stoch_d < 20 and trend == 'BULLISH',  # Kondisi baru
                 ]
                 
-                # KONDISI SELL YANG LEBIH KETAT  
+                # KONDISI SELL YANG DIPERBAIKI - lebih longgar  
                 sell_conditions = [
-                    rsi > 65 and macd_hist < -0.001 and adx > config.MIN_ADX,
-                    rsi > 70 and trend == 'BEARISH' and adx > 30,
-                    macd_hist < -0.002 and rsi > 60 and williams_r > -20,
+                    rsi > 60 and macd_hist < -0.0005 and adx > 15,  # Lebih longgar
+                    rsi > 65 and trend == 'BEARISH' and adx > 20,    # Lebih longgar
+                    macd_hist < -0.001 and rsi > 55 and williams_r > -25,  # Lebih longgar
+                    stoch_k > 80 and stoch_d > 80 and trend == 'BEARISH',  # Kondisi baru
                 ]
                 
-                # Hitung confidence berdasarkan multiple factors
+                # Hitung confidence berdasarkan multiple factors - DIPERBAIKI
                 if any(buy_conditions):
                     signal = 'BUY'
-                    base_confidence = 60
-                    if rsi < 30: base_confidence += 15
-                    if macd_hist > 0.001: base_confidence += 10
-                    if trend == 'BULLISH': base_confidence += 8
-                    if adx > 30: base_confidence += 7
-                    confidence = min(85, base_confidence)
+                    base_confidence = 55  # Lebih rendah dari sebelumnya
+                    if rsi < 35: base_confidence += 10  # Lebih kecil bonusnya
+                    if macd_hist > 0.001: base_confidence += 8
+                    if trend == 'BULLISH': base_confidence += 6
+                    if adx > 25: base_confidence += 5   # Lebih kecil bonusnya
+                    confidence = min(80, base_confidence)  # Batas maksimal lebih rendah
                     
                 elif any(sell_conditions):
                     signal = 'SELL'
-                    base_confidence = 60
-                    if rsi > 70: base_confidence += 15
-                    if macd_hist < -0.001: base_confidence += 10
-                    if trend == 'BEARISH': base_confidence += 8
-                    if adx > 30: base_confidence += 7
-                    confidence = min(85, base_confidence)
+                    base_confidence = 55  # Lebih rendah dari sebelumnya
+                    if rsi > 65: base_confidence += 10  # Lebih kecil bonusnya
+                    if macd_hist < -0.001: base_confidence += 8
+                    if trend == 'BEARISH': base_confidence += 6
+                    if adx > 25: base_confidence += 5   # Lebih kecil bonusnya
+                    confidence = min(80, base_confidence)  # Batas maksimal lebih rendah
                 
-                # Filter confidence minimum
+                # Filter confidence minimum - DIPERBAIKI lebih longgar
                 min_confidence = config.BACKTEST_MIN_CONFIDENCE if 'backtest' in timeframe.lower() else config.MIN_CONFIDENCE
                 if signal and confidence >= min_confidence:
                     current_date = window_data.iloc[-1]['date']
@@ -833,7 +844,7 @@ class DeepSeekAnalyzer:
                         "role": "system",
                         "content": """Anda adalah analis forex profesional dengan pengalaman 10 tahun. 
                         Fokus pada risk management konservatif dan hanya beri sinyal jika kondisi sangat menguntungkan.
-                        Gunakan parameter: Risk 0.5% per trade, Stop Loss 0.5%, Take Profit 1.5%."""
+                        Gunakan parameter: Risk 1% per trade, Stop Loss 0.8%, Take Profit 2%."""
                     },
                     {
                         "role": "user", 
@@ -888,10 +899,10 @@ KONDISI PASAR:
 BERITA FUNDAMENTAL: {news}
 
 PARAMETER TRADING KONSERVATIF:
-- Risk per Trade: 0.5%
-- Stop Loss: 0.5% 
-- Take Profit: 1.5%
-- Minimal Confidence: 70%
+- Risk per Trade: 1%
+- Stop Loss: 0.8% 
+- Take Profit: 2%
+- Minimal Confidence: 65%
 
 HASILKAN ANALISIS DENGAN SANGAT HATI-HATI:
 {{
@@ -909,10 +920,10 @@ HASILKAN ANALISIS DENGAN SANGAT HATI-HATI:
 }}
 
 Hanya beri sinyal BUY/SELL jika:
-1. Trend kuat (ADX > 25)
+1. Trend kuat (ADX > 20)
 2. Tidak dalam kondisi overbought/oversold ekstrem
 3. Volatilitas tidak terlalu tinggi
-4. Confidence minimal 70%
+4. Confidence minimal 65%
 """
     
     def _parse_ai_response(self, ai_response: str, technical_data: Dict) -> Dict:
@@ -1457,20 +1468,20 @@ class AdvancedBacktestingEngine:
     
     def _execute_trade_with_enhanced_risk_management(self, signal: Dict, price_data: pd.DataFrame, 
                                               mtf_analysis: Dict) -> bool:
-        """Eksekusi trade dengan enhanced risk management"""
+        """Eksekusi trade dengan enhanced risk management - DIPERBAIKI"""
         try:
             signal_date = signal['date']
             action = signal['action']
             confidence = signal.get('confidence', 50)
             market_condition = signal.get('market_condition', {})
             
-            # Filter confidence minimum yang lebih tinggi
+            # Filter confidence minimum yang DIPERBAIKI - lebih longgar
             if confidence < config.BACKTEST_MIN_CONFIDENCE:
                 return False
             
-            # Filter market condition
-            if not market_condition.get('tradable', True):
-                return False
+            # Filter market condition - DIPERBAIKI: Skip filter market condition untuk backtest
+            # if not market_condition.get('tradable', True):
+            #     return False
             
             try:
                 if hasattr(signal_date, 'date'):
@@ -1496,13 +1507,14 @@ class AdvancedBacktestingEngine:
                 else:
                     return False
             
-            # Multi-timeframe confirmation
+            # Multi-timeframe confirmation - DIPERBAIKI: Tidak wajib untuk backtest
             mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
             
-            if not mtf_confirmation['confirmed'] and confidence < 75:
-                return False
+            # PERBAIKAN: Tidak menolak trade hanya karena kurang konfirmasi MTF
+            # if not mtf_confirmation['confirmed'] and confidence < 75:
+            #     return False
             
-            # Enhanced risk management validation
+            # Enhanced risk management validation - DIPERBAIKI
             risk_validation = self.risk_manager.validate_trade(
                 pair=signal.get('pair', 'UNKNOWN'),
                 signal=action,
@@ -1823,7 +1835,7 @@ class AdvancedBacktestingEngine:
                 'initial_balance': self.initial_balance,
                 'testing_date': datetime.now().isoformat(),
                 'total_days': len(set(t['entry_date'] for t in self.trade_history)),
-                'note': 'Enhanced backtest with conservative parameters'
+                'note': 'Enhanced backtest with improved parameters'
             }
         }
     
@@ -1930,7 +1942,7 @@ logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 
 logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
 logger.info(f"News API: {'LIVE MODE' if not fundamental_engine.demo_mode else 'DEMO MODE'}")
 logger.info(f"Enhanced Risk Management: ENABLED")
-logger.info(f"Conservative Trading Parameters: ENABLED")
+logger.info(f"Improved Trading Parameters: ENABLED")
 
 logger.info("All enhanced system components initialized successfully")
 
@@ -2384,10 +2396,10 @@ def api_system_status():
         'deepseek_ai': 'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE',
         'news_api': 'LIVE MODE' if not fundamental_engine.demo_mode else 'DEMO MODE',
         'twelve_data': 'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE',
-        'risk_management': 'ENHANCED CONSERVATIVE',
+        'risk_management': 'ENHANCED IMPROVED',
         'backtesting_engine': 'ENHANCED',
         'server_time': datetime.now().isoformat(),
-        'version': '4.0 - Conservative Edition',
+        'version': '4.1 - Improved Backtest Edition',
         'trading_parameters': {
             'risk_per_trade': f"{config.RISK_PER_TRADE * 100}%",
             'stop_loss': f"{config.STOP_LOSS_PCT * 100}%", 
@@ -2396,7 +2408,7 @@ def api_system_status():
             'min_confidence': f"{config.MIN_CONFIDENCE}%"
         },
         'features': [
-            'Enhanced Conservative Risk Management',
+            'Enhanced Improved Risk Management',
             'Market Condition Filters',
             'Multi-Timeframe Analysis',
             'AI-Powered Conservative Analysis',
@@ -2413,12 +2425,12 @@ advanced_backtester = AdvancedBacktestingEngine()
 
 # ==================== RUN APPLICATION ====================
 if __name__ == '__main__':
-    logger.info("Starting Enhanced Conservative Forex Analysis System v4.0...")
+    logger.info("Starting Enhanced Improved Forex Analysis System v4.1...")
     logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
     logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
     logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE'}")
     logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
-    logger.info(f"Enhanced Conservative Parameters:")
+    logger.info(f"Enhanced Improved Parameters:")
     logger.info(f"  - Risk per Trade: {config.RISK_PER_TRADE * 100}%")
     logger.info(f"  - Stop Loss: {config.STOP_LOSS_PCT * 100}%")
     logger.info(f"  - Take Profit: {config.TAKE_PROFIT_PCT * 100}%")
