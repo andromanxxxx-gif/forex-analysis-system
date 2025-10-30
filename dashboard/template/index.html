@@ -24,11 +24,26 @@
       --border-radius: 12px;
     }
 
+    /* Dark theme variables */
+    .dark-theme {
+      --deepseek-primary: #3b82f6;
+      --deepseek-secondary: #60a5fa;
+      --deepseek-accent: #1d4ed8;
+      --signal-buy: #10b981;
+      --signal-sell: #ef4444;
+      --signal-hold: #f59e0b;
+      --text-primary: #f9fafb;
+      --text-secondary: #d1d5db;
+      --bg-primary: #111827;
+      --bg-card: #1f2937;
+    }
+
     body {
       background: var(--bg-primary);
       color: var(--text-primary);
       font-family: "Inter", "Segoe UI", sans-serif;
       padding: 18px;
+      transition: background-color 0.3s, color 0.3s;
     }
 
     .topbar {
@@ -63,6 +78,12 @@
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
       margin-bottom: 20px;
       border: 1px solid rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card-soft:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     }
 
     .section-title {
@@ -211,6 +232,7 @@
       border: none;
       border-radius: 8px;
       padding: 8px 16px;
+      transition: background-color 0.2s;
     }
 
     .btn-deepseek:hover {
@@ -225,6 +247,7 @@
       border: none;
       border-radius: 8px;
       padding: 8px 16px;
+      transition: background-color 0.2s;
     }
 
     .btn-action:hover {
@@ -307,8 +330,8 @@
       align-items: center;
       padding: 8px;
       border-radius: 8px;
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
+      background: var(--bg-primary);
+      border: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .risk-factor-card.low {
@@ -405,12 +428,12 @@
       display: flex;
       justify-content: space-between;
       padding: 4px 0;
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     }
 
     .pivot-label {
       font-size: 0.8rem;
-      color: #6b7280;
+      color: var(--text-secondary);
     }
 
     .pivot-value {
@@ -438,6 +461,11 @@
       display: none;
     }
 
+    .dark-theme .chart-loading {
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+    }
+
     .realtime-indicator {
       position: absolute;
       top: 10px;
@@ -450,9 +478,142 @@
       font-weight: 600;
       z-index: 5;
     }
+
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+    }
+
+    .custom-toast {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 350px;
+      opacity: 0;
+      transform: translateX(100%);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .custom-toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .custom-toast.success {
+      border-left: 4px solid #10b981;
+    }
+
+    .custom-toast.error {
+      border-left: 4px solid #ef4444;
+    }
+
+    .custom-toast.warning {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .custom-toast.info {
+      border-left: 4px solid #3b82f6;
+    }
+
+    /* Theme Toggle */
+    .theme-toggle {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .topbar > div:last-child {
+        margin-left: 0 !important;
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .col-lg-8, .col-lg-4 {
+        width: 100%;
+      }
+
+      #chartRoot {
+        height: 350px;
+      }
+
+      #macdRoot {
+        height: 120px;
+      }
+
+      .price-ticker {
+        font-size: 1.1rem;
+      }
+
+      .section-title {
+        font-size: 1.1rem;
+      }
+
+      .card-soft {
+        padding: 15px;
+      }
+
+      .levels-container {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 576px) {
+      #chartRoot {
+        height: 300px;
+      }
+
+      .topbar > div:last-child {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .d-flex.align-items-center {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+
+    /* Chart tooltip customization */
+    .tv-lightweight-charts {
+      border-radius: var(--border-radius);
+    }
   </style>
 </head>
 <body>
+
+<!-- Toast Notifications Container -->
+<div class="toast-container" id="toastContainer"></div>
 
 <div class="topbar">
   <div class="brand-logo">
@@ -461,6 +622,10 @@
   </div>
   
   <div class="d-flex flex-wrap gap-3 align-items-center ms-auto">
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+      <i class="fas fa-moon"></i>
+    </button>
+    
     <div class="d-flex align-items-center">
       <label class="small-muted mb-0 me-2">Pair</label>
       <select id="pairSelect" class="form-select form-select-sm" style="width:130px;">
@@ -468,12 +633,12 @@
         <option>EURJPY</option>
         <option>GBPJPY</option>
         <option>CHFJPY</option>
-        <option>EURUSD</option>  <!-- DITAMBAHKAN -->
+        <option>EURUSD</option>
         <option>GBPUSD</option>
         <option>USDCHF</option>
         <option>AUDUSD</option>
         <option>USDCAD</option>
-        <option>CADJPY</option>  <!-- DITAMBAHKAN -->
+        <option>CADJPY</option>
         <option>NZDUSD</option>
       </select>
     </div>
@@ -853,35 +1018,43 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// ===== ENHANCED PAIR SUPPORT: EURUSD & CADJPY =====
+// ===== ENHANCED FRONTEND FUNCTIONALITY =====
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('Initializing enhanced pair support for EURUSD and CADJPY...');
+  console.log('Initializing ANDRO-FX Trading Dashboard...');
   
-  // Enhanced base prices untuk EURUSD dan CADJPY
+  // Initialize user preferences
+  initializeUserPreferences();
+  
+  // Enhanced base prices untuk semua pairs
   const enhancedBasePrices = {
     'USDJPY': 147.25, 'GBPJPY': 198.50, 'EURJPY': 172.10, 'CHFJPY': 184.30,
     'EURUSD': 1.0835, 'GBPUSD': 1.2640, 'USDCHF': 0.8840,
     'AUDUSD': 0.6545, 'USDCAD': 1.3510, 'NZDUSD': 0.6095,
-    'CADJPY': 108.75  // Ditambahkan untuk CADJPY
+    'CADJPY': 108.75
   };
   
-  // Enhanced news mapping untuk EURUSD dan CADJPY
+  // Enhanced news mapping
   const enhancedNewsMapping = {
     'USDJPY': 'Japan United States economy Bank of Japan Federal Reserve',
     'EURJPY': 'Japan Europe ECB economy European Central Bank',
     'GBPJPY': 'Japan UK economy Brexit Bank of England',
     'CHFJPY': 'Japan Switzerland economy SNB Swiss National Bank',
-    'EURUSD': 'Europe United States Fed ECB Federal Reserve European Central Bank', // Enhanced
+    'EURUSD': 'Europe United States Fed ECB Federal Reserve European Central Bank',
     'GBPUSD': 'UK United States Bank of England Fed Brexit',
     'USDCHF': 'United States Switzerland SNB Fed Swiss National Bank',
     'AUDUSD': 'Australia United States RBA Fed Reserve Bank of Australia',
     'USDCAD': 'United States Canada Fed Bank of Canada BOC',
     'NZDUSD': 'New Zealand United States RBNZ Fed Reserve Bank of New Zealand',
-    'CADJPY': 'Canada Japan economy Bank of Canada BoJ' // Ditambahkan untuk CADJPY
+    'CADJPY': 'Canada Japan economy Bank of Canada BoJ'
   };
   
-  // Enhanced sample news untuk EURUSD dan CADJPY
+  // Enhanced sample news untuk semua pairs
   const enhancedNewsTemplates = {
+    'USDJPY': [
+      "USD/JPY reacts to Fed and BoJ policy divergence.",
+      "Yen weakness continues amid monetary policy expectations.",
+      "USD/JPY volatility expected with upcoming economic data releases."
+    ],
     'EURUSD': [
       "EUR/USD trades in tight range ahead of key economic data releases.",
       "European and US economic indicators driving EUR/USD direction.",
@@ -893,10 +1066,15 @@ document.addEventListener('DOMContentLoaded', function() {
       "Canadian dollar shows strength against yen amid commodity price stability.",
       "CAD/JPY reacts to Bank of Canada interest rate expectations.",
       "Yen weakness supports CAD/JPY amid global risk-on sentiment."
+    ],
+    'GBPUSD': [
+      "GBP/USD fluctuates amid Brexit developments and US economic data.",
+      "Bank of England decisions impact GBP/USD direction.",
+      "Sterling shows resilience against dollar amid economic uncertainty."
     ]
   };
   
-  // Override fungsi generateSamplePriceData untuk mendukung EURUSD dan CADJPY
+  // Override fungsi generateSamplePriceData untuk semua pairs
   window.enhancedGenerateSamplePriceData = function(timeframe = '1D') {
     const data = [];
     const pair = document.getElementById('pairSelect').value;
@@ -975,8 +1153,132 @@ document.addEventListener('DOMContentLoaded', function() {
     return defaultTemplates[Math.floor(Math.random() * defaultTemplates.length)];
   };
   
-  console.log('Enhanced pair support for EURUSD and CADJPY initialized successfully');
+  console.log('Enhanced frontend functionality initialized successfully');
 });
+
+// ===== USER PREFERENCES & THEME MANAGEMENT =====
+function initializeUserPreferences() {
+  // Load saved preferences
+  const savedPrefs = localStorage.getItem('androFxPrefs');
+  if (savedPrefs) {
+    try {
+      const prefs = JSON.parse(savedPrefs);
+      
+      // Apply saved pair and timeframe
+      if (prefs.pair) document.getElementById('pairSelect').value = prefs.pair;
+      if (prefs.timeframe) document.getElementById('timeframeSelect').value = prefs.timeframe;
+      
+      // Apply saved theme
+      if (prefs.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('themeToggle').innerHTML = '<i class="fas fa-sun"></i>';
+      }
+      
+      console.log('User preferences loaded:', prefs);
+    } catch (e) {
+      console.error('Error loading preferences:', e);
+    }
+  }
+  
+  // Initialize theme toggle
+  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+  const body = document.body;
+  const themeToggle = document.getElementById('themeToggle');
+  
+  if (body.classList.contains('dark-theme')) {
+    body.classList.remove('dark-theme');
+    themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+    saveUserPreference('theme', 'light');
+    showToast('Light theme activated', 'success');
+  } else {
+    body.classList.add('dark-theme');
+    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    saveUserPreference('theme', 'dark');
+    showToast('Dark theme activated', 'success');
+  }
+  
+  // Update chart colors based on theme
+  updateChartTheme();
+}
+
+function saveUserPreference(key, value) {
+  const prefs = JSON.parse(localStorage.getItem('androFxPrefs') || '{}');
+  prefs[key] = value;
+  localStorage.setItem('androFxPrefs', JSON.stringify(prefs));
+}
+
+// ===== TOAST NOTIFICATION SYSTEM =====
+function showToast(message, type = 'info', duration = 5000) {
+  const toastContainer = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `custom-toast ${type}`;
+  
+  let icon = 'info-circle';
+  if (type === 'success') icon = 'check-circle';
+  if (type === 'error') icon = 'exclamation-circle';
+  if (type === 'warning') icon = 'exclamation-triangle';
+  
+  toast.innerHTML = `
+    <i class="fas fa-${icon}"></i>
+    <div>${message}</div>
+  `;
+  
+  toastContainer.appendChild(toast);
+  
+  // Animate in
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // Auto remove after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  }, duration);
+}
+
+// ===== ENHANCED ERROR HANDLING =====
+async function safeApiCall(url, options = {}) {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('API call failed:', error);
+    showToast(`API Error: ${error.message}`, 'error');
+    return null;
+  }
+}
+
+function validateChartData(data) {
+  if (!Array.isArray(data)) {
+    console.error('Chart data is not an array');
+    return false;
+  }
+  
+  if (data.length === 0) {
+    console.warn('Chart data is empty');
+    return false;
+  }
+  
+  // Check first item structure
+  const firstItem = data[0];
+  if (!firstItem.time || 
+      typeof firstItem.open !== 'number' ||
+      typeof firstItem.high !== 'number' ||
+      typeof firstItem.low !== 'number' ||
+      typeof firstItem.close !== 'number') {
+    console.error('Invalid chart data structure');
+    return false;
+  }
+  
+  return true;
+}
 
 // Global state untuk menyimpan data chart
 let currentChartData = [];
@@ -985,6 +1287,7 @@ let currentMacdData = { macd: [], signal: [], hist: [] };
 let lastCandleTime = null;
 let realtimeCandle = null;
 let isRealtimeMode = false;
+let chart, candle, ema26, macdChart, macdLine, macdSignal, macdHist;
 
 /* ===== Utilities ===== */
 function calcEMA(values, period){
@@ -1111,9 +1414,55 @@ function createRealtimeCandle(lastCandle, timeframe) {
   };
 }
 
+// Update chart theme based on current theme
+function updateChartTheme() {
+  const isDark = document.body.classList.contains('dark-theme');
+  
+  const chartOptions = {
+    layout: { 
+      backgroundColor: isDark ? '#1f2937' : '#fff',
+      textColor: isDark ? '#f9fafb' : '#111'
+    },
+    grid: {
+      vertLines: { color: isDark ? '#374151' : '#f3f4f6' },
+      horzLines: { color: isDark ? '#374151' : '#f3f4f6' }
+    },
+    timeScale: {
+      borderColor: isDark ? '#4b5563' : '#eee',
+      timeVisible: true,
+      secondsVisible: false
+    },
+    rightPriceScale: {
+      borderColor: isDark ? '#4b5563' : '#eee'
+    }
+  };
+  
+  const macdChartOptions = {
+    layout: { 
+      backgroundColor: isDark ? '#1f2937' : '#fff',
+      textColor: isDark ? '#f9fafb' : '#111'
+    },
+    grid: {
+      vertLines: { color: isDark ? '#374151' : '#f3f4f6' },
+      horzLines: { color: isDark ? '#374151' : '#f3f4f6' }
+    },
+    timeScale: {
+      borderColor: isDark ? '#4b5563' : '#eee',
+      timeVisible: true,
+      secondsVisible: false
+    }
+  };
+  
+  if (chart) {
+    chart.applyOptions(chartOptions);
+    macdChart.applyOptions(macdChartOptions);
+  }
+}
+
 /* ===== Pair Ticker Update Function ===== */
 function updatePairTicker(pair) {
   document.getElementById('selectedPair').textContent = pair + ' –';
+  saveUserPreference('pair', pair);
 }
 
 /* ===== Risk Management Functions ===== */
@@ -1256,99 +1605,103 @@ function updateSupportResistance(data) {
 }
 
 /* ===== Chart Setup ===== */
-const chartOptions = {
-  layout: { 
-    backgroundColor: '#fff', 
-    textColor: '#111' 
-  },
-  grid: {
-    vertLines: { color: '#f3f4f6' },
-    horzLines: { color: '#f3f4f6' }
-  },
-  timeScale: {
-    borderColor: '#eee',
-    timeVisible: true,
-    secondsVisible: false,
-    barSpacing: 8,
-    minBarSpacing: 2,
-    fixLeftEdge: true,
-    fixRightEdge: true
-  },
-  rightPriceScale: {
-    borderColor: '#eee',
-    scaleMargins: {
-      top: 0.1,
-      bottom: 0.1
+function initializeCharts() {
+  const isDark = document.body.classList.contains('dark-theme');
+  
+  const chartOptions = {
+    layout: { 
+      backgroundColor: isDark ? '#1f2937' : '#fff', 
+      textColor: isDark ? '#f9fafb' : '#111' 
+    },
+    grid: {
+      vertLines: { color: isDark ? '#374151' : '#f3f4f6' },
+      horzLines: { color: isDark ? '#374151' : '#f3f4f6' }
+    },
+    timeScale: {
+      borderColor: isDark ? '#4b5563' : '#eee',
+      timeVisible: true,
+      secondsVisible: false,
+      barSpacing: 8,
+      minBarSpacing: 2,
+      fixLeftEdge: true,
+      fixRightEdge: true
+    },
+    rightPriceScale: {
+      borderColor: isDark ? '#4b5563' : '#eee',
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.1
+      }
+    },
+    width: document.getElementById('chartRoot').clientWidth,
+    height: 520
+  };
+
+  chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
+
+  candle = chart.addCandlestickSeries({
+    upColor: '#16a34a',
+    downColor: '#dc2626', 
+    borderVisible: true,
+    wickUpColor: '#16a34a',
+    wickDownColor: '#dc2626',
+    priceScaleId: 'right'
+  });
+
+  ema26 = chart.addLineSeries({
+    color: '#2563eb',
+    lineWidth: 1.5,
+    priceScaleId: 'right'
+  });
+
+  const macdChartOptions = {
+    layout: { 
+      backgroundColor: isDark ? '#1f2937' : '#fff', 
+      textColor: isDark ? '#f9fafb' : '#111' 
+    },
+    grid: {
+      vertLines: { color: isDark ? '#374151' : '#f3f4f6' },
+      horzLines: { color: isDark ? '#374151' : '#f3f4f6' }
+    },
+    timeScale: {
+      borderColor: isDark ? '#4b5563' : '#eee',
+      timeVisible: true,
+      secondsVisible: false,
+      barSpacing: 8,
+      minBarSpacing: 2
+    },
+    width: document.getElementById('macdRoot').clientWidth,
+    height: 160
+  };
+
+  macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), macdChartOptions);
+
+  macdLine = macdChart.addLineSeries({
+    color: '#0ea5e9',
+    lineWidth: 1
+  });
+
+  macdSignal = macdChart.addLineSeries({
+    color: '#f59e0b', 
+    lineWidth: 1
+  });
+
+  macdHist = macdChart.addHistogramSeries({
+    color: '#a78bfa',
+    priceFormat: {
+      type: 'volume',
     }
-  },
-  width: document.getElementById('chartRoot').clientWidth,
-  height: 520
-};
+  });
 
-const chart = LightweightCharts.createChart(document.getElementById('chartRoot'), chartOptions);
-
-const candle = chart.addCandlestickSeries({
-  upColor: '#16a34a',
-  downColor: '#dc2626', 
-  borderVisible: true,
-  wickUpColor: '#16a34a',
-  wickDownColor: '#dc2626',
-  priceScaleId: 'right'
-});
-
-const ema26 = chart.addLineSeries({
-  color: '#2563eb',
-  lineWidth: 1.5,
-  priceScaleId: 'right'
-});
-
-const macdChartOptions = {
-  layout: { 
-    backgroundColor: '#fff', 
-    textColor: '#111' 
-  },
-  grid: {
-    vertLines: { color: '#f3f4f6' },
-    horzLines: { color: '#f3f4f6' }
-  },
-  timeScale: {
-    borderColor: '#eee',
-    timeVisible: true,
-    secondsVisible: false,
-    barSpacing: 8,
-    minBarSpacing: 2
-  },
-  width: document.getElementById('macdRoot').clientWidth,
-  height: 160
-};
-
-const macdChart = LightweightCharts.createChart(document.getElementById('macdRoot'), macdChartOptions);
-
-const macdLine = macdChart.addLineSeries({
-  color: '#0ea5e9',
-  lineWidth: 1
-});
-
-const macdSignal = macdChart.addLineSeries({
-  color: '#f59e0b', 
-  lineWidth: 1
-});
-
-const macdHist = macdChart.addHistogramSeries({
-  color: '#a78bfa',
-  priceFormat: {
-    type: 'volume',
-  }
-});
-
-// Sync time scales between charts
-chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
-  try {
-    macdChart.timeScale().setVisibleRange(timeRange);
-  } catch (e) {
-    console.log('Time scale sync error:', e);
-  }
-});
+  // Sync time scales between charts
+  chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+    try {
+      macdChart.timeScale().setVisibleRange(timeRange);
+    } catch (e) {
+      console.log('Time scale sync error:', e);
+    }
+  });
+}
 
 /* ===== DOM refs ===== */
 const livePriceEl = document.getElementById('livePrice');
@@ -1508,25 +1861,41 @@ function generateSampleSupportResistance(currentPrice) {
   };
 }
 
+// Set loading state
+function setLoadingState(isLoading) {
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  if (isLoading) {
+    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
+    analyzeBtn.disabled = true;
+    chartLoading.style.display = 'block';
+  } else {
+    analyzeBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>Analyze';
+    analyzeBtn.disabled = false;
+    chartLoading.style.display = 'none';
+  }
+}
+
 /* ===== Fetch + Render ===== */
 async function analyze(){
   const pair = pairSelect.value, tf = timeframeSelect.value;
   
   // Show loading indicator
-  chartLoading.style.display = 'block';
+  setLoadingState(true);
   
   // Update pair ticker text
   updatePairTicker(pair);
   
   try {
     console.log(`Fetching analysis for ${pair}-${tf}...`);
-    const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${tf}`); 
     
-    if (!r.ok) {
-      throw new Error(`HTTP error! status: ${r.status}`);
+    // Use safe API call with error handling
+    const j = await safeApiCall(`/api/analyze?pair=${pair}&timeframe=${tf}`);
+    
+    if (!j) {
+      // If API call failed, use fallback data
+      throw new Error('API unavailable, using demo data');
     }
     
-    const j = await r.json();
     console.log('Analysis response:', j);
     
     // Update price series chart
@@ -1549,7 +1918,11 @@ async function analyze(){
     // Clean and set chart data
     const cleanData = cleanChartData(chartData);
     
-    // Add realtime candle for current period (8 October 2025)
+    if (!validateChartData(cleanData)) {
+      throw new Error('Invalid chart data received');
+    }
+    
+    // Add realtime candle for current period
     if (cleanData.length > 0) {
       const lastCandle = cleanData[cleanData.length - 1];
       realtimeCandle = createRealtimeCandle(lastCandle, tf);
@@ -1713,6 +2086,7 @@ async function analyze(){
     updateSupportResistance(srData);
     
     updateStatusIndicator(true);
+    showToast(`Analysis completed for ${pair}`, 'success');
     
   } catch (error) {
     console.error('Analysis error:', error);
@@ -1721,9 +2095,17 @@ async function analyze(){
     // Show error to user
     aiSummaryEl.textContent = `Error: ${error.message}`;
     aiSummaryEl.style.color = '#ef4444';
+    
+    // Use fallback data for demo purposes
+    if (error.message.includes('demo data')) {
+      showToast('Using demo data - API unavailable', 'warning');
+      // We can still proceed with sample data which is already generated
+    } else {
+      showToast(`Analysis failed: ${error.message}`, 'error');
+    }
   } finally {
     // Hide loading indicator
-    chartLoading.style.display = 'none';
+    setLoadingState(false);
   }
 }
 
@@ -1733,11 +2115,9 @@ async function updateLivePrice() {
   const pair = pairSelect.value;
   try {
     // Use the analyze endpoint to get updated price data
-    const r = await fetch(`/api/analyze?pair=${pair}&timeframe=${timeframeSelect.value}`);
+    const j = await safeApiCall(`/api/analyze?pair=${pair}&timeframe=${timeframeSelect.value}`);
     
-    if (!r.ok) return;
-    
-    const j = await r.json();
+    if (!j) return;
     
     const priceData = j.price_data || {};
     const t = j.technical_analysis || {};
@@ -1837,7 +2217,7 @@ async function runBacktest() {
     
     console.log('Starting backtest with:', { pair, timeframe, days, initialBalance, backtestType });
     
-    const response = await fetch(endpoint, {
+    const result = await safeApiCall(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1850,17 +2230,17 @@ async function runBacktest() {
       })
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!result) {
+      throw new Error('Backtest API unavailable');
     }
     
-    const result = await response.json();
     console.log('Backtest result:', result);
     
     if (result.status === 'success' || result.status === 'no_trades') {
       displayBacktestResults(result);
       backtestStatusEl.textContent = 'Completed';
       backtestStatusEl.className = 'badge bg-success';
+      showToast('Backtest completed successfully', 'success');
     } else {
       throw new Error(result.error || 'Backtest failed');
     }
@@ -1870,6 +2250,7 @@ async function runBacktest() {
     backtestResultsEl.innerHTML = `<div class="alert alert-danger">Backtest failed: ${error.message}</div>`;
     backtestStatusEl.textContent = 'Failed';
     backtestStatusEl.className = 'badge bg-danger';
+    showToast(`Backtest failed: ${error.message}`, 'error');
   }
 }
 
@@ -1970,9 +2351,14 @@ pairSelect.addEventListener('change', function() {
   updatePairTicker(this.value);
   analyze();
 });
-timeframeSelect.addEventListener('change', analyze);
+
+timeframeSelect.addEventListener('change', function() {
+  saveUserPreference('timeframe', this.value);
+  analyze();
+});
 
 // Initialize dashboard
+initializeCharts();
 updatePairTicker(pairSelect.value);
 analyze();
 
@@ -1988,17 +2374,51 @@ window.addEventListener('resize', () => {
       const chartWidth = document.getElementById('chartRoot').clientWidth;
       const macdWidth = document.getElementById('macdRoot').clientWidth;
       
-      chart.resize(chartWidth, 520);
-      macdChart.resize(macdWidth, 160);
-      
-      // Re-apply time scale settings after resize
-      chart.timeScale().fitContent();
-      macdChart.timeScale().fitContent();
+      if (chart && macdChart) {
+        chart.resize(chartWidth, 520);
+        macdChart.resize(macdWidth, 160);
+        
+        // Re-apply time scale settings after resize
+        chart.timeScale().fitContent();
+        macdChart.timeScale().fitContent();
+      }
     } catch (e) {
       console.log('Resize error:', e);
     }
   }, 250);
 });
+
+// Export functionality for potential future use
+window.exportChartData = function() {
+  const dataStr = JSON.stringify(currentChartData);
+  const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+  
+  const exportFileDefaultName = `chart-data-${pairSelect.value}-${new Date().toISOString().slice(0,10)}.json`;
+  
+  const linkElement = document.createElement('a');
+  linkElement.setAttribute('href', dataUri);
+  linkElement.setAttribute('download', exportFileDefaultName);
+  linkElement.click();
+  
+  showToast('Chart data exported', 'success');
+};
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  // Ctrl+Enter to analyze
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    analyze();
+  }
+  
+  // Ctrl+B for backtest
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault();
+    showBacktestModal();
+  }
+});
+
+console.log('ANDRO-FX Trading Dashboard initialized successfully');
 </script>
 </body>
 </html>
