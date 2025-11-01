@@ -1,5 +1,3 @@
-[file name]: app.py
-[file content begin]
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -573,6 +571,8 @@ class AdvancedRiskManager:
     def _check_volatility_risk(self, pair: str, current_price: float) -> Dict:
         """Check volatility risk yang lebih realistis"""
         try:
+            # Import data_manager di sini untuk menghindari circular import
+            from __main__ import data_manager
             price_data = data_manager.get_price_data(pair, '1H', days=5)
             if len(price_data) > 10:
                 closes = price_data['close'].values
@@ -1563,6 +1563,8 @@ class AdvancedBacktestingEngine:
         
         for tf in ['M30', '1H', '4H', '1D']:
             try:
+                # Import data_manager dan tech_engine di sini
+                from __main__ import data_manager, tech_engine
                 data = data_manager.get_price_data(pair, tf, days=30)
                 if not data.empty and len(data) > 20:
                     tech = tech_engine.calculate_all_indicators(data)
@@ -2457,4 +2459,3 @@ if __name__ == '__main__':
     logger.info("Forex Analysis System is ready and running on http://localhost:5000")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
-[file content end]
