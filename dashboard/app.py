@@ -571,8 +571,6 @@ class AdvancedRiskManager:
     def _check_volatility_risk(self, pair: str, current_price: float) -> Dict:
         """Check volatility risk yang lebih realistis"""
         try:
-            # Import data_manager di sini untuk menghindari circular import
-            from __main__ import data_manager
             price_data = data_manager.get_price_data(pair, '1H', days=5)
             if len(price_data) > 10:
                 closes = price_data['close'].values
@@ -1401,15 +1399,14 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
         
         tech_engine = TechnicalAnalysisEngine()
         
-        # PERBAIKAN: Kurangi step_size untuk menghasilkan lebih banyak sinyal
         if timeframe == 'M30':
-            step_size = max(5, len(price_data) // 150)  # Lebih banyak sinyal
+            step_size = max(10, len(price_data) // 100)
         elif timeframe == '1H':
-            step_size = max(4, len(price_data) // 120)
+            step_size = max(8, len(price_data) // 80)
         elif timeframe == '4H':
-            step_size = max(3, len(price_data) // 80)
+            step_size = max(6, len(price_data) // 60)
         else:
-            step_size = max(2, len(price_data) // 60)
+            step_size = max(5, len(price_data) // 40)
         
         logger.info(f"Generating QUALITY signals for {pair}-{timeframe} with step_size: {step_size}, data points: {len(price_data)}")
         
@@ -1431,29 +1428,25 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                 ema_alignment = tech_analysis['trend'].get('ema_alignment', 'NEUTRAL')
                 volatility = tech_analysis['volatility']['volatility_pct']
                 
-                # PERBAIKAN: Longgar kriteria untuk menghasilkan lebih banyak sinyal
-                if volatility > 0.04:  # Dari 0.035 menjadi 0.04
+                if volatility > 0.035:
                     continue
                     
-                if adx < 15:  # Dari 18 menjadi 15
+                if adx < 18:
                     continue
                 
                 signal = None
                 confidence = 50
                 
-                # PERBAIKAN: Tambahkan lebih banyak kondisi untuk sinyal
                 buy_conditions = [
-                    rsi < 40 and macd_hist > 0.0001 and trend == 'BULLISH',  # Lebih longgar
-                    rsi < 45 and ema_alignment == 'STRONG_BULLISH' and adx > 18,  # Lebih longgar
-                    rsi < 42 and macd_hist > 0.00005 and adx > 20 and trend == 'BULLISH',  # Lebih longgar
-                    rsi < 38 and ema_alignment in ['STRONG_BULLISH', 'MIXED'] and adx > 15  # Kondisi baru
+                    rsi < 38 and macd_hist > 0.0002 and trend == 'BULLISH',
+                    rsi < 42 and ema_alignment == 'STRONG_BULLISH' and adx > 20,
+                    rsi < 40 and macd_hist > 0.0001 and adx > 22 and trend == 'BULLISH'
                 ]
                 
                 sell_conditions = [
-                    rsi > 60 and macd_hist < -0.0001 and trend == 'BEARISH',  # Lebih longgar
-                    rsi > 55 and ema_alignment == 'STRONG_BEARISH' and adx > 18,  # Lebih longgar
-                    rsi > 58 and macd_hist < -0.00005 and adx > 20 and trend == 'BEARISH',  # Lebih longgar
-                    rsi > 62 and ema_alignment in ['STRONG_BEARISH', 'MIXED'] and adx > 15  # Kondisi baru
+                    rsi > 62 and macd_hist < -0.0002 and trend == 'BEARISH',
+                    rsi > 58 and ema_alignment == 'STRONG_BEARISH' and adx > 20,
+                    rsi > 60 and macd_hist < -0.0001 and adx > 22 and trend == 'BEARISH'
                 ]
                 
                 buy_score = sum(1 for condition in buy_conditions if condition)
@@ -1461,7 +1454,7 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                 
                 if buy_score >= 1:
                     signal = 'BUY'
-                    base_confidence = 60 + (buy_score * 8)
+                    base_confidence = 60 + (buy_score * 10)
                     if rsi < 35: base_confidence += 5
                     if ema_alignment == 'STRONG_BULLISH': base_confidence += 8
                     if adx > 25: base_confidence += 5
@@ -1469,14 +1462,13 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                     
                 elif sell_score >= 1:
                     signal = 'SELL'
-                    base_confidence = 60 + (sell_score * 8)
+                    base_confidence = 60 + (sell_score * 10)
                     if rsi > 65: base_confidence += 5
                     if ema_alignment == 'STRONG_BEARISH': base_confidence += 8
                     if adx > 25: base_confidence += 5
                     confidence = min(85, base_confidence)
                 
-                # PERBAIKAN: Kurangi minimum confidence untuk lebih banyak sinyal
-                if signal and confidence >= 60:  # Dari 65 menjadi 60
+                if signal and confidence >= 65:
                     current_date = window_data.iloc[-1]['date']
                     signals.append({
                         'date': current_date,
@@ -1563,8 +1555,6 @@ class AdvancedBacktestingEngine:
         
         for tf in ['M30', '1H', '4H', '1D']:
             try:
-                # Import data_manager dan tech_engine di sini
-                from __main__ import data_manager, tech_engine
                 data = data_manager.get_price_data(pair, tf, days=30)
                 if not data.empty and len(data) > 20:
                     tech = tech_engine.calculate_all_indicators(data)
@@ -1624,7 +1614,6 @@ class AdvancedBacktestingEngine:
                 return False
             
             try:
-                # PERBAIKAN: Handle date parsing dengan lebih baik
                 if hasattr(signal_date, 'date'):
                     signal_date_date = signal_date.date()
                 else:
@@ -1634,16 +1623,8 @@ class AdvancedBacktestingEngine:
                 trade_data = price_data[price_data_dates == signal_date_date]
                 
                 if trade_data.empty:
-                    # PERBAIKAN: Jika tidak ada data untuk tanggal yang tepat, cari yang terdekat
                     if len(price_data) > 0:
-                        # Cari data terdekat berdasarkan tanggal
-                        price_data['date_dt'] = pd.to_datetime(price_data['date']).dt.date
-                        date_diff = abs((price_data['date_dt'] - signal_date_date).dt.days)
-                        closest_idx = date_diff.idxmin()
-                        if date_diff[closest_idx] <= 7:  # Maksimal 7 hari selisih
-                            trade_data = price_data.iloc[[closest_idx]]
-                        else:
-                            trade_data = price_data.iloc[-1:]
+                        trade_data = price_data.iloc[-1:]
                     else:
                         return False
                         
@@ -1658,8 +1639,7 @@ class AdvancedBacktestingEngine:
             
             mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
             
-            # PERBAIKAN: Longgarkan konfirmasi MTF untuk lebih banyak eksekusi
-            if not mtf_confirmation['confirmed'] and mtf_confirmation['score'] < 0.5:  # Dari 0.75 menjadi 0.5
+            if not mtf_confirmation['confirmed']:
                 logger.info(f"MTF confirmation weak for {signal['pair']}-{action}, rejecting trade")
                 return False
             
@@ -1709,9 +1689,8 @@ class AdvancedBacktestingEngine:
         confirmation_score = confirming_timeframes / total_timeframes if total_timeframes > 0 else 0
         avg_strength = total_strength / confirming_timeframes if confirming_timeframes > 0 else 0
         
-        # PERBAIKAN: Longgarkan kriteria konfirmasi
         return {
-            'confirmed': confirmation_score >= 0.5,  # Dari 0.75 menjadi 0.5
+            'confirmed': confirmation_score >= 0.75,
             'score': confirmation_score,
             'strength': avg_strength,
             'confirming_tf': confirming_timeframes,
@@ -2129,53 +2108,64 @@ def api_analyze():
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
 @app.route('/api/backtest', methods=['POST'])
-def api_backtest():
-    """Endpoint untuk basic backtesting"""
+def api_backtest_compatible():
+    """Endpoint backtest yang compatible dengan frontend existing"""
     try:
         data = request.get_json()
-        pair = data.get('pair', 'USDJPY')
-        timeframe = data.get('timeframe', '4H')
+        pair = data.get('pair', 'USDJPY').upper()
+        timeframe = data.get('timeframe', '4H').upper()
         days = int(data.get('days', 30))
         initial_balance = float(data.get('initial_balance', config.INITIAL_BALANCE))
         
-        logger.info(f"Basic backtest request: {pair}-{timeframe} for {days} days")
+        logger.info(f"Compatible backtest request: {pair}-{timeframe} for {days} days")
         
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
+        # Dapatkan data harga
         price_data = data_manager.get_price_data(pair, timeframe, days)
         
         if price_data.empty:
             return jsonify({'error': 'No price data available for backtesting'}), 400
         
+        # Generate sinyal trading
         signals = generate_trading_signals(price_data, pair, timeframe)
         
-        simple_backtester = AdvancedBacktestingEngine(initial_balance)
-        result = simple_backtester.run_comprehensive_backtest(signals, price_data, pair, timeframe)
+        # Jalankan backtest
+        backtester = AdvancedBacktestingEngine(initial_balance)
+        result = backtester.run_comprehensive_backtest(signals, price_data, pair, timeframe)
         
-        return jsonify(result)
+        # Format response yang compatible dengan frontend
+        response = {
+            'status': 'success',
+            'summary': result.get('summary', {}),
+            'trade_analysis': result.get('trade_analysis', {}),
+            'performance_grade': result.get('performance_grade', 'N/A'),
+            'metadata': result.get('metadata', {})
+        }
+        
+        return jsonify(response)
         
     except Exception as e:
-        logger.error(f"Backtest error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        logger.error(f"Compatible backtest error: {e}")
         return jsonify({'error': f'Backtest failed: {str(e)}'}), 500
 
 @app.route('/api/advanced_backtest', methods=['POST'])
-def api_advanced_backtest():
-    """Endpoint untuk advanced backtesting"""
+def api_advanced_backtest_compatible():
+    """Endpoint advanced backtest yang compatible dengan frontend existing"""
     try:
         data = request.get_json()
         pair = data.get('pair', 'USDJPY').upper()
         timeframe = data.get('timeframe', '4H').upper()
-        days = min(int(data.get('days', 30)), 180)
+        days = min(int(data.get('days', 90)), 180)
         initial_balance = float(data.get('initial_balance', config.INITIAL_BALANCE))
         
-        logger.info(f"Advanced backtest request: {pair}-{timeframe} for {days} days")
+        logger.info(f"Compatible advanced backtest: {pair}-{timeframe} for {days} days")
         
         if pair not in config.FOREX_PAIRS:
             return jsonify({'error': f'Unsupported pair: {pair}'}), 400
         
+        # Dapatkan data harga
         price_data = data_manager.get_price_data(pair, timeframe, days)
         
         if price_data.empty:
@@ -2183,35 +2173,61 @@ def api_advanced_backtest():
         
         logger.info(f"Price data loaded: {len(price_data)} records for {pair}-{timeframe}")
         
+        # Generate sinyal trading
         signals = generate_trading_signals(price_data, pair, timeframe)
         
         logger.info(f"Generated {len(signals)} trading signals for backtesting")
         
+        # Jalankan backtest advanced
         advanced_backtester.initial_balance = initial_balance
         result = advanced_backtester.run_comprehensive_backtest(signals, price_data, pair, timeframe)
         
-        result['backtest_parameters'] = {
-            'pair': pair,
-            'timeframe': timeframe,
-            'days': days,
-            'initial_balance': initial_balance,
-            'signals_generated': len(signals),
-            'trades_executed': result['summary']['total_trades'],
-            'backtest_mode': True,
-            'risk_parameters': {
-                'daily_trade_limit': config.BACKTEST_DAILY_TRADE_LIMIT,
-                'min_confidence': config.BACKTEST_MIN_CONFIDENCE,
-                'risk_score_threshold': config.BACKTEST_RISK_SCORE_THRESHOLD
-            }
+        # Format response yang compatible dengan frontend
+        response = {
+            'status': 'success', 
+            'summary': result.get('summary', {}),
+            'trade_analysis': result.get('trade_analysis', {}),
+            'performance_grade': result.get('performance_grade', 'N/A'),
+            'metadata': result.get('metadata', {})
         }
         
-        return jsonify(result)
+        return jsonify(response)
         
     except Exception as e:
-        logger.error(f"Advanced backtest error: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        logger.error(f"Compatible advanced backtest error: {e}")
         return jsonify({'error': f'Advanced backtest failed: {str(e)}'}), 500
+
+@app.route('/api/backtest/status')
+def api_backtest_status():
+    """Endpoint untuk mengecek status dan ketersediaan data backtest"""
+    status_report = {
+        'backtest_engine': 'READY',
+        'historical_data_status': {},
+        'supported_pairs': config.FOREX_PAIRS,
+        'timeframes': config.TIMEFRAMES,
+        'risk_parameters': {
+            'initial_balance': config.INITIAL_BALANCE,
+            'daily_trade_limit': config.BACKTEST_DAILY_TRADE_LIMIT,
+            'min_confidence': config.BACKTEST_MIN_CONFIDENCE
+        }
+    }
+    
+    # Cek ketersediaan data untuk setiap pair
+    for pair in config.FOREX_PAIRS[:6]:  # Cek 6 pair pertama
+        data_status = {}
+        for tf in config.TIMEFRAMES:
+            try:
+                data = data_manager.get_price_data(pair, tf, days=30)
+                data_status[tf] = {
+                    'records': len(data),
+                    'status': 'AVAILABLE' if len(data) > 50 else 'INSUFFICIENT'
+                }
+            except Exception as e:
+                data_status[tf] = {'records': 0, 'status': 'ERROR', 'error': str(e)}
+        
+        status_report['historical_data_status'][pair] = data_status
+    
+    return jsonify(status_report)
 
 @app.route('/api/market_overview')
 def api_market_overview():
