@@ -1,3 +1,5 @@
+[file name]: app.py
+[file content begin]
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import numpy as np
@@ -1399,14 +1401,15 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
         
         tech_engine = TechnicalAnalysisEngine()
         
+        # PERBAIKAN: Kurangi step_size untuk menghasilkan lebih banyak sinyal
         if timeframe == 'M30':
-            step_size = max(10, len(price_data) // 100)
+            step_size = max(5, len(price_data) // 150)  # Lebih banyak sinyal
         elif timeframe == '1H':
-            step_size = max(8, len(price_data) // 80)
+            step_size = max(4, len(price_data) // 120)
         elif timeframe == '4H':
-            step_size = max(6, len(price_data) // 60)
+            step_size = max(3, len(price_data) // 80)
         else:
-            step_size = max(5, len(price_data) // 40)
+            step_size = max(2, len(price_data) // 60)
         
         logger.info(f"Generating QUALITY signals for {pair}-{timeframe} with step_size: {step_size}, data points: {len(price_data)}")
         
@@ -1428,25 +1431,29 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                 ema_alignment = tech_analysis['trend'].get('ema_alignment', 'NEUTRAL')
                 volatility = tech_analysis['volatility']['volatility_pct']
                 
-                if volatility > 0.035:
+                # PERBAIKAN: Longgar kriteria untuk menghasilkan lebih banyak sinyal
+                if volatility > 0.04:  # Dari 0.035 menjadi 0.04
                     continue
                     
-                if adx < 18:
+                if adx < 15:  # Dari 18 menjadi 15
                     continue
                 
                 signal = None
                 confidence = 50
                 
+                # PERBAIKAN: Tambahkan lebih banyak kondisi untuk sinyal
                 buy_conditions = [
-                    rsi < 38 and macd_hist > 0.0002 and trend == 'BULLISH',
-                    rsi < 42 and ema_alignment == 'STRONG_BULLISH' and adx > 20,
-                    rsi < 40 and macd_hist > 0.0001 and adx > 22 and trend == 'BULLISH'
+                    rsi < 40 and macd_hist > 0.0001 and trend == 'BULLISH',  # Lebih longgar
+                    rsi < 45 and ema_alignment == 'STRONG_BULLISH' and adx > 18,  # Lebih longgar
+                    rsi < 42 and macd_hist > 0.00005 and adx > 20 and trend == 'BULLISH',  # Lebih longgar
+                    rsi < 38 and ema_alignment in ['STRONG_BULLISH', 'MIXED'] and adx > 15  # Kondisi baru
                 ]
                 
                 sell_conditions = [
-                    rsi > 62 and macd_hist < -0.0002 and trend == 'BEARISH',
-                    rsi > 58 and ema_alignment == 'STRONG_BEARISH' and adx > 20,
-                    rsi > 60 and macd_hist < -0.0001 and adx > 22 and trend == 'BEARISH'
+                    rsi > 60 and macd_hist < -0.0001 and trend == 'BEARISH',  # Lebih longgar
+                    rsi > 55 and ema_alignment == 'STRONG_BEARISH' and adx > 18,  # Lebih longgar
+                    rsi > 58 and macd_hist < -0.00005 and adx > 20 and trend == 'BEARISH',  # Lebih longgar
+                    rsi > 62 and ema_alignment in ['STRONG_BEARISH', 'MIXED'] and adx > 15  # Kondisi baru
                 ]
                 
                 buy_score = sum(1 for condition in buy_conditions if condition)
@@ -1454,7 +1461,7 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                 
                 if buy_score >= 1:
                     signal = 'BUY'
-                    base_confidence = 60 + (buy_score * 10)
+                    base_confidence = 60 + (buy_score * 8)
                     if rsi < 35: base_confidence += 5
                     if ema_alignment == 'STRONG_BULLISH': base_confidence += 8
                     if adx > 25: base_confidence += 5
@@ -1462,13 +1469,14 @@ def generate_trading_signals(price_data: pd.DataFrame, pair: str, timeframe: str
                     
                 elif sell_score >= 1:
                     signal = 'SELL'
-                    base_confidence = 60 + (sell_score * 10)
+                    base_confidence = 60 + (sell_score * 8)
                     if rsi > 65: base_confidence += 5
                     if ema_alignment == 'STRONG_BEARISH': base_confidence += 8
                     if adx > 25: base_confidence += 5
                     confidence = min(85, base_confidence)
                 
-                if signal and confidence >= 65:
+                # PERBAIKAN: Kurangi minimum confidence untuk lebih banyak sinyal
+                if signal and confidence >= 60:  # Dari 65 menjadi 60
                     current_date = window_data.iloc[-1]['date']
                     signals.append({
                         'date': current_date,
@@ -1614,6 +1622,7 @@ class AdvancedBacktestingEngine:
                 return False
             
             try:
+                # PERBAIKAN: Handle date parsing dengan lebih baik
                 if hasattr(signal_date, 'date'):
                     signal_date_date = signal_date.date()
                 else:
@@ -1623,8 +1632,16 @@ class AdvancedBacktestingEngine:
                 trade_data = price_data[price_data_dates == signal_date_date]
                 
                 if trade_data.empty:
+                    # PERBAIKAN: Jika tidak ada data untuk tanggal yang tepat, cari yang terdekat
                     if len(price_data) > 0:
-                        trade_data = price_data.iloc[-1:]
+                        # Cari data terdekat berdasarkan tanggal
+                        price_data['date_dt'] = pd.to_datetime(price_data['date']).dt.date
+                        date_diff = abs((price_data['date_dt'] - signal_date_date).dt.days)
+                        closest_idx = date_diff.idxmin()
+                        if date_diff[closest_idx] <= 7:  # Maksimal 7 hari selisih
+                            trade_data = price_data.iloc[[closest_idx]]
+                        else:
+                            trade_data = price_data.iloc[-1:]
                     else:
                         return False
                         
@@ -1639,7 +1656,8 @@ class AdvancedBacktestingEngine:
             
             mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
             
-            if not mtf_confirmation['confirmed']:
+            # PERBAIKAN: Longgarkan konfirmasi MTF untuk lebih banyak eksekusi
+            if not mtf_confirmation['confirmed'] and mtf_confirmation['score'] < 0.5:  # Dari 0.75 menjadi 0.5
                 logger.info(f"MTF confirmation weak for {signal['pair']}-{action}, rejecting trade")
                 return False
             
@@ -1689,8 +1707,9 @@ class AdvancedBacktestingEngine:
         confirmation_score = confirming_timeframes / total_timeframes if total_timeframes > 0 else 0
         avg_strength = total_strength / confirming_timeframes if confirming_timeframes > 0 else 0
         
+        # PERBAIKAN: Longgarkan kriteria konfirmasi
         return {
-            'confirmed': confirmation_score >= 0.75,
+            'confirmed': confirmation_score >= 0.5,  # Dari 0.75 menjadi 0.5
             'score': confirmation_score,
             'strength': avg_strength,
             'confirming_tf': confirming_timeframes,
@@ -2438,3 +2457,4 @@ if __name__ == '__main__':
     logger.info("Forex Analysis System is ready and running on http://localhost:5000")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+[file content end]
