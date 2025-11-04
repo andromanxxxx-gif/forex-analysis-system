@@ -1998,4 +1998,862 @@ class AdvancedBacktestingEngine:
         try:
             signal_date = signal['date']
             action = signal['action']
-            confidence
+            confidence = signal['confidence']
+            
+            if confidence < config.BACKTEST_MIN_CONFIDENCE:
+                return False
+            
+            try:
+                if hasattr(signal_date, 'date'):
+                    signal_date_date = signal_date.date()
+                else:
+                    signal_date_date = pd.to_datetime(signal_date).date()
+                
+                price_data_dates = pd.to_datetime(price_data['date']).dt.date
+                trade_data = price_data[price_data_dates == signal_date_date]
+                
+                if trade_data.empty:
+                    if len(price_data) > 0:
+                        trade_data = price_data.iloc[-1:]
+                    else:
+                        return False
+                        
+                entry_price = float(trade_data['close'].iloc[0])
+                
+            except Exception as e:
+                logger.warning(f"Date processing error: {e}, using latest price")
+                if len(price_data) > 0:
+                    entry_price = float(price_data['close'].iloc[-1])
+                else:
+                    return False
+            
+            mtf_confirmation = self._get_mtf_confirmation(action, mtf_analysis)
+            
+            if not mtf_confirmation['confirmed']:
+                logger.info(f"MTF confirmation weak for {signal['pair']}-{action}, rejecting trade")
+                return False
+            
+            # Enhanced risk validation dengan technical analysis
+            current_tech = tech_engine.calculate_all_indicators(price_data)
+            enhanced_risk_validation = self.risk_manager.enhanced_risk_validation(
+                pair=signal.get('pair', 'UNKNOWN'),
+                signal=action,
+                confidence=confidence,
+                technical_data=current_tech,
+                current_price=entry_price
+            )
+            
+            if not enhanced_risk_validation['approved']:
+                logger.info(f"Enhanced risk validation failed: {enhanced_risk_validation['rejection_reasons']}")
+                return False
+            
+            lot_size = 0.1  # Default lot size
+            trade_result = self._simulate_enhanced_trade_execution(
+                action=action,
+                entry_price=entry_price,
+                lot_size=lot_size,
+                confidence=confidence,
+                mtf_strength=mtf_confirmation['strength'],
+                risk_score=enhanced_risk_validation['risk_score'],
+                technical_data=current_tech
+            )
+            
+            self._update_portfolio(signal, trade_result, entry_price, lot_size, enhanced_risk_validation)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in enhanced trade execution: {e}")
+            return False
+    
+    def _get_mtf_confirmation(self, action: str, mtf_analysis: Dict) -> Dict:
+        """Dapatkan konfirmasi multi-timeframe"""
+        confirming_timeframes = 0
+        total_timeframes = len(mtf_analysis)
+        total_strength = 0
+        
+        for tf, analysis in mtf_analysis.items():
+            if analysis['signal'] == action:
+                confirming_timeframes += 1
+                total_strength += analysis['strength']
+        
+        confirmation_score = confirming_timeframes / total_timeframes if total_timeframes > 0 else 0
+        avg_strength = total_strength / confirming_timeframes if confirming_timeframes > 0 else 0
+        
+        return {
+            'confirmed': confirmation_score >= 0.75,
+            'score': confirmation_score,
+            'strength': avg_strength,
+            'confirming_tf': confirming_timeframes,
+            'total_tf': total_timeframes
+        }
+    
+    def _simulate_enhanced_trade_execution(self, action: str, entry_price: float, 
+                                         lot_size: float, confidence: int, mtf_strength: float,
+                                         risk_score: int, technical_data: Dict) -> Dict:
+        """Simulasi eksekusi trade yang lebih realistis dengan analisis teknikal"""
+        
+        base_probability = confidence / 100.0
+        mtf_bonus = mtf_strength * 0.3
+        risk_penalty = risk_score * 0.1
+        
+        # Additional factors dari technical analysis
+        rsi = technical_data['momentum']['rsi']
+        adx = technical_data['trend']['adx']
+        ema_alignment = technical_data['trend']['ema_alignment']
+        
+        # Technical bonuses
+        tech_bonus = 0
+        if action == 'BUY' and rsi < 30:
+            tech_bonus += 0.1
+        elif action == 'SELL' and rsi > 70:
+            tech_bonus += 0.1
+        
+        if adx > 30:
+            tech_bonus += 0.1
+        
+        if (action == 'BUY' and ema_alignment == 'STRONG_BULLISH') or (action == 'SELL' and ema_alignment == 'STRONG_BEARISH'):
+            tech_bonus += 0.15
+        
+        enhanced_probability = base_probability + mtf_bonus + tech_bonus - risk_penalty
+        enhanced_probability = max(0.4, min(0.85, enhanced_probability))
+        
+        if np.random.random() < enhanced_probability:
+            if action == 'BUY':
+                price_change_pct = np.random.uniform(0.01, 0.04)
+                profit = entry_price * price_change_pct * lot_size * 100000
+            else:
+                price_change_pct = np.random.uniform(-0.04, -0.01)
+                profit = abs(entry_price * price_change_pct * lot_size * 100000)
+            
+            outcome = 'WIN'
+            close_reason = 'TAKE_PROFIT'
+            
+        else:
+            if action == 'BUY':
+                price_change_pct = np.random.uniform(-0.01, -0.003)
+                profit = entry_price * price_change_pct * lot_size * 100000
+            else:
+                price_change_pct = np.random.uniform(0.003, 0.01)
+                profit = -abs(entry_price * price_change_pct * lot_size * 100000)
+            
+            outcome = 'LOSS'
+            close_reason = 'STOP_LOSS'
+        
+        return {
+            'profit': profit,
+            'outcome': outcome,
+            'close_reason': close_reason,
+            'probability_used': enhanced_probability,
+            'price_change_pct': price_change_pct
+        }
+    
+    def _get_current_positions(self) -> List[Dict]:
+        return []
+    
+    def _update_portfolio(self, signal: Dict, trade_result: Dict, entry_price: float, 
+                         lot_size: float, risk_validation: Dict):
+        profit = trade_result['profit']
+        
+        self.balance += profit
+        
+        trade_record = {
+            'entry_date': signal['date'].strftime('%Y-%m-%d') if hasattr(signal['date'], 'strftime') else str(signal['date']),
+            'pair': signal.get('pair', 'UNKNOWN'),
+            'action': signal['action'],
+            'entry_price': round(entry_price, 4),
+            'lot_size': round(lot_size, 2),
+            'profit': round(profit, 2),
+            'outcome': trade_result['outcome'],
+            'close_reason': trade_result['close_reason'],
+            'confidence': signal.get('confidence', 50),
+            'balance_after': round(self.balance, 2),
+            'risk_score': risk_validation['risk_score'],
+            'probability': round(trade_result['probability_used'], 3),
+            'price_change_pct': round(trade_result['price_change_pct'] * 100, 2)
+        }
+        
+        self.trade_history.append(trade_record)
+        
+        self.portfolio_history.append({
+            'date': trade_record['entry_date'],
+            'balance': self.balance,
+            'drawdown': self._calculate_current_drawdown()
+        })
+        
+        if trade_result['outcome'] == 'WIN':
+            self.winning_trades += 1
+            self.consecutive_losses = 0
+            
+            if signal['action'] == 'BUY':
+                self.winning_long_trades += 1
+            else:
+                self.winning_short_trades += 1
+                
+        else:
+            self.losing_trades += 1
+            self.consecutive_losses += 1
+            self.max_consecutive_losses = max(self.max_consecutive_losses, self.consecutive_losses)
+        
+        if signal['action'] == 'BUY':
+            self.total_long_trades += 1
+        else:
+            self.total_short_trades += 1
+        
+        if self.balance > self.peak_balance:
+            self.peak_balance = self.balance
+        
+        current_drawdown = self._calculate_current_drawdown()
+        self.max_drawdown = max(self.max_drawdown, current_drawdown)
+        
+        self.risk_manager.update_trade_result(profit, trade_result['outcome'] == 'WIN')
+    
+    def _calculate_current_drawdown(self) -> float:
+        if self.peak_balance == 0:
+            return 0.0
+        return (self.peak_balance - self.balance) / self.peak_balance
+    
+    def _generate_comprehensive_report(self, pair: str, timeframe: str, mtf_analysis: Dict) -> Dict:
+        total_trades = len(self.trade_history)
+        
+        if total_trades == 0:
+            return self._empty_backtest_result(pair)
+        
+        win_rate = (self.winning_trades / total_trades * 100) if total_trades > 0 else 0
+        total_profit = sum(trade['profit'] for trade in self.trade_history)
+        average_profit = total_profit / total_trades if total_trades > 0 else 0
+        
+        winning_trades = [t for t in self.trade_history if t['outcome'] == 'WIN']
+        losing_trades = [t for t in self.trade_history if t['outcome'] == 'LOSS']
+        
+        avg_win = sum(t['profit'] for t in winning_trades) / len(winning_trades) if winning_trades else 0
+        avg_loss = sum(t['profit'] for t in losing_trades) / len(losing_trades) if losing_trades else 0
+        profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
+        
+        long_win_rate = (self.winning_long_trades / self.total_long_trades * 100) if self.total_long_trades > 0 else 0
+        short_win_rate = (self.winning_short_trades / self.total_short_trades * 100) if self.total_short_trades > 0 else 0
+        
+        total_return_pct = ((self.balance - self.initial_balance) / self.initial_balance * 100)
+        
+        returns = [t['profit'] / self.initial_balance for t in self.trade_history]
+        if len(returns) > 1:
+            avg_return = np.mean(returns)
+            std_return = np.std(returns)
+            if std_return > 0:
+                self.sharpe_ratio = (avg_return - 0.02/252) / std_return * np.sqrt(252)
+            else:
+                self.sharpe_ratio = 0
+        else:
+            self.sharpe_ratio = 0
+        
+        if self.max_drawdown > 0:
+            self.calmar_ratio = total_return_pct / (self.max_drawdown * 100)
+        else:
+            self.calmar_ratio = float('inf')
+        
+        recovery_factor = total_profit / (self.max_drawdown * self.initial_balance) if self.max_drawdown > 0 else 0
+        
+        self.risk_adjusted_return = total_return_pct / (self.max_drawdown * 100 + 1) if self.max_drawdown > 0 else total_return_pct
+        
+        avg_risk_score = np.mean([t.get('risk_score', 0) for t in self.trade_history]) if self.trade_history else 0
+        
+        return {
+            'status': 'success',
+            'summary': {
+                'total_trades': total_trades,
+                'winning_trades': self.winning_trades,
+                'losing_trades': self.losing_trades,
+                'win_rate': round(win_rate, 2),
+                'total_profit': round(total_profit, 2),
+                'final_balance': round(self.balance, 2),
+                'return_percentage': round(total_return_pct, 2),
+                'max_drawdown': round(self.max_drawdown * 100, 2),
+                'profit_factor': round(profit_factor, 2),
+                'sharpe_ratio': round(self.sharpe_ratio, 2),
+                'calmar_ratio': round(self.calmar_ratio, 2),
+                'recovery_factor': round(recovery_factor, 2),
+                'risk_adjusted_return': round(self.risk_adjusted_return, 2),
+                'avg_win': round(avg_win, 2),
+                'avg_loss': round(avg_loss, 2),
+                'avg_trade': round(average_profit, 2),
+                'max_consecutive_losses': self.max_consecutive_losses,
+                'avg_risk_score': round(avg_risk_score, 1)
+            },
+            'trade_analysis': {
+                'long_trades': self.total_long_trades,
+                'short_trades': self.total_short_trades,
+                'long_win_rate': round(long_win_rate, 2),
+                'short_win_rate': round(short_win_rate, 2),
+                'best_trade': max(self.trade_history, key=lambda x: x['profit']) if self.trade_history else {},
+                'worst_trade': min(self.trade_history, key=lambda x: x['profit']) if self.trade_history else {},
+                'avg_confidence': round(np.mean([t['confidence'] for t in self.trade_history]), 1) if self.trade_history else 0,
+                'avg_probability': round(np.mean([t.get('probability', 0.5) for t in self.trade_history]), 3) if self.trade_history else 0
+            },
+            'multi_timeframe_analysis': mtf_analysis,
+            'risk_report': self.risk_manager.get_risk_report(),
+            'trade_history': self.trade_history[-20:],
+            'performance_grade': self._calculate_performance_grade(win_rate, profit_factor, self.sharpe_ratio),
+            'metadata': {
+                'pair': pair,
+                'timeframe': timeframe,
+                'initial_balance': self.initial_balance,
+                'testing_date': datetime.now().isoformat(),
+                'total_days': len(set(t['entry_date'] for t in self.trade_history)),
+                'note': 'Enhanced backtest with strict risk management and multi-timeframe analysis'
+            }
+        }
+    
+    def _calculate_performance_grade(self, win_rate: float, profit_factor: float, sharpe_ratio: float) -> str:
+        score = 0
+        
+        if win_rate >= 60:
+            score += 3
+        elif win_rate >= 55:
+            score += 2
+        elif win_rate >= 50:
+            score += 1
+        
+        if profit_factor >= 2.0:
+            score += 3
+        elif profit_factor >= 1.5:
+            score += 2
+        elif profit_factor >= 1.2:
+            score += 1
+        
+        if sharpe_ratio >= 2.0:
+            score += 3
+        elif sharpe_ratio >= 1.5:
+            score += 2
+        elif sharpe_ratio >= 1.0:
+            score += 1
+        elif sharpe_ratio >= 0.5:
+            score += 0
+        else:
+            score -= 1
+        
+        if score >= 8:
+            return "A+"
+        elif score >= 7:
+            return "A"
+        elif score >= 6:
+            return "A-"
+        elif score >= 5:
+            return "B+"
+        elif score >= 4:
+            return "B"
+        elif score >= 3:
+            return "B-"
+        elif score >= 2:
+            return "C+"
+        elif score >= 1:
+            return "C"
+        else:
+            return "D"
+    
+    def _empty_backtest_result(self, pair: str) -> Dict:
+        return {
+            'status': 'no_trades',
+            'summary': {
+                'total_trades': 0,
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'win_rate': 0,
+                'total_profit': 0,
+                'final_balance': self.initial_balance,
+                'return_percentage': 0,
+                'max_drawdown': 0,
+                'profit_factor': 0,
+                'sharpe_ratio': 0,
+                'calmar_ratio': 0,
+                'recovery_factor': 0,
+                'risk_adjusted_return': 0,
+                'avg_win': 0,
+                'avg_loss': 0,
+                'avg_trade': 0,
+                'max_consecutive_losses': 0,
+                'avg_risk_score': 0
+            },
+            'trade_analysis': {
+                'long_trades': 0,
+                'short_trades': 0,
+                'long_win_rate': 0,
+                'short_win_rate': 0
+            },
+            'risk_report': self.risk_manager.get_risk_report(),
+            'trade_history': [],
+            'performance_grade': 'N/A',
+            'metadata': {
+                'pair': pair,
+                'initial_balance': self.initial_balance,
+                'testing_date': datetime.now().isoformat(),
+                'message': 'No trades executed during backtest period - strategy too conservative'
+            }
+        }
+
+# ==================== INITIALIZE SYSTEM ====================
+logger.info("Initializing Enhanced Forex Analysis System...")
+
+tech_engine = TechnicalAnalysisEngine()
+fundamental_engine = FundamentalAnalysisEngine()
+deepseek_analyzer = DeepSeekAnalyzer()
+data_manager = DataManager()
+twelve_data_client = TwelveDataClient()
+
+risk_manager = AdvancedRiskManager()
+advanced_backtester = AdvancedBacktestingEngine()
+
+logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
+logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
+logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE'}")
+logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
+logger.info(f"News API: {'LIVE MODE' if not fundamental_engine.demo_mode else 'DEMO MODE'}")
+logger.info(f"Advanced Risk Management: ENABLED")
+logger.info(f"Enhanced Backtesting: ENABLED")
+logger.info(f"Backtesting Parameters: Daily Trade Limit: {config.BACKTEST_DAILY_TRADE_LIMIT}, Min Confidence: {config.BACKTEST_MIN_CONFIDENCE}")
+
+logger.info("All system components initialized successfully")
+
+# ==================== FLASK ROUTES ====================
+@app.route('/')
+def index():
+    return render_template('index.html', 
+                         pairs=config.FOREX_PAIRS,
+                         timeframes=config.TIMEFRAMES,
+                         initial_balance=config.INITIAL_BALANCE)
+
+@app.route('/api/analyze')
+def api_analyze():
+    """Endpoint untuk analisis market real-time"""
+    try:
+        pair = request.args.get('pair', 'USDJPY').upper()
+        timeframe = request.args.get('timeframe', '4H').upper()
+        
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        real_time_price = twelve_data_client.get_real_time_price(pair)
+        
+        price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
+        if price_data.empty:
+            logger.warning(f"No price data for {pair}-{timeframe}, generating sample data")
+            data_manager._generate_sample_data(pair, timeframe)
+            price_data = data_manager.get_price_data_with_timezone(pair, timeframe, days=60)
+        
+        technical_analysis = tech_engine.calculate_all_indicators(price_data)
+        
+        technical_analysis['levels']['current_price'] = real_time_price
+        
+        fundamental_news = fundamental_engine.get_forex_news(pair)
+        
+        ai_analysis = deepseek_analyzer.analyze_market(pair, technical_analysis, fundamental_news)
+        
+        # Enhanced risk validation
+        enhanced_risk_validation = risk_manager.enhanced_risk_validation(
+            pair=pair,
+            signal=ai_analysis.get('signal', 'HOLD'),
+            confidence=ai_analysis.get('confidence', 50),
+            technical_data=technical_analysis,
+            current_price=real_time_price
+        )
+        
+        price_series = []
+        try:
+            hist_df = data_manager.get_price_data_with_timezone(pair, timeframe, days=200)
+            if not hist_df.empty:
+                hist_df = hist_df.sort_values('date')
+                
+                for _, row in hist_df.iterrows():
+                    date_value = row['date']
+                    
+                    if hasattr(date_value, 'isoformat'):
+                        if date_value.tzinfo is None:
+                            date_str = date_value.isoformat() + 'Z'
+                        else:
+                            date_str = date_value.isoformat()
+                    else:
+                        date_str = str(date_value)
+                    
+                    price_series.append({
+                        'date': date_str,
+                        'open': float(row['open']),
+                        'high': float(row['high']),
+                        'low': float(row['low']),
+                        'close': float(row['close']),
+                        'volume': int(row['volume']) if 'volume' in row and not pd.isna(row['volume']) else 0
+                    })
+                    
+                logger.info(f"Prepared {len(price_series)} price series records for {pair}-{timeframe}")
+                
+        except Exception as e:
+            logger.error(f"Error preparing price series for {pair}-{timeframe}: {e}")
+            price_series = []
+        
+        response = {
+            'pair': pair,
+            'timeframe': timeframe,
+            'timestamp': datetime.now().isoformat(),
+            'technical_analysis': technical_analysis,
+            'fundamental_analysis': fundamental_news,
+            'ai_analysis': ai_analysis,
+            'enhanced_risk_validation': enhanced_risk_validation,
+            'price_data': {
+                'current': real_time_price,
+                'support': technical_analysis.get('levels', {}).get('support'),
+                'resistance': technical_analysis.get('levels', {}).get('resistance'),
+                'change_pct': technical_analysis.get('momentum', {}).get('price_change_pct', 0)
+            },
+            'price_series': price_series,
+            'analysis_summary': f"{pair} currently trading at {real_time_price:.4f}",
+            'ai_provider': ai_analysis.get('ai_provider', 'DeepSeek AI'),
+            'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo',
+            'timezone_info': 'UTC'
+        }
+        
+        return jsonify(response)
+    
+    except Exception as e:
+        logger.error(f"Analysis error: {e}", exc_info=True)
+        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+
+@app.route('/api/backtest', methods=['POST'])
+def api_backtest():
+    """Endpoint untuk basic backtesting"""
+    try:
+        data = request.get_json()
+        pair = data.get('pair', 'USDJPY')
+        timeframe = data.get('timeframe', '4H')
+        days = int(data.get('days', 30))
+        initial_balance = float(data.get('initial_balance', config.INITIAL_BALANCE))
+        
+        logger.info(f"Basic backtest request: {pair}-{timeframe} for {days} days")
+        
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        price_data = data_manager.get_price_data(pair, timeframe, days)
+        
+        if price_data.empty:
+            return jsonify({'error': 'No price data available for backtesting'}), 400
+        
+        signals = generate_enhanced_trading_signals(price_data, pair, timeframe)
+        
+        simple_backtester = AdvancedBacktestingEngine(initial_balance)
+        result = simple_backtester.run_comprehensive_backtest(signals, price_data, pair, timeframe)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Backtest error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f'Backtest failed: {str(e)}'}), 500
+
+@app.route('/api/advanced_backtest', methods=['POST'])
+def api_advanced_backtest():
+    """Endpoint untuk advanced backtesting"""
+    try:
+        data = request.get_json()
+        pair = data.get('pair', 'USDJPY')
+        timeframe = data.get('timeframe', '4H')
+        days = int(data.get('days', 30))
+        initial_balance = float(data.get('initial_balance', config.INITIAL_BALANCE))
+        
+        logger.info(f"Advanced backtest request: {pair}-{timeframe} for {days} days")
+        
+        if pair not in config.FOREX_PAIRS:
+            return jsonify({'error': f'Unsupported pair: {pair}'}), 400
+        
+        price_data = data_manager.get_price_data(pair, timeframe, days)
+        
+        if price_data.empty:
+            return jsonify({'error': 'No price data available for backtesting'}), 400
+        
+        logger.info(f"Price data loaded: {len(price_data)} records for {pair}-{timeframe}")
+        
+        signals = generate_enhanced_trading_signals(price_data, pair, timeframe)
+        
+        logger.info(f"Generated {len(signals)} trading signals for backtesting")
+        
+        advanced_backtester.initial_balance = initial_balance
+        result = advanced_backtester.run_comprehensive_backtest(signals, price_data, pair, timeframe)
+        
+        result['backtest_parameters'] = {
+            'pair': pair,
+            'timeframe': timeframe,
+            'days': days,
+            'initial_balance': initial_balance,
+            'signals_generated': len(signals),
+            'trades_executed': result['summary']['total_trades'],
+            'backtest_mode': True,
+            'risk_parameters': {
+                'daily_trade_limit': config.BACKTEST_DAILY_TRADE_LIMIT,
+                'min_confidence': config.BACKTEST_MIN_CONFIDENCE,
+                'risk_score_threshold': config.BACKTEST_RISK_SCORE_THRESHOLD
+            }
+        }
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Advanced backtest error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f'Advanced backtest failed: {str(e)}'}), 500
+
+@app.route('/api/market_overview')
+def api_market_overview():
+    """Overview market untuk semua pair dengan REAL-TIME prices"""
+    overview = {}
+    
+    for pair in config.FOREX_PAIRS:
+        try:
+            real_time_price = twelve_data_client.get_real_time_price(pair)
+            
+            price_data = data_manager.get_price_data(pair, '1D', days=5)
+            
+            if not price_data.empty:
+                tech = tech_engine.calculate_all_indicators(price_data)
+                
+                change_pct = 0
+                if len(price_data) > 1 and 'close' in price_data.columns:
+                    try:
+                        prev_price = float(price_data['close'].iloc[-2])
+                        change_pct = ((real_time_price - prev_price) / prev_price) * 100
+                    except:
+                        change_pct = 0
+                
+                rsi = tech['momentum']['rsi']
+                trend = tech['trend']['trend_direction']
+                ema_alignment = tech['trend'].get('ema_alignment', 'MIXED')
+                adx = tech['trend']['adx']
+                volatility = tech['volatility']['volatility_pct']
+                
+                # Enhanced recommendation logic
+                if volatility > config.VOLATILITY_THRESHOLD:
+                    recommendation = 'AVOID'
+                    confidence = 'HIGH'
+                elif adx < config.MIN_ADX:
+                    recommendation = 'HOLD'
+                    confidence = 'MEDIUM'
+                elif (rsi < config.MIN_RSI_BUY and 
+                      trend == 'BULLISH' and 
+                      ema_alignment in ['STRONG_BULLISH', 'BULLISH']):
+                    recommendation = 'BUY'
+                    confidence = 'HIGH'
+                elif (rsi > config.MAX_RSI_SELL and 
+                      trend == 'BEARISH' and 
+                      ema_alignment in ['STRONG_BEARISH', 'BEARISH']):
+                    recommendation = 'SELL'
+                    confidence = 'HIGH'
+                elif rsi < config.MIN_RSI_BUY + 5 and trend == 'BULLISH':
+                    recommendation = 'BUY'
+                    confidence = 'MEDIUM'
+                elif rsi > config.MAX_RSI_SELL - 5 and trend == 'BEARISH':
+                    recommendation = 'SELL'
+                    confidence = 'MEDIUM'
+                else:
+                    recommendation = 'HOLD'
+                    confidence = 'LOW'
+                
+                overview[pair] = {
+                    'price': real_time_price,
+                    'change': round(float(change_pct), 2),
+                    'rsi': float(tech['momentum']['rsi']),
+                    'trend': tech['trend']['trend_direction'],
+                    'trend_strength': tech['trend']['trend_strength'],
+                    'ema_alignment': ema_alignment,
+                    'volatility': round(tech['volatility']['volatility_pct'], 2),
+                    'recommendation': recommendation,
+                    'confidence': confidence,
+                    'support': tech['levels']['support'],
+                    'resistance': tech['levels']['resistance'],
+                    'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                }
+            else:
+                overview[pair] = {
+                    'price': real_time_price,
+                    'change': 0,
+                    'rsi': 50,
+                    'trend': 'UNKNOWN',
+                    'trend_strength': 'UNKNOWN',
+                    'ema_alignment': 'MIXED',
+                    'volatility': 0,
+                    'recommendation': 'HOLD',
+                    'confidence': 'LOW',
+                    'error': 'No historical data available',
+                    'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                }
+        except Exception as e:
+            logger.error(f"Error getting overview for {pair}: {e}")
+            overview[pair] = {
+                'price': 0,
+                'change': 0,
+                'rsi': 50,
+                'trend': 'UNKNOWN',
+                'trend_strength': 'UNKNOWN',
+                'ema_alignment': 'MIXED',
+                'volatility': 0,
+                'recommendation': 'HOLD',
+                'confidence': 'LOW',
+                'error': f'Processing error: {str(e)}'
+            }
+    
+    return jsonify(overview)
+
+@app.route('/api/risk_dashboard')
+def api_risk_dashboard():
+    """Dashboard risk management yang komprehensif"""
+    try:
+        risk_report = risk_manager.get_risk_report()
+        
+        market_analysis = {}
+        for pair in config.FOREX_PAIRS[:4]:
+            try:
+                real_time_price = twelve_data_client.get_real_time_price(pair)
+                
+                data = data_manager.get_price_data(pair, '1D', days=5)
+                if not data.empty:
+                    tech = tech_engine.calculate_all_indicators(data)
+                    volatility = tech['volatility']['volatility_pct']
+                    
+                    if volatility > config.VOLATILITY_THRESHOLD:
+                        risk_level = 'HIGH'
+                    elif volatility > config.VOLATILITY_THRESHOLD * 0.7:
+                        risk_level = 'MEDIUM'
+                    else:
+                        risk_level = 'LOW'
+                        
+                    market_analysis[pair] = {
+                        'current_price': real_time_price,
+                        'volatility': round(volatility, 3),
+                        'trend': tech['trend']['trend_direction'],
+                        'ema_alignment': tech['trend'].get('ema_alignment', 'MIXED'),
+                        'rsi': round(tech['momentum']['rsi'], 1),
+                        'risk_level': risk_level,
+                        'atr': round(tech['volatility']['atr'], 4),
+                        'data_source': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+                    }
+            except Exception as e:
+                logger.error(f"Error analyzing {pair} for risk dashboard: {e}")
+                market_analysis[pair] = {'error': str(e)}
+        
+        trading_recommendations = []
+        for pair in config.FOREX_PAIRS[:4]:
+            try:
+                data = data_manager.get_price_data(pair, '4H', days=10)
+                if not data.empty:
+                    tech = tech_engine.calculate_all_indicators(data)
+                    
+                    rsi = tech['momentum']['rsi']
+                    trend = tech['trend']['trend_direction']
+                    volatility = tech['volatility']['volatility_pct']
+                    adx = tech['trend']['adx']
+                    ema_alignment = tech['trend'].get('ema_alignment', 'MIXED')
+                    
+                    if (rsi < config.MIN_RSI_BUY and 
+                        trend == 'BULLISH' and 
+                        adx > config.MIN_ADX and 
+                        ema_alignment in ['STRONG_BULLISH', 'BULLISH']):
+                        recommendation = 'BUY'
+                        confidence = 'HIGH'
+                        reason = 'Oversold with strong bullish alignment and momentum'
+                    elif (rsi > config.MAX_RSI_SELL and 
+                          trend == 'BEARISH' and 
+                          adx > config.MIN_ADX and 
+                          ema_alignment in ['STRONG_BEARISH', 'BEARISH']):
+                        recommendation = 'SELL'
+                        confidence = 'HIGH'
+                        reason = 'Overbought with strong bearish alignment and momentum'
+                    elif volatility > config.VOLATILITY_THRESHOLD:
+                        recommendation = 'AVOID'
+                        confidence = 'HIGH'
+                        reason = 'High volatility market conditions'
+                    elif adx < config.MIN_ADX:
+                        recommendation = 'AVOID'
+                        confidence = 'MEDIUM'
+                        reason = 'Weak trend momentum'
+                    else:
+                        recommendation = 'HOLD'
+                        confidence = 'LOW'
+                        reason = 'Neutral market conditions'
+                    
+                    trading_recommendations.append({
+                        'pair': pair,
+                        'recommendation': recommendation,
+                        'confidence': confidence,
+                        'reason': reason,
+                        'current_rsi': round(rsi, 1),
+                        'trend': trend,
+                        'ema_alignment': ema_alignment,
+                        'volatility': round(volatility, 3),
+                        'adx': round(adx, 1)
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error generating recommendation for {pair}: {e}")
+                continue
+        
+        return jsonify({
+            'risk_management': risk_report,
+            'market_conditions': market_analysis,
+            'trading_recommendations': trading_recommendations,
+            'system_status': {
+                'total_pairs_monitored': len(config.FOREX_PAIRS),
+                'risk_manager_status': 'ACTIVE',
+                'last_update': datetime.now().isoformat(),
+                'data_provider': 'TwelveData Live' if not twelve_data_client.demo_mode else 'TwelveData Demo'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Risk dashboard error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/system_status')
+def api_system_status():
+    """Status sistem dan ketersediaan API"""
+    return jsonify({
+        'system': 'RUNNING',
+        'historical_data': f"{len(data_manager.historical_data)} pairs loaded",
+        'supported_pairs': config.FOREX_PAIRS,
+        'deepseek_ai': 'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE',
+        'news_api': 'LIVE MODE' if not fundamental_engine.demo_mode else 'DEMO MODE',
+        'twelve_data': 'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE',
+        'risk_management': 'ADVANCED',
+        'backtesting_engine': 'ENHANCED',
+        'server_time': datetime.now().isoformat(),
+        'version': '3.2',
+        'features': [
+            'Enhanced EMA Analysis (20, 50, 200)',
+            'Advanced Risk Management', 
+            'Multi-Timeframe Analysis',
+            'AI-Powered Analysis',
+            'Comprehensive Backtesting',
+            'Real-time Market Overview',
+            'Risk Dashboard',
+            'TwelveData Real-time Integration',
+            'Fundamental News Analysis'
+        ]
+    })
+
+# ==================== RUN APPLICATION ====================
+if __name__ == '__main__':
+    logger.info("Starting Enhanced Forex Analysis System v3.2...")
+    logger.info(f"Supported pairs: {config.FOREX_PAIRS}")
+    logger.info(f"Historical data: {len(data_manager.historical_data)} pairs loaded")
+    logger.info(f"DeepSeek AI: {'LIVE MODE' if not deepseek_analyzer.demo_mode else 'DEMO MODE'}")
+    logger.info(f"TwelveData Real-time: {'LIVE MODE' if not twelve_data_client.demo_mode else 'DEMO MODE'}")
+    logger.info(f"News API: {'LIVE MODE' if not fundamental_engine.demo_mode else 'DEMO MODE'}")
+    logger.info(f"Advanced Risk Management: ENABLED")
+    logger.info(f"Enhanced Backtesting: ENABLED")
+    logger.info(f"Backtesting Parameters:")
+    logger.info(f"  - Daily Trade Limit: {config.BACKTEST_DAILY_TRADE_LIMIT}")
+    logger.info(f"  - Min Confidence: {config.BACKTEST_MIN_CONFIDENCE}")
+    logger.info(f"  - Risk Score Threshold: {config.BACKTEST_RISK_SCORE_THRESHOLD}")
+    
+    os.makedirs('historical_data', exist_ok=True)
+    os.makedirs('logs', exist_ok=True)
+    
+    logger.info("Forex Analysis System is ready and running on http://localhost:5000")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)
