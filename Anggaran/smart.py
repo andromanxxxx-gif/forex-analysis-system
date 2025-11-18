@@ -1,15 +1,21 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from datetime import datetime
 import pdfplumber
 import re
 import io
 import requests
 import json
+
+# Suppress specific warnings
+import logging
+logging.getLogger().setLevel(logging.ERROR)
 
 # Konfigurasi halaman
 st.set_page_config(
@@ -101,11 +107,11 @@ class AdvancedBudgetProcessor:
         self.capaian_output_data = None
         self.recommendations = None
     
-    def process_detailed_budget(self, file_path):
+    def process_detailed_budget(self, file_buffer):
         """Process detailed budget Excel file with the specified format"""
         try:
             # Read the detailed budget sheet
-            df = pd.read_excel(file_path, sheet_name='Rincian_Anggaran')
+            df = pd.read_excel(file_buffer, sheet_name='Rincian_Anggaran')
             
             # Validate required columns
             required_columns = ['Kode', 'Uraian Volume', 'Satuan', 'Harga Satuan', 
@@ -188,7 +194,6 @@ class AdvancedBudgetProcessor:
             
             # Items with remaining budget
             sisa_items = bidang_data[bidang_data['Sisa Anggaran'] > 0]
-            sisa_per_triwulan = sisa_items.groupby('Triwulan')['Sisa Anggaran'].sum()
             
             # Calculate required acceleration
             target_now = target_penyerapan[current_quarter]
@@ -254,7 +259,6 @@ class SatuanKerjaIKPACalculator:
     def __init__(self):
         self.satuan_kerja_data = None
         self.bidang_data = {}
-        self.ikpa_trend = []
     
     def calculate_satuan_kerja_ikpa(self, all_bidang_data, capaian_output_satker):
         """Calculate IKPA for entire satuan kerja"""
@@ -267,12 +271,12 @@ class SatuanKerjaIKPACalculator:
         
         # Calculate IKPA for satuan kerja
         ikpa_data = {
-            'revisi_dipa': 100.00,  # Asumsi optimal untuk satker
+            'revisi_dipa': 100.00,
             'deviasi_halaman_iii': aggregated_metrics['avg_deviasi_rpd'],
             'penyerapan_anggaran': aggregated_metrics['avg_penyerapan'],
             'belanja_kontraktual': 0.00,
             'penyelesaian_tagihan': 0.00,
-            'pengelolaan_up_tup': 100.00,  # Asumsi optimal
+            'pengelolaan_up_tup': 100.00,
             'capaian_output': capaian_output_satker,
             'dispensasi_spm': 0.00
         }
@@ -375,22 +379,6 @@ def create_ikpa_radar_chart(ikpa_data):
     
     return fig
 
-def create_penyerapan_pie_chart(penyerapan_data):
-    """Create pie chart for budget absorption by bidang"""
-    
-    labels = penyerapan_data['summary_by_bidang']['Bidang'].tolist()
-    values = penyerapan_data['summary_by_bidang']['Realisasi'].tolist()
-    
-    fig = px.pie(
-        values=values, 
-        names=labels,
-        title='Distribusi Realisasi Anggaran per Bidang',
-        color_discrete_sequence=px.colors.sequential.RdBu
-    )
-    
-    fig.update_layout(height=400)
-    return fig
-
 def create_ikpa_gauge_chart(current_value, category):
     """Create gauge chart for IKPA score"""
     
@@ -430,441 +418,6 @@ def create_ikpa_gauge_chart(current_value, category):
     fig.update_layout(height=300)
     return fig
 
-def display_satuan_kerja_dashboard(processor, satuan_kerja_calculator, capaian_output_data, deepseek_api):
-    """Display comprehensive dashboard for entire satuan kerja"""
-    
-    st.header("🏢 DASHBOARD SATUAN KERJA - BNN PROVINSI DKI JAKARTA")
-    
-    if not satuan_kerja_calculator.satuan_kerja_data:
-        st.warning("Data satuan kerja belum tersedia")
-        return
-    
-    data_satker = satuan_kerja_calculator.satuan_kerja_data
-    
-    # Key Performance Indicators for Satuan Kerja
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric(
-            "Nilai IKPA Satuan Kerja", 
-            f"{data_satker['ikpa']['nilai_akhir']:.2f}",
-            data_satker['ikpa']['kategori']
-        )
-    with col2:
-        st.metric("Total Alokasi Anggaran", f"Rp {data_satker['total_alokasi']:,.0f}")
-    with col3:
-        st.metric("Total Realisasi", f"Rp {data_satker['total_realisasi']:,.0f}")
-    with col4:
-        st.metric("Rata-rata Penyerapan", f"{data_satker['aggregated_metrics']['avg_penyerapan']:.1f}%")
-    
-    # Tab untuk berbagai level analisis
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Overview Satuan Kerja", 
-        "🔍 Analisis Per Bidang", 
-        "📈 Trend & Forecasting",
-        "🎯 Rekomendasi AI"
-    ])
-    
-    with tab1:
-        display_satuan_kerja_overview(data_satker, processor)
-    
-    with tab2:
-        display_per_bidang_analysis(processor)
-    
-    with tab3:
-        display_trend_forecasting(processor, satuan_kerja_calculator)
-    
-    with tab4:
-        display_ai_recommendations(data_satker, processor, capaian_output_data, deepseek_api)
-
-def display_satuan_kerja_overview(data_satker, processor):
-    """Display overview charts for entire satuan kerja"""
-    
-    st.subheader("📊 Overview Kinerja Satuan Kerja")
-    
-    # Chart 1: IKPA Breakdown
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # IKPA Components Radar Chart
-        fig_radar = create_ikpa_radar_chart(data_satker['ikpa'])
-        st.plotly_chart(fig_radar, use_container_width=True)
-    
-    with col2:
-        # Penyerapan per Jenis Belanja
-        if processor.penyerapan_data:
-            fig_pie = create_penyerapan_pie_chart(processor.penyerapan_data)
-            st.plotly_chart(fig_pie, use_container_width=True)
-    
-    # Chart 2: Performance vs Target
-    fig_gauge = create_ikpa_gauge_chart(
-        data_satker['ikpa']['nilai_akhir'], 
-        data_satker['ikpa']['kategori']
-    )
-    st.plotly_chart(fig_gauge, use_container_width=True)
-
-def display_per_bidang_analysis(processor):
-    """Display detailed analysis per bidang"""
-    
-    st.subheader("🔍 Analisis Detail Per Bidang")
-    
-    if not processor.penyerapan_data:
-        st.warning("Data bidang belum tersedia")
-        return
-    
-    data = processor.penyerapan_data
-    
-    # Chart 1: Perbandingan Penyerapan per Bidang
-    fig_comparison = px.bar(
-        data['summary_by_bidang'], 
-        x='Bidang', 
-        y='Penyerapan_Persen',
-        title='Perbandingan Penyerapan Anggaran per Bidang',
-        color='Penyerapan_Persen',
-        color_continuous_scale='RdYlGn',
-        text='Penyerapan_Persen'
-    )
-    fig_comparison.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-    st.plotly_chart(fig_comparison, use_container_width=True)
-    
-    # Chart 2: Trend Triwulanan per Bidang
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fig_trend = px.line(
-            data['triwulan_bidang'],
-            x='Triwulan',
-            y='Penyerapan_Persen',
-            color='Bidang',
-            title='Trend Penyerapan per Triwulan',
-            markers=True
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
-    
-    with col2:
-        # Alokasi vs Realisasi per Bidang
-        fig_bubble = px.scatter(
-            data['summary_by_bidang'],
-            x='Jumlah',
-            y='Penyerapan_Persen',
-            size='Realisasi',
-            color='Bidang',
-            title='Alokasi vs Penyerapan per Bidang',
-            hover_data=['Bidang', 'Penyerapan_Persen']
-        )
-        st.plotly_chart(fig_bubble, use_container_width=True)
-    
-    # Detailed Table per Bidang
-    with st.expander("📋 Detail Data per Bidang"):
-        st.dataframe(data['summary_by_bidang'], use_container_width=True)
-
-def display_trend_forecasting(processor, satuan_kerja_calculator):
-    """Display trend analysis and forecasting"""
-    
-    st.subheader("📈 Analisis Trend & Forecasting")
-    
-    if not processor.penyerapan_data:
-        return
-    
-    # Forecasting untuk akhir tahun
-    current_data = processor.penyerapan_data
-    current_penyerapan = current_data['rata_penyerapan']
-    current_triwulan = 3  # Asumsi triwulan 3
-    
-    # Calculate projection
-    months_remaining = (4 - current_triwulan) * 3
-    if months_remaining > 0:
-        monthly_rate = (100 - current_penyerapan) / months_remaining
-        projected_penyerapan = min(100, current_penyerapan + (monthly_rate * months_remaining))
-    else:
-        projected_penyerapan = current_penyerapan
-    
-    # Projection Chart
-    periods = ['Triwulan 1', 'Triwulan 2', 'Triwulan 3', 'Triwulan 4 (Proyeksi)']
-    actual_penyerapan = [15, 50, current_penyerapan, projected_penyerapan]  # Example data
-    target_penyerapan = [15, 50, 70, 90]
-    
-    fig_projection = go.Figure()
-    
-    fig_projection.add_trace(go.Scatter(
-        x=periods, y=actual_penyerapan,
-        mode='lines+markers',
-        name='Realisasi',
-        line=dict(color='blue', width=3)
-    ))
-    
-    fig_projection.add_trace(go.Scatter(
-        x=periods, y=target_penyerapan,
-        mode='lines+markers',
-        name='Target',
-        line=dict(color='red', width=3, dash='dash')
-    ))
-    
-    fig_projection.update_layout(
-        title='Proyeksi Penyerapan Anggaran hingga Akhir Tahun',
-        xaxis_title='Periode',
-        yaxis_title='Penyerapan (%)',
-        hovermode='x unified'
-    )
-    
-    st.plotly_chart(fig_projection, use_container_width=True)
-    
-    # Risk Analysis
-    st.subheader("⚠️ Analisis Risiko")
-    
-    risk_factors = analyze_risk_factors(processor, current_penyerapan, projected_penyerapan)
-    
-    for risk in risk_factors:
-        with st.container():
-            st.write(f"**{risk['factor']}** - {risk['level']}")
-            st.progress(risk['severity'] / 100)
-            st.write(f"*{risk['description']}*")
-            st.write("---")
-
-def analyze_risk_factors(processor, current_penyerapan, projected_penyerapan):
-    """Analyze risk factors for IKPA achievement"""
-    
-    risks = []
-    
-    # Risk 1: Penyerapan rendah
-    if current_penyerapan < 70:
-        risks.append({
-            'factor': 'Penyerapan Anggaran',
-            'level': 'TINGGI',
-            'severity': 80,
-            'description': f'Penyerapan saat ini {current_penyerapan:.1f}% di bawah target 70% untuk triwulan 3'
-        })
-    
-    # Risk 2: Deviasi RPD
-    if processor.penyerapan_data and processor.penyerapan_data.get('deviasi_rpd_rata', 0) > 5:
-        risks.append({
-            'factor': 'Deviasi RPD',
-            'level': 'SEDANG', 
-            'severity': 60,
-            'description': f'Deviasi RPD {processor.penyerapan_data["deviasi_rpd_rata"]:.1f}% melebihi batas 5%'
-        })
-    
-    # Risk 3: Proyeksi tidak mencapai target
-    if projected_penyerapan < 90:
-        risks.append({
-            'factor': 'Proyeksi Akhir Tahun',
-            'level': 'TINGGI',
-            'severity': 75,
-            'description': f'Proyeksi penyerapan akhir tahun {projected_penyerapan:.1f}% di bawah target 90%'
-        })
-    
-    return risks
-
-def display_ai_recommendations(data_satker, processor, capaian_output_data, deepseek_api):
-    """Display AI-powered recommendations using DeepSeek API"""
-    
-    st.subheader("🤖 Rekomendasi AI DeepSeek untuk Optimalisasi IKPA")
-    
-    # Current Status
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("IKPA Saat Ini", f"{data_satker['ikpa']['nilai_akhir']:.2f}")
-    with col2:
-        st.metric("Target", "95.00", delta_color="off")
-    with col3:
-        gap = 95 - data_satker['ikpa']['nilai_akhir']
-        st.metric("Gap", f"{gap:+.2f}")
-    
-    # Generate AI Recommendations
-    if st.button("🔄 Generate Rekomendasi AI", type="primary"):
-        with st.spinner("DeepSeek AI sedang menganalisis data dan menghasilkan rekomendasi..."):
-            
-            # Prepare prompt for DeepSeek
-            prompt = f"""
-            ANALISIS KINERJA DAN REKOMENDASI UNTUK BNN PROVINSI DKI JAKARTA:
-
-            DATA KINERJA SATUAN KERJA:
-            - Nilai IKPA: {data_satker['ikpa']['nilai_akhir']:.2f} ({data_satker['ikpa']['kategori']})
-            - Rata-rata Penyerapan Anggaran: {data_satker['aggregated_metrics']['avg_penyerapan']:.1f}%
-            - Total Alokasi: Rp {data_satker['total_alokasi']:,.0f}
-            - Total Realisasi: Rp {data_satker['total_realisasi']:,.0f}
-            - Sisa Anggaran: Rp {data_satker['total_sisa']:,.0f}
-            - Capaian Output: {capaian_output_data['persentase_capaian']}%
-
-            INDIKATOR KRITIS IKPA:
-            1. Revisi DIPA: 100.00% (Optimal)
-            2. Deviasi Halaman III: {data_satker['ikpa']['deviasi_halaman_iii']:.2f}%
-            3. Penyerapan Anggaran: {data_satker['ikpa']['penyerapan_anggaran']:.2f}%
-            4. Pengelolaan UP/TUP: 100.00% (Optimal)
-            5. Capaian Output: {data_satker['ikpa']['capaian_output']:.2f}%
-
-            TARGET: Mencapai IKPA ≥95 (Sangat Baik)
-
-            BERDASARKAN DATA DI ATAS, BERIKAN REKOMENDASI STRATEGIS YANG:
-            1. SPESIFIK: Rekomendasi konkret dan dapat ditindaklanjuti
-            2. TERSTRUKTUR: Prioritaskan berdasarkan urgensi dan impact
-            3. REALISTIS: Mempertimbangkan waktu triwulan 3-4
-            4. TERUKUR: Dengan target kuantitatif yang jelas
-            5. TERINTEGRASI: Koordinasi antar bidang/bagian
-
-            FORMAT OUTPUT:
-            - Analisis kondisi terkini
-            - 3-5 rekomendasi strategis utama
-            - Action plan per bidang
-            - Timeline dan target
-            - Monitoring dan evaluasi
-            """
-
-            # Call DeepSeek API
-            ai_response = deepseek_api.generate_recommendation(prompt)
-            
-            # Display AI Response
-            st.markdown('<div class="ai-response">', unsafe_allow_html=True)
-            st.markdown("### 📋 Rekomendasi DeepSeek AI")
-            st.markdown(ai_response)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Save recommendation to session state
-            st.session_state.ai_recommendation = ai_response
-
-    # Display previous recommendation if exists
-    if 'ai_recommendation' in st.session_state:
-        st.markdown("---")
-        st.subheader("📖 Rekomendasi Sebelumnya")
-        st.markdown(st.session_state.ai_recommendation)
-
-def display_budget_dashboard(processor):
-    """Display comprehensive budget dashboard with recommendations"""
-    
-    st.header("📊 Dashboard Detail Penyerapan Anggaran")
-    
-    if not processor.penyerapan_data:
-        st.error("Data penyerapan belum diproses")
-        return
-    
-    data = processor.penyerapan_data
-    
-    # Key Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Alokasi", f"Rp {data['total_alokasi']:,.0f}")
-    with col2:
-        st.metric("Total Realisasi", f"Rp {data['total_realisasi']:,.0f}")
-    with col3:
-        st.metric("Sisa Anggaran", f"Rp {data['total_sisa']:,.0f}")
-    with col4:
-        st.metric("Rata-rata Penyerapan", f"{data['rata_penyerapan']:.1f}%")
-    
-    # Visualization 1: Penyerapan per Bidang
-    st.subheader("📈 Penyerapan Anggaran per Bidang")
-    fig1 = px.bar(data['summary_by_bidang'], 
-                 x='Bidang', y='Penyerapan_Persen',
-                 title="Persentase Penyerapan per Bidang",
-                 color='Penyerapan_Persen',
-                 color_continuous_scale='RdYlGn')
-    st.plotly_chart(fig1, use_container_width=True)
-    
-    # Visualization 2: Trend Triwulanan
-    st.subheader("📅 Trend Penyerapan per Triwulan")
-    fig2 = px.line(data['triwulan_bidang'], 
-                  x='Triwulan', y='Penyerapan_Persen',
-                  color='Bidang',
-                  title="Perkembangan Penyerapan per Triwulan")
-    st.plotly_chart(fig2, use_container_width=True)
-    
-    # Detailed Data Table
-    st.subheader("📋 Data Rinci Anggaran")
-    st.dataframe(data['raw_data'], use_container_width=True)
-    
-    # Recommendations Section
-    display_recommendations(processor)
-
-def display_recommendations(processor):
-    """Display spending recommendations for each bidang"""
-    st.header("🎯 Rekomendasi Rencana Penyerapan per Bidang")
-    
-    if not processor.recommendations:
-        st.warning("Belum ada rekomendasi yang dihasilkan")
-        return
-    
-    for bidang, rec in processor.recommendations.items():
-        with st.expander(f"📌 {bidang} - Penyerapan: {rec['penyerapan_sekarang']:.1f}% (Target: {rec['target_triwulan']}%)", expanded=True):
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Gap Penyerapan", f"{rec['gap']:.1f}%")
-            with col2:
-                st.metric("Dibutuhkan Penyerapan", f"Rp {rec['required_spending']:,.0f}")
-            with col3:
-                st.metric("Sisa Anggaran", f"Rp {rec['sisa_anggaran']:,.0f}")
-            
-            # Action Plan
-            st.subheader("📋 Rencana Aksi")
-            for i, action in enumerate(rec['rekomendasi_aksi'], 1):
-                priority_color = {
-                    'HIGH': '🔴', 
-                    'MEDIUM': '🟡', 
-                    'LOW': '🟢'
-                }
-                
-                with st.container():
-                    st.write(f"**{priority_color[action['priority']]} Aksi {i}: {action['action']}**")
-                    st.write(f"**Deadline:** {action['deadline']}")
-                    if 'target_peningkatan' in action:
-                        st.write(f"**Target Peningkatan:** {action['target_peningkatan']}")
-                    if 'items' in action:
-                        st.write("**Item Prioritas:**")
-                        for item in action['items']:
-                            st.write(f"- {item}")
-                    if 'catatan' in action:
-                        st.info(f"Catatan: {action['catatan']}")
-                    st.write("---")
-            
-            # Priority Items Table
-            if rec['priority_items']:
-                st.subheader("🎯 Item Prioritas untuk Diselesaikan")
-                priority_df = pd.DataFrame(rec['priority_items'])
-                st.dataframe(priority_df, use_container_width=True)
-
-def process_pdf_capaian_output(file_buffer):
-    """Process PDF file for output achievement"""
-    try:
-        text = ""
-        with pdfplumber.open(file_buffer) as pdf:
-            for page in pdf.pages:
-                text += page.extract_text() or ""
-        
-        # Extract percentage using various patterns
-        patterns = [
-            r'capaian\s*output\s*:?\s*(\d+\.?\d*)%',
-            r'persentase\s*capaian\s*:?\s*(\d+\.?\d*)%',
-            r'capaian\s*:?\s*(\d+\.?\d*)%',
-            r'realisasi\s*output\s*:?\s*(\d+\.?\d*)%'
-        ]
-        
-        persentase = 0
-        for pattern in patterns:
-            matches = re.findall(pattern, text.lower())
-            if matches:
-                persentase = float(matches[0])
-                break
-        
-        return {
-            'persentase_capaian': persentase,
-            'text_analysis': text[:1500],
-            'status': 'success'
-        }
-        
-    except Exception as e:
-        return {"error": f"Error processing PDF: {str(e)}"}
-
-def display_capaian_dashboard(data):
-    """Display output achievement dashboard"""
-    st.header("🎯 Dashboard Capaian Output")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Persentase Capaian Output", f"{data['persentase_capaian']}%")
-    with col2:
-        st.metric("Status", "✅ Terpenuhi" if data['persentase_capaian'] >= 80 else "⚠️ Perlu Perbaikan")
-    
-    with st.expander("📋 Analisis Konten Laporan"):
-        st.text_area("Teks yang diekstrak:", data['text_analysis'], height=200)
-
 def main():
     # Header
     st.markdown('<h1 class="main-header">🏢 SMART - Sistem Monitoring dan Evaluasi Kinerja Terpadu</h1>', unsafe_allow_html=True)
@@ -877,17 +430,12 @@ def main():
     # DeepSeek API Configuration
     st.sidebar.header("🔑 Konfigurasi DeepSeek API")
     
-    # Option 1: Input API Key manually
     api_key = st.sidebar.text_input(
         "DeepSeek API Key",
         type="password",
         placeholder="Masukkan API Key DeepSeek Anda...",
         help="Dapatkan API key dari https://platform.deepseek.com/"
     )
-    
-    # Option 2: Use secrets (for deployment)
-    if not api_key and 'DEEPSEEK_API_KEY' in st.secrets:
-        api_key = st.secrets['DEEPSEEK_API_KEY']
     
     # Initialize DeepSeek API
     deepseek_api = None
@@ -898,90 +446,184 @@ def main():
         st.sidebar.warning("⚠️ Masukkan DeepSeek API Key untuk menggunakan fitur AI")
     
     # Sidebar for file uploads
-    st.sidebar.header("📁 Upload Files untuk Satuan Kerja")
+    st.sidebar.header("📁 Upload Files")
     
     with st.sidebar.expander("📊 Laporan Penyerapan Anggaran", expanded=True):
         budget_file = st.sidebar.file_uploader(
-            "Upload Excel Penyerapan seluruh Satuan Kerja", 
+            "Upload Excel Penyerapan Anggaran", 
             type=['xlsx', 'xls'],
-            help="Format harus mencakup semua bidang: Pemberantasan, Rehabilitasi, P2M, Bagian Umum"
+            help="Format: Kode, Uraian Volume, Satuan, Harga Satuan, Jumlah, Realisasi, Sisa Anggaran, Bidang, Triwulan"
         )
     
-    with st.sidebar.expander("📈 Capaian Output Satuan Kerja"):
+    with st.sidebar.expander("📈 Capaian Output"):
         pdf_file = st.sidebar.file_uploader(
-            "Upload PDF Capaian Output Satuan Kerja", 
+            "Upload PDF Capaian Output", 
             type=['pdf'],
-            help="Laporan capaian output keseluruhan BNNP DKI Jakarta"
+            help="Laporan capaian output dalam format PDF"
         )
     
     # Process files
     capaian_output_data = None
     
-    if budget_file:
-        with st.spinner("Memproses laporan penyerapan anggaran seluruh satuan kerja..."):
+    if budget_file is not None:
+        with st.spinner("Memproses laporan penyerapan anggaran..."):
             budget_results = processor.process_detailed_budget(budget_file)
             
         if "error" not in budget_results:
             st.sidebar.success("✅ Data penyerapan berhasil diproses")
-        else:
-            st.sidebar.error(f"❌ {budget_results['error']}")
-    
-    if pdf_file:
-        with st.spinner("Memproses laporan capaian output satuan kerja..."):
-            capaian_output_data = process_pdf_capaian_output(pdf_file)
             
-        if "error" not in capaian_output_data:
-            st.sidebar.success("✅ Data capaian output berhasil diproses")
+            # Display budget dashboard
+            st.header("📊 Dashboard Penyerapan Anggaran")
+            
+            data = processor.penyerapan_data
+            
+            # Key Metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Alokasi", f"Rp {data['total_alokasi']:,.0f}")
+            with col2:
+                st.metric("Total Realisasi", f"Rp {data['total_realisasi']:,.0f}")
+            with col3:
+                st.metric("Sisa Anggaran", f"Rp {data['total_sisa']:,.0f}")
+            with col4:
+                st.metric("Rata-rata Penyerapan", f"{data['rata_penyerapan']:.1f}%")
+            
+            # Visualizations
+            col1, col2 = st.columns(2)
+            with col1:
+                fig1 = px.bar(data['summary_by_bidang'], 
+                             x='Bidang', y='Penyerapan_Persen',
+                             title="Penyerapan per Bidang",
+                             color='Penyerapan_Persen',
+                             color_continuous_scale='RdYlGn')
+                st.plotly_chart(fig1, use_container_width=True)
+            
+            with col2:
+                fig2 = px.pie(data['summary_by_bidang'], 
+                             values='Realisasi', names='Bidang',
+                             title='Distribusi Realisasi per Bidang')
+                st.plotly_chart(fig2, use_container_width=True)
+            
+            # Recommendations per bidang
+            if processor.recommendations:
+                st.header("🎯 Rekomendasi per Bidang")
+                for bidang, rec in processor.recommendations.items():
+                    with st.expander(f"{bidang} - Penyerapan: {rec['penyerapan_sekarang']:.1f}%", expanded=True):
+                        st.metric("Gap", f"{rec['gap']:.1f}%")
+                        st.metric("Dibutuhkan", f"Rp {rec['required_spending']:,.0f}")
+                        
+                        for action in rec['rekomendasi_aksi']:
+                            st.write(f"**{action['action']}**")
+                            st.write(f"Deadline: {action['deadline']}")
         else:
-            st.sidebar.error(f"❌ {capaian_output_data['error']}")
+            st.error(f"❌ {budget_results['error']}")
     
-    # Calculate and display satuan kerja analysis
-    if (processor.penyerapan_data and capaian_output_data and 
-        "error" not in capaian_output_data):
+    if pdf_file is not None:
+        with st.spinner("Memproses laporan capaian output..."):
+            # Process PDF
+            try:
+                text = ""
+                with pdfplumber.open(pdf_file) as pdf:
+                    for page in pdf.pages:
+                        text += page.extract_text() or ""
+                
+                # Extract percentage
+                patterns = [r'capaian\s*output\s*:?\s*(\d+\.?\d*)%', r'persentase\s*capaian\s*:?\s*(\d+\.?\d*)%']
+                persentase = 0
+                for pattern in patterns:
+                    matches = re.findall(pattern, text.lower())
+                    if matches:
+                        persentase = float(matches[0])
+                        break
+                
+                capaian_output_data = {
+                    'persentase_capaian': persentase,
+                    'text_analysis': text[:1000]
+                }
+                
+                st.sidebar.success("✅ Data capaian output berhasil diproses")
+                
+                # Display capaian output
+                st.header("🎯 Dashboard Capaian Output")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Persentase Capaian", f"{persentase}%")
+                with col2:
+                    status = "✅ Optimal" if persentase >= 80 else "⚠️ Perlu Perbaikan"
+                    st.metric("Status", status)
+                
+            except Exception as e:
+                st.error(f"Error processing PDF: {str(e)}")
+    
+    # Calculate IKPA if both files are available
+    if (processor.penyerapan_data is not None and 
+        capaian_output_data is not None and
+        deepseek_api is not None):
         
-        # Calculate IKPA for entire satuan kerja
-        all_bidang_data = {
-            'overall': processor.penyerapan_data
-        }
+        st.header("🧮 Perhitungan IKPA Terintegrasi")
         
+        # Calculate IKPA
+        all_bidang_data = {'overall': processor.penyerapan_data}
         satuan_kerja_results = satuan_kerja_calculator.calculate_satuan_kerja_ikpa(
             all_bidang_data,
             capaian_output_data['persentase_capaian']
         )
         
-        # Display comprehensive dashboard
-        display_satuan_kerja_dashboard(processor, satuan_kerja_calculator, capaian_output_data, deepseek_api)
-    
-    elif budget_file and "error" not in budget_results:
-        # Display bidang-level analysis if only budget data is available
-        display_budget_dashboard(processor)
-    
-    # Additional AI Features
-    if deepseek_api and processor.penyerapan_data:
-        st.sidebar.header("🤖 Fitur AI Tambahan")
+        data_satker = satuan_kerja_results
         
-        with st.sidebar.expander("💡 Konsultasi AI"):
-            user_question = st.text_area(
-                "Pertanyaan spesifik untuk AI:",
-                placeholder="Contoh: Bagaimana strategi meningkatkan penyerapan di Bidang Pemberantasan?",
-                height=100
+        # Display IKPA Results
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Nilai IKPA", f"{data_satker['ikpa']['nilai_akhir']:.2f}")
+        with col2:
+            st.metric("Kategori", data_satker['ikpa']['kategori'])
+        with col3:
+            gap = 95 - data_satker['ikpa']['nilai_akhir']
+            st.metric("Selisih Target", f"{gap:+.2f}")
+        
+        # IKPA Visualization
+        col1, col2 = st.columns(2)
+        with col1:
+            fig_gauge = create_ikpa_gauge_chart(
+                data_satker['ikpa']['nilai_akhir'], 
+                data_satker['ikpa']['kategori']
             )
-            
-            if st.button("Tanyakan AI", key="ask_ai"):
-                with st.spinner("AI sedang menganalisis..."):
-                    custom_prompt = f"""
-                    Pertanyaan: {user_question}
-                    
-                    Konteks Data BNNP DKI Jakarta:
-                    - Rata-rata penyerapan: {processor.penyerapan_data['rata_penyerapan']:.1f}%
-                    - Total alokasi: Rp {processor.penyerapan_data['total_alokasi']:,.0f}
-                    - Total realisasi: Rp {processor.penyerapan_data['total_realisasi']:,.0f}
-                    
-                    Berikan jawaban yang spesifik dan praktis berdasarkan data di atas.
-                    """
-                    
-                    ai_response = deepseek_api.generate_recommendation(custom_prompt)
-                    st.info(f"**Jawaban AI:** {ai_response}")
+            st.plotly_chart(fig_gauge, use_container_width=True)
+        
+        with col2:
+            fig_radar = create_ikpa_radar_chart(data_satker['ikpa'])
+            st.plotly_chart(fig_radar, use_container_width=True)
+        
+        # AI Recommendations
+        st.header("🤖 Rekomendasi AI DeepSeek")
+        
+        if st.button("🔄 Generate Rekomendasi AI", type="primary"):
+            with st.spinner("DeepSeek AI sedang menganalisis..."):
+                prompt = f"""
+                ANALISIS KINERJA BNNP DKI JAKARTA:
+
+                DATA:
+                - IKPA: {data_satker['ikpa']['nilai_akhir']:.2f} ({data_satker['ikpa']['kategori']})
+                - Penyerapan: {data_satker['aggregated_metrics']['avg_penyerapan']:.1f}%
+                - Capaian Output: {capaian_output_data['persentase_capaian']}%
+                - Alokasi: Rp {data_satker['total_alokasi']:,.0f}
+                - Realisasi: Rp {data_satker['total_realisasi']:,.0f}
+
+                TARGET: Mencapai IKPA ≥95 (Sangat Baik)
+
+                BERIKAN REKOMENDASI STRATEGIS YANG:
+                1. SPESIFIK dan dapat ditindaklanjuti
+                2. TERSTRUKTUR dengan prioritas jelas
+                3. REALISTIS untuk triwulan 3-4
+                4. TERUKUR dengan target kuantitatif
+
+                FORMAT: Analisis, Rekomendasi Utama, Action Plan, Timeline
+                """
+                
+                ai_response = deepseek_api.generate_recommendation(prompt)
+                
+                st.markdown("### 📋 Rekomendasi DeepSeek AI")
+                st.markdown(f'<div class="ai-response">{ai_response}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
