@@ -125,6 +125,7 @@ class IKPACalculator:
                     'penyelesaian_tagihan': 0,
                     'pengelolaan_up_tup': 10,
                     'capaian_output': 25,
+                    'dispensasi_spm': 0,  # FIX: Added missing key
                     'total_efektif': 80
                 }
             }
@@ -360,27 +361,56 @@ def create_ikpa_gauge(value, category):
     return fig
 
 def create_component_chart(ikpa_data):
-    """Create component breakdown chart"""
-    components = list(ikpa_data['components'].keys())
-    values = [ikpa_data['components'][k] for k in components]
-    bobot = [ikpa_data['bobot'][k] for k in components]
-    
-    # Filter hanya komponen yang memiliki bobot
-    filtered_data = [(c, v, b) for c, v, b in zip(components, values, bobot) if b > 0]
-    components, values, bobot = zip(*filtered_data)
-    
-    fig = go.Figure(data=[
-        go.Bar(name='Nilai', x=components, y=values, marker_color='blue'),
-        go.Bar(name='Target', x=components, y=[95]*len(components), marker_color='red', opacity=0.3)
-    ])
-    
-    fig.update_layout(
-        title='Perbandingan Komponen IKPA vs Target',
-        barmode='overlay',
-        height=400
-    )
-    
-    return fig
+    """Create component breakdown chart - FIXED VERSION"""
+    try:
+        # Components with non-zero weights only
+        components_to_show = ['revisi_dipa', 'deviasi_halaman_iii', 'penyerapan_anggaran', 'pengelolaan_up_tup', 'capaian_output']
+        
+        components = []
+        values = []
+        bobot = []
+        
+        for comp in components_to_show:
+            if comp in ikpa_data['components'] and comp in ikpa_data['bobot']:
+                components.append(comp)
+                values.append(ikpa_data['components'][comp])
+                bobot.append(ikpa_data['bobot'][comp])
+        
+        if not components:
+            # Return empty figure if no data
+            fig = go.Figure()
+            fig.update_layout(title="No IKPA component data available", height=400)
+            return fig
+        
+        # Create readable labels
+        readable_labels = {
+            'revisi_dipa': 'Revisi DIPA',
+            'deviasi_halaman_iii': 'Deviasi RPD', 
+            'penyerapan_anggaran': 'Penyerapan',
+            'pengelolaan_up_tup': 'UP/TUP',
+            'capaian_output': 'Capaian Output'
+        }
+        
+        labels = [readable_labels.get(comp, comp) for comp in components]
+        
+        fig = go.Figure(data=[
+            go.Bar(name='Nilai', x=labels, y=values, marker_color='blue'),
+            go.Bar(name='Target', x=labels, y=[95]*len(components), marker_color='red', opacity=0.3)
+        ])
+        
+        fig.update_layout(
+            title='Perbandingan Komponen IKPA vs Target',
+            barmode='overlay',
+            height=400
+        )
+        
+        return fig
+        
+    except Exception as e:
+        # Return empty figure in case of error
+        fig = go.Figure()
+        fig.update_layout(title=f"Error creating chart: {str(e)}", height=400)
+        return fig
 
 def main():
     st.markdown('<h1 class="main-header">🏢 SMART - Analisis IKPA & Rekomendasi</h1>', unsafe_allow_html=True)
@@ -449,7 +479,7 @@ def main():
         
         with col1:
             fig_gauge = create_ikpa_gauge(ikpa_result['nilai_akhir'], ikpa_result['kategori'])
-            st.plotly_chart(fig_gauge, use_container_width=True)
+            st.plotly_chart(fig_gauge, width='stretch')  # FIX: Replaced use_container_width
         
         with col2:
             st.metric("Nilai IKPA", f"{ikpa_result['nilai_akhir']:.2f}")
@@ -468,23 +498,23 @@ def main():
         
         with col1:
             fig_components = create_component_chart(ikpa_result)
-            st.plotly_chart(fig_components, use_container_width=True)
+            st.plotly_chart(fig_components, width='stretch')  # FIX: Replaced use_container_width
         
         with col2:
             # Component details
             st.subheader("Detail Komponen")
-            components_df = pd.DataFrame({
-                'Komponen': list(ikpa_result['components'].keys()),
-                'Nilai': [ikpa_result['components'][k] for k in ikpa_result['components'].keys()],
-                'Bobot': [ikpa_result['bobot'][k] for k in ikpa_result['components'].keys()],
-                'Kontribusi': [ikpa_result['components'][k] * ikpa_result['bobot'][k] / 100 for k in ikpa_result['components'].keys()]
-            })
+            components_data = []
+            for comp, weight in ikpa_result['bobot'].items():
+                if weight > 0 and comp in ikpa_result['components']:
+                    components_data.append({
+                        'Komponen': comp.replace('_', ' ').title(),
+                        'Nilai': ikpa_result['components'][comp],
+                        'Bobot': weight,
+                        'Kontribusi': round(ikpa_result['components'][comp] * weight / 100, 2)
+                    })
             
-            # Filter hanya yang ada bobotnya
-            components_df = components_df[components_df['Bobot'] > 0]
-            components_df['Kontribusi'] = components_df['Kontribusi'].round(2)
-            
-            st.dataframe(components_df, use_container_width=True)
+            components_df = pd.DataFrame(components_data)
+            st.dataframe(components_df, width='stretch')
             
             # Summary
             st.subheader("📈 Summary")
@@ -517,7 +547,7 @@ def main():
                     color='Penyerapan_Persen',
                     color_continuous_scale='RdYlGn'
                 )
-                st.plotly_chart(fig_bidang, use_container_width=True)
+                st.plotly_chart(fig_bidang, width='stretch')  # FIX: Replaced use_container_width
         
         # AI Recommendations
         if deepseek_analyzer and budget_data:
@@ -634,7 +664,7 @@ def main():
             
             with col1:
                 fig_demo = create_ikpa_gauge(demo_ikpa['nilai_akhir'], demo_ikpa['kategori'])
-                st.plotly_chart(fig_demo, use_container_width=True)
+                st.plotly_chart(fig_demo, width='stretch')  # FIX: Replaced use_container_width
             
             with col2:
                 st.metric("Nilai IKPA Demo", f"{demo_ikpa['nilai_akhir']:.2f}")
