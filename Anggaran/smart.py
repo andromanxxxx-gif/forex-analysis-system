@@ -11,6 +11,7 @@ import pdfplumber
 import re
 import requests
 import io
+import base64
 
 # Set page config
 st.set_page_config(
@@ -47,6 +48,13 @@ st.markdown("""
         border-left: 4px solid #007bff;
         margin: 1rem 0;
     }
+    .file-upload-section {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 10px;
+        border: 2px dashed #dee2e6;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -57,35 +65,47 @@ class IKPACalculator:
     def calculate_ikpa(self, penyerapan_data, capaian_output_data, deviasi_rpd=0):
         """
         Calculate IKPA based on actual formula from PER-5/PB/2022
-        Asumsi: Tidak ada kontraktual, UP/TUP optimal
+        Dengan normalisasi yang benar agar maksimal 100
         """
         try:
-            # Hitung komponen IKPA
+            # Normalisasi input data antara 0-100
             revisi_dipa = 100.00  # Asumsi optimal - tidak ada revisi
-            deviasi_halaman_iii = max(0, 100 - (deviasi_rpd * 2))  # Konversi deviasi ke skala 0-100
-            penyerapan_anggaran = penyerapan_data
+            
+            # Deviasi RPD: semakin kecil deviasi semakin baik, maksimal 100 jika deviasi <= 5%
+            deviasi_halaman_iii = max(0, 100 - (min(deviasi_rpd, 50) * 2))  # Normalisasi deviasi
+            
+            # Pastikan penyerapan antara 0-100
+            penyerapan_anggaran = max(0, min(100, penyerapan_data))
+            
             belanja_kontraktual = 0.00  # Tidak ada kontraktual
             penyelesaian_tagihan = 0.00  # Tidak ada kontraktual
             pengelolaan_up_tup = 100.00  # Asumsi optimal
-            capaian_output = capaian_output_data
+            
+            # Pastikan capaian output antara 0-100
+            capaian_output = max(0, min(100, capaian_output_data))
+            
             dispensasi_spm = 0.00  # Asumsi optimal
             
-            # Perhitungan nilai total berdasarkan bobot
-            nilai_total = (
-                (revisi_dipa * 0.10) +
-                (deviasi_halaman_iii * 0.15) +
-                (penyerapan_anggaran * 0.20) +
-                (belanja_kontraktual * 0.00) +
-                (penyelesaian_tagihan * 0.00) +
-                (pengelolaan_up_tup * 0.10) +
-                (capaian_output * 0.25)
+            # PERHITUNGAN YANG BENAR - sesuai rumus resmi
+            # Nilai per komponen dikalikan bobot, lalu dijumlahkan
+            nilai_per_komponen = (
+                (revisi_dipa * 10) +          # Bobot 10%
+                (deviasi_halaman_iii * 15) +  # Bobot 15%  
+                (penyerapan_anggaran * 20) +  # Bobot 20%
+                (belanja_kontraktual * 0) +   # Bobot 0%
+                (penyelesaian_tagihan * 0) +  # Bobot 0%
+                (pengelolaan_up_tup * 10) +   # Bobot 10%
+                (capaian_output * 25)         # Bobot 25%
             )
             
-            # Konversi ke skala 100 (karena total bobot efektif = 80%)
-            nilai_konversi = (nilai_total / 0.80) * 100
+            # Total bobot efektif = 80% (karena beberapa indikator 0%)
+            nilai_total = nilai_per_komponen / 100  # Konversi ke skala 1
+            
+            # Konversi ke skala 100
+            nilai_konversi = (nilai_total / 80) * 100
             
             # Kurangi dispensasi SPM
-            nilai_akhir = nilai_konversi - dispensasi_spm
+            nilai_akhir = max(0, min(100, nilai_konversi - dispensasi_spm))
             
             # Tentukan kategori
             if nilai_akhir >= 95:
@@ -125,7 +145,7 @@ class IKPACalculator:
                     'penyelesaian_tagihan': 0,
                     'pengelolaan_up_tup': 10,
                     'capaian_output': 25,
-                    'dispensasi_spm': 0,  # FIX: Added missing key
+                    'dispensasi_spm': 0,
                     'total_efektif': 80
                 }
             }
@@ -231,15 +251,149 @@ class BudgetProcessor:
         except:
             return 5.0  # Default value
 
+class PDFProcessor:
+    def __init__(self):
+        self.extracted_data = {}
+    
+    def process_capaian_output_pdf(self, file_buffer):
+        """Extract achievement output from PDF"""
+        try:
+            text = ""
+            with pdfplumber.open(file_buffer) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() or ""
+            
+            # Multiple patterns to find achievement percentage
+            patterns = [
+                r'capaian\s*output\s*:?\s*(\d+[.,]?\d*)%',
+                r'persentase\s*capaian\s*:?\s*(\d+[.,]?\d*)%',
+                r'capaian\s*:?\s*(\d+[.,]?\d*)%',
+                r'realisasi\s*output\s*:?\s*(\d+[.,]?\d*)%',
+                r'(\d+[.,]?\d*)%\s*.*capaian',
+                r'capaian.*?(\d+[.,]?\d*)%'
+            ]
+            
+            persentase = 0
+            for pattern in patterns:
+                matches = re.findall(pattern, text.lower())
+                if matches:
+                    # Handle comma as decimal separator
+                    value = matches[0].replace(',', '.')
+                    persentase = float(value)
+                    break
+            
+            self.extracted_data['capaian_output'] = persentase
+            self.extracted_data['capaian_text'] = text[:2000]  # Store first 2000 chars
+            
+            return {
+                'persentase_capaian': persentase,
+                'text_sample': text[:1000],
+                'status': 'success'
+            }
+            
+        except Exception as e:
+            return {"error": f"Error processing capaian output PDF: {str(e)}"}
+    
+    def process_rencana_penarikan_pdf(self, file_buffer):
+        """Extract RPD data from PDF"""
+        try:
+            text = ""
+            with pdfplumber.open(file_buffer) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() or ""
+            
+            # Look for RPD patterns
+            patterns = [
+                r'rencana\s*penarikan\s*dana.*?(\d+[.,]?\d*)%',
+                r'rpd.*?(\d+[.,]?\d*)%',
+                r'deviasi.*?rpd.*?(\d+[.,]?\d*)%',
+                r'penarikan\s*dana.*?(\d+[.,]?\d*)%'
+            ]
+            
+            # Also try to extract tabular data if available
+            rpd_data = {}
+            
+            # Simple extraction for demo
+            for pattern in patterns:
+                matches = re.findall(pattern, text.lower())
+                if matches:
+                    value = matches[0].replace(',', '.')
+                    rpd_data['deviasi_rpd'] = float(value)
+                    break
+            
+            self.extracted_data['rpd_info'] = rpd_data
+            self.extracted_data['rpd_text'] = text[:2000]
+            
+            return {
+                'rpd_data': rpd_data,
+                'text_sample': text[:1000],
+                'status': 'success'
+            }
+            
+        except Exception as e:
+            return {"error": f"Error processing RPD PDF: {str(e)}"}
+    
+    def process_ikpa_previous_pdf(self, file_buffer):
+        """Extract previous IKPA data from PDF"""
+        try:
+            text = ""
+            with pdfplumber.open(file_buffer) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() or ""
+            
+            # Look for IKPA value patterns
+            patterns = [
+                r'ikpa.*?(\d+[.,]?\d*)',
+                r'nilai\s*ikpa.*?(\d+[.,]?\d*)',
+                r'indikator\s*kinerja.*?(\d+[.,]?\d*)',
+                r'(\d+[.,]?\d*).*ikpa'
+            ]
+            
+            ikpa_value = 0
+            for pattern in patterns:
+                matches = re.findall(pattern, text.lower())
+                if matches:
+                    value = matches[0].replace(',', '.')
+                    ikpa_value = float(value)
+                    break
+            
+            # Also look for category
+            kategori_patterns = [
+                r'sangat\s+baik',
+                r'baik',
+                r'cukup',
+                r'kurang'
+            ]
+            
+            kategori = "Tidak Diketahui"
+            for pattern in kategori_patterns:
+                if re.search(pattern, text.lower()):
+                    kategori = pattern.upper()
+                    break
+            
+            self.extracted_data['ikpa_previous'] = ikpa_value
+            self.extracted_data['ikpa_kategori'] = kategori
+            self.extracted_data['ikpa_text'] = text[:2000]
+            
+            return {
+                'nilai_ikpa': ikpa_value,
+                'kategori': kategori,
+                'text_sample': text[:1000],
+                'status': 'success'
+            }
+            
+        except Exception as e:
+            return {"error": f"Error processing IKPA PDF: {str(e)}"}
+
 class DeepSeekAnalyzer:
     def __init__(self, api_key):
         self.api_key = api_key
         self.base_url = "https://api.deepseek.com/v1"
         
-    def analyze_ikpa(self, ikpa_data, budget_data, capaian_output):
+    def analyze_ikpa(self, ikpa_data, budget_data, capaian_output, previous_ikpa=None):
         """Analyze IKPA and generate recommendations using DeepSeek API"""
         try:
-            prompt = self._build_analysis_prompt(ikpa_data, budget_data, capaian_output)
+            prompt = self._build_analysis_prompt(ikpa_data, budget_data, capaian_output, previous_ikpa)
             
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -280,8 +434,12 @@ class DeepSeekAnalyzer:
         except Exception as e:
             return f"Error calling DeepSeek API: {str(e)}"
     
-    def _build_analysis_prompt(self, ikpa_data, budget_data, capaian_output):
+    def _build_analysis_prompt(self, ikpa_data, budget_data, capaian_output, previous_ikpa):
         """Build analysis prompt for DeepSeek"""
+        
+        previous_text = ""
+        if previous_ikpa:
+            previous_text = f"- IKPA Bulan Sebelumnya: {previous_ikpa['nilai_ikpa']:.2f} ({previous_ikpa['kategori']})"
         
         return f"""
         ANALISIS KINERJA IKPA BNNP DKI JAKARTA:
@@ -290,6 +448,7 @@ class DeepSeekAnalyzer:
         - Nilai IKPA: {ikpa_data['nilai_akhir']:.2f} ({ikpa_data['kategori']})
         - Target IKPA: 95.00 (Sangat Baik)
         - Gap: {95 - ikpa_data['nilai_akhir']:.2f} poin
+        {previous_text}
 
         DETAIL KOMPONEN IKPA:
         1. Revisi DIPA: {ikpa_data['components']['revisi_dipa']:.2f}% (Bobot: 10%)
@@ -419,6 +578,16 @@ def main():
     # Initialize classes
     budget_processor = BudgetProcessor()
     ikpa_calculator = IKPACalculator()
+    pdf_processor = PDFProcessor()
+    
+    # Initialize session state
+    if 'processed_data' not in st.session_state:
+        st.session_state.processed_data = {
+            'budget': None,
+            'capaian_output': None,
+            'rpd': None,
+            'ikpa_previous': None
+        }
     
     # Sidebar configuration
     st.sidebar.header("🔑 Konfigurasi")
@@ -436,37 +605,113 @@ def main():
         deepseek_analyzer = DeepSeekAnalyzer(api_key)
         st.sidebar.success("✅ API Terkoneksi")
     
-    # File uploads
+    # File uploads section
     st.sidebar.header("📁 Upload Data")
     
+    # Budget Excel Upload
+    st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
+    st.sidebar.subheader("💰 Data Penyerapan Anggaran")
     budget_file = st.sidebar.file_uploader(
         "Laporan Penyerapan Anggaran (Excel)",
         type=['xlsx', 'xls'],
-        help="Upload file Excel laporan realisasi anggaran"
+        help="Upload file Excel laporan realisasi anggaran",
+        key="budget_upload"
+    )
+    st.sidebar.markdown('</div>', unsafe_allow_html=True)
+    
+    # PDF Uploads
+    st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
+    st.sidebar.subheader("📊 Data Tambahan (PDF)")
+    
+    capaian_output_file = st.sidebar.file_uploader(
+        "Capaian Output Bulan Terakhir (PDF)",
+        type=['pdf'],
+        help="Upload PDF laporan capaian output",
+        key="capaian_upload"
     )
     
-    capaian_output = st.sidebar.number_input(
-        "Capaian Output (%)",
+    rencana_penarikan_file = st.sidebar.file_uploader(
+        "Rencana Penarikan Dana (PDF)",
+        type=['pdf'],
+        help="Upload PDF rencana penarikan dana",
+        key="rpd_upload"
+    )
+    
+    ikpa_previous_file = st.sidebar.file_uploader(
+        "IKPA Bulan Sebelumnya (PDF)",
+        type=['pdf'],
+        help="Upload PDF laporan IKPA bulan sebelumnya",
+        key="ikpa_previous_upload"
+    )
+    st.sidebar.markdown('</div>', unsafe_allow_html=True)
+    
+    # Manual input fallback
+    st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
+    st.sidebar.subheader("✍️ Input Manual")
+    manual_capaian_output = st.sidebar.number_input(
+        "Capaian Output (%) - Manual",
         min_value=0.0,
         max_value=100.0,
         value=80.0,
-        help="Masukkan persentase capaian output"
+        help="Masukkan persentase capaian output jika tidak upload PDF"
     )
+    st.sidebar.markdown('</div>', unsafe_allow_html=True)
     
-    # Process data
+    # Process uploaded files
     budget_data = None
-    ikpa_result = None
+    capaian_output_data = manual_capaian_output
+    rpd_data = None
+    ikpa_previous_data = None
     
+    # Process budget file
     if budget_file:
         with st.spinner("Memproses data anggaran..."):
             budget_data = budget_processor.process_budget_file(budget_file)
+            if "error" not in budget_data:
+                st.session_state.processed_data['budget'] = budget_data
+                st.sidebar.success("✅ Data anggaran berhasil diproses")
+            else:
+                st.sidebar.error(f"❌ {budget_data['error']}")
     
+    # Process capaian output PDF
+    if capaian_output_file:
+        with st.spinner("Memproses capaian output..."):
+            result = pdf_processor.process_capaian_output_pdf(capaian_output_file)
+            if "error" not in result:
+                capaian_output_data = result['persentase_capaian']
+                st.session_state.processed_data['capaian_output'] = result
+                st.sidebar.success(f"✅ Capaian output: {capaian_output_data}%")
+            else:
+                st.sidebar.error(f"❌ {result['error']}")
+    
+    # Process RPD PDF
+    if rencana_penarikan_file:
+        with st.spinner("Memproses Rencana Penarikan Dana..."):
+            result = pdf_processor.process_rencana_penarikan_pdf(rencana_penarikan_file)
+            if "error" not in result:
+                st.session_state.processed_data['rpd'] = result
+                st.sidebar.success("✅ Data RPD berhasil diproses")
+    
+    # Process previous IKPA PDF
+    if ikpa_previous_file:
+        with st.spinner("Memproses IKPA sebelumnya..."):
+            result = pdf_processor.process_ikpa_previous_pdf(ikpa_previous_file)
+            if "error" not in result:
+                ikpa_previous_data = result
+                st.session_state.processed_data['ikpa_previous'] = result
+                st.sidebar.success(f"✅ IKPA sebelumnya: {result['nilai_ikpa']:.2f}")
+    
+    # Use stored data if available
+    if st.session_state.processed_data['budget']:
+        budget_data = st.session_state.processed_data['budget']
+    
+    # Calculate IKPA if we have budget data
+    ikpa_result = None
     if budget_data and "error" not in budget_data:
-        # Calculate IKPA
         with st.spinner("Menghitung nilai IKPA..."):
             ikpa_result = ikpa_calculator.calculate_ikpa(
                 budget_data['penyerapan_persen'],
-                capaian_output,
+                capaian_output_data,
                 budget_data['deviasi_rpd']
             )
     
@@ -475,11 +720,11 @@ def main():
         # Header with IKPA Score
         st.header("📊 Hasil Analisis IKPA")
         
-        col1, col2, col3 = st.columns([2, 1, 1])
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
         
         with col1:
             fig_gauge = create_ikpa_gauge(ikpa_result['nilai_akhir'], ikpa_result['kategori'])
-            st.plotly_chart(fig_gauge, width='stretch')  # FIX: Replaced use_container_width
+            st.plotly_chart(fig_gauge, width='stretch')
         
         with col2:
             st.metric("Nilai IKPA", f"{ikpa_result['nilai_akhir']:.2f}")
@@ -491,6 +736,13 @@ def main():
             status = "✅ Optimal" if ikpa_result['nilai_akhir'] >= 95 else "⚠️ Perlu Perbaikan"
             st.metric("Status", status)
         
+        with col4:
+            if ikpa_previous_data:
+                change = ikpa_result['nilai_akhir'] - ikpa_previous_data['nilai_ikpa']
+                st.metric("IKPA Sebelumnya", f"{ikpa_previous_data['nilai_ikpa']:.2f}", f"{change:+.2f}")
+            else:
+                st.metric("IKPA Sebelumnya", "N/A")
+        
         # Component Analysis
         st.header("🔍 Analisis Komponen IKPA")
         
@@ -498,7 +750,7 @@ def main():
         
         with col1:
             fig_components = create_component_chart(ikpa_result)
-            st.plotly_chart(fig_components, width='stretch')  # FIX: Replaced use_container_width
+            st.plotly_chart(fig_components, width='stretch')
         
         with col2:
             # Component details
@@ -509,18 +761,37 @@ def main():
                     components_data.append({
                         'Komponen': comp.replace('_', ' ').title(),
                         'Nilai': ikpa_result['components'][comp],
-                        'Bobot': weight,
-                        'Kontribusi': round(ikpa_result['components'][comp] * weight / 100, 2)
+                        'Bobot': f"{weight}%",
+                        'Kontribusi': f"{ikpa_result['components'][comp] * weight / 100:.2f}"
                     })
             
             components_df = pd.DataFrame(components_data)
-            st.dataframe(components_df, width='stretch')
+            st.dataframe(components_df, width='stretch', hide_index=True)
             
             # Summary
             st.subheader("📈 Summary")
             st.write(f"**Total Bobot Efektif:** {ikpa_result['bobot']['total_efektif']}%")
             st.write(f"**Nilai Total:** {ikpa_result['nilai_total']:.2f}")
             st.write(f"**Nilai Konversi:** {ikpa_result['nilai_konversi']:.2f}")
+        
+        # Data Sources Section
+        st.header("📁 Sumber Data yang Diproses")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Data Anggaran", "✅ Tersedia" if budget_data else "❌ Tidak Ada")
+        
+        with col2:
+            st.metric("Capaian Output", f"{capaian_output_data}%")
+        
+        with col3:
+            deviasi = budget_data['deviasi_rpd'] if budget_data else 0
+            st.metric("Deviasi RPD", f"{deviasi:.1f}%")
+        
+        with col4:
+            prev_ikpa = ikpa_previous_data['nilai_ikpa'] if ikpa_previous_data else "N/A"
+            st.metric("IKPA Sebelumnya", f"{prev_ikpa}")
         
         # Budget Analysis
         if budget_data:
@@ -547,7 +818,42 @@ def main():
                     color='Penyerapan_Persen',
                     color_continuous_scale='RdYlGn'
                 )
-                st.plotly_chart(fig_bidang, width='stretch')  # FIX: Replaced use_container_width
+                st.plotly_chart(fig_bidang, width='stretch')
+        
+        # Extracted Data from PDFs
+        if (st.session_state.processed_data['capaian_output'] or 
+            st.session_state.processed_data['rpd'] or 
+            st.session_state.processed_data['ikpa_previous']):
+            
+            st.header("📄 Data yang Diekstrak dari PDF")
+            
+            cols = st.columns(3)
+            
+            with cols[0]:
+                if st.session_state.processed_data['capaian_output']:
+                    data = st.session_state.processed_data['capaian_output']
+                    st.subheader("Capaian Output")
+                    st.write(f"**Persentase:** {data['persentase_capaian']}%")
+                    with st.expander("Lihat teks yang diekstrak"):
+                        st.text_area("", data['text_sample'], height=200)
+            
+            with cols[1]:
+                if st.session_state.processed_data['rpd']:
+                    data = st.session_state.processed_data['rpd']
+                    st.subheader("Rencana Penarikan")
+                    if 'rpd_data' in data and 'deviasi_rpd' in data['rpd_data']:
+                        st.write(f"**Deviasi RPD:** {data['rpd_data']['deviasi_rpd']}%")
+                    with st.expander("Lihat teks yang diekstrak"):
+                        st.text_area("", data['text_sample'], height=200)
+            
+            with cols[2]:
+                if st.session_state.processed_data['ikpa_previous']:
+                    data = st.session_state.processed_data['ikpa_previous']
+                    st.subheader("IKPA Sebelumnya")
+                    st.write(f"**Nilai:** {data['nilai_ikpa']:.2f}")
+                    st.write(f"**Kategori:** {data['kategori']}")
+                    with st.expander("Lihat teks yang diekstrak"):
+                        st.text_area("", data['text_sample'], height=200)
         
         # AI Recommendations
         if deepseek_analyzer and budget_data:
@@ -558,7 +864,8 @@ def main():
                     recommendations = deepseek_analyzer.analyze_ikpa(
                         ikpa_result, 
                         budget_data, 
-                        capaian_output
+                        capaian_output_data,
+                        ikpa_previous_data
                     )
                     
                     st.markdown("### 📋 Hasil Analisis DeepSeek AI")
@@ -628,29 +935,23 @@ def main():
         berdasarkan Peraturan Dirjen Perbendaharaan No. PER-5/PB/2022.
         
         ### 🎯 Fitur Utama:
-        - **Analisis Komprehensif** nilai IKPA
-        - **Identifikasi Area Perbaikan** berdasarkan komponen IKPA
+        - **Analisis Komprehensif** nilai IKPA dengan normalisasi yang benar
+        - **Multi-file Upload** untuk data lengkap
+        - **Ekstraksi Otomatis** dari file PDF
         - **Rekomendasi AI** menggunakan DeepSeek
         - **Visualisasi Interaktif** kinerja anggaran
-        - **Action Plan** untuk peningkatan IKPA
         
-        ### 📊 Komponen IKPA yang Dianalisis:
-        1. **Revisi DIPA** (10%) - Asumsi optimal
-        2. **Deviasi Halaman III DIPA** (15%) - Dari data RPD
-        3. **Penyerapan Anggaran** (20%) - Dari realisasi anggaran
-        4. **Pengelolaan UP/TUP** (10%) - Asumsi optimal
-        5. **Capaian Output** (25%) - Input manual/upload PDF
+        ### 📊 Sumber Data yang Didukung:
+        1. **Excel Anggaran** - Data penyerapan anggaran
+        2. **PDF Capaian Output** - Laporan capaian output 
+        3. **PDF Rencana Penarikan** - Data RPD dan deviasi
+        4. **PDF IKPA Sebelumnya** - Data historis IKPA
         
         ### 🚀 Cara Menggunakan:
         1. **Upload file Excel** laporan penyerapan anggaran
-        2. **Input persentase capaian output**
-        3. **Masukkan API Key DeepSeek** (opsional untuk rekomendasi AI)
-        4. **Lihat hasil analisis** dan rekomendasi
-        
-        ### 📁 Format Data yang Didukung:
-        - File Excel dengan data realisasi anggaran
-        - Kolom fleksibel (sistem otomatis deteksi)
-        - Data numerik untuk alokasi dan realisasi
+        2. **Upload file PDF** tambahan (opsional)
+        3. **Input manual** data yang tidak tersedia
+        4. **Lihat hasil analisis** dan rekomendasi otomatis
         """)
         
         # Demo visualization
@@ -664,7 +965,7 @@ def main():
             
             with col1:
                 fig_demo = create_ikpa_gauge(demo_ikpa['nilai_akhir'], demo_ikpa['kategori'])
-                st.plotly_chart(fig_demo, width='stretch')  # FIX: Replaced use_container_width
+                st.plotly_chart(fig_demo, width='stretch')
             
             with col2:
                 st.metric("Nilai IKPA Demo", f"{demo_ikpa['nilai_akhir']:.2f}")
