@@ -597,7 +597,8 @@ def main():
         "DeepSeek API Key",
         type="password",
         placeholder="Masukkan API Key...",
-        help="Dapatkan dari https://platform.deepseek.com/"
+        help="Dapatkan dari https://platform.deepseek.com/",
+        key="api_key_input"  # UNIQUE KEY
     )
     
     deepseek_analyzer = None
@@ -653,7 +654,8 @@ def main():
         min_value=0.0,
         max_value=100.0,
         value=80.0,
-        help="Masukkan persentase capaian output jika tidak upload PDF"
+        help="Masukkan persentase capaian output jika tidak upload PDF",
+        key="manual_capaian_input"  # UNIQUE KEY
     )
     st.sidebar.markdown('</div>', unsafe_allow_html=True)
     
@@ -835,7 +837,8 @@ def main():
                     st.subheader("Capaian Output")
                     st.write(f"**Persentase:** {data['persentase_capaian']}%")
                     with st.expander("Lihat teks yang diekstrak"):
-                        st.text_area("", data['text_sample'], height=200)
+                        # FIXED: Added unique key
+                        st.text_area("Teks Capaian Output", data['text_sample'], height=200, key="capaian_output_text")
             
             with cols[1]:
                 if st.session_state.processed_data['rpd']:
@@ -844,7 +847,8 @@ def main():
                     if 'rpd_data' in data and 'deviasi_rpd' in data['rpd_data']:
                         st.write(f"**Deviasi RPD:** {data['rpd_data']['deviasi_rpd']}%")
                     with st.expander("Lihat teks yang diekstrak"):
-                        st.text_area("", data['text_sample'], height=200)
+                        # FIXED: Added unique key
+                        st.text_area("Teks RPD", data['text_sample'], height=200, key="rpd_text")
             
             with cols[2]:
                 if st.session_state.processed_data['ikpa_previous']:
@@ -853,13 +857,14 @@ def main():
                     st.write(f"**Nilai:** {data['nilai_ikpa']:.2f}")
                     st.write(f"**Kategori:** {data['kategori']}")
                     with st.expander("Lihat teks yang diekstrak"):
-                        st.text_area("", data['text_sample'], height=200)
+                        # FIXED: Added unique key
+                        st.text_area("Teks IKPA Sebelumnya", data['text_sample'], height=200, key="ikpa_previous_text")
         
         # AI Recommendations
         if deepseek_analyzer and budget_data:
             st.header("🤖 Rekomendasi AI DeepSeek")
             
-            if st.button("🔄 Generate Rekomendasi Mendalam", type="primary"):
+            if st.button("🔄 Generate Rekomendasi Mendalam", type="primary", key="generate_recommendations_btn"):
                 with st.spinner("DeepSeek AI menganalisis data dan menghasilkan rekomendasi..."):
                     recommendations = deepseek_analyzer.analyze_ikpa(
                         ikpa_result, 
@@ -968,9 +973,9 @@ def main():
                 st.plotly_chart(fig_demo, width='stretch')
             
             with col2:
-                st.metric("Nilai IKPA Demo", f"{demo_ikpa['nilai_akhir']:.2f}")
-                st.metric("Kategori", demo_ikpa['kategori'])
-                st.metric("Status", "Contoh Analisis")
+                st.metric("Nilai IKPA Demo", f"{demo_ikpa['nilai_akhir']:.2f}", key="demo_ikpa_metric")
+                st.metric("Kategori", demo_ikpa['kategori'], key="demo_kategori_metric")
+                st.metric("Status", "Contoh Analisis", key="demo_status_metric")
 
 if __name__ == "__main__":
     main()
