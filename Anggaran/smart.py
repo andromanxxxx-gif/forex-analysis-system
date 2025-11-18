@@ -160,27 +160,44 @@ class BudgetProcessor:
         self.penyerapan_data = None
         
     def process_budget_file(self, file_buffer):
-        """Process budget Excel file"""
+        """Process budget Excel file - IMPROVED VERSION"""
         try:
             # Baca file Excel
             df = pd.read_excel(file_buffer)
             
+            # Debug: Tampilkan kolom yang tersedia
+            st.sidebar.info(f"Kolom ditemukan: {list(df.columns)}")
+            
             # Deteksi kolom secara fleksibel
             column_mapping = self._detect_columns(df)
+            
+            # Debug: Tampilkan mapping kolom
+            st.sidebar.info(f"Mapping kolom: {column_mapping}")
             
             # Rename kolom ke standar
             df = df.rename(columns=column_mapping)
             
-            # Pastikan kolom numerik
+            # Pastikan kolom numerik - PERBAIKAN: Handling yang lebih robust
             numeric_cols = ['Harga Satuan', 'Jumlah', 'Realisasi', 'Sisa Anggaran']
             for col in numeric_cols:
                 if col in df.columns:
+                    # Clean numeric values - handle commas, currency symbols, etc.
+                    df[col] = df[col].astype(str).str.replace(r'[^\d,-]', '', regex=True)
+                    df[col] = df[col].str.replace(',', '.', regex=False)
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-            # Hitung metrik utama
+            # Debug: Tampilkan sample data
+            st.sidebar.info(f"Sample data - Jumlah: {df['Jumlah'].head(3).tolist() if 'Jumlah' in df.columns else 'N/A'}")
+            
+            # Hitung metrik utama - PERBAIKAN: Pastikan kolom ada
             total_alokasi = df['Jumlah'].sum() if 'Jumlah' in df.columns else 0
             total_realisasi = df['Realisasi'].sum() if 'Realisasi' in df.columns else 0
-            penyerapan_persen = (total_realisasi / total_alokasi * 100) if total_alokasi > 0 else 0
+            
+            # Hitung penyerapan dengan handling division by zero
+            if total_alokasi > 0:
+                penyerapan_persen = (total_realisasi / total_alokasi) * 100
+            else:
+                penyerapan_persen = 0
             
             # Hitung deviasi RPD (simplified)
             deviasi_rpd = self._calculate_deviation_rpd(df)
@@ -191,7 +208,7 @@ class BudgetProcessor:
                     'Jumlah': 'sum',
                     'Realisasi': 'sum'
                 }).reset_index()
-                bidang_summary['Penyerapan_Persen'] = (bidang_summary['Realisasi'] / bidang_summary['Jumlah'] * 100)
+                bidang_summary['Penyerapan_Persen'] = (bidang_summary['Realisasi'] / bidang_summary['Jumlah'] * 100).fillna(0)
             else:
                 bidang_summary = pd.DataFrame({
                     'Bidang': ['All'],
@@ -213,41 +230,50 @@ class BudgetProcessor:
             return self.penyerapan_data
             
         except Exception as e:
+            st.sidebar.error(f"Error detail: {str(e)}")
             return {"error": f"Error processing budget file: {str(e)}"}
     
     def _detect_columns(self, df):
-        """Detect and map columns flexibly"""
+        """Detect and map columns flexibly - IMPROVED VERSION"""
         column_mapping = {}
         
-        # Mapping patterns
+        # Mapping patterns yang lebih komprehensif
         patterns = {
-            'Kode': ['kode', 'KODE', 'Kode Rekening', 'KODE REKENING'],
-            'Uraian Volume': ['uraian', 'Uraian', 'Kegiatan', 'KEGIATAN', 'Uraian Volume', 'URAIAN VOLUME'],
-            'Satuan': ['satuan', 'SATUAN', 'Unit', 'UNIT'],
-            'Harga Satuan': ['harga', 'Harga', 'Harga Satuan', 'HARGA SATUAN'],
-            'Jumlah': ['jumlah', 'Jumlah', 'Anggaran', 'ANGGARAN', 'Jumlah Anggaran'],
-            'Realisasi': ['realisasi', 'Realisasi', 'REALISASI', 'Realisasi Anggaran'],
-            'Sisa Anggaran': ['sisa', 'Sisa', 'Sisa Anggaran', 'SISA ANGGARAN'],
-            'Bidang': ['bidang', 'Bidang', 'BIDANG', 'Unit Kerja'],
-            'Triwulan': ['triwulan', 'Triwulan', 'TRIWULAN', 'Periode']
+            'Kode': ['kode', 'KODE', 'Kode Rekening', 'KODE REKENING', 'kode_rekening', 'koderek'],
+            'Uraian Volume': ['uraian', 'Uraian', 'Kegiatan', 'KEGIATAN', 'Uraian Volume', 'URAIAN VOLUME', 'kegiatan', 'program', 'Program'],
+            'Satuan': ['satuan', 'SATUAN', 'Unit', 'UNIT', 'sat'],
+            'Harga Satuan': ['harga', 'Harga', 'Harga Satuan', 'HARGA SATUAN', 'harga_satuan', 'harga satuan'],
+            'Jumlah': ['jumlah', 'Jumlah', 'Anggaran', 'ANGGARAN', 'Jumlah Anggaran', 'alokasi', 'Alokasi', 'total', 'Total', 'anggaran', 'pagu'],
+            'Realisasi': ['realisasi', 'Realisasi', 'REALISASI', 'Realisasi Anggaran', 'realisasi_anggaran', 'real', 'pakai', 'digunakan'],
+            'Sisa Anggaran': ['sisa', 'Sisa', 'Sisa Anggaran', 'SISA ANGGARAN', 'sisa_anggaran', 'saldo', 'Saldo'],
+            'Bidang': ['bidang', 'Bidang', 'BIDANG', 'Unit Kerja', 'unit_kerja', 'unit', 'Unit', 'bagian', 'Bagian'],
+            'Triwulan': ['triwulan', 'Triwulan', 'TRIWULAN', 'Periode', 'periode', 'bulan', 'Bulan']
         }
         
         for standard_name, possible_names in patterns.items():
             for possible_name in possible_names:
+                # Check exact match first
                 if possible_name in df.columns:
-                    column_mapping[standard_name] = possible_name
+                    column_mapping[possible_name] = standard_name
                     break
+                # Check case insensitive and partial matches
+                for actual_col in df.columns:
+                    if possible_name.lower() in actual_col.lower():
+                        column_mapping[actual_col] = standard_name
+                        break
         
         return column_mapping
     
     def _calculate_deviation_rpd(self, df):
-        """Calculate RPD deviation (simplified)"""
+        """Calculate RPD deviation (simplified) - IMPROVED"""
         try:
             if 'Realisasi' in df.columns and 'Jumlah' in df.columns:
-                # Asumsi: deviasi dihitung dari variasi penyerapan
-                avg_deviation = abs(df['Realisasi'] / df['Jumlah'].replace(0, 1) - 1).mean() * 100
-                return min(avg_deviation, 50)  # Cap at 50%
-            return 5.0  # Default value
+                # Filter out zero values to avoid division issues
+                valid_data = df[(df['Jumlah'] > 0) & (df['Realisasi'] > 0)]
+                if len(valid_data) > 0:
+                    avg_deviation = abs(valid_data['Realisasi'] / valid_data['Jumlah'] - 1).mean() * 100
+                    return min(avg_deviation, 50)  # Cap at 50%
+            return 5.0  # Default reasonable value
         except:
             return 5.0  # Default value
 
@@ -256,34 +282,52 @@ class PDFProcessor:
         self.extracted_data = {}
     
     def process_capaian_output_pdf(self, file_buffer):
-        """Extract achievement output from PDF"""
+        """Extract achievement output from PDF - IMPROVED VERSION"""
         try:
             text = ""
             with pdfplumber.open(file_buffer) as pdf:
                 for page in pdf.pages:
                     text += page.extract_text() or ""
             
-            # Multiple patterns to find achievement percentage
+            # Debug: Tampilkan sample teks
+            st.sidebar.info(f"Sample teks PDF: {text[:200]}...")
+            
+            # Multiple patterns to find achievement percentage - IMPROVED PATTERNS
             patterns = [
-                r'capaian\s*output\s*:?\s*(\d+[.,]?\d*)%',
-                r'persentase\s*capaian\s*:?\s*(\d+[.,]?\d*)%',
-                r'capaian\s*:?\s*(\d+[.,]?\d*)%',
-                r'realisasi\s*output\s*:?\s*(\d+[.,]?\d*)%',
-                r'(\d+[.,]?\d*)%\s*.*capaian',
-                r'capaian.*?(\d+[.,]?\d*)%'
+                r'capaian\s*output\s*:?\s*(\d+[.,]?\d*)\s*%',
+                r'persentase\s*capaian\s*:?\s*(\d+[.,]?\d*)\s*%',
+                r'capaian\s*:?\s*(\d+[.,]?\d*)\s*%',
+                r'realisasi\s*output\s*:?\s*(\d+[.,]?\d*)\s*%',
+                r'(\d+[.,]?\d*)\s*%.*capaian',
+                r'capaian.*?(\d+[.,]?\d*)\s*%',
+                r'output.*?(\d+[.,]?\d*)\s*%',
+                r'tingkat\s*capaian\s*:?\s*(\d+[.,]?\d*)\s*%',
+                r'capaian\s*kinerja\s*:?\s*(\d+[.,]?\d*)\s*%'
             ]
             
             persentase = 0
             for pattern in patterns:
                 matches = re.findall(pattern, text.lower())
                 if matches:
-                    # Handle comma as decimal separator
-                    value = matches[0].replace(',', '.')
-                    persentase = float(value)
+                    # Ambil nilai tertinggi jika ada beberapa match
+                    values = [float(match.replace(',', '.')) for match in matches]
+                    persentase = max(values)  # Ambil nilai tertinggi
+                    st.sidebar.success(f"Pattern ditemukan: {pattern} -> {persentase}%")
                     break
             
+            # Fallback: cari angka persentase di mana saja dalam teks
+            if persentase == 0:
+                all_percentages = re.findall(r'(\d+[.,]?\d*)\s*%', text)
+                if all_percentages:
+                    # Ambil nilai persentase yang reasonable (antara 0-100)
+                    possible_values = [float(p.replace(',', '.')) for p in all_percentages]
+                    reasonable_values = [v for v in possible_values if 0 <= v <= 100]
+                    if reasonable_values:
+                        persentase = max(reasonable_values)  # Ambil nilai tertinggi yang reasonable
+                        st.sidebar.info(f"Fallback ditemukan: {persentase}%")
+            
             self.extracted_data['capaian_output'] = persentase
-            self.extracted_data['capaian_text'] = text[:2000]  # Store first 2000 chars
+            self.extracted_data['capaian_text'] = text[:2000]
             
             return {
                 'persentase_capaian': persentase,
@@ -295,25 +339,24 @@ class PDFProcessor:
             return {"error": f"Error processing capaian output PDF: {str(e)}"}
     
     def process_rencana_penarikan_pdf(self, file_buffer):
-        """Extract RPD data from PDF"""
+        """Extract RPD data from PDF - IMPROVED VERSION"""
         try:
             text = ""
             with pdfplumber.open(file_buffer) as pdf:
                 for page in pdf.pages:
                     text += page.extract_text() or ""
             
-            # Look for RPD patterns
+            # Look for RPD patterns - IMPROVED
             patterns = [
-                r'rencana\s*penarikan\s*dana.*?(\d+[.,]?\d*)%',
-                r'rpd.*?(\d+[.,]?\d*)%',
-                r'deviasi.*?rpd.*?(\d+[.,]?\d*)%',
-                r'penarikan\s*dana.*?(\d+[.,]?\d*)%'
+                r'rencana\s*penarikan\s*dana.*?(\d+[.,]?\d*)\s*%',
+                r'rpd.*?(\d+[.,]?\d*)\s*%',
+                r'deviasi.*?rpd.*?(\d+[.,]?\d*)\s*%',
+                r'penarikan\s*dana.*?(\d+[.,]?\d*)\s*%',
+                r'realisasi.*?rpd.*?(\d+[.,]?\d*)\s*%'
             ]
             
-            # Also try to extract tabular data if available
-            rpd_data = {}
+            rpd_data = {'deviasi_rpd': 5.0}  # Default value
             
-            # Simple extraction for demo
             for pattern in patterns:
                 matches = re.findall(pattern, text.lower())
                 if matches:
@@ -334,41 +377,73 @@ class PDFProcessor:
             return {"error": f"Error processing RPD PDF: {str(e)}"}
     
     def process_ikpa_previous_pdf(self, file_buffer):
-        """Extract previous IKPA data from PDF"""
+        """Extract previous IKPA data from PDF - IMPROVED VERSION"""
         try:
             text = ""
             with pdfplumber.open(file_buffer) as pdf:
                 for page in pdf.pages:
                     text += page.extract_text() or ""
             
-            # Look for IKPA value patterns
+            # Debug: Tampilkan sample teks
+            st.sidebar.info(f"Sample teks IKPA: {text[:200]}...")
+            
+            # Look for IKPA value patterns - FOCUS ON "Nilai Akhir"
             patterns = [
+                r'nilai\s*akhir\s*:?\s*(\d+[.,]?\d*)',  # Pattern khusus untuk "Nilai Akhir"
                 r'ikpa.*?(\d+[.,]?\d*)',
-                r'nilai\s*ikpa.*?(\d+[.,]?\d*)',
+                r'nilai\s*ikpa\s*:?\s*(\d+[.,]?\d*)',
                 r'indikator\s*kinerja.*?(\d+[.,]?\d*)',
-                r'(\d+[.,]?\d*).*ikpa'
+                r'(\d+[.,]?\d*).*ikpa',
+                r'skor\s*:?\s*(\d+[.,]?\d*)',
+                r'hasil\s*:?\s*(\d+[.,]?\d*)'
             ]
             
             ikpa_value = 0
             for pattern in patterns:
                 matches = re.findall(pattern, text.lower())
                 if matches:
+                    # Ambil nilai pertama yang ditemukan
                     value = matches[0].replace(',', '.')
-                    ikpa_value = float(value)
-                    break
+                    try:
+                        ikpa_value = float(value)
+                        # Pastikan nilai reasonable untuk IKPA (biasanya antara 0-100)
+                        if 0 <= ikpa_value <= 100:
+                            st.sidebar.success(f"Pattern IKPA ditemukan: {pattern} -> {ikpa_value}")
+                            break
+                        else:
+                            ikpa_value = 0  # Reset jika tidak reasonable
+                    except:
+                        continue
             
-            # Also look for category
+            # Fallback: cari semua angka dan ambil yang paling mungkin sebagai IKPA
+            if ikpa_value == 0:
+                all_numbers = re.findall(r'(\d+[.,]?\d*)', text)
+                possible_ikpa = []
+                for num in all_numbers:
+                    try:
+                        value = float(num.replace(',', '.'))
+                        if 50 <= value <= 100:  # IKPA biasanya di range ini
+                            possible_ikpa.append(value)
+                    except:
+                        continue
+                if possible_ikpa:
+                    ikpa_value = max(possible_ikpa)  # Ambil nilai tertinggi yang reasonable
+                    st.sidebar.info(f"Fallback IKPA ditemukan: {ikpa_value}")
+            
+            # Also look for category - IMPROVED PATTERNS
             kategori_patterns = [
-                r'sangat\s+baik',
-                r'baik',
-                r'cukup',
-                r'kurang'
+                (r'sangat\s+baik', 'Sangat Baik'),
+                (r'baik', 'Baik'),
+                (r'cukup', 'Cukup'),
+                (r'kurang', 'Kurang'),
+                (r'memuaskan', 'Baik'),
+                (r'optimal', 'Sangat Baik')
             ]
             
             kategori = "Tidak Diketahui"
-            for pattern in kategori_patterns:
+            for pattern, kategori_name in kategori_patterns:
                 if re.search(pattern, text.lower()):
-                    kategori = pattern.upper()
+                    kategori = kategori_name
                     break
             
             self.extracted_data['ikpa_previous'] = ikpa_value
@@ -384,6 +459,8 @@ class PDFProcessor:
             
         except Exception as e:
             return {"error": f"Error processing IKPA PDF: {str(e)}"}
+
+# ... (DeepSeekAnalyzer dan fungsi-fungsi lainnya tetap sama)
 
 class DeepSeekAnalyzer:
     def __init__(self, api_key):
@@ -598,7 +675,7 @@ def main():
         type="password",
         placeholder="Masukkan API Key...",
         help="Dapatkan dari https://platform.deepseek.com/",
-        key="api_key_input"  # UNIQUE KEY
+        key="api_key_input"
     )
     
     deepseek_analyzer = None
@@ -655,7 +732,7 @@ def main():
         max_value=100.0,
         value=80.0,
         help="Masukkan persentase capaian output jika tidak upload PDF",
-        key="manual_capaian_input"  # UNIQUE KEY
+        key="manual_capaian_input"
     )
     st.sidebar.markdown('</div>', unsafe_allow_html=True)
     
@@ -672,6 +749,10 @@ def main():
             if "error" not in budget_data:
                 st.session_state.processed_data['budget'] = budget_data
                 st.sidebar.success("✅ Data anggaran berhasil diproses")
+                # Tampilkan preview data
+                st.sidebar.info(f"Total Alokasi: Rp {budget_data['total_alokasi']:,.0f}")
+                st.sidebar.info(f"Total Realisasi: Rp {budget_data['total_realisasi']:,.0f}")
+                st.sidebar.info(f"Penyerapan: {budget_data['penyerapan_persen']:.1f}%")
             else:
                 st.sidebar.error(f"❌ {budget_data['error']}")
     
@@ -692,7 +773,10 @@ def main():
             result = pdf_processor.process_rencana_penarikan_pdf(rencana_penarikan_file)
             if "error" not in result:
                 st.session_state.processed_data['rpd'] = result
-                st.sidebar.success("✅ Data RPD berhasil diproses")
+                if 'deviasi_rpd' in result['rpd_data']:
+                    st.sidebar.success(f"✅ Deviasi RPD: {result['rpd_data']['deviasi_rpd']}%")
+                else:
+                    st.sidebar.success("✅ Data RPD berhasil diproses")
     
     # Process previous IKPA PDF
     if ikpa_previous_file:
@@ -701,7 +785,7 @@ def main():
             if "error" not in result:
                 ikpa_previous_data = result
                 st.session_state.processed_data['ikpa_previous'] = result
-                st.sidebar.success(f"✅ IKPA sebelumnya: {result['nilai_ikpa']:.2f}")
+                st.sidebar.success(f"✅ IKPA sebelumnya: {result['nilai_ikpa']:.2f} ({result['kategori']})")
     
     # Use stored data if available
     if st.session_state.processed_data['budget']:
@@ -726,7 +810,7 @@ def main():
         
         with col1:
             fig_gauge = create_ikpa_gauge(ikpa_result['nilai_akhir'], ikpa_result['kategori'])
-            st.plotly_chart(fig_gauge, width='stretch')
+            st.plotly_chart(fig_gauge, use_container_width=True)
         
         with col2:
             st.metric("Nilai IKPA", f"{ikpa_result['nilai_akhir']:.2f}")
@@ -752,7 +836,7 @@ def main():
         
         with col1:
             fig_components = create_component_chart(ikpa_result)
-            st.plotly_chart(fig_components, width='stretch')
+            st.plotly_chart(fig_components, use_container_width=True)
         
         with col2:
             # Component details
@@ -768,7 +852,7 @@ def main():
                     })
             
             components_df = pd.DataFrame(components_data)
-            st.dataframe(components_df, width='stretch', hide_index=True)
+            st.dataframe(components_df, use_container_width=True, hide_index=True)
             
             # Summary
             st.subheader("📈 Summary")
@@ -792,7 +876,10 @@ def main():
             st.metric("Deviasi RPD", f"{deviasi:.1f}%")
         
         with col4:
-            prev_ikpa = ikpa_previous_data['nilai_ikpa'] if ikpa_previous_data else "N/A"
+            if ikpa_previous_data:
+                prev_ikpa = f"{ikpa_previous_data['nilai_ikpa']:.2f}"
+            else:
+                prev_ikpa = "N/A"
             st.metric("IKPA Sebelumnya", f"{prev_ikpa}")
         
         # Budget Analysis
@@ -820,7 +907,7 @@ def main():
                     color='Penyerapan_Persen',
                     color_continuous_scale='RdYlGn'
                 )
-                st.plotly_chart(fig_bidang, width='stretch')
+                st.plotly_chart(fig_bidang, use_container_width=True)
         
         # Extracted Data from PDFs
         if (st.session_state.processed_data['capaian_output'] or 
@@ -837,7 +924,6 @@ def main():
                     st.subheader("Capaian Output")
                     st.write(f"**Persentase:** {data['persentase_capaian']}%")
                     with st.expander("Lihat teks yang diekstrak"):
-                        # FIXED: Added unique key
                         st.text_area("Teks Capaian Output", data['text_sample'], height=200, key="capaian_output_text")
             
             with cols[1]:
@@ -847,7 +933,6 @@ def main():
                     if 'rpd_data' in data and 'deviasi_rpd' in data['rpd_data']:
                         st.write(f"**Deviasi RPD:** {data['rpd_data']['deviasi_rpd']}%")
                     with st.expander("Lihat teks yang diekstrak"):
-                        # FIXED: Added unique key
                         st.text_area("Teks RPD", data['text_sample'], height=200, key="rpd_text")
             
             with cols[2]:
@@ -857,7 +942,6 @@ def main():
                     st.write(f"**Nilai:** {data['nilai_ikpa']:.2f}")
                     st.write(f"**Kategori:** {data['kategori']}")
                     with st.expander("Lihat teks yang diekstrak"):
-                        # FIXED: Added unique key
                         st.text_area("Teks IKPA Sebelumnya", data['text_sample'], height=200, key="ikpa_previous_text")
         
         # AI Recommendations
@@ -970,12 +1054,12 @@ def main():
             
             with col1:
                 fig_demo = create_ikpa_gauge(demo_ikpa['nilai_akhir'], demo_ikpa['kategori'])
-                st.plotly_chart(fig_demo, width='stretch')
+                st.plotly_chart(fig_demo, use_container_width=True)
             
             with col2:
-                st.metric("Nilai IKPA Demo", f"{demo_ikpa['nilai_akhir']:.2f}", key="demo_ikpa_metric")
-                st.metric("Kategori", demo_ikpa['kategori'], key="demo_kategori_metric")
-                st.metric("Status", "Contoh Analisis", key="demo_status_metric")
+                st.metric("Nilai IKPA Demo", f"{demo_ikpa['nilai_akhir']:.2f}")
+                st.metric("Kategori", demo_ikpa['kategori'])
+                st.metric("Status", "Contoh Analisis")
 
 if __name__ == "__main__":
     main()
