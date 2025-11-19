@@ -570,59 +570,113 @@ class StrategicAdvisor:
             ]
         }
 
-# Visualization functions
+# Visualization functions - FIXED VERSION
 def create_ikpa_gauge(value, category):
-    """Create IKPA gauge chart"""
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number+delta+goal",
-        value = value,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': f"IKPA 2024 - {category}", 'font': {'size': 24}},
-        delta = {'reference': 95, 'increasing': {'color': "green"}},
-        gauge = {
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "darkblue"},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': [
-                {'range': [0, 70], 'color': 'red'},
-                {'range': [70, 89], 'color': 'orange'},
-                {'range': [89, 95], 'color': 'yellow'},
-                {'range': [95, 100], 'color': 'green'}],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': 95}
-        }
-    ))
-    
-    fig.update_layout(height=300, margin=dict(t=50, b=10))
-    return fig
+    """Create IKPA gauge chart - FIXED VERSION"""
+    try:
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number+delta",  # REMOVED 'goal' - not valid in Plotly
+            value=value,
+            domain={'x': [0, 1], 'y': [0, 1]},
+            title={'text': f"IKPA 2024 - {category}", 'font': {'size': 24}},
+            delta={'reference': 95, 'increasing': {'color': "green"}},
+            gauge={
+                'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                'bar': {'color': "darkblue"},
+                'bgcolor': "white",
+                'borderwidth': 2,
+                'bordercolor': "gray",
+                'steps': [
+                    {'range': [0, 70], 'color': 'red'},
+                    {'range': [70, 89], 'color': 'orange'},
+                    {'range': [89, 95], 'color': 'yellow'},
+                    {'range': [95, 100], 'color': 'green'}],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 95}
+            }
+        ))
+        
+        fig.update_layout(height=300, margin=dict(t=50, b=10))
+        return fig
+    except Exception as e:
+        # Fallback simple gauge if error
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=value,
+            domain={'x': [0, 1], 'y': [0, 1]},
+            title={'text': f"IKPA - {category}"},
+            gauge={'axis': {'range': [None, 100]}}
+        ))
+        fig.update_layout(height=300)
+        return fig
 
 def create_component_chart(ikpa_data):
     """Create component breakdown chart"""
-    components = ['Revisi DIPA', 'Deviasi Halaman III', 'Penyerapan Anggaran', 'Pengelolaan UP/TUP', 'Capaian Output']
-    values = [
-        ikpa_data['components']['revisi_dipa'],
-        ikpa_data['components']['deviasi_halaman_iii'],
-        ikpa_data['components']['penyerapan_anggaran'],
-        ikpa_data['components']['pengelolaan_up_tup'],
-        ikpa_data['components']['capaian_output']
-    ]
-    
-    fig = go.Figure(data=[
-        go.Bar(name='Nilai', x=components, y=values, marker_color='blue'),
-        go.Bar(name='Target', x=components, y=[95]*len(components), marker_color='red', opacity=0.3)
-    ])
-    
-    fig.update_layout(
-        title='Perbandingan Komponen IKPA vs Target',
-        barmode='overlay',
-        height=400
-    )
-    
-    return fig
+    try:
+        components = ['Revisi DIPA', 'Deviasi Halaman III', 'Penyerapan Anggaran', 'Pengelolaan UP/TUP', 'Capaian Output']
+        values = [
+            ikpa_data['components']['revisi_dipa'],
+            ikpa_data['components']['deviasi_halaman_iii'],
+            ikpa_data['components']['penyerapan_anggaran'],
+            ikpa_data['components']['pengelolaan_up_tup'],
+            ikpa_data['components']['capaian_output']
+        ]
+        
+        fig = go.Figure(data=[
+            go.Bar(name='Nilai', x=components, y=values, marker_color='blue'),
+            go.Bar(name='Target', x=components, y=[95]*len(components), marker_color='red', opacity=0.3)
+        ])
+        
+        fig.update_layout(
+            title='Perbandingan Komponen IKPA vs Target',
+            barmode='overlay',
+            height=400
+        )
+        
+        return fig
+    except Exception as e:
+        # Return empty figure if error
+        fig = go.Figure()
+        fig.update_layout(title="Error creating chart", height=400)
+        return fig
+
+def create_improvement_radar(ikpa_data):
+    """Create radar chart for improvement areas"""
+    try:
+        categories = ['Penyerapan', 'Capaian Output', 'Deviasi', 'UP/TUP', 'Revisi DIPA']
+        values = [
+            ikpa_data['components']['penyerapan_anggaran'],
+            ikpa_data['components']['capaian_output'],
+            ikpa_data['components']['deviasi_halaman_iii'],
+            ikpa_data['components']['pengelolaan_up_tup'],
+            ikpa_data['components']['revisi_dipa']
+        ]
+        
+        fig = go.Figure(data=go.Scatterpolar(
+            r=values + [values[0]],  # Close the radar
+            theta=categories + [categories[0]],
+            fill='toself',
+            name='IKPA Components'
+        ))
+        
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100]
+                )),
+            showlegend=False,
+            title='Radar Chart Komponen IKPA',
+            height=400
+        )
+        
+        return fig
+    except Exception as e:
+        fig = go.Figure()
+        fig.update_layout(title="Error creating radar chart", height=400)
+        return fig
 
 def main():
     try:
@@ -738,21 +792,37 @@ def main():
         if budget_file:
             with st.spinner("Memproses data anggaran..."):
                 budget_data = data_processor.process_anggaran_excel(budget_file)
+                if "error" not in budget_data:
+                    st.sidebar.success("✅ Data anggaran berhasil diproses")
+                else:
+                    st.sidebar.error(f"❌ {budget_data['error']}")
         
         # Process capaian output file
         if capaian_file:
             with st.spinner("Memproses capaian output..."):
                 capaian_data = data_processor.process_capaian_output_excel(capaian_file)
+                if "error" not in capaian_data:
+                    st.sidebar.success("✅ Data capaian output berhasil diproses")
+                else:
+                    st.sidebar.error(f"❌ {capaian_data['error']}")
         
         # Process indikator file
         if indikator_file:
             with st.spinner("Memproses indikator pelaksanaan..."):
                 indikator_data = data_processor.process_indikator_pelaksanaan_excel(indikator_file)
+                if "error" not in indikator_data:
+                    st.sidebar.success("✅ Data indikator berhasil diproses")
+                else:
+                    st.sidebar.error(f"❌ {indikator_data['error']}")
         
         # Process previous IKPA file
         if ikpa_previous_file:
             with st.spinner("Memproses IKPA sebelumnya..."):
                 ikpa_previous_data = pdf_extractor.extract_ikpa_from_pdf(ikpa_previous_file)
+                if "error" not in ikpa_previous_data:
+                    st.sidebar.success("✅ Data IKPA sebelumnya berhasil diproses")
+                else:
+                    st.sidebar.error(f"❌ {ikpa_previous_data['error']}")
         
         # Prepare data for IKPA calculation
         ikpa_input = {
@@ -777,8 +847,10 @@ def main():
                     ikpa_input[key] = current_data[key]
         
         # Calculate IKPA
-        with st.spinner("Menghitung nilai IKPA 2024..."):
-            ikpa_result = ikpa_calculator.calculate_ikpa_2024(ikpa_input)
+        ikpa_result = None
+        if any([budget_data, capaian_data, indikator_data]) or any([manual_penyerapan > 0, manual_capaian > 0]):
+            with st.spinner("Menghitung nilai IKPA 2024..."):
+                ikpa_result = ikpa_calculator.calculate_ikpa_2024(ikpa_input)
         
         # Display results
         if ikpa_result and 'error' not in ikpa_result:
@@ -817,19 +889,9 @@ def main():
                 st.plotly_chart(fig_components, use_container_width=True)
             
             with col2:
-                st.subheader("Detail Komponen")
-                components_data = []
-                for comp, weight in ikpa_result['bobot'].items():
-                    if weight > 0 and comp in ikpa_result['components']:
-                        components_data.append({
-                            'Komponen': comp.replace('_', ' ').title(),
-                            'Nilai': ikpa_result['components'][comp],
-                            'Bobot': f"{weight}%",
-                            'Kontribusi': f"{ikpa_result['components'][comp] * weight / 100:.2f}"
-                        })
-                
-                components_df = pd.DataFrame(components_data)
-                st.dataframe(components_df, use_container_width=True, hide_index=True)
+                # Radar chart for visual overview
+                fig_radar = create_improvement_radar(ikpa_result)
+                st.plotly_chart(fig_radar, use_container_width=True)
             
             # Data Summary
             st.header("📈 Summary Data")
