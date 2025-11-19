@@ -263,7 +263,7 @@ class DataProcessor:
         self.processed_data = {}
     
     def process_anggaran_excel(self, file_buffer):
-        """Process Excel file for budget data - IMPROVED VERSION"""
+        """Process Excel file for budget data - FIXED untuk struktur kolom: URAIAN, JUMLAH PAGU, REALISASI, SISA, PERSENTASE"""
         try:
             # Baca file Excel
             df = pd.read_excel(file_buffer)
@@ -271,40 +271,29 @@ class DataProcessor:
             # Debug: Tampilkan kolom yang tersedia
             st.sidebar.info(f"📊 Kolom ditemukan: {list(df.columns)}")
             
-            # Normalize column names dengan mapping yang lebih komprehensif
-            df = self._normalize_columns_improved(df)
+            # Normalize column names khusus untuk struktur yang ditentukan
+            df = self._normalize_columns_specific(df)
             
             # Debug: Tampilkan data sample
             st.sidebar.info(f"📋 Sample data - 3 baris pertama:")
             st.sidebar.dataframe(df.head(3), use_container_width=True)
             
-            # Clean and convert numeric data dengan handling yang lebih baik
-            df = self._clean_numeric_data_improved(df)
+            # Clean and convert numeric data
+            df = self._clean_numeric_data_specific(df)
             
-            # Calculate metrics dengan validasi
-            total_alokasi, total_realisasi = self._calculate_budget_metrics_improved(df)
+            # Calculate metrics
+            total_alokasi, total_realisasi = self._calculate_budget_metrics_specific(df)
             
             penyerapan_persen = (total_realisasi / total_alokasi * 100) if total_alokasi > 0 else 0
             
             # Calculate deviasi RPD
             deviasi_rpd = self._calculate_deviation_rpd(df)
             
-            # Group by bidang jika ada
-            if 'Bidang' in df.columns:
-                bidang_summary = df.groupby('Bidang').agg({
-                    'Jumlah': 'sum',
-                    'Realisasi': 'sum'
-                }).reset_index()
-                bidang_summary['Penyerapan_Persen'] = (bidang_summary['Realisasi'] / bidang_summary['Jumlah'] * 100).fillna(0)
-            else:
-                bidang_summary = pd.DataFrame()
-            
             self.processed_data['anggaran'] = {
                 'total_alokasi': total_alokasi,
                 'total_realisasi': total_realisasi,
                 'penyerapan_persen': penyerapan_persen,
                 'deviasi_rpd': deviasi_rpd,
-                'bidang_summary': bidang_summary,
                 'raw_data': df,
                 'columns_info': {
                     'alokasi_column': 'Jumlah' if 'Jumlah' in df.columns else 'Tidak ditemukan',
@@ -320,16 +309,10 @@ class DataProcessor:
             st.sidebar.error(f"❌ {error_msg}")
             return {"error": error_msg}
     
-    def _normalize_columns_improved(self, df):
-        """Improved column normalization dengan lebih banyak variasi"""
+    def _normalize_columns_specific(self, df):
+        """Normalize columns khusus untuk struktur: URAIAN, JUMLAH PAGU, REALISASI, SISA, PERSENTASE"""
         column_mapping = {
-            # Mapping untuk alokasi/anggaran
-            'kode': 'Kode',
-            'KODE': 'Kode',
-            'kode_rekening': 'Kode',
-            'Kode Rekening': 'Kode',
-            
-            # Mapping untuk uraian
+            # Mapping untuk URAIAN
             'uraian': 'Uraian',
             'Uraian': 'Uraian',
             'kegiatan': 'Uraian',
@@ -337,51 +320,45 @@ class DataProcessor:
             'program': 'Uraian',
             'Program': 'Uraian',
             'nama_kegiatan': 'Uraian',
+            'keterangan': 'Uraian',
+            'Keterangan': 'Uraian',
             
-            # Mapping untuk alokasi/anggaran
-            'jumlah': 'Jumlah',
-            'Jumlah': 'Jumlah',
-            'anggaran': 'Jumlah',
-            'Anggaran': 'Jumlah',
+            # Mapping untuk JUMLAH PAGU
+            'jumlah pagu': 'Jumlah',
+            'Jumlah Pagu': 'Jumlah',
             'pagu': 'Jumlah',
             'Pagu': 'Jumlah',
+            'anggaran': 'Jumlah',
+            'Anggaran': 'Jumlah',
             'alokasi': 'Jumlah',
             'Alokasi': 'Jumlah',
-            'pagu_anggaran': 'Jumlah',
-            'total': 'Jumlah',
+            'jumlah': 'Jumlah',
+            'Jumlah': 'Jumlah',
+            'pagu anggaran': 'Jumlah',
             
-            # Mapping untuk realisasi
+            # Mapping untuk REALISASI
             'realisasi': 'Realisasi',
             'Realisasi': 'Realisasi',
+            'realisasi anggaran': 'Realisasi',
             'real': 'Realisasi',
-            'realisasi_anggaran': 'Realisasi',
             'pakai': 'Realisasi',
             'digunakan': 'Realisasi',
             'penggunaan': 'Realisasi',
-            'realisasi_pagu': 'Realisasi',
             
-            # Mapping untuk sisa
+            # Mapping untuk SISA
             'sisa': 'Sisa',
             'Sisa': 'Sisa',
             'saldo': 'Sisa',
-            'sisa_anggaran': 'Sisa',
+            'sisa anggaran': 'Sisa',
             
-            # Mapping untuk bidang/unit
-            'bidang': 'Bidang',
-            'Bidang': 'Bidang',
-            'unit': 'Bidang',
-            'Unit': 'Bidang',
-            'bagian': 'Bidang',
-            'Bagian': 'Bidang',
-            'unit_kerja': 'Bidang',
-            
-            # Mapping untuk triwulan
-            'triwulan': 'Triwulan',
-            'Triwulan': 'Triwulan',
-            'periode': 'Triwulan',
-            'Periode': 'Triwulan',
-            'bulan': 'Triwulan',
-            'Bulan': 'Triwulan'
+            # Mapping untuk PERSENTASE
+            'persentase': 'Persentase',
+            'Persentase': 'Persentase',
+            'presentase': 'Persentase',
+            'prosentase': 'Persentase',
+            'percentage': 'Persentase',
+            '%': 'Persentase',
+            'penyerapan': 'Persentase'
         }
         
         new_columns = []
@@ -392,7 +369,7 @@ class DataProcessor:
             # Cari mapping yang cocok
             mapped = False
             for pattern, standard_name in column_mapping.items():
-                if pattern.lower() in col_lower or col_lower in pattern.lower():
+                if pattern.lower() == col_lower or col_lower in pattern.lower():
                     new_columns.append(standard_name)
                     mapped = True
                     break
@@ -403,13 +380,13 @@ class DataProcessor:
         df.columns = new_columns
         return df
     
-    def _clean_numeric_data_improved(self, df):
-        """Improved numeric data cleaning"""
-        numeric_columns = ['Jumlah', 'Realisasi', 'Sisa']
+    def _clean_numeric_data_specific(self, df):
+        """Clean numeric data khusus untuk struktur anggaran"""
+        numeric_columns = ['Jumlah', 'Realisasi', 'Sisa', 'Persentase']
         
         for col in numeric_columns:
             if col in df.columns:
-                # Convert to string first untuk handling berbagai format
+                # Convert to string first
                 df[col] = df[col].astype(str)
                 
                 # Remove currency symbols, spaces, dan karakter non-numeric
@@ -418,58 +395,31 @@ class DataProcessor:
                 # Handle comma as decimal separator
                 df[col] = df[col].str.replace(',', '.', regex=False)
                 
-                # Handle multiple dots (hanya pertahankan yang terakhir sebagai decimal)
-                def clean_number(x):
-                    if isinstance(x, str):
-                        # Hapus semua dots kecuali yang terakhir
-                        parts = x.split('.')
-                        if len(parts) > 1:
-                            # Gabungkan bagian sebelum dot terakhir tanpa dots, dan dot terakhir dengan setelahnya
-                            before_last = ''.join(parts[:-1])
-                            after_last = parts[-1]
-                            x = before_last + '.' + after_last
-                        return x
-                    return x
-                
-                df[col] = df[col].apply(clean_number)
-                
                 # Convert to numeric, coerce errors to NaN lalu fill dengan 0
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         return df
     
-    def _calculate_budget_metrics_improved(self, df):
-        """Improved budget metrics calculation dengan validasi"""
+    def _calculate_budget_metrics_specific(self, df):
+        """Calculate budget metrics untuk struktur spesifik"""
         try:
-            # Cek kolom yang tersedia
+            # Pastikan kolom yang diperlukan ada
             if 'Jumlah' not in df.columns:
-                st.sidebar.warning("⚠️ Kolom 'Jumlah' tidak ditemukan, menggunakan kolom alternatif...")
-                # Coba cari kolom lain yang mungkin berisi alokasi
-                for col in df.columns:
-                    if any(keyword in col.lower() for keyword in ['pagu', 'anggaran', 'alokasi', 'total']):
-                        df['Jumlah'] = df[col]
-                        break
+                st.sidebar.error("❌ Kolom 'Jumlah' tidak ditemukan dalam data")
+                return 0, 0
             
             if 'Realisasi' not in df.columns:
-                st.sidebar.warning("⚠️ Kolom 'Realisasi' tidak ditemukan, menggunakan kolom alternatif...")
-                # Coba cari kolom lain yang mungkin berisi realisasi
-                for col in df.columns:
-                    if any(keyword in col.lower() for keyword in ['realisasi', 'real', 'pakai', 'digunakan']):
-                        df['Realisasi'] = df[col]
-                        break
-            
-            # Validasi data numerik
-            if 'Jumlah' in df.columns and 'Realisasi' in df.columns:
-                total_alokasi = df['Jumlah'].sum()
-                total_realisasi = df['Realisasi'].sum()
-                
-                st.sidebar.success(f"✅ Alokasi: Rp {total_alokasi:,.0f}")
-                st.sidebar.success(f"✅ Realisasi: Rp {total_realisasi:,.0f}")
-                
-                return total_alokasi, total_realisasi
-            else:
-                st.sidebar.error("❌ Tidak dapat menemukan kolom alokasi dan realisasi")
+                st.sidebar.error("❌ Kolom 'Realisasi' tidak ditemukan dalam data")
                 return 0, 0
+            
+            total_alokasi = df['Jumlah'].sum()
+            total_realisasi = df['Realisasi'].sum()
+            
+            st.sidebar.success(f"✅ Total Alokasi: Rp {total_alokasi:,.0f}")
+            st.sidebar.success(f"✅ Total Realisasi: Rp {total_realisasi:,.0f}")
+            st.sidebar.success(f"✅ Penyerapan: {(total_realisasi/total_alokasi*100) if total_alokasi > 0 else 0:.1f}%")
+            
+            return total_alokasi, total_realisasi
                 
         except Exception as e:
             st.sidebar.error(f"❌ Error menghitung metrik: {str(e)}")
@@ -525,11 +475,14 @@ class DataProcessor:
             return {"error": f"Error processing capaian output Excel: {str(e)}"}
     
     def process_indikator_pelaksanaan_excel(self, file_buffer):
-        """Process Excel file for indikator pelaksanaan anggaran"""
+        """Process Excel file for indikator pelaksanaan anggaran - FOCUS ON NILAI TOTAL/KONVERSI BOBOT"""
         try:
             df = pd.read_excel(file_buffer)
             
-            # Normalize column names
+            # Debug: Tampilkan kolom yang tersedia
+            st.sidebar.info(f"📈 Kolom indikator: {list(df.columns)}")
+            
+            # Normalize column names dengan fokus pada Nilai Total/Konversi Bobot
             column_mapping = {
                 'Kode Satker': 'kode_satker',
                 'Uraian Satker': 'nama_satker',
@@ -543,21 +496,45 @@ class DataProcessor:
                 'Nilai Total': 'nilai_total',
                 'Konversi Bobot': 'konversi_bobot',
                 'Dispensasi SPM': 'dispensasi_spm',
-                'Nilai Akhir': 'nilai_akhir'
+                'Nilai Akhir': 'nilai_akhir',
+                # Alternatif naming
+                'Nilai IKPA': 'nilai_akhir',
+                'IKPA': 'nilai_akhir',
+                'Total': 'nilai_total',
+                'Konversi': 'konversi_bobot'
             }
             
             df = df.rename(columns=column_mapping)
             
-            # Extract the first row as current data
+            # Extract data - prioritaskan Nilai Total/Konversi Bobot sebagai nilai IKPA
+            current_data = {}
             if len(df) > 0:
-                current_data = df.iloc[0].to_dict()
-            else:
-                current_data = {}
+                row_data = df.iloc[0].to_dict()
+                
+                # Prioritaskan nilai_akhir, jika tidak ada gunakan konversi_bobot atau nilai_total
+                if 'nilai_akhir' in row_data and pd.notna(row_data['nilai_akhir']):
+                    current_data['nilai_ikpa'] = row_data['nilai_akhir']
+                elif 'konversi_bobot' in row_data and pd.notna(row_data['konversi_bobot']):
+                    current_data['nilai_ikpa'] = row_data['konversi_bobot']
+                elif 'nilai_total' in row_data and pd.notna(row_data['nilai_total']):
+                    current_data['nilai_ikpa'] = row_data['nilai_total']
+                else:
+                    current_data['nilai_ikpa'] = 0
+                
+                # Simpan semua komponen
+                for key in ['revisi_dipa', 'deviasi_halaman_iii', 'penyerapan_anggaran', 
+                           'belanja_kontraktual', 'penyelesaian_tagihan', 'pengelolaan_up_tup', 
+                           'capaian_output', 'dispensasi_spm']:
+                    if key in row_data:
+                        current_data[key] = row_data[key]
             
             self.processed_data['indikator_pelaksanaan'] = {
                 'current_data': current_data,
                 'raw_data': df
             }
+            
+            # Debug info
+            st.sidebar.success(f"✅ Nilai IKPA dari tabel: {current_data.get('nilai_ikpa', 'N/A')}")
             
             return self.processed_data['indikator_pelaksanaan']
             
@@ -582,7 +559,7 @@ class PDFExtractor:
         self.extracted_data = {}
     
     def extract_ikpa_from_pdf(self, file_buffer):
-        """Extract IKPA data from PDF - IMPROVED VERSION untuk nilai akhir"""
+        """Extract IKPA data from PDF - FOCUS ON NILAI TOTAL/KONVERSI BOBOT"""
         try:
             text = ""
             tables_data = []
@@ -596,22 +573,22 @@ class PDFExtractor:
                     # Extract tables
                     page_tables = page.extract_tables()
                     for table in page_tables:
-                        if table and len(table) > 1:  # Minimal ada header dan 1 row data
+                        if table and len(table) > 1:
                             tables_data.append(table)
             
             # Debug: Tampilkan sample teks
             st.sidebar.info(f"📄 Sample teks PDF (200 karakter): {text[:200]}...")
             
-            # STRATEGI 1: Cari "Nilai Akhir" dengan pattern yang lebih spesifik
-            nilai_akhir = self._extract_nilai_akhir_improved(text, tables_data)
+            # STRATEGI UTAMA: Cari "Nilai Total" atau "Konversi Bobot"
+            nilai_ikpa = self._extract_nilai_total_konversi_bobot(text, tables_data)
             
-            # STRATEGI 2: Jika tidak ketemu, cari di tabel
-            if nilai_akhir == 0 and tables_data:
-                nilai_akhir = self._extract_from_tables(tables_data)
+            # STRATEGI 2: Jika tidak ketemu, cari "Nilai Akhir"
+            if nilai_ikpa == 0:
+                nilai_ikpa = self._extract_nilai_akhir(text, tables_data)
             
-            # STRATEGI 3: Fallback - cari angka yang paling mungkin sebagai IKPA
-            if nilai_akhir == 0:
-                nilai_akhir = self._fallback_extraction(text)
+            # STRATEGI 3: Fallback
+            if nilai_ikpa == 0:
+                nilai_ikpa = self._fallback_extraction(text)
             
             # Extract components
             components = self._extract_components_improved(text)
@@ -620,7 +597,7 @@ class PDFExtractor:
             kategori = self._extract_kategori_improved(text)
             
             self.extracted_data['ikpa'] = {
-                'nilai_akhir': nilai_akhir,
+                'nilai_akhir': nilai_ikpa,
                 'kategori': kategori,
                 'components': components,
                 'raw_text': text[:2000],
@@ -628,7 +605,7 @@ class PDFExtractor:
             }
             
             # Debug info
-            st.sidebar.success(f"✅ Nilai Akhir ditemukan: {nilai_akhir}")
+            st.sidebar.success(f"✅ Nilai IKPA ditemukan: {nilai_ikpa}")
             st.sidebar.info(f"📋 Kategori: {kategori}")
             st.sidebar.info(f"🔍 Tabel ditemukan: {len(tables_data)}")
             
@@ -639,24 +616,24 @@ class PDFExtractor:
             st.sidebar.error(f"❌ {error_msg}")
             return {"error": error_msg}
     
-    def _extract_nilai_akhir_improved(self, text, tables_data):
-        """Improved extraction untuk nilai akhir"""
-        # Pattern untuk nilai akhir dengan berbagai variasi
+    def _extract_nilai_total_konversi_bobot(self, text, tables_data):
+        """Extract nilai dari Nilai Total atau Konversi Bobot"""
+        # Pattern untuk Nilai Total dan Konversi Bobot
         patterns = [
-            # Pattern utama - "Nilai Akhir" dengan format berbeda
-            r'nilai\s*akhir\s*:?\s*(\d+[.,]\d+)',
-            r'nilai\s*akhir\s*:?\s*(\d+)\s*',
-            r'nilai\s*akhir\s*:?\s*(\d+[.,]\d+)\s*\(',
-            r'akhir\s*:?\s*(\d+[.,]\d+)',
+            # Nilai Total patterns
+            r'nilai\s*total\s*:?\s*(\d+[.,]\d+)',
+            r'total\s*:?\s*(\d+[.,]\d+)',
+            r'nilai\s*total.*?(\d+[.,]\d+)',
             
-            # Pattern dengan label yang mungkin
-            r'ikpa.*?nilai\s*akhir\s*:?\s*(\d+[.,]\d+)',
-            r'nilai\s*akhir\s*ikpa\s*:?\s*(\d+[.,]\d+)',
-            r'hasil.*?nilai\s*akhir\s*:?\s*(\d+[.,]\d+)',
+            # Konversi Bobot patterns
+            r'konversi\s*bobot\s*:?\s*(\d+[.,]\d+)',
+            r'konversi\s*:?\s*(\d+[.,]\d+)',
+            r'bobot\s*:?\s*(\d+[.,]\d+)',
+            r'konversi.*bobot.*?(\d+[.,]\d+)',
             
-            # Pattern untuk format tabel
-            r'nilai\s*akhir[\s\n]*(\d+[.,]\d+)',
-            r'akhir[\s\n]*(\d+[.,]\d+)',
+            # Kombinasi
+            r'nilai\s*total\s*\/\s*konversi\s*bobot\s*:?\s*(\d+[.,]\d+)',
+            r'total\s*\/\s*konversi\s*:?\s*(\d+[.,]\d+)',
         ]
         
         for pattern in patterns:
@@ -664,23 +641,20 @@ class PDFExtractor:
             if matches:
                 try:
                     value = float(matches[0].replace(',', '.'))
-                    if 0 <= value <= 100:  # Valid range untuk IKPA
+                    if 0 <= value <= 100:
+                        st.sidebar.info(f"🔍 Pattern matched: {pattern} -> {value}")
                         return value
                 except ValueError:
                     continue
         
-        return 0
-    
-    def _extract_from_tables(self, tables_data):
-        """Extract nilai akhir dari tabel"""
+        # Cari di tabel
         for table in tables_data:
-            for row in table:
-                for cell in row:
+            for i, row in enumerate(table):
+                for j, cell in enumerate(row):
                     if cell:
-                        cell_text = str(cell).strip()
-                        # Cari baris yang mengandung "Nilai Akhir"
-                        if 'nilai akhir' in cell_text.lower():
-                            # Cari angka di cell yang sama atau cell berikutnya
+                        cell_text = str(cell).strip().lower()
+                        if any(term in cell_text for term in ['nilai total', 'konversi bobot', 'total/konversi']):
+                            # Cari nilai di cell yang sama atau sekitar
                             numbers = re.findall(r'(\d+[.,]\d+)', cell_text)
                             if numbers:
                                 try:
@@ -690,36 +664,52 @@ class PDFExtractor:
                                 except ValueError:
                                     continue
                             
-                            # Coba cell berikutnya dalam row yang sama
-                            for next_cell in row:
-                                if next_cell != cell:
-                                    next_numbers = re.findall(r'(\d+[.,]\d+)', str(next_cell))
-                                    if next_numbers:
-                                        try:
-                                            value = float(next_numbers[0].replace(',', '.'))
-                                            if 0 <= value <= 100:
-                                                return value
-                                        except ValueError:
-                                            continue
+                            # Coba cell di kanan atau bawah
+                            if j + 1 < len(row) and row[j + 1]:
+                                next_numbers = re.findall(r'(\d+[.,]\d+)', str(row[j + 1]))
+                                if next_numbers:
+                                    try:
+                                        value = float(next_numbers[0].replace(',', '.'))
+                                        if 0 <= value <= 100:
+                                            return value
+                                    except ValueError:
+                                        continue
+        
+        return 0
+    
+    def _extract_nilai_akhir(self, text, tables_data):
+        """Extract nilai akhir sebagai fallback"""
+        patterns = [
+            r'nilai\s*akhir\s*:?\s*(\d+[.,]\d+)',
+            r'akhir\s*:?\s*(\d+[.,]\d+)',
+            r'ikpa.*?(\d+[.,]\d+)',
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                try:
+                    value = float(matches[0].replace(',', '.'))
+                    if 0 <= value <= 100:
+                        return value
+                except ValueError:
+                    continue
         return 0
     
     def _fallback_extraction(self, text):
         """Fallback extraction method"""
-        # Cari semua angka desimal dalam teks
         all_numbers = re.findall(r'(\d+[.,]\d+)', text)
         possible_values = []
         
         for num in all_numbers:
             try:
                 value = float(num.replace(',', '.'))
-                # Filter values yang masuk akal untuk IKPA (biasanya antara 50-100)
                 if 50 <= value <= 100:
                     possible_values.append(value)
             except ValueError:
                 continue
         
         if possible_values:
-            # Return nilai tertinggi yang reasonable
             return max(possible_values)
         
         return 0
@@ -755,12 +745,10 @@ class PDFExtractor:
             (r'a\s*\(sangat\s+baik\)', 'Sangat Baik'),
             (r'b\s*\(baik\)', 'Baik'),
             (r'c\s*\(cukup\)', 'Cukup'),
-            (r'd\s*\(kurang\)', 'Kurang'),
-            (r'memuaskan', 'Baik'),
-            (r'optimal', 'Sangat Baik')
+            (r'd\s*\(kurang\)', 'Kurang')
         ]
         
-        for pattern, kategori in kategori_patterns:
+        for pattern, kategori in kategori_patterns.items():
             if re.search(pattern, text, re.IGNORECASE):
                 return kategori
         
@@ -939,6 +927,10 @@ def main():
             ### Komponen Capaian Output:
             - **Ketepatan Waktu (30%)**: Pengiriman sebelum 5 hari kerja
             - **Capaian RO (70%)**: Berdasarkan realisasi vs target
+            
+            ### Nilai IKPA:
+            - **Nilai Total/Konversi Bobot** = Nilai IKPA
+            - **Target Optimal**: ≥95 (Sangat Baik)
             """)
         
         # Initialize processors
@@ -963,6 +955,8 @@ def main():
         
         st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
         st.sidebar.subheader("💰 Data Anggaran (Excel)")
+        st.sidebar.write("**Format yang didukung:**")
+        st.sidebar.write("URAIAN | JUMLAH PAGU | REALISASI | SISA | PERSENTASE")
         budget_file = st.sidebar.file_uploader(
             "Upload Realisasi Anggaran",
             type=['xlsx', 'xls'],
@@ -981,6 +975,7 @@ def main():
         
         st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
         st.sidebar.subheader("📈 Indikator Pelaksanaan (Excel)")
+        st.sidebar.write("**Fokus pada kolom:** Nilai Total/Konversi Bobot")
         indikator_file = st.sidebar.file_uploader(
             "Upload Indikator Pelaksanaan",
             type=['xlsx', 'xls'],
@@ -990,6 +985,7 @@ def main():
         
         st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
         st.sidebar.subheader("📋 IKPA Sebelumnya (PDF)")
+        st.sidebar.write("**Ekstraksi dari:** Nilai Total/Konversi Bobot")
         ikpa_previous_file = st.sidebar.file_uploader(
             "Upload IKPA Previous",
             type=['pdf'],
@@ -1032,7 +1028,7 @@ def main():
         indikator_data = None
         ikpa_previous_data = None
         
-        # Process budget file - IMPROVED
+        # Process budget file - FIXED untuk struktur spesifik
         if budget_file:
             with st.spinner("🔄 Memproses data anggaran..."):
                 budget_data = data_processor.process_anggaran_excel(budget_file)
@@ -1056,7 +1052,7 @@ def main():
                 else:
                     st.sidebar.error(f"❌ {capaian_data['error']}")
         
-        # Process indikator file
+        # Process indikator file - FIXED untuk Nilai Total/Konversi Bobot
         if indikator_file:
             with st.spinner("🔄 Memproses indikator pelaksanaan..."):
                 indikator_data = data_processor.process_indikator_pelaksanaan_excel(indikator_file)
@@ -1065,7 +1061,7 @@ def main():
                 else:
                     st.sidebar.error(f"❌ {indikator_data['error']}")
         
-        # Process previous IKPA file - IMPROVED
+        # Process previous IKPA file - FIXED untuk Nilai Total/Konversi Bobot
         if ikpa_previous_file:
             with st.spinner("🔄 Memproses IKPA sebelumnya..."):
                 ikpa_previous_data = pdf_extractor.extract_ikpa_from_pdf(ikpa_previous_file)
@@ -1094,6 +1090,12 @@ def main():
         
         if indikator_data and 'error' not in indikator_data:
             current_data = indikator_data['current_data']
+            # Gunakan nilai IKPA dari tabel jika ada
+            if 'nilai_ikpa' in current_data and current_data['nilai_ikpa'] > 0:
+                # Jika ada data dari tabel indikator, kita bisa menggunakan nilai langsung
+                st.sidebar.info(f"📊 Nilai IKPA dari tabel: {current_data['nilai_ikpa']:.2f}")
+            
+            # Tetap gunakan komponen individual untuk perhitungan
             for key in ['revisi_dipa', 'deviasi_halaman_iii', 'penyerapan_anggaran', 'capaian_output']:
                 if key in current_data and current_data[key] is not None:
                     ikpa_input[key] = current_data[key]
@@ -1244,6 +1246,10 @@ def main():
                 if capaian_data and 'error' not in capaian_data:
                     with st.expander("Data Capaian Output"):
                         st.dataframe(capaian_data['raw_data'].head(10), use_container_width=True)
+                
+                if indikator_data and 'error' not in indikator_data:
+                    with st.expander("Data Indikator Pelaksanaan"):
+                        st.dataframe(indikator_data['raw_data'].head(10), use_container_width=True)
         
         else:
             # Welcome screen
@@ -1253,11 +1259,13 @@ def main():
             ### 📋 Panduan Penggunaan:
             
             1. **Pilih Triwulan** yang akan dianalisis
-            2. **Upload file Excel** data anggaran, capaian output, dan indikator pelaksanaan
-            3. **Upload file PDF** IKPA sebelumnya (opsional)
-            4. **Input manual** data yang tidak tersedia via file
-            5. **Sistem akan menghitung** nilai IKPA 2024 otomatis
-            6. **Dapatkan rekomendasi** strategis untuk peningkatan IKPA
+            2. **Upload file Excel** data anggaran dengan format: URAIAN, JUMLAH PAGU, REALISASI, SISA, PERSENTASE
+            3. **Upload file Excel** capaian output
+            4. **Upload file Excel** indikator pelaksanaan (fokus pada Nilai Total/Konversi Bobot)
+            5. **Upload file PDF** IKPA sebelumnya (opsional)
+            6. **Input manual** data yang tidak tersedia via file
+            7. **Sistem akan menghitung** nilai IKPA 2024 otomatis
+            8. **Dapatkan rekomendasi** strategis untuk peningkatan IKPA
             
             ### 🎯 Fitur Utama:
             - Perhitungan IKPA 2024 berdasarkan PER-5/PB/2024
