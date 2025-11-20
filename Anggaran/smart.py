@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Custom (tetap sama)
+# CSS Custom
 st.markdown("""
 <style>
     .main-header {
@@ -101,7 +101,7 @@ class IKPA2024Calculator:
         """
         try:
             # Ekstrak data input
-            revisi_dipa = data_input.get('revisi_dipa', 100.0)
+            revisi_dipa = data_input.get('revisi_dipa', 0.0)
             deviasi_halaman_iii = data_input.get('deviasi_halaman_iii', 0.0)
             penyerapan_anggaran = data_input.get('penyerapan_anggaran', 0.0)
             belanja_kontraktual = data_input.get('belanja_kontraktual', 0.0)
@@ -109,6 +109,7 @@ class IKPA2024Calculator:
             pengelolaan_up_tup = data_input.get('pengelolaan_up_tup', 100.0)
             capaian_output = data_input.get('capaian_output', 0.0)
             dispensasi_spm = data_input.get('dispensasi_spm', 0.0)
+            triwulan = data_input.get('triwulan', 1)
             
             # Normalisasi sesuai formula 2024
             # 1. Revisi DIPA - semakin sedikit revisi semakin baik
@@ -127,7 +128,7 @@ class IKPA2024Calculator:
             nilai_penyelesaian_tagihan = min(100, penyelesaian_tagihan)
             
             # 6. Pengelolaan UP/TUP dengan KKP
-            nilai_pengelolaan_up_tup = self._calculate_pengelolaan_up_tup(pengelolaan_up_tup, data_input.get('triwulan', 1))
+            nilai_pengelolaan_up_tup = self._calculate_pengelolaan_up_tup(pengelolaan_up_tup, triwulan)
             
             # 7. Capaian Output dengan komponen ketepatan waktu (30%) dan capaian RO (70%)
             nilai_capaian_output = self._calculate_capaian_output(capaian_output, data_input.get('ketepatan_waktu', 100))
@@ -408,7 +409,6 @@ class DataProcessor:
         
         return metrics
 
-    # TAMBAHKAN METHOD UNTUK PROSES REVISI DIPA DI SINI
     def process_revisi_dipa(self, file_buffer):
         """
         Process Excel file for Revisi DIPA data
@@ -510,21 +510,34 @@ class DataProcessor:
         """Calculate metrics for revisi DIPA"""
         metrics = {}
         
+        # Hitung deviasi per jenis belanja
         deviasi_columns = [col for col in df.columns if '% Deviasi' in col]
         if deviasi_columns:
+            # Rata-rata deviasi semua jenis belanja
             metrics['avg_deviasi_persen'] = df[deviasi_columns].mean().mean()
             metrics['max_deviasi_persen'] = df[deviasi_columns].max().max()
             metrics['min_deviasi_persen'] = df[deviasi_columns].min().min()
+            
+            # Deviasi per jenis belanja
+            if '% Deviasi Belanja Pegawai' in df.columns:
+                metrics['avg_deviasi_pegawai'] = df['% Deviasi Belanja Pegawai'].mean()
+            if '% Deviasi Belanja Barang' in df.columns:
+                metrics['avg_deviasi_barang'] = df['% Deviasi Belanja Barang'].mean()
+            if '% Deviasi Belanja Modal' in df.columns:
+                metrics['avg_deviasi_modal'] = df['% Deviasi Belanja Modal'].mean()
         else:
             metrics['avg_deviasi_persen'] = 0
             metrics['max_deviasi_persen'] = 0
             metrics['min_deviasi_persen'] = 0
         
+        # Nilai Revisi Halaman III DIPA - ambil dari kolom khusus
         if 'Nilai Revisi Halaman III DIPA' in df.columns:
             metrics['nilai_revisi_halaman_iii'] = df['Nilai Revisi Halaman III DIPA'].mean()
         else:
-            metrics['nilai_revisi_halaman_iii'] = 0
+            # Fallback: gunakan rata-rata deviasi jika kolom khusus tidak ada
+            metrics['nilai_revisi_halaman_iii'] = metrics['avg_deviasi_persen']
         
+        # Total Rencana vs Penyerapan
         rencana_columns = [col for col in df.columns if 'Rencana' in col]
         penyerapan_columns = [col for col in df.columns if 'Penyerapan' in col]
         
@@ -532,6 +545,9 @@ class DataProcessor:
             metrics['total_rencana'] = df[rencana_columns].sum().sum()
             metrics['total_penyerapan'] = df[penyerapan_columns].sum().sum()
             metrics['effisiensi_penyerapan'] = (metrics['total_penyerapan'] / metrics['total_rencana'] * 100) if metrics['total_rencana'] > 0 else 0
+        
+        # Hitung jumlah revisi (asumsi: setiap baris adalah satu revisi)
+        metrics['jumlah_revisi'] = len(df)
         
         return metrics
 
@@ -550,7 +566,6 @@ class DataProcessor:
         
         return analysis
 
-    # Method lainnya tetap sama...
     def process_capaian_output(self, file_buffer):
         """Process capaian output data"""
         try:
@@ -894,23 +909,36 @@ class StrategicAdvisor:
         
         rekomendasi = []
         
-        if metrics.get('avg_deviasi_persen', 0) > 10:
-            rekomendasi.append(f"🚨 **PRIORITAS TINGGI**: Turunkan deviasi rata-rata dari {metrics['avg_deviasi_persen']:.1f}% menjadi <5%")
-            rekomendasi.append("• Perbaiki akurasi perencanaan bulanan")
-            rekomendasi.append("• Lakukan forecasting yang lebih realistis")
-            rekomendasi.append("• Koordinasi intensif dengan pengguna anggaran")
+        # Analisis jumlah revisi
+        jumlah_revisi = metrics.get('jumlah_revisi', 0)
+        if jumlah_revisi > 1:
+            rekomendasi.append(f"🚨 **PRIORITAS TINGGI**: Kurangi jumlah revisi dari {jumlah_revisi} menjadi maksimal 1")
+            rekomendasi.append("• Perbaiki akurasi perencanaan di awal tahun")
+            rekomendasi.append("• Hindari perubahan mendasar pada DIPA")
+            rekomendasi.append("• Koordinasi intensif dengan BUN untuk perubahan")
         
-        if metrics.get('max_deviasi_persen', 0) > 20:
-            rekomendasi.append(f"⚠️ **Koreksi Segera**: Deviasi maksimal {metrics['max_deviasi_persen']:.1f}% perlu penanganan khusus")
+        # Analisis deviasi Halaman III
+        deviasi_halaman_iii = metrics.get('nilai_revisi_halaman_iii', 0)
+        if deviasi_halaman_iii > 10:
+            rekomendasi.append(f"🚨 **PRIORITAS TINGGI**: Turunkan deviasi Halaman III dari {deviasi_halaman_iii:.1f}% menjadi <5%")
+            rekomendasi.append("• Perbaiki akurasi forecasting bulanan")
+            rekomendasi.append("• Lakukan real-time monitoring rencana vs realisasi")
+            rekomendasi.append("• Optimalkan timing penarikan dana")
+        elif deviasi_halaman_iii > 5:
+            rekomendasi.append(f"⚠️ **Perbaikan Diperlukan**: Deviasi Halaman III {deviasi_halaman_iii:.1f}% mendekati batas")
+        
+        # Analisis deviasi rata-rata
+        if metrics.get('avg_deviasi_persen', 0) > 10:
+            rekomendasi.append(f"📊 **Optimasi**: Rata-rata deviasi {metrics['avg_deviasi_persen']:.1f}% perlu diturunkan")
         
         if 'highest_deviation_type' in analysis:
             rekomendasi.append(f"🔍 **Fokus Perbaikan**: {analysis['highest_deviation_type']} (deviasi: {analysis['highest_deviation_value']:.1f}%)")
         
         return {
-            'avg_deviasi': f"{metrics.get('avg_deviasi_persen', 0):.1f}%",
+            'jumlah_revisi': f"{jumlah_revisi}",
+            'target_revisi': "≤1",
+            'deviasi_halaman_iii': f"{deviasi_halaman_iii:.1f}%",
             'target_deviasi': "<5%",
-            'revisi_halaman_iii': f"{metrics.get('nilai_revisi_halaman_iii', 0):.1f}",
-            'target_revisi': "0",
             'rekomendasi': rekomendasi if rekomendasi else [
                 "✅ Pertahankan kinerja optimal deviasi dan revisi",
                 "📊 Monitoring rutin perbandingan rencana vs realisasi",
@@ -1107,16 +1135,27 @@ def create_revisi_dipa_chart(revisi_data):
         
         metrics = revisi_data['metrics']
         
-        categories = ['Pegawai', 'Barang', 'Modal']
-        deviasi_values = [
-            metrics.get('avg_deviasi_pegawai', 0),
-            metrics.get('avg_deviasi_barang', 0), 
-            metrics.get('avg_deviasi_modal', 0)
-        ]
+        categories = []
+        deviasi_values = []
+        
+        if 'avg_deviasi_pegawai' in metrics:
+            categories.append('Pegawai')
+            deviasi_values.append(metrics['avg_deviasi_pegawai'])
+        if 'avg_deviasi_barang' in metrics:
+            categories.append('Barang')
+            deviasi_values.append(metrics['avg_deviasi_barang'])
+        if 'avg_deviasi_modal' in metrics:
+            categories.append('Modal')
+            deviasi_values.append(metrics['avg_deviasi_modal'])
+        
+        if not categories:
+            # Fallback jika tidak ada data per jenis belanja
+            categories = ['Rata-rata']
+            deviasi_values = [metrics.get('avg_deviasi_persen', 0)]
         
         fig = go.Figure(data=[
             go.Bar(name='% Deviasi Rata-rata', x=categories, y=deviasi_values, marker_color='red'),
-            go.Bar(name='Target (<5%)', x=categories, y=[5, 5, 5], marker_color='green', opacity=0.3)
+            go.Bar(name='Target (<5%)', x=categories, y=[5] * len(categories), marker_color='green', opacity=0.3)
         ])
         
         fig.update_layout(
@@ -1172,7 +1211,7 @@ def main():
             help="Pilih triwulan untuk analisis dan rekomendasi"
         )
         
-        # File upload section - TAMBAHKAN UPLOAD REVISI DIPA DI SINI
+        # File upload section
         st.sidebar.header("📁 Upload Data")
         
         # 1. Data Realisasi Anggaran
@@ -1197,7 +1236,7 @@ def main():
         )
         st.sidebar.markdown('</div>', unsafe_allow_html=True)
         
-        # 3. Data Revisi DIPA - INI YANG DITAMBAHKAN
+        # 3. Data Revisi DIPA
         st.sidebar.markdown('<div class="file-upload-section">', unsafe_allow_html=True)
         st.sidebar.subheader("📋 Data Revisi DIPA")
         st.sidebar.write("**Format:** Rencana Belanja, Penyerapan, Deviasi, % Deviasi per Jenis Belanja")
@@ -1248,10 +1287,10 @@ def main():
         )
         st.sidebar.markdown('</div>', unsafe_allow_html=True)
         
-        # Process data - INISIALISASI VARIABEL REVISI_DIPA_DATA DI SINI
+        # Process data
         realisasi_data = None
         capaian_data = None
-        revisi_dipa_data = None  # INI YANG DITAMBAHKAN
+        revisi_dipa_data = None
         ikpa_previous_data = None
         
         # Process realisasi anggaran
@@ -1272,7 +1311,7 @@ def main():
                 else:
                     st.sidebar.error(f"❌ {capaian_data['error']}")
         
-        # Process revisi DIPA - INI YANG DITAMBAHKAN
+        # Process revisi DIPA
         if revisi_dipa_file:
             with st.spinner("🔄 Memproses data revisi DIPA..."):
                 revisi_dipa_data = data_processor.process_revisi_dipa(revisi_dipa_file)
@@ -1308,10 +1347,16 @@ def main():
             ikpa_input['capaian_output'] = capaian_data['metrics']['avg_capaian_output']
             st.sidebar.info(f"📊 Capaian output dari file: {capaian_data['metrics']['avg_capaian_output']:.1f}%")
         
-        # Use revisi DIPA data if available - INI YANG DITAMBAHKAN
+        # Use revisi DIPA data if available
         if revisi_dipa_data and 'error' not in revisi_dipa_data:
-            ikpa_input['revisi_dipa'] = revisi_dipa_data['metrics'].get('nilai_revisi_halaman_iii', 0)
-            st.sidebar.info(f"📋 Revisi DIPA dari file: {revisi_dipa_data['metrics'].get('nilai_revisi_halaman_iii', 0):.1f}")
+            # Ambil nilai revisi DIPA untuk komponen 'revisi_dipa'
+            ikpa_input['revisi_dipa'] = revisi_dipa_data['metrics'].get('jumlah_revisi', 0)
+            
+            # Ambil nilai deviasi Halaman III DIPA untuk komponen 'deviasi_halaman_iii'
+            ikpa_input['deviasi_halaman_iii'] = revisi_dipa_data['metrics'].get('nilai_revisi_halaman_iii', 0)
+            
+            st.sidebar.info(f"📋 Revisi DIPA: {revisi_dipa_data['metrics'].get('jumlah_revisi', 0)} revisi")
+            st.sidebar.info(f"📋 Deviasi Halaman III: {revisi_dipa_data['metrics'].get('nilai_revisi_halaman_iii', 0):.1f}%")
         
         # Calculate IKPA
         ikpa_result = None
@@ -1387,7 +1432,7 @@ def main():
             with col4:
                 st.metric("Triwulan", f"{triwulan}")
             
-            # Tampilkan data Revisi DIPA jika ada - INI YANG DITAMBAHKAN
+            # Tampilkan data Revisi DIPA jika ada
             if revisi_dipa_data and 'error' not in revisi_dipa_data:
                 st.header("📋 Analisis Revisi DIPA & Deviasi")
                 
@@ -1395,16 +1440,32 @@ def main():
                 
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("Rata-rata % Deviasi", f"{metrics.get('avg_deviasi_persen', 0):.1f}%")
+                    st.metric("Jumlah Revisi", f"{metrics.get('jumlah_revisi', 0)}")
                 with col2:
-                    st.metric("Deviasi Maksimal", f"{metrics.get('max_deviasi_persen', 0):.1f}%")
+                    st.metric("Deviasi Halaman III", f"{metrics.get('nilai_revisi_halaman_iii', 0):.1f}%")
                 with col3:
-                    st.metric("Nilai Revisi Halaman III", f"{metrics.get('nilai_revisi_halaman_iii', 0):.1f}")
+                    st.metric("Rata-rata % Deviasi", f"{metrics.get('avg_deviasi_persen', 0):.1f}%")
                 with col4:
-                    st.metric("Efisiensi Penyerapan", f"{metrics.get('effisiensi_penyerapan', 0):.1f}%")
+                    st.metric("Deviasi Maksimal", f"{metrics.get('max_deviasi_persen', 0):.1f}%")
                 
+                # Chart deviasi
                 fig_revisi = create_revisi_dipa_chart(revisi_dipa_data)
                 st.plotly_chart(fig_revisi, use_container_width=True)
+                
+                # Tampilkan detail deviasi per jenis belanja jika ada
+                if any(key in metrics for key in ['avg_deviasi_pegawai', 'avg_deviasi_barang', 'avg_deviasi_modal']):
+                    st.subheader("Detail Deviasi per Jenis Belanja")
+                    deviasi_detail = []
+                    if 'avg_deviasi_pegawai' in metrics:
+                        deviasi_detail.append({'Jenis Belanja': 'Pegawai', 'Deviasi': f"{metrics['avg_deviasi_pegawai']:.1f}%"})
+                    if 'avg_deviasi_barang' in metrics:
+                        deviasi_detail.append({'Jenis Belanja': 'Barang', 'Deviasi': f"{metrics['avg_deviasi_barang']:.1f}%"})
+                    if 'avg_deviasi_modal' in metrics:
+                        deviasi_detail.append({'Jenis Belanja': 'Modal', 'Deviasi': f"{metrics['avg_deviasi_modal']:.1f}%"})
+                    
+                    if deviasi_detail:
+                        deviasi_df = pd.DataFrame(deviasi_detail)
+                        st.dataframe(deviasi_df, use_container_width=True, hide_index=True)
             
             # Detail Data Section
             if realisasi_data and 'error' not in realisasi_data:
@@ -1440,7 +1501,7 @@ def main():
                 with col4:
                     st.metric("Ketepatan Waktu", f"{metrics['ketepatan_waktu']:.1f}%")
             
-            # Strategic Recommendations - UPDATE PEMANGGILAN DENGAN REVISI_DIPA_DATA
+            # Strategic Recommendations
             st.header("🎯 Rekomendasi Strategis")
             
             recommendations = strategic_advisor.generate_recommendations(
@@ -1467,22 +1528,22 @@ def main():
                 for strategy in capaian['strategi']:
                     st.write(f"• {strategy}")
             
-            # Tampilkan rekomendasi revisi DIPA - INI YANG DITAMBAHKAN
+            # Tampilkan rekomendasi revisi DIPA
             st.header("🔄 Rekomendasi Optimasi Revisi DIPA")
             revisi_rec = recommendations['revisi_dipa']
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Deviasi Saat Ini", revisi_rec['avg_deviasi'])
-                st.metric("Target Deviasi", revisi_rec['target_deviasi'])
-            with col2:
-                st.metric("Revisi Halaman III", revisi_rec['revisi_halaman_iii'])
+                st.metric("Jumlah Revisi", revisi_rec['jumlah_revisi'])
                 st.metric("Target Revisi", revisi_rec['target_revisi'])
+            with col2:
+                st.metric("Deviasi Halaman III", revisi_rec['deviasi_halaman_iii'])
+                st.metric("Target Deviasi", revisi_rec['target_deviasi'])
 
             st.write("**Rekomendasi Implementasi:**")
             for rec in revisi_rec['rekomendasi']:
                 st.write(f"• {rec}")
 
-            # Tampilkan rekomendasi rencana penyerapan - INI YANG DITAMBAHKAN
+            # Tampilkan rekomendasi rencana penyerapan
             st.header("📅 Rencana Penyerapan Periode Berikutnya")
             penyerapan_rec = recommendations['rencana_penyerapan']
             col1, col2 = st.columns(2)
@@ -1557,7 +1618,7 @@ def main():
                         st.write(f"**Total RO:** {capaian_data['metrics']['total_ro']}")
                         st.dataframe(capaian_data['raw_data'].head(10), use_container_width=True)
                 
-                # Tampilkan preview revisi DIPA - INI YANG DITAMBAHKAN
+                # Tampilkan preview revisi DIPA
                 if revisi_dipa_data and 'error' not in revisi_dipa_data:
                     with st.expander("Data Revisi DIPA"):
                         st.write(f"**Total Records:** {len(revisi_dipa_data['raw_data'])}")
