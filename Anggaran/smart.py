@@ -300,7 +300,7 @@ class DataProcessor:
     
     def process_realisasi_anggaran(self, file_buffer):
         """
-        Process Excel file for budget realization data
+        Process Excel file for budget realization data - VERSI DIPERBAIKI
         """
         try:
             # Baca file Excel
@@ -315,7 +315,7 @@ class DataProcessor:
             # Clean numeric data
             df = self._clean_realisasi_numeric_data(df)
             
-            # Calculate metrics
+            # Calculate metrics - ambil data dari row terakhir
             metrics = self._calculate_realisasi_metrics(df)
             
             # Calculate deviasi RPD
@@ -325,6 +325,7 @@ class DataProcessor:
                 'metrics': metrics,
                 'deviasi_rpd': deviasi_rpd,
                 'raw_data': df,
+                'last_row_data': self._extract_last_row_data(df),
                 'columns_info': {
                     'all_columns': list(df.columns),
                     'pagu_columns': [col for col in df.columns if 'pagu' in col.lower()],
@@ -340,105 +341,240 @@ class DataProcessor:
             return {"error": error_msg}
     
     def _normalize_realisasi_columns(self, df):
-        """Normalize columns for realisasi anggaran data"""
+        """Normalize columns for realisasi anggaran data - VERSI DIPERBAIKI"""
         column_mapping = {
-            'nama kegiatan': 'Nama Kegiatan',
-            'kegiatan': 'Nama Kegiatan',
-            'uraian': 'Nama Kegiatan',
-            'program': 'Nama Kegiatan',
+            # Kolom utama
+            'jumlah revisi': 'Jumlah Revisi',
+            'revisi': 'Jumlah Revisi',
+            'keterangan': 'Keterangan',
+            'uraian': 'Keterangan',
+            'deskripsi': 'Keterangan',
+            
+            # Pagu
             'pagu belanja pegawai': 'Pagu Belanja Pegawai',
             'pagu pegawai': 'Pagu Belanja Pegawai',
             'belanja pegawai': 'Pagu Belanja Pegawai',
-            'realisasi belanja pegawai': 'Realisasi Belanja Pegawai',
-            'realisasi pegawai': 'Realisasi Belanja Pegawai',
             'pagu belanja barang': 'Pagu Belanja Barang',
             'pagu barang': 'Pagu Belanja Barang',
             'belanja barang': 'Pagu Belanja Barang',
-            'realisasi belanja barang': 'Realisasi Belanja Barang',
-            'realisasi barang': 'Realisasi Belanja Barang',
             'pagu belanja modal': 'Pagu Belanja Modal',
             'pagu modal': 'Pagu Belanja Modal',
             'belanja modal': 'Pagu Belanja Modal',
+            
+            # Realisasi
+            'realisasi belanja pegawai': 'Realisasi Belanja Pegawai',
+            'realisasi pegawai': 'Realisasi Belanja Pegawai',
+            'real belanja pegawai': 'Realisasi Belanja Pegawai',
+            'realisasi belanja barang': 'Realisasi Belanja Barang',
+            'realisasi barang': 'Realisasi Belanja Barang',
+            'real belanja barang': 'Realisasi Belanja Barang',
             'realisasi belanja modal': 'Realisasi Belanja Modal',
             'realisasi modal': 'Realisasi Belanja Modal',
+            'real belanja modal': 'Realisasi Belanja Modal',
+            
+            # Total dan NKPA
             'total pagu': 'Total Pagu',
             'total anggaran': 'Total Pagu',
             'pagu total': 'Total Pagu',
             'total realisasi': 'Total Realisasi',
-            'realisasi total': 'Total Realisasi'
+            'realisasi total': 'Total Realisasi',
+            'nkpa semua jenis belanja': 'NKPA Semua Jenis Belanja',
+            'nkpa': 'NKPA Semua Jenis Belanja',
+            'nilai ikpa penyerapan anggaran': 'Nilai IKPA Penyerapan Anggaran',
+            'ikpa penyerapan': 'Nilai IKPA Penyerapan Anggaran'
         }
         
         new_columns = []
+        seen_columns = {}
+        
         for col in df.columns:
             col_str = str(col).strip()
             col_lower = col_str.lower()
             
             mapped = False
             for pattern, standard_name in column_mapping.items():
-                if pattern.lower() == col_lower or col_lower in pattern.lower():
-                    new_columns.append(standard_name)
+                if pattern in col_lower or col_lower in pattern:
+                    # Handle duplicate column names
+                    if standard_name in seen_columns:
+                        count = seen_columns[standard_name] + 1
+                        new_name = f"{standard_name}_{count}"
+                        seen_columns[standard_name] = count
+                    else:
+                        new_name = standard_name
+                        seen_columns[standard_name] = 1
+                    
+                    new_columns.append(new_name)
                     mapped = True
                     break
             
             if not mapped:
-                new_columns.append(col_str)
+                # Handle duplicate unnamed columns
+                if col_str.startswith('Unnamed:'):
+                    if col_str in seen_columns:
+                        count = seen_columns[col_str] + 1
+                        new_name = f"{col_str}_{count}"
+                        seen_columns[col_str] = count
+                    else:
+                        new_name = col_str
+                        seen_columns[col_str] = 1
+                    new_columns.append(new_name)
+                else:
+                    new_columns.append(col_str)
         
         df.columns = new_columns
+        
+        # Remove completely empty columns
+        df = df.dropna(axis=1, how='all')
+        
         return df
-    
+
     def _clean_realisasi_numeric_data(self, df):
-        """Clean numeric data for realisasi anggaran"""
+        """Clean numeric data for realisasi anggaran - VERSI DIPERBAIKI"""
+        # Semua kolom yang mungkin berisi angka
         numeric_columns = [
+            'Jumlah Revisi',
             'Pagu Belanja Pegawai', 'Realisasi Belanja Pegawai',
-            'Pagu Belanja Barang', 'Realisasi Belanja Barang',
+            'Pagu Belanja Barang', 'Realisasi Belanja Barang', 
             'Pagu Belanja Modal', 'Realisasi Belanja Modal',
-            'Total Pagu', 'Total Realisasi'
+            'Total Pagu', 'Total Realisasi',
+            'NKPA Semua Jenis Belanja', 'Nilai IKPA Penyerapan Anggaran'
         ]
         
         for col in numeric_columns:
             if col in df.columns:
-                df[col] = df[col].astype(str)
-                df[col] = df[col].str.replace(r'[^\d,-.]', '', regex=True)
-                df[col] = df[col].str.replace(',', '.', regex=False)
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                try:
+                    df[col] = df[col].astype(str)
+                    # Hapus karakter non-numeric kecuali titik dan minus
+                    df[col] = df[col].str.replace(r'[^\d,-.]', '', regex=True)
+                    df[col] = df[col].str.replace(',', '.', regex=False)
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                except:
+                    continue
         
         return df
-    
+
     def _calculate_realisasi_metrics(self, df):
-        """Calculate metrics for realisasi anggaran"""
+        """Calculate metrics for realisasi anggaran - AMBIL DARI ROW TERAKHIR"""
         metrics = {}
         
-        if 'Total Pagu' in df.columns and 'Total Realisasi' in df.columns:
-            metrics['total_pagu'] = df['Total Pagu'].sum()
-            metrics['total_realisasi'] = df['Total Realisasi'].sum()
+        # Ambil data dari row terakhir (kondisi bulan terakhir)
+        if len(df) > 0:
+            last_row = df.iloc[-1]
+            
+            # Debug info
+            st.sidebar.info(f"📊 Menggunakan data dari row terakhir (total {len(df)} rows)")
+            
+            # Ambil nilai dari row terakhir
+            metrics['jumlah_revisi'] = last_row.get('Jumlah Revisi', 0)
+            
+            # Hitung total pagu dan realisasi dari row terakhir
+            pagu_pegawai = last_row.get('Pagu Belanja Pegawai', 0)
+            pagu_barang = last_row.get('Pagu Belanja Barang', 0)
+            pagu_modal = last_row.get('Pagu Belanja Modal', 0)
+            
+            realisasi_pegawai = last_row.get('Realisasi Belanja Pegawai', 0)
+            realisasi_barang = last_row.get('Realisasi Belanja Barang', 0)
+            realisasi_modal = last_row.get('Realisasi Belanja Modal', 0)
+            
+            # Total dari komponen
+            metrics['total_pagu'] = pagu_pegawai + pagu_barang + pagu_modal
+            metrics['total_realisasi'] = realisasi_pegawai + realisasi_barang + realisasi_modal
+            
+            # Jika ada kolom total langsung, gunakan itu
+            if 'Total Pagu' in last_row.index and last_row['Total Pagu'] > 0:
+                metrics['total_pagu'] = last_row['Total Pagu']
+            if 'Total Realisasi' in last_row.index and last_row['Total Realisasi'] > 0:
+                metrics['total_realisasi'] = last_row['Total Realisasi']
+            
+            # Hitung penyerapan
+            if metrics['total_pagu'] > 0:
+                metrics['penyerapan_persen'] = (metrics['total_realisasi'] / metrics['total_pagu']) * 100
+            else:
+                metrics['penyerapan_persen'] = 0
+            
+            # Jika ada nilai IKPA penyerapan langsung, gunakan itu
+            if 'Nilai IKPA Penyerapan Anggaran' in last_row.index:
+                ikpa_penyerapan = last_row['Nilai IKPA Penyerapan Anggaran']
+                if ikpa_penyerapan > 0:
+                    metrics['penyerapan_persen'] = ikpa_penyerapan
+            
+            # Hitung penyerapan per jenis belanja
+            if pagu_pegawai > 0:
+                metrics['penyerapan_pegawai'] = (realisasi_pegawai / pagu_pegawai) * 100
+            else:
+                metrics['penyerapan_pegawai'] = 0
+                
+            if pagu_barang > 0:
+                metrics['penyerapan_barang'] = (realisasi_barang / pagu_barang) * 100
+            else:
+                metrics['penyerapan_barang'] = 0
+                
+            if pagu_modal > 0:
+                metrics['penyerapan_modal'] = (realisasi_modal / pagu_modal) * 100
+            else:
+                metrics['penyerapan_modal'] = 0
+            
+            # Simpan nilai NKPA jika ada
+            if 'NKPA Semua Jenis Belanja' in last_row.index:
+                metrics['nkpa_semua_jenis'] = last_row['NKPA Semua Jenis Belanja']
+            else:
+                metrics['nkpa_semua_jenis'] = 0
+                
         else:
+            # Fallback jika dataframe kosong
+            metrics.update({
+                'jumlah_revisi': 0,
+                'total_pagu': 0,
+                'total_realisasi': 0,
+                'penyerapan_persen': 0,
+                'penyerapan_pegawai': 0,
+                'penyerapan_barang': 0,
+                'penyerapan_modal': 0,
+                'nkpa_semua_jenis': 0
+            })
+        
+        return metrics
+
+    def _extract_last_row_data(self, df):
+        """Extract data from the last row for detailed analysis"""
+        if len(df) == 0:
+            return {}
+        
+        last_row = df.iloc[-1]
+        last_row_data = {}
+        
+        # Extract all numeric values from last row
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                value = last_row[col]
+                if not pd.isna(value):
+                    last_row_data[col] = value
+        
+        return last_row_data
+
+    def _calculate_deviation_rpd(self, df):
+        """Calculate RPD deviation from last row"""
+        try:
+            if len(df) == 0:
+                return 5.0
+                
+            last_row = df.iloc[-1]
+            
+            # Hitung deviasi dari row terakhir
             pagu_columns = [col for col in df.columns if 'pagu' in col.lower() and 'realisasi' not in col.lower()]
             realisasi_columns = [col for col in df.columns if 'realisasi' in col.lower()]
             
-            metrics['total_pagu'] = df[pagu_columns].sum().sum() if pagu_columns else 0
-            metrics['total_realisasi'] = df[realisasi_columns].sum().sum() if realisasi_columns else 0
-        
-        if metrics['total_pagu'] > 0:
-            metrics['penyerapan_persen'] = (metrics['total_realisasi'] / metrics['total_pagu']) * 100
-        else:
-            metrics['penyerapan_persen'] = 0
-        
-        if 'Pagu Belanja Pegawai' in df.columns and 'Realisasi Belanja Pegawai' in df.columns:
-            metrics['pagu_pegawai'] = df['Pagu Belanja Pegawai'].sum()
-            metrics['realisasi_pegawai'] = df['Realisasi Belanja Pegawai'].sum()
-            metrics['penyerapan_pegawai'] = (metrics['realisasi_pegawai'] / metrics['pagu_pegawai'] * 100) if metrics['pagu_pegawai'] > 0 else 0
-        
-        if 'Pagu Belanja Barang' in df.columns and 'Realisasi Belanja Barang' in df.columns:
-            metrics['pagu_barang'] = df['Pagu Belanja Barang'].sum()
-            metrics['realisasi_barang'] = df['Realisasi Belanja Barang'].sum()
-            metrics['penyerapan_barang'] = (metrics['realisasi_barang'] / metrics['pagu_barang'] * 100) if metrics['pagu_barang'] > 0 else 0
-        
-        if 'Pagu Belanja Modal' in df.columns and 'Realisasi Belanja Modal' in df.columns:
-            metrics['pagu_modal'] = df['Pagu Belanja Modal'].sum()
-            metrics['realisasi_modal'] = df['Realisasi Belanja Modal'].sum()
-            metrics['penyerapan_modal'] = (metrics['realisasi_modal'] / metrics['pagu_modal'] * 100) if metrics['pagu_modal'] > 0 else 0
-        
-        return metrics
+            if pagu_columns and realisasi_columns:
+                total_pagu = sum([last_row.get(col, 0) for col in pagu_columns])
+                total_realisasi = sum([last_row.get(col, 0) for col in realisasi_columns])
+                
+                if total_pagu > 0:
+                    deviation = abs((total_realisasi - total_pagu) / total_pagu) * 100
+                    return min(deviation, 50)
+            
+            return 5.0
+        except:
+            return 5.0
 
     def process_revisi_dipa(self, file_buffer):
         """
@@ -483,7 +619,7 @@ class DataProcessor:
             return {"error": error_msg}
 
     def _normalize_revisi_columns(self, df):
-        """Normalize columns for revisi DIPA data - MAPPING YANG LEBIH LUAS"""
+        """Normalize columns for revisi DIPA data - MAPPING YANG LEBIH LUAS DENGAN HANDLING DUPLIKAT"""
         column_mapping = {
             # Rencana Belanja
             'rencana belanja pegawai': 'Rencana Belanja Pegawai',
@@ -522,16 +658,16 @@ class DataProcessor:
             'deviasi modal': 'Deviasi Belanja Modal',
             
             # % Deviasi
-            '% deviasi belanja pegawai': '% Deviasi Belanja Pegawai',
-            'persentase deviasi pegawai': '% Deviasi Belanja Pegawai',
-            'deviasi % pegawai': '% Deviasi Belanja Pegawai',
-            '% deviasi belanja barang': '% Deviasi Belanja Barang',
-            'persentase deviasi barang': '% Deviasi Belanja Barang',
-            'deviasi % barang': '% Deviasi Belanja Barang',
-            '% deviasi belanja modal': '% Deviasi Belanja Modal',
-            'persentase deviasi modal': '% Deviasi Belanja Modal',
-            'deviasi % modal': '% Deviasi Belanja Modal',
-            'deviasi': '% Deviasi',
+            '% deviasi belanja pegawai': 'Persentase Deviasi Belanja Pegawai',
+            'persentase deviasi pegawai': 'Persentase Deviasi Belanja Pegawai',
+            'deviasi % pegawai': 'Persentase Deviasi Belanja Pegawai',
+            '% deviasi belanja barang': 'Persentase Deviasi Belanja Barang',
+            'persentase deviasi barang': 'Persentase Deviasi Belanja Barang',
+            'deviasi % barang': 'Persentase Deviasi Belanja Barang',
+            '% deviasi belanja modal': 'Persentase Deviasi Belanja Modal',
+            'persentase deviasi modal': 'Persentase Deviasi Belanja Modal',
+            'deviasi % modal': 'Persentase Deviasi Belanja Modal',
+            'deviasi': 'Persentase Deviasi',
             
             # Nilai Revisi Halaman III
             'nilai revisi halaman iii dipa': 'Nilai Revisi Halaman III DIPA',
@@ -545,11 +681,12 @@ class DataProcessor:
             # Jumlah Revisi
             'jumlah revisi': 'Jumlah Revisi',
             'revisi dipa': 'Jumlah Revisi',
-            'total revisi': 'Jumlah Revisi',
-            'revisi': 'Jumlah Revisi'
+            'total revisi': 'Jumlah Revisi'
         }
         
         new_columns = []
+        seen_columns = {}
+        
         for col in df.columns:
             col_str = str(col).strip()
             col_lower = col_str.lower()
@@ -557,14 +694,38 @@ class DataProcessor:
             mapped = False
             for pattern, standard_name in column_mapping.items():
                 if pattern in col_lower or col_lower in pattern:
-                    new_columns.append(standard_name)
+                    # Handle duplicate column names
+                    if standard_name in seen_columns:
+                        count = seen_columns[standard_name] + 1
+                        new_name = f"{standard_name}_{count}"
+                        seen_columns[standard_name] = count
+                    else:
+                        new_name = standard_name
+                        seen_columns[standard_name] = 1
+                    
+                    new_columns.append(new_name)
                     mapped = True
                     break
             
             if not mapped:
-                new_columns.append(col_str)
+                # Handle duplicate unnamed columns
+                if col_str.startswith('Unnamed:'):
+                    if col_str in seen_columns:
+                        count = seen_columns[col_str] + 1
+                        new_name = f"{col_str}_{count}"
+                        seen_columns[col_str] = count
+                    else:
+                        new_name = col_str
+                        seen_columns[col_str] = 1
+                    new_columns.append(new_name)
+                else:
+                    new_columns.append(col_str)
         
         df.columns = new_columns
+        
+        # Remove completely empty columns
+        df = df.dropna(axis=1, how='all')
+        
         return df
 
     def _clean_revisi_numeric_data(self, df):
@@ -644,19 +805,19 @@ class DataProcessor:
                         metrics['nilai_revisi_halaman_iii'] = 0
         
         # 3. Hitung metrik tambahan untuk analisis
-        deviasi_columns = [col for col in df.columns if '% Deviasi' in col]
+        deviasi_columns = [col for col in df.columns if 'Persentase Deviasi' in col]
         if deviasi_columns:
             metrics['avg_deviasi_persen'] = df[deviasi_columns].mean().mean()
             metrics['max_deviasi_persen'] = df[deviasi_columns].max().max()
             metrics['min_deviasi_persen'] = df[deviasi_columns].min().min()
             
             # Deviasi per jenis belanja
-            if '% Deviasi Belanja Pegawai' in df.columns:
-                metrics['avg_deviasi_pegawai'] = df['% Deviasi Belanja Pegawai'].mean()
-            if '% Deviasi Belanja Barang' in df.columns:
-                metrics['avg_deviasi_barang'] = df['% Deviasi Belanja Barang'].mean()
-            if '% Deviasi Belanja Modal' in df.columns:
-                metrics['avg_deviasi_modal'] = df['% Deviasi Belanja Modal'].mean()
+            if 'Persentase Deviasi Belanja Pegawai' in df.columns:
+                metrics['avg_deviasi_pegawai'] = df['Persentase Deviasi Belanja Pegawai'].mean()
+            if 'Persentase Deviasi Belanja Barang' in df.columns:
+                metrics['avg_deviasi_barang'] = df['Persentase Deviasi Belanja Barang'].mean()
+            if 'Persentase Deviasi Belanja Modal' in df.columns:
+                metrics['avg_deviasi_modal'] = df['Persentase Deviasi Belanja Modal'].mean()
         else:
             metrics['avg_deviasi_persen'] = 0
             metrics['max_deviasi_persen'] = 0
@@ -684,7 +845,7 @@ class DataProcessor:
         """Analyze deviation patterns for recommendations"""
         analysis = {}
         
-        deviasi_persen_columns = [col for col in df.columns if '% Deviasi' in col]
+        deviasi_persen_columns = [col for col in df.columns if 'Persentase Deviasi' in col]
         
         if deviasi_persen_columns:
             avg_deviasi = df[deviasi_persen_columns].mean()
@@ -831,23 +992,6 @@ class DataProcessor:
             metrics['total_realisasi_ro'] = 0
         
         return metrics
-
-    def _calculate_deviation_rpd(self, df):
-        """Calculate RPD deviation"""
-        try:
-            pagu_columns = [col for col in df.columns if 'pagu' in col.lower() and 'realisasi' not in col.lower()]
-            realisasi_columns = [col for col in df.columns if 'realisasi' in col.lower()]
-            
-            if pagu_columns and realisasi_columns:
-                total_pagu = df[pagu_columns].sum().sum()
-                total_realisasi = df[realisasi_columns].sum().sum()
-                
-                if total_pagu > 0:
-                    deviation = abs((total_realisasi - total_pagu) / total_pagu) * 100
-                    return min(deviation, 50)
-            return 5.0
-        except:
-            return 5.0
 
 class PDFExtractor:
     def __init__(self):
@@ -1225,7 +1369,7 @@ def create_component_chart(ikpa_data):
         return fig
 
 def create_penyerapan_chart(realisasi_data):
-    """Create chart for penyerapan anggaran by jenis belanja"""
+    """Create chart for penyerapan anggaran by jenis belanja - VERSI DIPERBAIKI"""
     try:
         if not realisasi_data or 'metrics' not in realisasi_data:
             return go.Figure()
@@ -1240,20 +1384,36 @@ def create_penyerapan_chart(realisasi_data):
             metrics.get('penyerapan_persen', 0)
         ]
         
+        # Warna berdasarkan performa
+        colors = []
+        for value in values:
+            if value >= 80:
+                colors.append('#28a745')  # Hijau untuk baik
+            elif value >= 60:
+                colors.append('#ffc107')  # Kuning untuk cukup
+            else:
+                colors.append('#dc3545')  # Merah untuk kurang
+        
         fig = go.Figure(data=[
-            go.Bar(name='Penyerapan', x=categories, y=values, marker_color='green')
+            go.Bar(name='Penyerapan', 
+                   x=categories, 
+                   y=values, 
+                   marker_color=colors,
+                   text=[f'{v:.1f}%' for v in values],
+                   textposition='auto')
         ])
         
         fig.update_layout(
-            title='Persentase Penyerapan per Jenis Belanja',
+            title='Persentase Penyerapan per Jenis Belanja (Bulan Terakhir)',
             yaxis_title='Persentase (%)',
-            height=300
+            yaxis_range=[0, 100],
+            height=400
         )
         
         return fig
     except Exception as e:
         fig = go.Figure()
-        fig.update_layout(title="Error creating chart", height=300)
+        fig.update_layout(title="Error creating chart", height=400)
         return fig
 
 def create_revisi_dipa_chart(revisi_data):
@@ -1431,6 +1591,17 @@ def main():
                 realisasi_data = data_processor.process_realisasi_anggaran(realisasi_file)
                 if "error" not in realisasi_data:
                     st.sidebar.success("✅ Data realisasi anggaran berhasil diproses")
+                    
+                    # Tampilkan detail data realisasi
+                    with st.sidebar.expander("🔍 Detail Realisasi Anggaran"):
+                        st.write("Data dari row terakhir:")
+                        if 'last_row_data' in realisasi_data:
+                            for key, value in realisasi_data['last_row_data'].items():
+                                st.write(f"• {key}: {value:,.0f}" if isinstance(value, (int, float)) else f"• {key}: {value}")
+                        
+                        st.write("Metrics yang dihitung:")
+                        st.json(realisasi_data['metrics'])
+                        
                 else:
                     st.sidebar.error(f"❌ {realisasi_data['error']}")
         
@@ -1453,7 +1624,19 @@ def main():
                     # Tampilkan preview data
                     with st.sidebar.expander("🔍 Preview Data Revisi DIPA"):
                         st.write("Data mentah dari file:")
-                        st.dataframe(revisi_dipa_data['raw_data'].head(3))
+                        
+                        # Create a copy and clean the dataframe for display
+                        display_df = revisi_dipa_data['raw_data'].head(3).copy()
+                        
+                        # Fill NaN values for display
+                        display_df = display_df.fillna('')
+                        
+                        # Convert all data to string to avoid display issues
+                        for col in display_df.columns:
+                            display_df[col] = display_df[col].astype(str)
+                        
+                        st.dataframe(display_df)
+                        
                         st.write("Metrics yang dihitung:")
                         st.json(revisi_dipa_data['metrics'])
                     
@@ -1595,6 +1778,50 @@ def main():
             with col4:
                 st.metric("Capaian Output", f"{ikpa_input['capaian_output']:.1f}%")
             
+            # Detail Data Realisasi dengan informasi row terakhir
+            if realisasi_data and 'error' not in realisasi_data:
+                st.header("💰 Detail Realisasi Anggaran (Bulan Terakhir)")
+                
+                metrics = realisasi_data['metrics']
+                last_row = realisasi_data.get('last_row_data', {})
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Pagu", f"Rp {metrics['total_pagu']:,.0f}")
+                with col2:
+                    st.metric("Total Realisasi", f"Rp {metrics['total_realisasi']:,.0f}")
+                with col3:
+                    st.metric("Penyerapan", f"{metrics['penyerapan_persen']:.1f}%")
+                with col4:
+                    st.metric("Jumlah Revisi", f"{metrics.get('jumlah_revisi', 0)}")
+                
+                # Tampilkan breakdown per jenis belanja
+                st.subheader("📊 Breakdown per Jenis Belanja")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Belanja Pegawai", 
+                             f"Rp {last_row.get('Pagu Belanja Pegawai', 0):,.0f}",
+                             f"Realisasi: {metrics.get('penyerapan_pegawai', 0):.1f}%")
+                
+                with col2:
+                    st.metric("Belanja Barang", 
+                             f"Rp {last_row.get('Pagu Belanja Barang', 0):,.0f}",
+                             f"Realisasi: {metrics.get('penyerapan_barang', 0):.1f}%")
+                
+                with col3:
+                    st.metric("Belanja Modal", 
+                             f"Rp {last_row.get('Pagu Belanja Modal', 0):,.0f}",
+                             f"Realisasi: {metrics.get('penyerapan_modal', 0):.1f}%")
+                
+                # Tampilkan NKPA jika ada
+                if metrics.get('nkpa_semua_jenis', 0) > 0:
+                    st.metric("NKPA Semua Jenis Belanja", f"{metrics['nkpa_semua_jenis']:.2f}")
+                
+                fig_penyerapan = create_penyerapan_chart(realisasi_data)
+                st.plotly_chart(fig_penyerapan, use_container_width=True)
+            
             # Tampilkan data Revisi DIPA jika ada
             if revisi_dipa_data and 'error' not in revisi_dipa_data:
                 st.header("📋 Analisis Revisi DIPA & Deviasi")
@@ -1629,25 +1856,6 @@ def main():
                     if deviasi_detail:
                         deviasi_df = pd.DataFrame(deviasi_detail)
                         st.dataframe(deviasi_df, use_container_width=True, hide_index=True)
-            
-            # Detail Data Section
-            if realisasi_data and 'error' not in realisasi_data:
-                st.header("💰 Detail Realisasi Anggaran")
-                
-                metrics = realisasi_data['metrics']
-                
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Total Pagu", f"Rp {metrics['total_pagu']:,.0f}")
-                with col2:
-                    st.metric("Total Realisasi", f"Rp {metrics['total_realisasi']:,.0f}")
-                with col3:
-                    st.metric("Penyerapan", f"{metrics['penyerapan_persen']:.1f}%")
-                with col4:
-                    st.metric("Deviasi RPD", f"{realisasi_data['deviasi_rpd']:.1f}%")
-                
-                fig_penyerapan = create_penyerapan_chart(realisasi_data)
-                st.plotly_chart(fig_penyerapan, use_container_width=True)
             
             if capaian_data and 'error' not in capaian_data:
                 st.header("📊 Detail Capaian Output")
@@ -1795,7 +2003,8 @@ def main():
             ### 📋 Panduan Penggunaan:
             
             **1. Upload Data Realisasi Anggaran (Excel)**
-            - Format: Nama Kegiatan, Pagu/Realisasi Belanja Pegawai/Barang/Modal, Total
+            - Format: Jumlah Revisi, Keterangan, Pagu Belanja Pegawai/Barang/Modal, Realisasi Belanja Pegawai/Barang/Modal, NKPA Semua Jenis Belanja, Nilai IKPA Penyerapan Anggaran
+            - **Data diambil dari row terakhir** sebagai kondisi bulan terakhir
             
             **2. Upload Data Capaian Output (Excel)** 
             - Format: Kertas Kerja Capaian RO dengan PCRO bulan ini & kumulatif
@@ -1819,6 +2028,7 @@ def main():
             - Target waktu pencapaian output
             - Monitoring area perbaikan prioritas
             - **Analisis Revisi DIPA & Deviasi - SUDAH DIPERBAIKI**
+            - **Data Realisasi dari Row Terakhir - FITUR BARU**
             """)
             
             # Demo visualization
